@@ -6,7 +6,7 @@ import path from "path";
 const dbPath =
   process.env.NODE_ENV === "development"
     ? "game.db"
-    : path.join((process as any).resourcesPath, "game.db");
+    : path.join((process as NodeJS.Process).resourcesPath, "game.db");
 
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");

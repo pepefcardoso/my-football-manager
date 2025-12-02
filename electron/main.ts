@@ -1,6 +1,8 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { db } from "../src/db/client";
+import { teams } from "../src/db/schema";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -13,6 +15,19 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
+
+function registerIpcHandlers() {
+  ipcMain.handle("get-teams", async () => {
+    try {
+      console.log("📡 Buscando times no banco de dados...");
+      const allTeams = await db.select().from(teams);
+      return allTeams;
+    } catch (error) {
+      console.error("Erro ao buscar times:", error);
+      return [];
+    }
+  });
+}
 
 let win: BrowserWindow | null;
 
@@ -47,4 +62,7 @@ app.on("activate", () => {
   }
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  registerIpcHandlers();
+  createWindow();
+});

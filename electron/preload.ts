@@ -1,7 +1,5 @@
-import { contextBridge } from 'electron'
-
-console.log('Preload carregado com sucesso!')
+import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // ping: () => ipcRenderer.invoke('ping')
+  getTeams: () => ipcRenderer.invoke('get-teams'),
 })
