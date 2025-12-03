@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import path$1 from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath as fileURLToPath$1 } from "node:url";
 import Client from "better-sqlite3";
 import path from "path";
+import { fileURLToPath } from "url";
 const entityKind = Symbol.for("drizzle:entityKind");
 function is(value, type) {
   if (!value || typeof value !== "object") {
@@ -1143,6 +1144,17 @@ function extractTablesRelationalConfig(schema2, configHelpers) {
     }
   }
   return { tables: tablesConfig, tableNamesMap };
+}
+function relations(table, relations2) {
+  return new Relations(
+    table,
+    (helpers) => Object.fromEntries(
+      Object.entries(relations2(helpers)).map(([key, value]) => [
+        key,
+        value.withFieldName(key)
+      ])
+    )
+  );
 }
 function createOne(sourceTable) {
   return function one(table, config) {
@@ -4706,39 +4718,238 @@ const teams = sqliteTable("teams", {
   secondaryColor: text("secondary_color").default("#ffffff"),
   reputation: integer("reputation").default(0),
   budget: real("budget").default(0),
-  isHuman: integer("is_human", { mode: "boolean" }).default(false)
+  isHuman: integer("is_human", { mode: "boolean" }).default(false),
+  stadiumCapacity: integer("stadium_capacity").default(1e4),
+  stadiumQuality: integer("stadium_quality").default(50),
+  trainingCenterQuality: integer("training_center_quality").default(50),
+  youthAcademyQuality: integer("youth_academy_quality").default(50),
+  fanSatisfaction: integer("fan_satisfaction").default(50),
+  fanBase: integer("fan_base").default(1e4),
+  headCoachId: integer("head_coach_id"),
+  footballDirectorId: integer("football_director_id"),
+  executiveDirectorId: integer("executive_director_id")
 });
 const players = sqliteTable("players", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   teamId: integer("team_id").references(() => teams.id),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  position: text("position").notNull(),
   age: integer("age").notNull(),
+  nationality: text("nationality").default("BRA"),
+  position: text("position").notNull(),
+  preferredFoot: text("preferred_foot").default("right"),
   overall: integer("overall").notNull(),
-  attack: integer("attack").default(50),
-  defense: integer("defense").default(50),
+  potential: integer("potential").notNull(),
+  finishing: integer("finishing").default(50),
+  passing: integer("passing").default(50),
+  dribbling: integer("dribbling").default(50),
+  defending: integer("defending").default(50),
   physical: integer("physical").default(50),
+  pace: integer("pace").default(50),
+  shooting: integer("shooting").default(50),
   moral: integer("moral").default(100),
-  energy: integer("energy").default(100)
+  energy: integer("energy").default(100),
+  fitness: integer("fitness").default(100),
+  form: integer("form").default(50),
+  salary: real("salary").default(0),
+  contractEnd: text("contract_end"),
+  releaseClause: real("release_clause"),
+  isFullyScounted: integer("is_fully_scouted", { mode: "boolean" }).default(
+    false
+  ),
+  scoutingProgress: integer("scouting_progress").default(0),
+  isYouth: integer("is_youth", { mode: "boolean" }).default(false),
+  youthLevel: text("youth_level"),
+  isInjured: integer("is_injured", { mode: "boolean" }).default(false),
+  injuryType: text("injury_type"),
+  injuryDaysRemaining: integer("injury_days_remaining").default(0),
+  yellowCards: integer("yellow_cards").default(0),
+  redCards: integer("red_cards").default(0),
+  suspensionGamesRemaining: integer("suspension_games_remaining").default(0),
+  isCaptain: integer("is_captain", { mode: "boolean" }).default(false)
+});
+const staff = sqliteTable("staff", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: integer("team_id").references(() => teams.id),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  age: integer("age").notNull(),
+  nationality: text("nationality").default("BRA"),
+  role: text("role").notNull(),
+  overall: integer("overall").notNull(),
+  salary: real("salary").default(0),
+  contractEnd: text("contract_end"),
+  specialization: text("specialization")
+});
+const competitions = sqliteTable("competitions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  shortName: text("short_name").notNull(),
+  country: text("country").notNull(),
+  tier: integer("tier").default(1),
+  format: text("format").notNull(),
+  teams: integer("teams").default(20),
+  prize: real("prize").default(0),
+  reputation: integer("reputation").default(0)
+});
+const competitionStandings = sqliteTable("competition_standings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  competitionId: integer("competition_id").references(() => competitions.id),
+  seasonId: integer("season_id").references(() => seasons.id),
+  teamId: integer("team_id").references(() => teams.id),
+  played: integer("played").default(0),
+  wins: integer("wins").default(0),
+  draws: integer("draws").default(0),
+  losses: integer("losses").default(0),
+  goalsFor: integer("goals_for").default(0),
+  goalsAgainst: integer("goals_against").default(0),
+  points: integer("points").default(0)
+});
+const seasons = sqliteTable("seasons", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  year: integer("year").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(false)
+});
+const matches = sqliteTable("matches", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  competitionId: integer("competition_id").references(() => competitions.id),
+  seasonId: integer("season_id").references(() => seasons.id),
+  homeTeamId: integer("home_team_id").references(() => teams.id),
+  awayTeamId: integer("away_team_id").references(() => teams.id),
+  date: text("date").notNull(),
+  round: integer("round"),
+  homeScore: integer("home_score"),
+  awayScore: integer("away_score"),
+  isPlayed: integer("is_played", { mode: "boolean" }).default(false),
+  attendance: integer("attendance"),
+  ticketRevenue: real("ticket_revenue"),
+  weather: text("weather")
+});
+const matchEvents = sqliteTable("match_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  matchId: integer("match_id").references(() => matches.id),
+  minute: integer("minute").notNull(),
+  type: text("type").notNull(),
+  teamId: integer("team_id").references(() => teams.id),
+  playerId: integer("player_id").references(() => players.id),
+  description: text("description")
+});
+const transfers = sqliteTable("transfers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  playerId: integer("player_id").references(() => players.id),
+  fromTeamId: integer("from_team_id").references(() => teams.id),
+  toTeamId: integer("to_team_id").references(() => teams.id),
+  fee: real("fee").default(0),
+  date: text("date").notNull(),
+  seasonId: integer("season_id").references(() => seasons.id),
+  type: text("type").default("transfer")
+});
+const scoutingReports = sqliteTable("scouting_reports", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  playerId: integer("player_id").references(() => players.id),
+  scoutId: integer("scout_id").references(() => staff.id),
+  teamId: integer("team_id").references(() => teams.id),
+  date: text("date").notNull(),
+  progress: integer("progress").default(0),
+  overallEstimate: integer("overall_estimate"),
+  potentialEstimate: integer("potential_estimate"),
+  notes: text("notes"),
+  recommendation: text("recommendation")
+});
+const financialRecords = sqliteTable("financial_records", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: integer("team_id").references(() => teams.id),
+  seasonId: integer("season_id").references(() => seasons.id),
+  date: text("date").notNull(),
+  type: text("type").notNull(),
+  category: text("category").notNull(),
+  amount: real("amount").notNull(),
+  description: text("description")
 });
 const gameState = sqliteTable("game_state", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   currentDate: text("current_date").notNull(),
+  currentSeasonId: integer("current_season_id").references(() => seasons.id),
   managerName: text("manager_name").default("Treinador"),
-  playerTeamId: integer("player_team_id").references(() => teams.id)
+  playerTeamId: integer("player_team_id").references(() => teams.id),
+  simulationSpeed: integer("simulation_speed").default(1)
 });
+const teamsRelations = relations(teams, ({ many, one }) => ({
+  players: many(players),
+  staff: many(staff),
+  homeMatches: many(matches, { relationName: "homeTeam" }),
+  awayMatches: many(matches, { relationName: "awayTeam" }),
+  financialRecords: many(financialRecords),
+  headCoach: one(staff, {
+    fields: [teams.headCoachId],
+    references: [staff.id]
+  })
+}));
+const playersRelations = relations(players, ({ one }) => ({
+  team: one(teams, {
+    fields: [players.teamId],
+    references: [teams.id]
+  })
+}));
+const staffRelations = relations(staff, ({ one }) => ({
+  team: one(teams, {
+    fields: [staff.teamId],
+    references: [teams.id]
+  })
+}));
+const matchesRelations = relations(matches, ({ one, many }) => ({
+  competition: one(competitions, {
+    fields: [matches.competitionId],
+    references: [competitions.id]
+  }),
+  homeTeam: one(teams, {
+    fields: [matches.homeTeamId],
+    references: [teams.id],
+    relationName: "homeTeam"
+  }),
+  awayTeam: one(teams, {
+    fields: [matches.awayTeamId],
+    references: [teams.id],
+    relationName: "awayTeam"
+  }),
+  events: many(matchEvents)
+}));
 const schema = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
+  competitionStandings,
+  competitions,
+  financialRecords,
   gameState,
+  matchEvents,
+  matches,
+  matchesRelations,
   players,
-  teams
+  playersRelations,
+  scoutingReports,
+  seasons,
+  staff,
+  staffRelations,
+  teams,
+  teamsRelations,
+  transfers
 }, Symbol.toStringTag, { value: "Module" }));
-const dbPath = process.env.NODE_ENV === "development" ? "game.db" : path.join(process.resourcesPath, "game.db");
+let dbPath;
+if (process.env.NODE_ENV === "development") {
+  dbPath = path.join(process.cwd(), "data", "database.sqlite");
+} else if (process.resourcesPath) {
+  dbPath = path.join(process.resourcesPath, "database.sqlite");
+} else {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  dbPath = path.join(__dirname, "../../data/database.sqlite");
+}
+console.log("📁 Database path:", dbPath);
 const sqlite = new Client(dbPath);
 sqlite.pragma("journal_mode = WAL");
 const db = drizzle(sqlite, { schema });
-const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
+const __dirname$1 = path$1.dirname(fileURLToPath$1(import.meta.url));
 process.env.APP_ROOT = path$1.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");

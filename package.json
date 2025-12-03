@@ -2,16 +2,17 @@
   "name": "my-football-manager",
   "private": true,
   "version": "0.0.0",
-  "type": "module", 
+  "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "db:seed": "cross-env NODE_ENV=development tsx src/db/seed.ts",
-    "db:push": "drizzle-kit push",
-    "rebuild": "electron-builder install-app-deps" 
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx src/db/seed.ts",
+    "rebuild": "electron-builder install-app-deps"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
