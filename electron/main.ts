@@ -1,8 +1,16 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { teamRepository } from "../src/data/repositories/TeamRepository";
+import { playerRepository } from "../src/data/repositories/PlayerRepository";
+import { staffRepository } from "../src/data/repositories/StaffRepository";
+import { matchRepository } from "../src/data/repositories/MatchRepository";
+import { competitionRepository } from "../src/data/repositories/CompetitionRepository";
+// import { GameEngine } from "../src/engine/GameEngine";
 import { db } from "../src/db/client";
-import { teams } from "../src/db/schema";
+import { gameState } from "../src/db/schema";
+import { eq } from "drizzle-orm";
+// const gameEngine = new GameEngine();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,12 +27,85 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 function registerIpcHandlers() {
   ipcMain.handle("get-teams", async () => {
     try {
-      console.log("📡 Buscando times no banco de dados...");
-      const allTeams = await db.select().from(teams);
-      return allTeams;
+      return await teamRepository.findAll();
     } catch (error) {
-      console.error("Erro ao buscar times:", error);
+      console.error("IPC Error [get-teams]:", error);
       return [];
+    }
+  });
+
+  ipcMain.handle("get-players", async (_, teamId: number) => {
+    try {
+      return await playerRepository.findByTeamId(teamId);
+    } catch (error) {
+      console.error(`IPC Error [get-players] teamId=${teamId}:`, error);
+      return [];
+    }
+  });
+
+  ipcMain.handle("get-staff", async (_, teamId: number) => {
+    try {
+      return await staffRepository.findByTeamId(teamId);
+    } catch (error) {
+      console.error(`IPC Error [get-staff] teamId=${teamId}:`, error);
+      return [];
+    }
+  });
+
+  ipcMain.handle(
+    "get-matches",
+    async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
+      try {
+        return await matchRepository.findByTeamAndSeason(teamId, seasonId);
+      } catch (error) {
+        console.error(`IPC Error [get-matches]:`, error);
+        return [];
+      }
+    }
+  );
+
+  ipcMain.handle("get-competitions", async () => {
+    try {
+      return await competitionRepository.findAll();
+    } catch (error) {
+      console.error("IPC Error [get-competitions]:", error);
+      return [];
+    }
+  });
+
+  ipcMain.handle("advance-day", async () => {
+    try {
+      console.log("⏳ Advancing day...");
+
+      const currentState = await db.select().from(gameState).limit(1);
+      if (!currentState[0]) throw new Error("No game state found");
+
+      const current = new Date(currentState[0].currentDate);
+      current.setDate(current.getDate() + 1);
+      const nextDate = current.toISOString().split("T")[0];
+
+      await db
+        .update(gameState)
+        .set({ currentDate: nextDate })
+        .where(eq(gameState.id, currentState[0].id));
+
+      return {
+        date: nextDate,
+        messages: ["Dia avançado com sucesso"],
+      };
+    } catch (error) {
+      console.error("IPC Error [advance-day]:", error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("get-game-state", async () => {
+    try {
+      const state = await db.select().from(gameState).limit(1);
+      return state[0];
+    } catch (error) {
+      console.error("IPC Error [get-game-state]:", error);
+      return null;
     }
   });
 }
@@ -37,7 +118,7 @@ function createWindow() {
     height: 800,
     icon: path.join(process.env.VITE_PUBLIC as string, "electron-vite.svg"),
     webPreferences: {
-      preload: path.join(__dirname, "preload.mjs"),
+      preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
     },
