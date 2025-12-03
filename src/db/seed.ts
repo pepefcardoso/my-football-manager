@@ -1,3 +1,4 @@
+import { AttributeCalculator } from "../engine/AttributeCalculator";
 import { db } from "./client";
 import {
   teams,
@@ -8,7 +9,13 @@ import {
   gameState,
   matches,
   financialRecords,
+  playerContracts,
+  matchEvents,
+  scoutingReports,
+  transfers,
+  competitionStandings,
 } from "./schema";
+import { eq } from "drizzle-orm";
 
 const FIRST_NAMES = [
   "João",
@@ -151,8 +158,6 @@ const TEAMS_DATA = [
   },
 ];
 
-// const POSITIONS = ["GK", "DF", "MF", "FW"] as const;
-
 const STAFF_ROLES = [
   "head_coach",
   "assistant_coach",
@@ -172,8 +177,6 @@ function randomInt(min: number, max: number): number {
 
 function generatePlayer(teamId: number, position: string, isYouth = false) {
   const age = isYouth ? randomInt(16, 19) : randomInt(18, 34);
-  const overall = isYouth ? randomInt(45, 65) : randomInt(55, 88);
-  const potential = overall + randomInt(0, Math.max(0, 90 - overall));
 
   let finishing = randomInt(40, 80);
   let passing = randomInt(40, 80);
@@ -200,6 +203,18 @@ function generatePlayer(teamId: number, position: string, isYouth = false) {
     pace = randomInt(65, 90);
   }
 
+  const overall = AttributeCalculator.calculateOverall(position as any, {
+    finishing,
+    passing,
+    dribbling,
+    defending,
+    physical,
+    pace,
+    shooting,
+  });
+
+  const potential = overall + randomInt(0, Math.max(0, 95 - overall));
+
   return {
     teamId,
     firstName: random(FIRST_NAMES),
@@ -218,22 +233,14 @@ function generatePlayer(teamId: number, position: string, isYouth = false) {
     pace,
     shooting,
     moral: randomInt(70, 100),
-    energy: randomInt(80, 100),
-    fitness: randomInt(75, 100),
+    energy: randomInt(90, 100),
+    fitness: randomInt(80, 100),
     form: randomInt(40, 70),
-    salary: overall * 1000 + randomInt(5000, 20000),
-    contractEnd: `${2025 + randomInt(1, 4)}-12-31`,
-    releaseClause: overall * 100000 + randomInt(500000, 2000000),
     isFullyScounted: !isYouth,
     scoutingProgress: isYouth ? 0 : 100,
     isYouth,
     youthLevel: isYouth ? "sub-20" : null,
     isInjured: false,
-    injuryType: null,
-    injuryDaysRemaining: 0,
-    yellowCards: 0,
-    redCards: 0,
-    suspensionGamesRemaining: 0,
     isCaptain: false,
   };
 }
@@ -257,14 +264,20 @@ function generateStaffMember(teamId: number, role: string) {
 async function main() {
   console.log("🌱 Iniciando Seed do Banco de Dados...\n");
 
-  console.log("🧹 Limpando dados antigos...");
+  console.log("🧹 Limpando dados antigos (na ordem correta)...");
+
+  await db.delete(matchEvents);
+  await db.delete(scoutingReports);
+  await db.delete(transfers);
+  await db.delete(competitionStandings);
+  await db.delete(playerContracts);
   await db.delete(financialRecords);
+  await db.delete(gameState);
   await db.delete(matches);
-  await db.delete(staff);
   await db.delete(players);
+  await db.delete(staff);
   await db.delete(competitions);
   await db.delete(seasons);
-  await db.delete(gameState);
   await db.delete(teams);
 
   console.log("⚽ Criando times...");
@@ -285,19 +298,20 @@ async function main() {
         youthAcademyQuality: randomInt(35, 75),
         fanSatisfaction: randomInt(50, 80),
         fanBase: randomInt(50000, 500000),
-        headCoachId: null,
-        footballDirectorId: null,
-        executiveDirectorId: null,
       }))
     )
     .returning({ id: teams.id, name: teams.name });
 
   console.log(`✅ ${insertedTeams.length} times criados`);
 
-  console.log("🏃 Criando jogadores...");
-  const allPlayers = [];
+  console.log("🏃 Criando jogadores e contratos...");
+
+  let totalPlayers = 0;
 
   for (const team of insertedTeams) {
+    const currentTeamPlayers = [];
+    const teamContractsData = [];
+
     const squad = [
       ...Array(3).fill("GK"),
       ...Array(8).fill("DF"),
@@ -306,45 +320,67 @@ async function main() {
     ];
 
     for (const pos of squad) {
-      allPlayers.push(generatePlayer(team.id, pos, false));
+      const pData = generatePlayer(team.id, pos, false);
+      const [newPlayer] = await db.insert(players).values(pData).returning();
+      currentTeamPlayers.push(newPlayer);
+
+      teamContractsData.push({
+        playerId: newPlayer.id,
+        teamId: team.id,
+        startDate: "2024-01-01",
+        endDate: `${2025 + randomInt(1, 4)}-12-31`,
+        wage: newPlayer.overall * 1000 + randomInt(5000, 20000),
+        releaseClause: newPlayer.overall * 100000 + randomInt(500000, 2000000),
+        type: "professional",
+        status: "active",
+      });
     }
 
     for (let i = 0; i < 15; i++) {
-      allPlayers.push(
-        generatePlayer(team.id, random(["DF", "MF", "FW"]), true)
+      const pData = generatePlayer(team.id, random(["DF", "MF", "FW"]), true);
+      const [newYouthPlayer] = await db
+        .insert(players)
+        .values(pData)
+        .returning();
+
+      teamContractsData.push({
+        playerId: newYouthPlayer.id,
+        teamId: team.id,
+        startDate: "2024-01-01",
+        endDate: "2026-12-31",
+        wage: randomInt(500, 2000),
+        releaseClause: randomInt(100000, 500000),
+        type: "youth",
+        status: "active",
+      });
+    }
+
+    if (teamContractsData.length > 0) {
+      await db.insert(playerContracts).values(teamContractsData as any);
+    }
+
+    totalPlayers += squad.length + 15;
+
+    if (currentTeamPlayers.length > 0) {
+      const captain = currentTeamPlayers.reduce((best, current) =>
+        current.overall > best.overall ? current : best
       );
+      await db
+        .update(players)
+        .set({ isCaptain: true })
+        .where(eq(players.id, captain.id));
     }
   }
 
-  await db.insert(players).values(allPlayers);
-  console.log(`✅ ${allPlayers.length} jogadores criados`);
-
-  for (const team of insertedTeams) {
-    const teamPlayers = allPlayers.filter(
-      (p) => p.teamId === team.id && !p.isYouth
-    );
-
-    const captain = teamPlayers.reduce((best, current) =>
-      current.overall > best.overall ? current : best
-    );
-
-    captain.isCaptain = true;
-
-    // await db
-    //   .update(players)
-    //   .set({ isCaptain: true })
-    //   .where(players.firstName.name.equals(captain.firstName).and(players.lastName.data.equals(captain.lastName)));
-  }
+  console.log(`✅ ${totalPlayers} jogadores e contratos criados`);
 
   console.log("👔 Criando staff técnico...");
   const allStaff = [];
-
   for (const team of insertedTeams) {
     for (const role of STAFF_ROLES) {
       allStaff.push(generateStaffMember(team.id, role));
     }
   }
-
   const insertedStaff = await db.insert(staff).values(allStaff).returning();
   console.log(`✅ ${insertedStaff.length} profissionais criados`);
 
@@ -410,7 +446,7 @@ async function main() {
   console.log("=".repeat(50));
   console.log(`📊 Resumo:`);
   console.log(`   • ${insertedTeams.length} times`);
-  console.log(`   • ${allPlayers.length} jogadores`);
+  console.log(`   • ${totalPlayers} jogadores`);
   console.log(`   • ${insertedStaff.length} profissionais`);
   console.log(`   • 3 competições`);
   console.log(`   • 1 temporada ativa`);

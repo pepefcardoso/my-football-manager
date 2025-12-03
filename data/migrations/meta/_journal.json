@@ -8,6 +8,13 @@
       "when": 1764770371930,
       "tag": "0000_wet_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1764796745942,
+      "tag": "0001_striped_living_mummy",
+      "breakpoints": true
     }
   ]
 }

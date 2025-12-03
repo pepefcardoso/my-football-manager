@@ -32,33 +32,38 @@ export const players = sqliteTable("players", {
   preferredFoot: text("preferred_foot").default("right"),
   overall: integer("overall").notNull(),
   potential: integer("potential").notNull(),
-  finishing: integer("finishing").default(50),
-  passing: integer("passing").default(50),
-  dribbling: integer("dribbling").default(50),
-  defending: integer("defending").default(50),
-  physical: integer("physical").default(50),
-  pace: integer("pace").default(50),
-  shooting: integer("shooting").default(50),
+  finishing: integer("finishing").default(10),
+  passing: integer("passing").default(10),
+  dribbling: integer("dribbling").default(10),
+  defending: integer("defending").default(10),
+  shooting: integer("shooting").default(10),
+  physical: integer("physical").default(10),
+  pace: integer("pace").default(10),
   moral: integer("moral").default(100),
   energy: integer("energy").default(100),
   fitness: integer("fitness").default(100),
   form: integer("form").default(50),
-  salary: real("salary").default(0),
-  contractEnd: text("contract_end"),
-  releaseClause: real("release_clause"),
-  isFullyScounted: integer("is_fully_scouted", { mode: "boolean" }).default(
-    false
-  ),
-  scoutingProgress: integer("scouting_progress").default(0),
   isYouth: integer("is_youth", { mode: "boolean" }).default(false),
-  youthLevel: text("youth_level"),
   isInjured: integer("is_injured", { mode: "boolean" }).default(false),
   injuryType: text("injury_type"),
   injuryDaysRemaining: integer("injury_days_remaining").default(0),
-  yellowCards: integer("yellow_cards").default(0),
-  redCards: integer("red_cards").default(0),
-  suspensionGamesRemaining: integer("suspension_games_remaining").default(0),
   isCaptain: integer("is_captain", { mode: "boolean" }).default(false),
+});
+
+export const playerContracts = sqliteTable("player_contracts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  playerId: integer("player_id")
+    .references(() => players.id)
+    .notNull(),
+  teamId: integer("team_id")
+    .references(() => teams.id)
+    .notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  wage: real("wage").notNull(),
+  releaseClause: real("release_clause"),
+  type: text("type").default("professional"),
+  status: text("status").default("active"),
 });
 
 export const staff = sqliteTable("staff", {
@@ -192,12 +197,31 @@ export const teamsRelations = relations(teams, ({ many, one }) => ({
   }),
 }));
 
-export const playersRelations = relations(players, ({ one }) => ({
+export const playersRelations = relations(players, ({ one, many }) => ({
   team: one(teams, {
     fields: [players.teamId],
     references: [teams.id],
   }),
+  contracts: many(playerContracts),
+  currentContract: one(playerContracts, {
+    fields: [players.id],
+    references: [playerContracts.playerId],
+  }),
 }));
+
+export const playerContractsRelations = relations(
+  playerContracts,
+  ({ one }) => ({
+    player: one(players, {
+      fields: [playerContracts.playerId],
+      references: [players.id],
+    }),
+    team: one(teams, {
+      fields: [playerContracts.teamId],
+      references: [teams.id],
+    }),
+  })
+);
 
 export const staffRelations = relations(staff, ({ one }) => ({
   team: one(teams, {

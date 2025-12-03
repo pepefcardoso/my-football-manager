@@ -4740,33 +4740,33 @@ const players = sqliteTable("players", {
   preferredFoot: text("preferred_foot").default("right"),
   overall: integer("overall").notNull(),
   potential: integer("potential").notNull(),
-  finishing: integer("finishing").default(50),
-  passing: integer("passing").default(50),
-  dribbling: integer("dribbling").default(50),
-  defending: integer("defending").default(50),
-  physical: integer("physical").default(50),
-  pace: integer("pace").default(50),
-  shooting: integer("shooting").default(50),
+  finishing: integer("finishing").default(10),
+  passing: integer("passing").default(10),
+  dribbling: integer("dribbling").default(10),
+  defending: integer("defending").default(10),
+  shooting: integer("shooting").default(10),
+  physical: integer("physical").default(10),
+  pace: integer("pace").default(10),
   moral: integer("moral").default(100),
   energy: integer("energy").default(100),
   fitness: integer("fitness").default(100),
   form: integer("form").default(50),
-  salary: real("salary").default(0),
-  contractEnd: text("contract_end"),
-  releaseClause: real("release_clause"),
-  isFullyScounted: integer("is_fully_scouted", { mode: "boolean" }).default(
-    false
-  ),
-  scoutingProgress: integer("scouting_progress").default(0),
   isYouth: integer("is_youth", { mode: "boolean" }).default(false),
-  youthLevel: text("youth_level"),
   isInjured: integer("is_injured", { mode: "boolean" }).default(false),
   injuryType: text("injury_type"),
   injuryDaysRemaining: integer("injury_days_remaining").default(0),
-  yellowCards: integer("yellow_cards").default(0),
-  redCards: integer("red_cards").default(0),
-  suspensionGamesRemaining: integer("suspension_games_remaining").default(0),
   isCaptain: integer("is_captain", { mode: "boolean" }).default(false)
+});
+const playerContracts = sqliteTable("player_contracts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  playerId: integer("player_id").references(() => players.id).notNull(),
+  teamId: integer("team_id").references(() => teams.id).notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  wage: real("wage").notNull(),
+  releaseClause: real("release_clause"),
+  type: text("type").default("professional"),
+  status: text("status").default("active")
 });
 const staff = sqliteTable("staff", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -4887,12 +4887,30 @@ const teamsRelations = relations(teams, ({ many, one }) => ({
     references: [staff.id]
   })
 }));
-const playersRelations = relations(players, ({ one }) => ({
+const playersRelations = relations(players, ({ one, many }) => ({
   team: one(teams, {
     fields: [players.teamId],
     references: [teams.id]
+  }),
+  contracts: many(playerContracts),
+  currentContract: one(playerContracts, {
+    fields: [players.id],
+    references: [playerContracts.playerId]
   })
 }));
+const playerContractsRelations = relations(
+  playerContracts,
+  ({ one }) => ({
+    player: one(players, {
+      fields: [playerContracts.playerId],
+      references: [players.id]
+    }),
+    team: one(teams, {
+      fields: [playerContracts.teamId],
+      references: [teams.id]
+    })
+  })
+);
 const staffRelations = relations(staff, ({ one }) => ({
   team: one(teams, {
     fields: [staff.teamId],
@@ -4925,6 +4943,8 @@ const schema = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   matchEvents,
   matches,
   matchesRelations,
+  playerContracts,
+  playerContractsRelations,
   players,
   playersRelations,
   scoutingReports,
@@ -4981,17 +5001,83 @@ class TeamRepository {
 const teamRepository = new TeamRepository();
 class PlayerRepository {
   async findById(id) {
-    const result = await db.select().from(players).where(eq(players.id, id));
-    return result[0];
+    const result = await db.query.players.findFirst({
+      where: eq(players.id, id),
+      with: {
+        contracts: {
+          where: (contracts, { eq: eq2 }) => eq2(contracts.status, "active"),
+          limit: 1
+        }
+      }
+    });
+    if (!result) return void 0;
+    const activeContract = result.contracts[0];
+    return {
+      ...result,
+      salary: activeContract ? activeContract.wage : 0,
+      contractEnd: activeContract ? activeContract.endDate : null,
+      releaseClause: activeContract ? activeContract.releaseClause : null
+    };
   }
   async findByTeamId(teamId) {
-    return await db.select().from(players).where(eq(players.teamId, teamId));
+    const result = await db.query.players.findMany({
+      where: eq(players.teamId, teamId),
+      with: {
+        contracts: {
+          where: (contracts, { eq: eq2 }) => eq2(contracts.status, "active"),
+          limit: 1
+        }
+      }
+    });
+    return result.map((p) => {
+      const activeContract = p.contracts[0];
+      return {
+        ...p,
+        salary: activeContract ? activeContract.wage : 0,
+        contractEnd: activeContract ? activeContract.endDate : null,
+        releaseClause: activeContract ? activeContract.releaseClause : null
+      };
+    });
   }
   async findFreeAgents() {
-    return await db.select().from(players).where(eq(players.teamId, null));
+    const result = await db.query.players.findMany({
+      where: eq(players.teamId, null),
+      with: {
+        contracts: {
+          where: (contracts, { eq: eq2 }) => eq2(contracts.status, "active"),
+          limit: 1
+        }
+      }
+    });
+    return result.map((p) => {
+      const activeContract = p.contracts[0];
+      return {
+        ...p,
+        salary: activeContract ? activeContract.wage : 0,
+        contractEnd: activeContract ? activeContract.endDate : null,
+        releaseClause: activeContract ? activeContract.releaseClause : null
+      };
+    });
   }
   async findYouthAcademy(teamId) {
-    return await db.select().from(players).where(and(eq(players.teamId, teamId), eq(players.isYouth, true)));
+    const result = await db.query.players.findMany({
+      where: and(eq(players.teamId, teamId), eq(players.isYouth, true)),
+      with: {
+        contracts: {
+          where: (contracts, { eq: eq2 }) => eq2(contracts.status, "active"),
+          limit: 1
+        }
+      }
+    });
+    return result.map((p) => {
+      const activeContract = p.contracts[0];
+      return {
+        ...p,
+        salary: activeContract ? activeContract.wage : 0,
+        contractEnd: activeContract ? activeContract.endDate : null,
+        releaseClause: activeContract ? activeContract.releaseClause : null
+      };
+    });
   }
   async create(player) {
     const result = await db.insert(players).values(player).returning({ id: players.id });

@@ -80,20 +80,24 @@ export interface Player {
   energy: number;
   fitness: number;
   form: number;
-  salary: number;
-  contractEnd: string | null;
-  releaseClause: number | null;
-  isFullyScounted: boolean;
-  scoutingProgress: number;
   isYouth: boolean;
-  youthLevel: string | null;
   isInjured: boolean;
   injuryType: string | null;
   injuryDaysRemaining: number;
-  yellowCards: number;
-  redCards: number;
-  suspensionGamesRemaining: number;
   isCaptain: boolean;
+  contract?: PlayerContract;
+}
+
+export interface PlayerContract {
+  id: number;
+  playerId: number;
+  teamId: number;
+  startDate: string;
+  endDate: string;
+  wage: number;
+  releaseClause: number | null;
+  type: "professional" | "youth" | "loan";
+  status: "active" | "expired" | "terminated";
 }
 
 export interface Staff {
