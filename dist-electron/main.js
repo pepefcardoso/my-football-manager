@@ -28,96 +28,6 @@ function is(value, type) {
   }
   return false;
 }
-class ConsoleLogWriter {
-  static [entityKind] = "ConsoleLogWriter";
-  write(message) {
-    console.log(message);
-  }
-}
-class DefaultLogger {
-  static [entityKind] = "DefaultLogger";
-  writer;
-  constructor(config) {
-    this.writer = config?.writer ?? new ConsoleLogWriter();
-  }
-  logQuery(query, params) {
-    const stringifiedParams = params.map((p) => {
-      try {
-        return JSON.stringify(p);
-      } catch {
-        return String(p);
-      }
-    });
-    const paramsStr = stringifiedParams.length ? ` -- params: [${stringifiedParams.join(", ")}]` : "";
-    this.writer.write(`Query: ${query}${paramsStr}`);
-  }
-}
-class NoopLogger {
-  static [entityKind] = "NoopLogger";
-  logQuery() {
-  }
-}
-const TableName = Symbol.for("drizzle:Name");
-const Schema = Symbol.for("drizzle:Schema");
-const Columns = Symbol.for("drizzle:Columns");
-const ExtraConfigColumns = Symbol.for("drizzle:ExtraConfigColumns");
-const OriginalName = Symbol.for("drizzle:OriginalName");
-const BaseName = Symbol.for("drizzle:BaseName");
-const IsAlias = Symbol.for("drizzle:IsAlias");
-const ExtraConfigBuilder = Symbol.for("drizzle:ExtraConfigBuilder");
-const IsDrizzleTable = Symbol.for("drizzle:IsDrizzleTable");
-class Table {
-  static [entityKind] = "Table";
-  /** @internal */
-  static Symbol = {
-    Name: TableName,
-    Schema,
-    OriginalName,
-    Columns,
-    ExtraConfigColumns,
-    BaseName,
-    IsAlias,
-    ExtraConfigBuilder
-  };
-  /**
-   * @internal
-   * Can be changed if the table is aliased.
-   */
-  [TableName];
-  /**
-   * @internal
-   * Used to store the original name of the table, before any aliasing.
-   */
-  [OriginalName];
-  /** @internal */
-  [Schema];
-  /** @internal */
-  [Columns];
-  /** @internal */
-  [ExtraConfigColumns];
-  /**
-   *  @internal
-   * Used to store the table name before the transformation via the `tableCreator` functions.
-   */
-  [BaseName];
-  /** @internal */
-  [IsAlias] = false;
-  /** @internal */
-  [IsDrizzleTable] = true;
-  /** @internal */
-  [ExtraConfigBuilder] = void 0;
-  constructor(name, schema2, baseName) {
-    this[TableName] = this[OriginalName] = name;
-    this[Schema] = schema2;
-    this[BaseName] = baseName;
-  }
-}
-function getTableName(table) {
-  return table[TableName];
-}
-function getTableUniqueName(table) {
-  return `${table[Schema] ?? "public"}.${table[TableName]}`;
-}
 class Column {
   constructor(table, config) {
     this.table = table;
@@ -268,6 +178,7 @@ class ColumnBuilder {
     this.config.name = name;
   }
 }
+const TableName = Symbol.for("drizzle:Name");
 const isPgEnumSym = Symbol.for("drizzle:isPgEnum");
 function isPgEnum(obj) {
   return !!obj && typeof obj === "function" && isPgEnumSym in obj && obj[isPgEnumSym] === true;
@@ -299,6 +210,66 @@ const tracer = {
   }
 };
 const ViewBaseConfig = Symbol.for("drizzle:ViewBaseConfig");
+const Schema = Symbol.for("drizzle:Schema");
+const Columns = Symbol.for("drizzle:Columns");
+const ExtraConfigColumns = Symbol.for("drizzle:ExtraConfigColumns");
+const OriginalName = Symbol.for("drizzle:OriginalName");
+const BaseName = Symbol.for("drizzle:BaseName");
+const IsAlias = Symbol.for("drizzle:IsAlias");
+const ExtraConfigBuilder = Symbol.for("drizzle:ExtraConfigBuilder");
+const IsDrizzleTable = Symbol.for("drizzle:IsDrizzleTable");
+class Table {
+  static [entityKind] = "Table";
+  /** @internal */
+  static Symbol = {
+    Name: TableName,
+    Schema,
+    OriginalName,
+    Columns,
+    ExtraConfigColumns,
+    BaseName,
+    IsAlias,
+    ExtraConfigBuilder
+  };
+  /**
+   * @internal
+   * Can be changed if the table is aliased.
+   */
+  [TableName];
+  /**
+   * @internal
+   * Used to store the original name of the table, before any aliasing.
+   */
+  [OriginalName];
+  /** @internal */
+  [Schema];
+  /** @internal */
+  [Columns];
+  /** @internal */
+  [ExtraConfigColumns];
+  /**
+   *  @internal
+   * Used to store the table name before the transformation via the `tableCreator` functions.
+   */
+  [BaseName];
+  /** @internal */
+  [IsAlias] = false;
+  /** @internal */
+  [IsDrizzleTable] = true;
+  /** @internal */
+  [ExtraConfigBuilder] = void 0;
+  constructor(name, schema2, baseName) {
+    this[TableName] = this[OriginalName] = name;
+    this[Schema] = schema2;
+    this[BaseName] = baseName;
+  }
+}
+function getTableName(table) {
+  return table[TableName];
+}
+function getTableUniqueName(table) {
+  return `${table[Schema] ?? "public"}.${table[TableName]}`;
+}
 function isSQLWrapper(value) {
   return value !== null && value !== void 0 && typeof value.getSQL === "function";
 }
@@ -688,6 +659,164 @@ Table.prototype.getSQL = function() {
 Subquery.prototype.getSQL = function() {
   return new SQL([this]);
 };
+class ColumnAliasProxyHandler {
+  constructor(table) {
+    this.table = table;
+  }
+  static [entityKind] = "ColumnAliasProxyHandler";
+  get(columnObj, prop) {
+    if (prop === "table") {
+      return this.table;
+    }
+    return columnObj[prop];
+  }
+}
+class TableAliasProxyHandler {
+  constructor(alias, replaceOriginalName) {
+    this.alias = alias;
+    this.replaceOriginalName = replaceOriginalName;
+  }
+  static [entityKind] = "TableAliasProxyHandler";
+  get(target, prop) {
+    if (prop === Table.Symbol.IsAlias) {
+      return true;
+    }
+    if (prop === Table.Symbol.Name) {
+      return this.alias;
+    }
+    if (this.replaceOriginalName && prop === Table.Symbol.OriginalName) {
+      return this.alias;
+    }
+    if (prop === ViewBaseConfig) {
+      return {
+        ...target[ViewBaseConfig],
+        name: this.alias,
+        isAlias: true
+      };
+    }
+    if (prop === Table.Symbol.Columns) {
+      const columns = target[Table.Symbol.Columns];
+      if (!columns) {
+        return columns;
+      }
+      const proxiedColumns = {};
+      Object.keys(columns).map((key) => {
+        proxiedColumns[key] = new Proxy(
+          columns[key],
+          new ColumnAliasProxyHandler(new Proxy(target, this))
+        );
+      });
+      return proxiedColumns;
+    }
+    const value = target[prop];
+    if (is(value, Column)) {
+      return new Proxy(value, new ColumnAliasProxyHandler(new Proxy(target, this)));
+    }
+    return value;
+  }
+}
+function aliasedTable(table, tableAlias) {
+  return new Proxy(table, new TableAliasProxyHandler(tableAlias, false));
+}
+function aliasedTableColumn(column, tableAlias) {
+  return new Proxy(
+    column,
+    new ColumnAliasProxyHandler(new Proxy(column.table, new TableAliasProxyHandler(tableAlias, false)))
+  );
+}
+function mapColumnsInAliasedSQLToAlias(query, alias) {
+  return new SQL.Aliased(mapColumnsInSQLToAlias(query.sql, alias), query.fieldAlias);
+}
+function mapColumnsInSQLToAlias(query, alias) {
+  return sql.join(query.queryChunks.map((c) => {
+    if (is(c, Column)) {
+      return aliasedTableColumn(c, alias);
+    }
+    if (is(c, SQL)) {
+      return mapColumnsInSQLToAlias(c, alias);
+    }
+    if (is(c, SQL.Aliased)) {
+      return mapColumnsInAliasedSQLToAlias(c, alias);
+    }
+    return c;
+  }));
+}
+class DrizzleError extends Error {
+  static [entityKind] = "DrizzleError";
+  constructor({ message, cause }) {
+    super(message);
+    this.name = "DrizzleError";
+    this.cause = cause;
+  }
+}
+class DrizzleQueryError extends Error {
+  constructor(query, params, cause) {
+    super(`Failed query: ${query}
+params: ${params}`);
+    this.query = query;
+    this.params = params;
+    this.cause = cause;
+    Error.captureStackTrace(this, DrizzleQueryError);
+    if (cause) this.cause = cause;
+  }
+}
+class TransactionRollbackError extends DrizzleError {
+  static [entityKind] = "TransactionRollbackError";
+  constructor() {
+    super({ message: "Rollback" });
+  }
+}
+class ConsoleLogWriter {
+  static [entityKind] = "ConsoleLogWriter";
+  write(message) {
+    console.log(message);
+  }
+}
+class DefaultLogger {
+  static [entityKind] = "DefaultLogger";
+  writer;
+  constructor(config) {
+    this.writer = config?.writer ?? new ConsoleLogWriter();
+  }
+  logQuery(query, params) {
+    const stringifiedParams = params.map((p) => {
+      try {
+        return JSON.stringify(p);
+      } catch {
+        return String(p);
+      }
+    });
+    const paramsStr = stringifiedParams.length ? ` -- params: [${stringifiedParams.join(", ")}]` : "";
+    this.writer.write(`Query: ${query}${paramsStr}`);
+  }
+}
+class NoopLogger {
+  static [entityKind] = "NoopLogger";
+  logQuery() {
+  }
+}
+class QueryPromise {
+  static [entityKind] = "QueryPromise";
+  [Symbol.toStringTag] = "QueryPromise";
+  catch(onRejected) {
+    return this.then(void 0, onRejected);
+  }
+  finally(onFinally) {
+    return this.then(
+      (value) => {
+        onFinally?.();
+        return value;
+      },
+      (reason) => {
+        onFinally?.();
+        throw reason;
+      }
+    );
+  }
+  then(onFulfilled, onRejected) {
+    return this.execute().then(onFulfilled, onRejected);
+  }
+}
 function mapResultRow(columns, row, joinsNotNullableMap) {
   const nullifyMap = {};
   const result = columns.reduce(
@@ -1267,88 +1396,6 @@ function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelect
   }
   return result;
 }
-class ColumnAliasProxyHandler {
-  constructor(table) {
-    this.table = table;
-  }
-  static [entityKind] = "ColumnAliasProxyHandler";
-  get(columnObj, prop) {
-    if (prop === "table") {
-      return this.table;
-    }
-    return columnObj[prop];
-  }
-}
-class TableAliasProxyHandler {
-  constructor(alias, replaceOriginalName) {
-    this.alias = alias;
-    this.replaceOriginalName = replaceOriginalName;
-  }
-  static [entityKind] = "TableAliasProxyHandler";
-  get(target, prop) {
-    if (prop === Table.Symbol.IsAlias) {
-      return true;
-    }
-    if (prop === Table.Symbol.Name) {
-      return this.alias;
-    }
-    if (this.replaceOriginalName && prop === Table.Symbol.OriginalName) {
-      return this.alias;
-    }
-    if (prop === ViewBaseConfig) {
-      return {
-        ...target[ViewBaseConfig],
-        name: this.alias,
-        isAlias: true
-      };
-    }
-    if (prop === Table.Symbol.Columns) {
-      const columns = target[Table.Symbol.Columns];
-      if (!columns) {
-        return columns;
-      }
-      const proxiedColumns = {};
-      Object.keys(columns).map((key) => {
-        proxiedColumns[key] = new Proxy(
-          columns[key],
-          new ColumnAliasProxyHandler(new Proxy(target, this))
-        );
-      });
-      return proxiedColumns;
-    }
-    const value = target[prop];
-    if (is(value, Column)) {
-      return new Proxy(value, new ColumnAliasProxyHandler(new Proxy(target, this)));
-    }
-    return value;
-  }
-}
-function aliasedTable(table, tableAlias) {
-  return new Proxy(table, new TableAliasProxyHandler(tableAlias, false));
-}
-function aliasedTableColumn(column, tableAlias) {
-  return new Proxy(
-    column,
-    new ColumnAliasProxyHandler(new Proxy(column.table, new TableAliasProxyHandler(tableAlias, false)))
-  );
-}
-function mapColumnsInAliasedSQLToAlias(query, alias) {
-  return new SQL.Aliased(mapColumnsInSQLToAlias(query.sql, alias), query.fieldAlias);
-}
-function mapColumnsInSQLToAlias(query, alias) {
-  return sql.join(query.queryChunks.map((c) => {
-    if (is(c, Column)) {
-      return aliasedTableColumn(c, alias);
-    }
-    if (is(c, SQL)) {
-      return mapColumnsInSQLToAlias(c, alias);
-    }
-    if (is(c, SQL.Aliased)) {
-      return mapColumnsInAliasedSQLToAlias(c, alias);
-    }
-    return c;
-  }));
-}
 class SelectionProxyHandler {
   static [entityKind] = "SelectionProxyHandler";
   config;
@@ -1413,28 +1460,6 @@ class SelectionProxyHandler {
       return value;
     }
     return new Proxy(value, new SelectionProxyHandler(this.config));
-  }
-}
-class QueryPromise {
-  static [entityKind] = "QueryPromise";
-  [Symbol.toStringTag] = "QueryPromise";
-  catch(onRejected) {
-    return this.then(void 0, onRejected);
-  }
-  finally(onFinally) {
-    return this.then(
-      (value) => {
-        onFinally?.();
-        return value;
-      },
-      (reason) => {
-        onFinally?.();
-        throw reason;
-      }
-    );
-  }
-  then(onFulfilled, onRejected) {
-    return this.execute().then(onFulfilled, onRejected);
   }
 }
 class ForeignKeyBuilder {
@@ -2150,31 +2175,6 @@ class CasingCache {
   clearCache() {
     this.cache = {};
     this.cachedTables = {};
-  }
-}
-class DrizzleError extends Error {
-  static [entityKind] = "DrizzleError";
-  constructor({ message, cause }) {
-    super(message);
-    this.name = "DrizzleError";
-    this.cause = cause;
-  }
-}
-class DrizzleQueryError extends Error {
-  constructor(query, params, cause) {
-    super(`Failed query: ${query}
-params: ${params}`);
-    this.query = query;
-    this.params = params;
-    this.cause = cause;
-    Error.captureStackTrace(this, DrizzleQueryError);
-    if (cause) this.cause = cause;
-  }
-}
-class TransactionRollbackError extends DrizzleError {
-  static [entityKind] = "TransactionRollbackError";
-  constructor() {
-    super({ message: "Rollback" });
   }
 }
 class SQLiteViewBase extends View {
@@ -4949,6 +4949,168 @@ console.log("📁 Database path:", dbPath);
 const sqlite = new Client(dbPath);
 sqlite.pragma("journal_mode = WAL");
 const db = drizzle(sqlite, { schema });
+class TeamRepository {
+  async findAll() {
+    return await db.select().from(teams);
+  }
+  async findById(id) {
+    const result = await db.select().from(teams).where(eq(teams.id, id));
+    return result[0];
+  }
+  async findHumanTeam() {
+    const result = await db.select().from(teams).where(eq(teams.isHuman, true));
+    return result[0];
+  }
+  async findByIdWithRelations(id) {
+    return await db.query.teams.findFirst({
+      where: eq(teams.id, id),
+      with: {
+        players: true,
+        staff: true,
+        headCoach: true
+      }
+    });
+  }
+  async update(id, data) {
+    await db.update(teams).set(data).where(eq(teams.id, id));
+  }
+  async updateBudget(id, newBudget) {
+    await db.update(teams).set({ budget: newBudget }).where(eq(teams.id, id));
+  }
+}
+const teamRepository = new TeamRepository();
+class PlayerRepository {
+  async findById(id) {
+    const result = await db.select().from(players).where(eq(players.id, id));
+    return result[0];
+  }
+  async findByTeamId(teamId) {
+    return await db.select().from(players).where(eq(players.teamId, teamId));
+  }
+  async findFreeAgents() {
+    return await db.select().from(players).where(eq(players.teamId, null));
+  }
+  async findYouthAcademy(teamId) {
+    return await db.select().from(players).where(and(eq(players.teamId, teamId), eq(players.isYouth, true)));
+  }
+  async create(player) {
+    const result = await db.insert(players).values(player).returning({ id: players.id });
+    return result[0].id;
+  }
+  async update(id, data) {
+    await db.update(players).set(data).where(eq(players.id, id));
+  }
+  async updateConditionBatch(updates) {
+    await db.transaction(async (tx) => {
+      for (const update of updates) {
+        await tx.update(players).set({ energy: update.energy, fitness: update.fitness }).where(eq(players.id, update.id));
+      }
+    });
+  }
+}
+const playerRepository = new PlayerRepository();
+class StaffRepository {
+  async findById(id) {
+    const result = await db.select().from(staff).where(eq(staff.id, id));
+    return result[0];
+  }
+  async findByTeamId(teamId) {
+    return await db.select().from(staff).where(eq(staff.teamId, teamId));
+  }
+  async findFreeAgents() {
+    return await db.select().from(staff).where(eq(staff.teamId, null));
+  }
+  async create(data) {
+    const result = await db.insert(staff).values(data).returning({ id: staff.id });
+    return result[0].id;
+  }
+  async update(id, data) {
+    await db.update(staff).set(data).where(eq(staff.id, id));
+  }
+  async fire(id) {
+    await db.update(staff).set({ teamId: null, contractEnd: null, salary: 0 }).where(eq(staff.id, id));
+  }
+}
+const staffRepository = new StaffRepository();
+class MatchRepository {
+  async findById(id) {
+    const result = await db.select().from(matches).where(eq(matches.id, id));
+    return result[0];
+  }
+  async findByTeamAndSeason(teamId, seasonId) {
+    return await db.select().from(matches).where(
+      and(
+        eq(matches.seasonId, seasonId),
+        or(eq(matches.homeTeamId, teamId), eq(matches.awayTeamId, teamId))
+      )
+    ).orderBy(asc(matches.date));
+  }
+  async findByDateRange(startDate, endDate) {
+    return await db.select().from(matches).where(and(gte(matches.date, startDate), lte(matches.date, endDate))).orderBy(asc(matches.date));
+  }
+  async findPendingMatchesByDate(date) {
+    return await db.select().from(matches).where(and(eq(matches.isPlayed, false), eq(matches.date, date)));
+  }
+  async updateMatchResult(id, homeScore, awayScore, attendance, ticketRevenue) {
+    await db.update(matches).set({
+      homeScore,
+      awayScore,
+      isPlayed: true,
+      attendance,
+      ticketRevenue
+    }).where(eq(matches.id, id));
+  }
+  async createMatchEvents(events) {
+    if (events.length > 0) {
+      await db.insert(matchEvents).values(events);
+    }
+  }
+}
+const matchRepository = new MatchRepository();
+class CompetitionRepository {
+  async findAll() {
+    return await db.select().from(competitions);
+  }
+  async findByCountry(country) {
+    return await db.select().from(competitions).where(eq(competitions.country, country));
+  }
+  async getStandings(competitionId, seasonId) {
+    return await db.query.competitionStandings.findMany({
+      where: and(
+        eq(competitionStandings.competitionId, competitionId),
+        eq(competitionStandings.seasonId, seasonId)
+      ),
+      orderBy: (standings, { desc: desc2 }) => [
+        desc2(standings.points),
+        desc2(standings.wins),
+        desc2(standings.goalsFor)
+      ],
+      with: {
+        team: true
+      }
+    });
+  }
+  async updateStanding(competitionId, seasonId, teamId, data) {
+    const existing = await db.select().from(competitionStandings).where(
+      and(
+        eq(competitionStandings.competitionId, competitionId),
+        eq(competitionStandings.seasonId, seasonId),
+        eq(competitionStandings.teamId, teamId)
+      )
+    );
+    if (existing.length === 0) {
+      await db.insert(competitionStandings).values({
+        competitionId,
+        seasonId,
+        teamId,
+        ...data
+      });
+    } else {
+      await db.update(competitionStandings).set(data).where(eq(competitionStandings.id, existing[0].id));
+    }
+  }
+}
+const competitionRepository = new CompetitionRepository();
 const __dirname$1 = path$1.dirname(fileURLToPath$1(import.meta.url));
 process.env.APP_ROOT = path$1.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
@@ -4958,12 +5120,72 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT
 function registerIpcHandlers() {
   ipcMain.handle("get-teams", async () => {
     try {
-      console.log("📡 Buscando times no banco de dados...");
-      const allTeams = await db.select().from(teams);
-      return allTeams;
+      return await teamRepository.findAll();
     } catch (error) {
-      console.error("Erro ao buscar times:", error);
+      console.error("IPC Error [get-teams]:", error);
       return [];
+    }
+  });
+  ipcMain.handle("get-players", async (_, teamId) => {
+    try {
+      return await playerRepository.findByTeamId(teamId);
+    } catch (error) {
+      console.error(`IPC Error [get-players] teamId=${teamId}:`, error);
+      return [];
+    }
+  });
+  ipcMain.handle("get-staff", async (_, teamId) => {
+    try {
+      return await staffRepository.findByTeamId(teamId);
+    } catch (error) {
+      console.error(`IPC Error [get-staff] teamId=${teamId}:`, error);
+      return [];
+    }
+  });
+  ipcMain.handle(
+    "get-matches",
+    async (_, { teamId, seasonId }) => {
+      try {
+        return await matchRepository.findByTeamAndSeason(teamId, seasonId);
+      } catch (error) {
+        console.error(`IPC Error [get-matches]:`, error);
+        return [];
+      }
+    }
+  );
+  ipcMain.handle("get-competitions", async () => {
+    try {
+      return await competitionRepository.findAll();
+    } catch (error) {
+      console.error("IPC Error [get-competitions]:", error);
+      return [];
+    }
+  });
+  ipcMain.handle("advance-day", async () => {
+    try {
+      console.log("⏳ Advancing day...");
+      const currentState = await db.select().from(gameState).limit(1);
+      if (!currentState[0]) throw new Error("No game state found");
+      const current = new Date(currentState[0].currentDate);
+      current.setDate(current.getDate() + 1);
+      const nextDate = current.toISOString().split("T")[0];
+      await db.update(gameState).set({ currentDate: nextDate }).where(eq(gameState.id, currentState[0].id));
+      return {
+        date: nextDate,
+        messages: ["Dia avançado com sucesso"]
+      };
+    } catch (error) {
+      console.error("IPC Error [advance-day]:", error);
+      throw error;
+    }
+  });
+  ipcMain.handle("get-game-state", async () => {
+    try {
+      const state = await db.select().from(gameState).limit(1);
+      return state[0];
+    } catch (error) {
+      console.error("IPC Error [get-game-state]:", error);
+      return null;
     }
   });
 }
@@ -4974,7 +5196,7 @@ function createWindow() {
     height: 800,
     icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: path$1.join(__dirname$1, "preload.mjs"),
+      preload: path$1.join(__dirname$1, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true
     }
