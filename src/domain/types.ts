@@ -258,3 +258,13 @@ export interface TeamStaffImpact {
   scoutingAccuracy: number;
   youthDevelopmentRate: number;
 }
+
+export interface PlayerAttributes {
+  defending: number;
+  physical: number;
+  passing: number;
+  finishing: number;
+  dribbling: number;
+  pace: number;
+  shooting: number;
+}

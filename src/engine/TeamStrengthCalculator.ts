@@ -1,66 +1,63 @@
 import type { Player } from "../domain/models";
 import type { TeamStrength } from "../domain/types";
+import { Position } from "../domain/enums";
 
 export class TeamStrengthCalculator {
   public static calculate(players: Player[]): TeamStrength {
-    if (players.length === 0) {
-      return {
-        overall: 50,
-        attack: 50,
-        defense: 50,
-        midfield: 50,
-        moralBonus: 0,
-        fitnessMultiplier: 1.0,
-      };
+    if (players.length === 0) return this.getDefaultStrength();
+
+    let totalOverall = 0;
+    let totalMoral = 0;
+    let totalEnergy = 0;
+
+    const stats = {
+      attack: { sum: 0, count: 0 },
+      midfield: { sum: 0, count: 0 },
+      defense: { sum: 0, count: 0 },
+    };
+
+    for (const p of players) {
+      totalOverall += p.overall;
+      totalMoral += p.moral;
+      totalEnergy += p.energy;
+
+      if (p.position === Position.FW) {
+        stats.attack.sum += (p.finishing + p.shooting + p.pace) / 3;
+        stats.attack.count++;
+      } else if (p.position === Position.MF) {
+        stats.midfield.sum += (p.passing + p.dribbling + p.pace) / 3;
+        stats.midfield.count++;
+      } else if (p.position === Position.DF || p.position === Position.GK) {
+        const defAttr =
+          p.position === Position.GK
+            ? p.defending
+            : (p.defending + p.physical) / 2;
+        stats.defense.sum += defAttr;
+        stats.defense.count++;
+      }
     }
 
-    const attackers = players.filter((p) => p.position === "FW");
-    const midfielders = players.filter((p) => p.position === "MF");
-    const defenders = players.filter((p) => p.position === "DF");
-    const goalkeeper = players.find((p) => p.position === "GK");
-
-    const attack =
-      (this.calcAvg(attackers, "finishing") +
-        this.calcAvg(attackers, "shooting") +
-        this.calcAvg(attackers, "pace")) /
-      3;
-
-    const midfield =
-      (this.calcAvg(midfielders, "passing") +
-        this.calcAvg(midfielders, "dribbling") +
-        this.calcAvg(midfielders, "pace")) /
-      3;
-
-    const defense =
-      (this.calcAvg(defenders, "defending") +
-        this.calcAvg(defenders, "physical") +
-        (goalkeeper?.defending || 50)) /
-      3;
-
-    const overallAvg =
-      players.reduce((sum, p) => sum + p.overall, 0) / players.length;
-
-    const avgMoral =
-      players.reduce((sum, p) => sum + p.moral, 0) / players.length;
-    const moralBonus = ((avgMoral - 50) / 100) * 10;
-
-    const avgEnergy =
-      players.reduce((sum, p) => sum + p.energy, 0) / players.length;
-    const fitnessMultiplier = 0.7 + (avgEnergy / 100) * 0.3;
+    const getAvg = (set: { sum: number; count: number }) =>
+      set.count > 0 ? set.sum / set.count : 50;
 
     return {
-      overall: overallAvg,
-      attack,
-      defense,
-      midfield,
-      moralBonus,
-      fitnessMultiplier,
+      overall: totalOverall / players.length,
+      attack: getAvg(stats.attack),
+      midfield: getAvg(stats.midfield),
+      defense: getAvg(stats.defense),
+      moralBonus: (totalMoral / players.length - 50) / 10,
+      fitnessMultiplier: 0.7 + (totalEnergy / players.length / 100) * 0.3,
     };
   }
 
-  private static calcAvg(arr: Player[], attr: keyof Player): number {
-    return arr.length > 0
-      ? arr.reduce((sum, p) => sum + (Number(p[attr]) || 0), 0) / arr.length
-      : 50;
+  private static getDefaultStrength(): TeamStrength {
+    return {
+      overall: 50,
+      attack: 50,
+      defense: 50,
+      midfield: 50,
+      moralBonus: 0,
+      fitnessMultiplier: 1.0,
+    };
   }
 }
