@@ -1,12 +1,8 @@
 import { RandomEngine } from "../engine/RandomEngine";
 import { GameEngine } from "../engine/GameEngine";
-import { TrainingFocus, type Player } from "../domain/types";
-import type { TeamStaffImpact } from "./StaffService";
-
-interface SimulationResult {
-  playerUpdates: any[];
-  logs: string[];
-}
+import type { Player } from "../domain/models";
+import { TrainingFocus } from "../domain/enums";
+import type { DailySimulationResult, TeamStaffImpact } from "../domain/types";
 
 export class DailySimulationService {
   private gameEngine: GameEngine;
@@ -19,7 +15,7 @@ export class DailySimulationService {
     players: Player[],
     trainingFocus: TrainingFocus,
     staffImpact: TeamStaffImpact
-  ): SimulationResult {
+  ): DailySimulationResult {
     const logs: string[] = [];
     const playerUpdates: any[] = [];
 

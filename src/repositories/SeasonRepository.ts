@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db } from "../db/client";
 import { seasons } from "../db/schema";
+import { db } from "../lib/db";
 
 export type SeasonSelect = typeof seasons.$inferSelect;
 

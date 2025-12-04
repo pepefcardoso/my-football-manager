@@ -1,5 +1,5 @@
 import { AttributeCalculator } from "../engine/AttributeCalculator";
-import { db } from "./client";
+import { db } from "../lib/db";
 import {
   teams,
   players,

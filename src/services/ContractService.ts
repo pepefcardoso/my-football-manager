@@ -1,7 +1,7 @@
 import { playerRepository } from "../repositories/PlayerRepository";
 import { staffRepository } from "../repositories/StaffRepository";
 import { financialRepository } from "../repositories/FinancialRepository";
-import { FinancialCategory } from "../domain/types";
+import { FinancialCategory } from "../domain/enums";
 
 export class ContractService {
   async checkExpiringContracts(currentDate: string): Promise<{

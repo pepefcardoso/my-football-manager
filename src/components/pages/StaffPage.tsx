@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Staff } from "../../domain/types";
-import StaffTable from "../tables/StaffTable";
+import type { Staff } from "../../domain/models";
+import StaffTable from "../features/staff/StaffTable";
 
 function StaffPage({ teamId }: { teamId: number }) {
     const [staff, setStaff] = useState<Staff[]>([]);

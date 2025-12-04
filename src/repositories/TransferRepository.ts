@@ -1,6 +1,6 @@
 import { eq, desc } from "drizzle-orm";
-import { db } from "../db/client";
 import { transfers } from "../db/schema";
+import { db } from "../lib/db";
 
 export type TransferInsert = typeof transfers.$inferInsert;
 

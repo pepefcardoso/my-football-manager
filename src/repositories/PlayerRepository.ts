@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
-import { db } from "../db/client";
 import { players } from "../db/schema";
-import type { Player } from "../domain/types";
+import { db } from "../lib/db";
+import type { Player } from "../domain/models";
 
 export class PlayerRepository {
   async findById(id: number): Promise<Player | undefined> {

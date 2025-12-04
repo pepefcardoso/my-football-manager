@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import type { GameState, Team } from "../../domain/types";
-import StatCard from "../StatCard";
-import TrainingControl from "../TrainingControl";
+import TrainingControl from "../features/squad/TrainingControl";
+import type { GameState, Team } from "../../domain/models";
+import StatCard from "../common/StatCard";
 
 function ClubOverviewPage({ team }: { team: Team }) {
     const [gameState, setGameState] = useState<GameState | null>(null);

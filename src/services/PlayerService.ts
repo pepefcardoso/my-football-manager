@@ -1,9 +1,9 @@
 import { AttributeCalculator } from "../engine/AttributeCalculator";
 import { playerRepository } from "../repositories/PlayerRepository";
-import { db } from "../db/client";
 import { players } from "../db/schema";
-import { Position } from "../domain/types";
 import { eq } from "drizzle-orm";
+import { db } from "../lib/db";
+import type { Position } from "../domain/enums";
 
 export class PlayerService {
   async updatePlayerOverall(playerId: number): Promise<void> {

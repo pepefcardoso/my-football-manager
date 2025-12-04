@@ -1,4 +1,5 @@
-import type { Team } from "../../domain/types";
+import type { Team } from "../../domain/models";
+
 
 function MenuPage({
     teams,

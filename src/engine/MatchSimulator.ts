@@ -1,40 +1,6 @@
+import { MatchEventType, Position } from "../domain/enums";
+import type { MatchResult, SimPlayer, SimTeam } from "../domain/types";
 import { RandomEngine } from "./RandomEngine";
-import { MatchEventType, Position } from "../domain/types";
-
-interface SimPlayer {
-  id: number;
-  name: string;
-  position: string;
-  overall: number;
-  energy: number;
-}
-
-interface SimTeam {
-  id: number;
-  name: string;
-  players: SimPlayer[];
-  tactics?: {
-    aggression: "low" | "normal" | "high";
-  };
-}
-
-export interface MatchResult {
-  homeScore: number;
-  awayScore: number;
-  events: {
-    minute: number;
-    type: MatchEventType;
-    description: string;
-    teamId: number;
-    playerId?: number;
-  }[];
-  stats: {
-    homePossession: number;
-    awayPossession: number;
-    homeShots: number;
-    awayShots: number;
-  };
-}
 
 export class MatchSimulator {
   static simulate(homeTeam: SimTeam, awayTeam: SimTeam): MatchResult {
@@ -105,7 +71,14 @@ export class MatchSimulator {
         awayPossession: 100 - homePossession,
         homeShots,
         awayShots,
+        homeShotsOnTarget: Math.round(homeShots * 0.4),
+        awayShotsOnTarget: Math.round(awayShots * 0.4),
+        homeCorners: Math.round(homeShots * 0.2),
+        awayCorners: Math.round(awayShots * 0.2),
+        homeFouls: RandomEngine.getInt(5, 15),
+        awayFouls: RandomEngine.getInt(5, 15),
       },
+      playerUpdates: [],
     };
   }
 

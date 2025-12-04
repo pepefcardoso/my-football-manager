@@ -7,13 +7,13 @@ import { staffRepository } from "../src/repositories/StaffRepository";
 import { matchRepository } from "../src/repositories/MatchRepository";
 import { competitionRepository } from "../src/repositories/CompetitionRepository";
 // import { GameEngine } from "../src/engine/GameEngine";
-import { db } from "../src/db/client";
 import { gameState } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { StaffService } from "../src/services/StaffService";
-import { TrainingFocus } from "../src/domain/types";
-import { matchService } from "../src/services/MatchService";
 import { dailySimulationService } from "../src/services/DailySimulationService";
+import { db } from "../src/lib/db";
+import { TrainingFocus } from "../src/domain/enums";
+import { matchService } from "../src/services/MatchService";
 // const gameEngine = new GameEngine();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

@@ -1,5 +1,7 @@
-import { formatCurrency, getPositionColor } from "../../domain/helpers";
-import type { Player } from "../../domain/types";
+import type { Player } from "../../../domain/models";
+import { formatCurrency } from "../../../utils/formatters";
+import { getPositionVariant } from "../../../utils/styleHelpers";
+import Badge from "../../common/Badge";
 
 function PlayerTable({ players }: { players: Player[] }) {
     if (players.length === 0) {
@@ -27,16 +29,20 @@ function PlayerTable({ players }: { players: Player[] }) {
                         <tr key={player.id} className="hover:bg-slate-800/50 transition-colors group">
                             <td className="p-4 font-medium text-slate-200">
                                 {player.firstName} {player.lastName}
-                                {player.isCaptain && <span className="ml-2 text-yellow-500 text-xs" title="Capitão">©</span>}
+                                {player.isCaptain && (
+                                    <span className="ml-2 text-yellow-500 text-xs" title="Capitão">©</span>
+                                )}
                             </td>
                             <td className="p-4">
-                                <span className={`px-2 py-1 rounded text-xs font-bold border ${getPositionColor(player.position)}`}>
+                                <Badge variant={getPositionVariant(player.position)}>
                                     {player.position}
-                                </span>
+                                </Badge>
                             </td>
                             <td className="p-4 text-center text-slate-400">{player.age}</td>
-                            <td className="p-4 text-center font-bold text-white bg-slate-800/30 rounded">
-                                {player.overall}
+                            <td className="p-4 text-center">
+                                <span className="inline-block px-2 py-0.5 rounded bg-slate-800 font-bold text-white text-xs">
+                                    {player.overall}
+                                </span>
                             </td>
                             <td className="p-4 text-center text-slate-400 opacity-70">
                                 {player.potential}
@@ -70,22 +76,18 @@ function PlayerTable({ players }: { players: Player[] }) {
                                 {formatCurrency(player.salary || 0)}
                             </td>
                             <td className="p-4 text-center">
-                                <div className="flex justify-center gap-2">
+                                <div className="flex justify-center gap-1">
                                     {player.isInjured && (
-                                        <span className="text-red-500 bg-red-500/10 px-2 py-0.5 rounded text-xs font-bold border border-red-500/20" title="Lesionado">
-                                            LES
-                                        </span>
+                                        <Badge variant="danger" title="Lesionado">LES</Badge>
                                     )}
                                     {player.suspensionGamesRemaining && player.suspensionGamesRemaining > 0 ? (
-                                        <span className="text-red-500 bg-red-500/10 px-2 py-0.5 rounded text-xs font-bold border border-red-500/20" title="Suspenso">
-                                            SUS
-                                        </span>
+                                        <Badge variant="danger" title="Suspenso">SUS</Badge>
                                     ) : null}
                                     {player.isYouth && (
-                                        <span className="text-cyan-400 text-xs" title="Base">🎓</span>
+                                        <Badge variant="info" title="Jogador da Base">BASE</Badge>
                                     )}
                                     {!player.isInjured && (!player.suspensionGamesRemaining || player.suspensionGamesRemaining === 0) && (
-                                        <span className="text-emerald-500 text-xs">OK</span>
+                                        <Badge variant="success">OK</Badge>
                                     )}
                                 </div>
                             </td>

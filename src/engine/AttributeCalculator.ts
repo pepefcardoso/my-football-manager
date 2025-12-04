@@ -1,4 +1,5 @@
-import { Position } from "../domain/types";
+import { Position } from "../domain/enums";
+
 
 const WEIGHTS = {
   [Position.GK]: {

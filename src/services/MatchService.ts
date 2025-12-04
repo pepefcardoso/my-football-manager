@@ -1,14 +1,12 @@
-import {
-  MatchEngine,
-  type MatchConfig,
-  type MatchResult,
-} from "../engine/MatchEngine";
 import { matchRepository } from "../repositories/MatchRepository";
 import { playerRepository } from "../repositories/PlayerRepository";
 import { teamRepository } from "../repositories/TeamRepository";
 import { competitionRepository } from "../repositories/CompetitionRepository";
 import { financialRepository } from "../repositories/FinancialRepository";
-import { FinancialCategory, type Team } from "../domain/types";
+import type { Team } from "../domain/models";
+import { FinancialCategory } from "../domain/enums";
+import { MatchEngine } from "../engine/MatchEngine";
+import type { MatchConfig, MatchResult } from "../domain/types";
 
 export class MatchService {
   private engines: Map<number, MatchEngine> = new Map();

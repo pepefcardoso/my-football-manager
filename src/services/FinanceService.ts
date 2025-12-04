@@ -1,4 +1,4 @@
-import { FinancialCategory } from "../domain/types";
+import { FinancialCategory } from "../domain/enums";
 
 export class FinanceService {
   static calculateDailyWageBill(annualSalaryTotal: number): number {

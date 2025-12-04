@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Player } from "../../domain/types";
-import PlayerTable from "../tables/PlayerTable";
+import PlayerTable from "../features/squad/PlayerTable";
+import type { Player } from "../../domain/models";
 
 function SquadPage({ teamId }: { teamId: number }) {
     const [players, setPlayers] = useState<Player[]>([]);

@@ -1,12 +1,6 @@
+import { StaffRole } from "../domain/enums";
+import type { TeamStaffImpact } from "../domain/types";
 import { staffRepository } from "../repositories/StaffRepository";
-import { StaffRole } from "../domain/types";
-
-export interface TeamStaffImpact {
-  injuryRecoveryMultiplier: number;
-  energyRecoveryBonus: number;
-  tacticalAnalysisBonus: number;
-  scoutingAccuracy: number;
-}
 
 export class StaffService {
   async getStaffImpact(teamId: number): Promise<TeamStaffImpact> {

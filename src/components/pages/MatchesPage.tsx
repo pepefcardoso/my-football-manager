@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { MatchViewer } from "../MatchViewer";
-import type { Match, Team } from "../../domain/types";
+import Badge from "../common/Badge";
+import { MatchViewer } from "../features/match/MatchViewer";
+import type { Match, Team } from "../../domain/models";
 
 function MatchesPage({ teamId, teams }: { teamId: number; teams: Team[] }) {
     const [matches, setMatches] = useState<Match[]>([]);
@@ -71,6 +72,24 @@ function MatchesPage({ teamId, teams }: { teamId: number; teams: Team[] }) {
                         const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
                         const opponent = teams.find((t) => t.id === opponentId);
 
+                        const homeScore = match.homeScore || 0;
+                        const awayScore = match.awayScore || 0;
+                        let resultVariant: "success" | "danger" | "neutral" = "neutral";
+                        let resultText = "EMPATE";
+
+                        if (match.isPlayed) {
+                            if (homeScore === awayScore) {
+                                resultVariant = "neutral";
+                                resultText = "EMPATE";
+                            } else if (isHome) {
+                                resultVariant = homeScore > awayScore ? "success" : "danger";
+                                resultText = homeScore > awayScore ? "VITÓRIA" : "DERROTA";
+                            } else {
+                                resultVariant = awayScore > homeScore ? "success" : "danger";
+                                resultText = awayScore > homeScore ? "VITÓRIA" : "DERROTA";
+                            }
+                        }
+
                         return (
                             <div
                                 key={match.id}
@@ -106,17 +125,9 @@ function MatchesPage({ teamId, teams }: { teamId: number; teams: Team[] }) {
                                             Jogar
                                         </button>
                                     ) : (
-                                        <span className={`text-xs font-bold px-3 py-1 rounded border ${(isHome && (match.homeScore || 0) > (match.awayScore || 0)) || (!isHome && (match.awayScore || 0) > (match.homeScore || 0))
-                                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                            : (match.homeScore === match.awayScore)
-                                                ? "bg-slate-500/10 text-slate-400 border-slate-500/20"
-                                                : "bg-red-500/10 text-red-400 border-red-500/20"
-                                            }`}>
-                                            {(isHome && (match.homeScore || 0) > (match.awayScore || 0)) || (!isHome && (match.awayScore || 0) > (match.homeScore || 0))
-                                                ? "VITÓRIA"
-                                                : (match.homeScore === match.awayScore) ? "EMPATE" : "DERROTA"
-                                            }
-                                        </span>
+                                        <Badge variant={resultVariant}>
+                                            {resultText}
+                                        </Badge>
                                     )}
                                 </div>
                             </div>

@@ -1,5 +1,5 @@
-import { formatCurrency, formatRole } from "../../domain/helpers";
-import type { Staff } from "../../domain/types";
+import type { Staff } from "../../../domain/models";
+import { formatCurrency, formatRole } from "../../../utils/formatters";
 
 function StaffTable({ staff }: { staff: Staff[] }) {
     if (staff.length === 0) {

@@ -1,80 +1,19 @@
+import { MatchEventType, MatchState } from "../domain/enums";
+import type { Player } from "../domain/models";
+import type {
+  MatchConfig,
+  MatchEventData,
+  MatchResult,
+  TeamStrength,
+} from "../domain/types";
 import { RandomEngine } from "./RandomEngine";
-import type { Player, Team } from "../domain/types";
-
-export enum MatchState {
-  NOT_STARTED = "not_started",
-  PLAYING = "playing",
-  PAUSED = "paused",
-  FINISHED = "finished",
-}
-
-export interface MatchEvent {
-  minute: number;
-  type:
-    | "goal"
-    | "yellow_card"
-    | "red_card"
-    | "injury"
-    | "substitution"
-    | "shot"
-    | "save"
-    | "foul"
-    | "corner"
-    | "offside";
-  teamId: number;
-  playerId?: number;
-  description: string;
-  severity?: "low" | "medium" | "high";
-}
-
-export interface MatchConfig {
-  homeTeam: Team;
-  awayTeam: Team;
-  homePlayers: Player[];
-  awayPlayers: Player[];
-  weather?: "sunny" | "rainy" | "cloudy" | "windy";
-}
-
-export interface MatchResult {
-  homeScore: number;
-  awayScore: number;
-  events: MatchEvent[];
-  stats: {
-    homePossession: number;
-    awayPossession: number;
-    homeShots: number;
-    awayShots: number;
-    homeShotsOnTarget: number;
-    awayShotsOnTarget: number;
-    homeCorners: number;
-    awayCorners: number;
-    homeFouls: number;
-    awayFouls: number;
-  };
-  playerUpdates: {
-    playerId: number;
-    energy: number;
-    moral: number;
-    isInjured: boolean;
-    injuryDays?: number;
-  }[];
-}
-
-interface TeamStrength {
-  overall: number;
-  attack: number;
-  defense: number;
-  midfield: number;
-  moralBonus: number;
-  fitnessMultiplier: number;
-}
 
 export class MatchEngine {
   private currentMinute: number = 0;
   private state: MatchState = MatchState.NOT_STARTED;
   private homeScore: number = 0;
   private awayScore: number = 0;
-  private events: MatchEvent[] = [];
+  private events: MatchEventData[] = [];
   private stats = {
     homePossession: 0,
     awayPossession: 0,
@@ -99,8 +38,6 @@ export class MatchEngine {
     this.awayStrength = this.calculateTeamStrength(config.awayPlayers);
     this.applyWeatherEffects(config.weather || "sunny");
   }
-
-  // ==================== CÁLCULO DE FORÇA ====================
 
   private calculateTeamStrength(players: Player[]): TeamStrength {
     if (players.length === 0) {
@@ -181,7 +118,7 @@ export class MatchEngine {
     this.state = MatchState.PLAYING;
     this.events.push({
       minute: 0,
-      type: "shot",
+      type: MatchEventType.SHOT,
       teamId: this.config.homeTeam.id,
       description: "⚽ A partida começou!",
     });
@@ -231,10 +168,9 @@ export class MatchEngine {
       this.state = MatchState.FINISHED;
       this.events.push({
         minute: 90,
-        type: "shot",
+        type: MatchEventType.FINISHED,
         teamId: this.config.homeTeam.id,
         description: `🏁 FIM DE JOGO! ${this.config.homeTeam.shortName} ${this.homeScore} x ${this.awayScore} ${this.config.awayTeam.shortName}`,
-        severity: "high",
       });
     }
   }
@@ -287,18 +223,17 @@ export class MatchEngine {
 
           this.events.push({
             minute: this.currentMinute,
-            type: "goal",
+            type: MatchEventType.GOAL,
             teamId: attackingTeam.id,
             playerId: shooter.id,
             description: `⚽ GOOOL! ${shooter.firstName} ${shooter.lastName} marca para o ${attackingTeam.shortName}!`,
-            severity: "high",
           });
         } else {
           this.events.push({
             minute: this.currentMinute,
-            type: "save",
+            type: MatchEventType.SAVE,
             teamId: defendingTeam.id,
-            playerId: goalkeeper?.id,
+            playerId: goalkeeper!.id,
             description: `🧤 Grande defesa de ${
               goalkeeper?.firstName || "o goleiro"
             }! ${shooter.firstName} quase marca.`,
@@ -307,7 +242,7 @@ export class MatchEngine {
       } else {
         this.events.push({
           minute: this.currentMinute,
-          type: "shot",
+          type: MatchEventType.SHOT,
           teamId: attackingTeam.id,
           playerId: shooter.id,
           description: `📉 ${shooter.firstName} ${shooter.lastName} chuta para fora.`,
@@ -321,7 +256,7 @@ export class MatchEngine {
 
       this.events.push({
         minute: this.currentMinute,
-        type: "corner",
+        type: MatchEventType.CORNER,
         teamId: attackingTeam.id,
         description: `🚩 Escanteio para o ${attackingTeam.shortName}.`,
       });
@@ -341,7 +276,7 @@ export class MatchEngine {
       const player = RandomEngine.pickOne(players);
       this.events.push({
         minute: this.currentMinute,
-        type: "foul",
+        type: MatchEventType.FOUL,
         teamId: team.id,
         playerId: player.id,
         description: `🟨 Falta cometida por ${player.firstName} ${player.lastName}.`,
@@ -350,21 +285,19 @@ export class MatchEngine {
       const player = RandomEngine.pickOne(players);
       this.events.push({
         minute: this.currentMinute,
-        type: "yellow_card",
+        type: MatchEventType.YELLOW_CARD,
         teamId: team.id,
         playerId: player.id,
         description: `🟨 Cartão amarelo para ${player.firstName} ${player.lastName}!`,
-        severity: "medium",
       });
     } else if (eventType === "injury") {
       const player = RandomEngine.pickOne(players);
       this.events.push({
         minute: this.currentMinute,
-        type: "injury",
+        type: MatchEventType.INJURY,
         teamId: team.id,
         playerId: player.id,
         description: `🩹 ${player.firstName} ${player.lastName} sente uma lesão e precisa de atendimento.`,
-        severity: "medium",
       });
     }
   }
@@ -388,7 +321,6 @@ export class MatchEngine {
 
     const homeWon = this.homeScore > this.awayScore;
     const awayWon = this.awayScore > this.homeScore;
-    // const draw = this.homeScore === this.awayScore;
 
     const playerUpdates: MatchResult["playerUpdates"] = [];
     for (const player of this.config.homePlayers) {
@@ -476,7 +408,7 @@ export class MatchEngine {
     return { home: this.homeScore, away: this.awayScore };
   }
 
-  public getEvents(): MatchEvent[] {
+  public getEvents(): MatchEventData[] {
     return this.events;
   }
 }

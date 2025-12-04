@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { MatchState, type MatchEvent } from "../engine/MatchEngine";
+import { MatchState } from "../domain/enums";
+import type { MatchEvent } from "../domain/models";
 
 interface MatchSimulationState {
   matchId: number;
