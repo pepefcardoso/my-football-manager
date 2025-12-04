@@ -1,5 +1,3 @@
-// src/domain/enums.ts
-
 export enum TrainingFocus {
   PHYSICAL = "physical",
   TECHNICAL = "technical",

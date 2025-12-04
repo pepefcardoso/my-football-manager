@@ -7,6 +7,7 @@ import type {
   TeamStrength,
 } from "../domain/types";
 import { RandomEngine } from "./RandomEngine";
+import { TeamStrengthCalculator } from "./TeamStrengthCalculator";
 
 export class MatchEngine {
   private currentMinute: number = 0;
@@ -34,70 +35,9 @@ export class MatchEngine {
 
   constructor(config: MatchConfig) {
     this.config = config;
-    this.homeStrength = this.calculateTeamStrength(config.homePlayers);
-    this.awayStrength = this.calculateTeamStrength(config.awayPlayers);
+    this.homeStrength = TeamStrengthCalculator.calculate(config.homePlayers);
+    this.awayStrength = TeamStrengthCalculator.calculate(config.awayPlayers);
     this.applyWeatherEffects(config.weather || "sunny");
-  }
-
-  private calculateTeamStrength(players: Player[]): TeamStrength {
-    if (players.length === 0) {
-      return {
-        overall: 50,
-        attack: 50,
-        defense: 50,
-        midfield: 50,
-        moralBonus: 0,
-        fitnessMultiplier: 1.0,
-      };
-    }
-
-    const attackers = players.filter((p) => p.position === "FW");
-    const midfielders = players.filter((p) => p.position === "MF");
-    const defenders = players.filter((p) => p.position === "DF");
-    const goalkeeper = players.find((p) => p.position === "GK");
-
-    const calcAvg = (arr: Player[], attr: keyof Player) =>
-      arr.length > 0
-        ? arr.reduce((sum, p) => sum + (Number(p[attr]) || 0), 0) / arr.length
-        : 50;
-
-    const attack =
-      (calcAvg(attackers, "finishing") +
-        calcAvg(attackers, "shooting") +
-        calcAvg(attackers, "pace")) /
-      3;
-
-    const midfield =
-      (calcAvg(midfielders, "passing") +
-        calcAvg(midfielders, "dribbling") +
-        calcAvg(midfielders, "pace")) /
-      3;
-
-    const defense =
-      (calcAvg(defenders, "defending") +
-        calcAvg(defenders, "physical") +
-        (goalkeeper?.defending || 50)) /
-      3;
-
-    const overallAvg =
-      players.reduce((sum, p) => sum + p.overall, 0) / players.length;
-
-    const avgMoral =
-      players.reduce((sum, p) => sum + p.moral, 0) / players.length;
-    const moralBonus = ((avgMoral - 50) / 100) * 10;
-
-    const avgEnergy =
-      players.reduce((sum, p) => sum + p.energy, 0) / players.length;
-    const fitnessMultiplier = 0.7 + (avgEnergy / 100) * 0.3;
-
-    return {
-      overall: overallAvg,
-      attack,
-      defense,
-      midfield,
-      moralBonus,
-      fitnessMultiplier,
-    };
   }
 
   private applyWeatherEffects(weather: string): void {
@@ -120,6 +60,7 @@ export class MatchEngine {
       minute: 0,
       type: MatchEventType.SHOT,
       teamId: this.config.homeTeam.id,
+      playerId: null,
       description: "⚽ A partida começou!",
     });
   }
@@ -170,6 +111,7 @@ export class MatchEngine {
         minute: 90,
         type: MatchEventType.FINISHED,
         teamId: this.config.homeTeam.id,
+        playerId: null,
         description: `🏁 FIM DE JOGO! ${this.config.homeTeam.shortName} ${this.homeScore} x ${this.awayScore} ${this.config.awayTeam.shortName}`,
       });
     }
@@ -233,7 +175,7 @@ export class MatchEngine {
             minute: this.currentMinute,
             type: MatchEventType.SAVE,
             teamId: defendingTeam.id,
-            playerId: goalkeeper!.id,
+            playerId: goalkeeper ? goalkeeper.id : null,
             description: `🧤 Grande defesa de ${
               goalkeeper?.firstName || "o goleiro"
             }! ${shooter.firstName} quase marca.`,
@@ -258,6 +200,7 @@ export class MatchEngine {
         minute: this.currentMinute,
         type: MatchEventType.CORNER,
         teamId: attackingTeam.id,
+        playerId: null,
         description: `🚩 Escanteio para o ${attackingTeam.shortName}.`,
       });
     }
@@ -323,65 +266,70 @@ export class MatchEngine {
     const awayWon = this.awayScore > this.homeScore;
 
     const playerUpdates: MatchResult["playerUpdates"] = [];
-    for (const player of this.config.homePlayers) {
-      let moralChange = 0;
 
-      if (homeWon) {
-        const repDiff = awayRep - homeRep;
-        moralChange = 5 + Math.max(0, Math.min(15, repDiff / 500));
-      } else if (awayWon) {
-        const repDiff = homeRep - awayRep;
-        moralChange = -5 - Math.max(0, Math.min(15, repDiff / 500));
-      } else {
-        moralChange = awayRep > homeRep ? 2 : -2;
+    const processPlayers = (
+      players: Player[],
+      won: boolean,
+      draw: boolean,
+      opponentRep: number,
+      teamRep: number
+    ) => {
+      for (const player of players) {
+        let moralChange = 0;
+
+        if (won) {
+          const repDiff = opponentRep - teamRep;
+          moralChange = 5 + Math.max(0, Math.min(15, repDiff / 500));
+        } else if (!won && !draw) {
+          const repDiff = teamRep - opponentRep;
+          moralChange = -5 - Math.max(0, Math.min(15, repDiff / 500));
+        } else {
+          moralChange = opponentRep > teamRep ? 2 : -2;
+        }
+
+        const newMoral = Math.max(0, Math.min(100, player.moral + moralChange));
+        const newEnergy = Math.max(
+          0,
+          player.energy - RandomEngine.getInt(10, 20)
+        );
+
+        const goals = this.events.filter(
+          (e) => e.type === MatchEventType.GOAL && e.playerId === player.id
+        ).length;
+
+        let rating = 6.0;
+        if (won) rating += 0.5;
+        rating += goals * 1.5;
+        if (newMoral < 40) rating -= 0.5;
+
+        rating += Math.random() * 2 - 1;
+        rating = Math.max(3, Math.min(10, Number(rating.toFixed(1))));
+
+        playerUpdates.push({
+          playerId: player.id,
+          energy: newEnergy,
+          moral: Math.round(newMoral),
+          isInjured: false,
+          rating: rating,
+          goals: goals,
+          assists: 0,
+        });
       }
+    };
 
-      const newMoral = Math.max(0, Math.min(100, player.moral + moralChange));
-      const newEnergy = Math.max(
-        0,
-        player.energy - RandomEngine.getInt(30, 50)
-      );
+    const isDraw = this.homeScore === this.awayScore;
 
-      playerUpdates.push({
-        playerId: player.id,
-        energy: newEnergy,
-        moral: Math.round(newMoral),
-        isInjured: false,
-      });
-    }
+    processPlayers(this.config.homePlayers, homeWon, isDraw, awayRep, homeRep);
 
-    for (const player of this.config.awayPlayers) {
-      let moralChange = 0;
-
-      if (awayWon) {
-        const repDiff = homeRep - awayRep;
-        moralChange = 5 + Math.max(0, Math.min(15, repDiff / 500));
-      } else if (homeWon) {
-        const repDiff = awayRep - homeRep;
-        moralChange = -5 - Math.max(0, Math.min(15, repDiff / 500));
-      } else {
-        moralChange = homeRep > awayRep ? 2 : -2;
-      }
-
-      const newMoral = Math.max(0, Math.min(100, player.moral + moralChange));
-      const newEnergy = Math.max(
-        0,
-        player.energy - RandomEngine.getInt(30, 50)
-      );
-
-      playerUpdates.push({
-        playerId: player.id,
-        energy: newEnergy,
-        moral: Math.round(newMoral),
-        isInjured: false,
-      });
-    }
+    processPlayers(this.config.awayPlayers, awayWon, isDraw, homeRep, awayRep);
 
     const totalPossession =
       this.stats.homePossession + this.stats.awayPossession;
-    const finalHomePossession = Math.round(
-      (this.stats.homePossession / totalPossession) * 100
-    );
+
+    const finalHomePossession =
+      totalPossession > 0
+        ? Math.round((this.stats.homePossession / totalPossession) * 100)
+        : 50;
 
     return {
       homeScore: this.homeScore,

@@ -21,7 +21,15 @@ export class StaffService {
       energyRecoveryBonus: this.calculateFitnessImpact(fitnessCoaches),
       tacticalAnalysisBonus: this.calculateCoachingImpact(coaches),
       scoutingAccuracy: this.calculateScoutingImpact(scouts),
+      youthDevelopmentRate: this.calculateYouthDevelopmentImpact(scouts),
     };
+  }
+
+  private calculateYouthDevelopmentImpact(scouts: any[]): number {
+    if (scouts.length === 0) return 0;
+
+    const bestScout = Math.max(...scouts.map((s) => s.overall));
+    return Math.round(bestScout * 0.1);
   }
 
   private calculateMedicalImpact(medics: any[]): number {

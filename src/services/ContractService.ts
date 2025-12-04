@@ -17,7 +17,7 @@ export class ContractService {
     const players = await playerRepository.findByTeamId(teamId);
     const staff = await staffRepository.findByTeamId(teamId);
 
-    const playerWages = players.reduce((sum, p) => sum + (p.salary || 0), 0);
+    const playerWages = players.reduce((sum) => sum + (0), 0);
     const staffWages = staff.reduce((sum, s) => sum + (s.salary || 0), 0);
 
     return Math.round((playerWages + staffWages) / 365);
@@ -28,11 +28,12 @@ export class ContractService {
     currentDate: string,
     seasonId: number
   ): Promise<void> {
-    const players = await playerRepository.findByTeamId(teamId);
+    // const players = await playerRepository.findByTeamId(teamId);
     const staffMembers = await staffRepository.findByTeamId(teamId);
 
-    const playerTotal =
-      players.reduce((sum, p) => sum + (p.salary || 0), 0) / 365;
+    const playerTotal = 1000;
+      // BUSCAR PELO CONRTATO
+      // players.reduce((sum, p) => sum + (p.salary || 0), 0) / 365;
     const staffTotal =
       staffMembers.reduce((sum, s) => sum + (s.salary || 0), 0) / 365;
 

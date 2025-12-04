@@ -150,7 +150,7 @@ export class GameEngine {
 
   generateInjuryDuration(
     severity: "light" | "moderate" | "severe",
-    medicalMultiplier: number = 1.0 // Padrão 1.0 se não tiver médico
+    medicalMultiplier: number = 1.0
   ): number {
     let baseDuration = 0;
     
@@ -166,14 +166,13 @@ export class GameEngine {
         break;
     }
 
-    // Aplica a redução do médico e arredonda
     return Math.max(1, Math.round(baseDuration * medicalMultiplier));
   }
 
   canPlayerPlay(player: Player): boolean {
     return (
       !player.isInjured &&
-      // player.suspensionGamesRemaining === 0 &&
+      player.suspensionGamesRemaining === 0 &&
       player.energy > 30 &&
       player.fitness > 40
     );
@@ -182,8 +181,8 @@ export class GameEngine {
   getPlayerAvailabilityStatus(player: Player): string {
     if (player.isInjured)
       return `Lesionado (${player.injuryDaysRemaining} dias)`;
-    // if (player.suspensionGamesRemaining > 0)
-    //   return `Suspenso (${player.suspensionGamesRemaining} jogos)`;
+    if (player.suspensionGamesRemaining ?? 0 > 0)
+      return `Suspenso (${player.suspensionGamesRemaining} jogos)`;
     if (player.energy < 30) return "Exausto";
     if (player.fitness < 40) return "Fora de forma";
     return "Disponível";

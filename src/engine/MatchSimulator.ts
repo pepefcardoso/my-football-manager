@@ -1,11 +1,18 @@
 import { MatchEventType, Position } from "../domain/enums";
 import type { MatchResult, SimPlayer, SimTeam } from "../domain/types";
 import { RandomEngine } from "./RandomEngine";
+import { TeamStrengthCalculator } from "./TeamStrengthCalculator";
 
 export class MatchSimulator {
   static simulate(homeTeam: SimTeam, awayTeam: SimTeam): MatchResult {
-    const homeStrength = this.calculateTeamStrength(homeTeam);
-    const awayStrength = this.calculateTeamStrength(awayTeam);
+    const homeStrengthData = TeamStrengthCalculator.calculate(
+      homeTeam.players as any
+    );
+    const awayStrengthData = TeamStrengthCalculator.calculate(
+      awayTeam.players as any
+    );
+    const homeStrength = homeStrengthData.overall;
+    const awayStrength = awayStrengthData.overall;
 
     const homeAdvantage = 1.05;
     const totalStrength = homeStrength * homeAdvantage + awayStrength;
@@ -80,13 +87,6 @@ export class MatchSimulator {
       },
       playerUpdates: [],
     };
-  }
-
-  private static calculateTeamStrength(team: SimTeam): number {
-    if (team.players.length === 0) return 50;
-
-    const totalOverall = team.players.reduce((sum, p) => sum + p.overall, 0);
-    return totalOverall / team.players.length;
   }
 
   private static selectScorer(players: SimPlayer[]): SimPlayer {

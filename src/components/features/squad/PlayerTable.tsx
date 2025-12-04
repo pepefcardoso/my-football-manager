@@ -73,7 +73,7 @@ function PlayerTable({ players }: { players: Player[] }) {
                                 </span>
                             </td>
                             <td className="p-4 text-right text-slate-300 font-mono text-xs">
-                                {formatCurrency(player.salary || 0)}
+                                {formatCurrency(/*player.salary ||*/ 0)}
                             </td>
                             <td className="p-4 text-center">
                                 <div className="flex justify-center gap-1">

@@ -1,4 +1,12 @@
-import type { CompetitionFormat, FinancialCategory, MatchEventType, Position, StaffRole, TransferType, WeatherCondition } from "./enums";
+import type {
+  CompetitionFormat,
+  FinancialCategory,
+  MatchEventType,
+  Position,
+  StaffRole,
+  TransferType,
+  WeatherCondition,
+} from "./enums";
 
 export interface Player {
   id: number;
@@ -7,7 +15,7 @@ export interface Player {
   lastName: string;
   age: number;
   nationality: string;
-  position: Position;
+  position: Position | string;
   preferredFoot: string;
   overall: number;
   potential: number;
@@ -15,9 +23,9 @@ export interface Player {
   passing: number;
   dribbling: number;
   defending: number;
+  shooting: number;
   physical: number;
   pace: number;
-  shooting: number;
   moral: number;
   energy: number;
   fitness: number;
@@ -27,13 +35,7 @@ export interface Player {
   injuryType: string | null;
   injuryDaysRemaining: number;
   isCaptain: boolean;
-  contract?: PlayerContract;
-
-  //TEMPORARIO TODO
-  salary?: number;
-  contractEnd?: string | null;
-  releaseClause?: number | null;
-  suspensionGamesRemaining?: number;
+  suspensionGamesRemaining: number;
 }
 
 export interface PlayerContract {
@@ -44,8 +46,8 @@ export interface PlayerContract {
   endDate: string;
   wage: number;
   releaseClause: number | null;
-  type: "professional" | "youth" | "loan";
-  status: "active" | "expired" | "terminated";
+  type: "professional" | "youth" | "loan" | string;
+  status: "active" | "expired" | "terminated" | string;
 }
 
 export interface Staff {
@@ -55,7 +57,7 @@ export interface Staff {
   lastName: string;
   age: number;
   nationality: string;
-  role: StaffRole;
+  role: StaffRole | string;
   overall: number;
   salary: number;
   contractEnd: string | null;
@@ -82,42 +84,30 @@ export interface Team {
   executiveDirectorId: number | null;
 }
 
-export interface Match {
-  id: number;
-  competitionId: number;
-  seasonId: number;
-  homeTeamId: number;
-  awayTeamId: number;
-  date: string;
-  round: number | null;
-  homeScore: number | null;
-  awayScore: number | null;
-  isPlayed: boolean;
-  attendance: number | null;
-  ticketRevenue: number | null;
-  weather: WeatherCondition | null;
-}
-
-export interface MatchEvent {
-  id: number;
-  matchId: number;
-  minute: number;
-  type: MatchEventType;
-  teamId: number;
-  playerId: number | null;
-  description: string | null;
-}
-
 export interface Competition {
   id: number;
   name: string;
   shortName: string;
   country: string;
   tier: number;
-  format: CompetitionFormat;
+  format: CompetitionFormat | string;
   teams: number;
   prize: number;
   reputation: number;
+}
+
+export interface CompetitionStanding {
+  id: number;
+  competitionId: number | null;
+  seasonId: number | null;
+  teamId: number | null;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  points: number;
 }
 
 export interface Season {
@@ -128,6 +118,67 @@ export interface Season {
   isActive: boolean;
 }
 
+export interface Match {
+  id: number;
+  competitionId: number | null;
+  seasonId: number | null;
+  homeTeamId: number | null;
+  awayTeamId: number | null;
+  date: string;
+  round: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  isPlayed: boolean;
+  attendance: number | null;
+  ticketRevenue: number | null;
+  weather: WeatherCondition | string | null;
+}
+
+export interface MatchEvent {
+  id: number;
+  matchId: number | null;
+  minute: number;
+  type: MatchEventType | string;
+  teamId: number | null;
+  playerId: number | null;
+  description: string | null;
+}
+
+export interface Transfer {
+  id: number;
+  playerId: number | null;
+  fromTeamId: number | null;
+  toTeamId: number | null;
+  fee: number;
+  date: string;
+  seasonId: number | null;
+  type: TransferType | string;
+}
+
+export interface ScoutingReport {
+  id: number;
+  playerId: number | null;
+  scoutId: number | null;
+  teamId: number | null;
+  date: string;
+  progress: number;
+  overallEstimate: number | null;
+  potentialEstimate: number | null;
+  notes: string | null;
+  recommendation: string | null;
+}
+
+export interface FinancialRecord {
+  id: number;
+  teamId: number | null;
+  seasonId: number | null;
+  date: string;
+  type: "income" | "expense" | string;
+  category: FinancialCategory | string;
+  amount: number;
+  description: string | null;
+}
+
 export interface GameState {
   id: number;
   currentDate: string;
@@ -135,111 +186,5 @@ export interface GameState {
   managerName: string;
   playerTeamId: number | null;
   simulationSpeed: number;
-}
-
-export interface FinancialRecord {
-  id: number;
-  teamId: number;
-  seasonId: number | null;
-  date: string;
-  type: "income" | "expense";
-  category: FinancialCategory;
-  amount: number;
-  description: string | null;
-}
-
-export interface Transfer {
-  id: number;
-  playerId: number;
-  fromTeamId: number | null;
-  toTeamId: number;
-  fee: number;
-  date: string;
-  seasonId: number | null;
-  type: TransferType;
-}
-
-export interface ScoutingReport {
-  id: number;
-  playerId: number;
-  scoutId: number;
-  teamId: number;
-  date: string;
-  progress: number;
-  overallEstimate: number | null;
-  potentialEstimate: number | null;
-  notes: string | null;
-  recommendation: "sign" | "watch" | "reject" | null;
-}
-
-export interface PlayerStats {
-  goals: number;
-  assists: number;
-  yellowCards: number;
-  redCards: number;
-  matchesPlayed: number;
-  minutesPlayed: number;
-  rating: number;
-}
-
-export interface TeamStats {
-  played: number;
-  wins: number;
-  draws: number;
-  losses: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  points: number;
-}
-
-export interface DailyUpdate {
-  date: string;
-  events: GameEvent[];
-  matchesPlayed: Match[];
-  financialChanges: FinancialRecord[];
-}
-
-export interface GameEvent {
-  type: "match" | "injury" | "contract_expiry" | "transfer_window" | "news";
-  title: string;
-  description: string;
-  importance: "low" | "medium" | "high";
-  date: string;
-}
-
-export interface PlayerListItem {
-  id: number;
-  fullName: string;
-  position: Position;
-  age: number;
-  overall: number;
-  moral: number;
-  energy: number;
-  isInjured: boolean;
-  isCaptain: boolean;
-}
-
-export interface StaffListItem {
-  id: number;
-  fullName: string;
-  role: StaffRole;
-  overall: number;
-  salary: number;
-}
-
-export interface MatchListItem {
-  id: number;
-  homeTeam: string;
-  awayTeam: string;
-  date: string;
-  homeScore: number | null;
-  awayScore: number | null;
-  isPlayed: boolean;
-  competition: string;
-}
-
-export interface DailyLog {
-  type: "attribute" | "injury" | "moral" | "info";
-  message: string;
-  entityId?: number;
+  trainingFocus: string | null;
 }

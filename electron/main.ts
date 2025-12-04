@@ -6,7 +6,6 @@ import { playerRepository } from "../src/repositories/PlayerRepository";
 import { staffRepository } from "../src/repositories/StaffRepository";
 import { matchRepository } from "../src/repositories/MatchRepository";
 import { competitionRepository } from "../src/repositories/CompetitionRepository";
-// import { GameEngine } from "../src/engine/GameEngine";
 import { gameState } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { StaffService } from "../src/services/StaffService";
@@ -14,7 +13,6 @@ import { dailySimulationService } from "../src/services/DailySimulationService";
 import { db } from "../src/lib/db";
 import { TrainingFocus } from "../src/domain/enums";
 import { matchService } from "../src/services/MatchService";
-// const gameEngine = new GameEngine();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

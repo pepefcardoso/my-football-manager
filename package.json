@@ -6,16 +6,12 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "build": "tsc && vite build && electron-builder",
     "preview": "vite preview",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx src/db/seed.ts",
-    "rebuild": "electron-builder install-app-deps",
-    "rebuild:local": "npm rebuild better-sqlite3",
-    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
-    "seed": "npm run rebuild:local && tsx src/db/seed.ts && npm run rebuild:electron"
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "seed": "npm rebuild better-sqlite3 && tsx src/db/seed.ts && npm run rebuild",
+    "db:push": "drizzle-kit push", 
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",

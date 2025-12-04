@@ -2,7 +2,22 @@ import { RandomEngine } from "../engine/RandomEngine";
 import { GameEngine } from "../engine/GameEngine";
 import type { Player } from "../domain/models";
 import { TrainingFocus } from "../domain/enums";
-import type { DailySimulationResult, TeamStaffImpact } from "../domain/types";
+import type { TeamStaffImpact } from "../domain/types";
+
+export interface PlayerTrainingUpdate {
+  id: number;
+  energy: number;
+  fitness: number;
+  moral: number;
+  overall: number;
+  isInjured: boolean;
+  injuryDays: number;
+}
+
+export interface TeamTrainingResult {
+  playerUpdates: PlayerTrainingUpdate[];
+  logs: string[];
+}
 
 export class DailySimulationService {
   private gameEngine: GameEngine;
@@ -15,9 +30,9 @@ export class DailySimulationService {
     players: Player[],
     trainingFocus: TrainingFocus,
     staffImpact: TeamStaffImpact
-  ): DailySimulationResult {
+  ): TeamTrainingResult {
     const logs: string[] = [];
-    const playerUpdates: any[] = [];
+    const playerUpdates: PlayerTrainingUpdate[] = [];
 
     logs.push(`Treino do dia: ${this.translateFocus(trainingFocus)}`);
 
@@ -29,6 +44,7 @@ export class DailySimulationService {
           energy: player.energy,
           fitness: Math.max(0, player.fitness - 1),
           moral: player.moral,
+          overall: player.overall,
           injuryDays: newDays,
           isInjured: newDays > 0,
         });
@@ -111,7 +127,7 @@ export class DailySimulationService {
         } else if (RandomEngine.chance(declineChance)) {
           newOverall -= 1;
           logs.push(
-            `jq ${player.firstName} ${player.lastName} caiu de rendimento (-1).`
+            `📉 ${player.firstName} ${player.lastName} caiu de rendimento (-1).`
           );
         }
       }
