@@ -1,6 +1,6 @@
 import { eq, and, or, asc, gte, lte } from "drizzle-orm";
-import { db } from "../../db/client";
-import { matches, matchEvents } from "../../db/schema";
+import { db } from "../db/client";
+import { matches, matchEvents } from "../db/schema";
 
 export type MatchSelect = typeof matches.$inferSelect;
 export type MatchInsert = typeof matches.$inferInsert;

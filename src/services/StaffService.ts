@@ -1,4 +1,4 @@
-import { staffRepository } from "../data/repositories/StaffRepository";
+import { staffRepository } from "../repositories/StaffRepository";
 import { StaffRole } from "../domain/types";
 
 export interface TeamStaffImpact {

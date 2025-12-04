@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
-import { db } from "../../db/client";
-import { competitions, competitionStandings } from "../../db/schema";
+import { competitions, competitionStandings } from "../db/schema";
+import { db } from "../db/client";
 
 export type CompetitionSelect = typeof competitions.$inferSelect;
 export type StandingSelect = typeof competitionStandings.$inferSelect;

@@ -1,6 +1,6 @@
-import { playerRepository } from "../data/repositories/PlayerRepository";
-import { staffRepository } from "../data/repositories/StaffRepository";
-import { financialRepository } from "../data/repositories/FinancialRepository";
+import { playerRepository } from "../repositories/PlayerRepository";
+import { staffRepository } from "../repositories/StaffRepository";
+import { financialRepository } from "../repositories/FinancialRepository";
 import { FinancialCategory } from "../domain/types";
 
 export class ContractService {

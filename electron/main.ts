@@ -1,11 +1,11 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { teamRepository } from "../src/data/repositories/TeamRepository";
-import { playerRepository } from "../src/data/repositories/PlayerRepository";
-import { staffRepository } from "../src/data/repositories/StaffRepository";
-import { matchRepository } from "../src/data/repositories/MatchRepository";
-import { competitionRepository } from "../src/data/repositories/CompetitionRepository";
+import { teamRepository } from "../src/repositories/TeamRepository";
+import { playerRepository } from "../src/repositories/PlayerRepository";
+import { staffRepository } from "../src/repositories/StaffRepository";
+import { matchRepository } from "../src/repositories/MatchRepository";
+import { competitionRepository } from "../src/repositories/CompetitionRepository";
 // import { GameEngine } from "../src/engine/GameEngine";
 import { db } from "../src/db/client";
 import { gameState } from "../src/db/schema";

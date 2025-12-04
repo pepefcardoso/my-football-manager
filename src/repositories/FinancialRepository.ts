@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
-import { db } from "../../db/client";
-import { financialRecords } from "../../db/schema";
+import { db } from "../db/client";
+import { financialRecords } from "../db/schema";
 
 export type FinancialRecordInsert = typeof financialRecords.$inferInsert;
 

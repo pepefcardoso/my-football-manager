@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../db/client";
-import { staff } from "../../db/schema";
+import { db } from "../db/client";
+import { staff } from "../db/schema";
 
 export type StaffSelect = typeof staff.$inferSelect;
 export type StaffInsert = typeof staff.$inferInsert;

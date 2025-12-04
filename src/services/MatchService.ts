@@ -3,11 +3,11 @@ import {
   type MatchConfig,
   type MatchResult,
 } from "../engine/MatchEngine";
-import { matchRepository } from "../data/repositories/MatchRepository";
-import { playerRepository } from "../data/repositories/PlayerRepository";
-import { teamRepository } from "../data/repositories/TeamRepository";
-import { competitionRepository } from "../data/repositories/CompetitionRepository";
-import { financialRepository } from "../data/repositories/FinancialRepository";
+import { matchRepository } from "../repositories/MatchRepository";
+import { playerRepository } from "../repositories/PlayerRepository";
+import { teamRepository } from "../repositories/TeamRepository";
+import { competitionRepository } from "../repositories/CompetitionRepository";
+import { financialRepository } from "../repositories/FinancialRepository";
 import { FinancialCategory, type Team } from "../domain/types";
 
 export class MatchService {

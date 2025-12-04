@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../db/client";
-import { teams } from "../../db/schema";
+import { db } from "../db/client";
+import { teams } from "../db/schema";
 
 export type TeamSelect = typeof teams.$inferSelect;
 export type TeamInsert = typeof teams.$inferInsert;

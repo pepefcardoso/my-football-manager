@@ -1,5 +1,5 @@
 import { AttributeCalculator } from "../engine/AttributeCalculator";
-import { playerRepository } from "../data/repositories/PlayerRepository";
+import { playerRepository } from "../repositories/PlayerRepository";
 import { db } from "../db/client";
 import { players } from "../db/schema";
 import { Position } from "../domain/types";
