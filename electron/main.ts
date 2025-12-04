@@ -12,6 +12,7 @@ import { gameState } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { StaffService } from "../src/services/StaffService";
 import { TrainingFocus } from "../src/domain/types";
+import { matchService } from "../src/services/MatchService";
 import { dailySimulationService } from "../src/services/DailySimulationService";
 // const gameEngine = new GameEngine();
 
@@ -153,6 +154,81 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error("IPC Error [get-game-state]:", error);
       return null;
+    }
+  });
+
+  ipcMain.handle("start-match", async (_, matchId: number) => {
+    try {
+      const engine = await matchService.initializeMatch(matchId);
+      if (!engine) return false;
+
+      return matchService.startMatch(matchId);
+    } catch (error) {
+      console.error(`IPC Error [start-match] matchId=${matchId}:`, error);
+      return false;
+    }
+  });
+
+  ipcMain.handle("pause-match", async (_, matchId: number) => {
+    try {
+      return matchService.pauseMatch(matchId);
+    } catch (error) {
+      console.error(`IPC Error [pause-match] matchId=${matchId}:`, error);
+      return false;
+    }
+  });
+
+  ipcMain.handle("resume-match", async (_, matchId: number) => {
+    try {
+      return matchService.resumeMatch(matchId);
+    } catch (error) {
+      console.error(`IPC Error [resume-match] matchId=${matchId}:`, error);
+      return false;
+    }
+  });
+
+  ipcMain.handle("simulate-match-minute", async (_, matchId: number) => {
+    try {
+      return matchService.simulateMinute(matchId);
+    } catch (error) {
+      console.error(
+        `IPC Error [simulate-match-minute] matchId=${matchId}:`,
+        error
+      );
+      return null;
+    }
+  });
+
+  ipcMain.handle("simulate-full-match", async (_, matchId: number) => {
+    try {
+      return await matchService.simulateFullMatch(matchId);
+    } catch (error) {
+      console.error(
+        `IPC Error [simulate-full-match] matchId=${matchId}:`,
+        error
+      );
+      return null;
+    }
+  });
+
+  ipcMain.handle("get-match-state", async (_, matchId: number) => {
+    try {
+      return matchService.getMatchState(matchId);
+    } catch (error) {
+      console.error(`IPC Error [get-match-state] matchId=${matchId}:`, error);
+      return null;
+    }
+  });
+
+  ipcMain.handle("simulate-matches-of-date", async (_, date: string) => {
+    try {
+      return await matchService.simulateMatchesOfDate(date);
+    } catch (error) {
+      console.error(
+        `IPC Error [simulate-matches-of-date] date=${date}:`,
+        error
+      );
+      return { matchesPlayed: 0, results: [] };
     }
   });
 }

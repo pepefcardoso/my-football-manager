@@ -16,6 +16,12 @@ declare global {
       getTeams: () => Promise<Team[]>;
       getPlayers: (teamId: number) => Promise<Player[]>;
       getStaff: (teamId: number) => Promise<Staff[]>;
+      getGameState: () => Promise<GameState>;
+      updateTrainingFocus: (focus: string) => Promise<void>;
+      startMatch: (matchId: number) => Promise<boolean>;
+      pauseMatch: (matchId: number) => Promise<void>;
+      resumeMatch: (matchId: number) => Promise<void>;
+      
     };
   }
 }

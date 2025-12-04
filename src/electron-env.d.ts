@@ -7,6 +7,7 @@ import type {
   Competition,
   GameState,
 } from "./domain/types";
+import type { MatchResult } from "./engine/MatchEngine";
 
 declare namespace NodeJS {
   interface Process {
@@ -27,5 +28,25 @@ interface Window {
     advanceDay: () => Promise<{ date: string; messages: string[] }>;
     saveGame: () => Promise<boolean>;
     loadGame: () => Promise<boolean>;
+
+    startMatch: (matchId: number) => Promise<boolean>;
+    pauseMatch: (matchId: number) => Promise<boolean>;
+    resumeMatch: (matchId: number) => Promise<boolean>;
+    simulateMatchMinute: (matchId: number) => Promise<{
+      currentMinute: number;
+      score: { home: number; away: number };
+      newEvents: any[];
+    } | null>;
+    simulateFullMatch: (matchId: number) => Promise<MatchResult | null>;
+    getMatchState: (matchId: number) => Promise<{
+      state: string;
+      currentMinute: number;
+      score: { home: number; away: number };
+      events: any[];
+    } | null>;
+    simulateMatchesOfDate: (date: string) => Promise<{
+      matchesPlayed: number;
+      results: Array<{ matchId: number; result: MatchResult }>;
+    }>;
   };
 }
