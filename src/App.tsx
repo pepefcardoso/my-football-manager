@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Player, Staff } from "./domain/types";
+import type { GameState, Player, Staff } from "./domain/types";
 
 type Team = {
   id: number;
@@ -274,6 +274,21 @@ function MenuPage({
 }
 
 function ClubOverviewPage({ team }: { team: Team }) {
+  const [gameState, setGameState] = useState<GameState | null>(null);
+
+  const fetchGameState = async () => {
+    try {
+      const state = await window.electronAPI.getGameState();
+      setGameState(state);
+    } catch (error) {
+      console.error("Erro ao carregar estado do jogo:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchGameState();
+  }, []);
+
   return (
     <div className="p-8">
       <header className="mb-8">
@@ -298,6 +313,54 @@ function ClubOverviewPage({ team }: { team: Team }) {
           value={`€${((team.budget || 0) / 1000000).toFixed(1)}M`}
         />
         <StatCard title="Próxima Partida" value="15 Jan 2025" subtitle="vs Blue Dragons" />
+      </div>
+
+      {gameState && (
+        <TrainingControl 
+          currentFocus={gameState.trainingFocus || "technical"} 
+          onUpdate={fetchGameState} 
+        />
+      )}
+    </div>
+  );
+}
+
+function TrainingControl({ currentFocus, onUpdate }: { currentFocus: string, onUpdate: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  const handleFocusChange = async (focus: string) => {
+    setSaving(true);
+    await window.electronAPI.updateTrainingFocus(focus);
+    onUpdate();
+    setSaving(false);
+  };
+
+  const focusOptions = [
+    { id: "technical", label: "Técnico", icon: "⚽" },
+    { id: "tactical", label: "Tático", icon: "📋" },
+    { id: "physical", label: "Físico", icon: "💪" },
+    { id: "rest", label: "Descanso", icon: "🛌" },
+  ];
+
+  return (
+    <div className="bg-slate-900 rounded-lg p-6 border border-slate-800 mt-6">
+      <h3 className="text-sm font-medium text-slate-400 mb-4">Foco do Treino (Próximo Dia)</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {focusOptions.map((opt) => (
+          <button
+            key={opt.id}
+            onClick={() => handleFocusChange(opt.id)}
+            disabled={saving}
+            className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
+              currentFocus === opt.id
+                ? "bg-emerald-600/20 border-emerald-500 text-white"
+                : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700"
+            }`}
+          >
+            <span className="text-2xl">{opt.icon}</span>
+            <span className="text-sm font-medium">{opt.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

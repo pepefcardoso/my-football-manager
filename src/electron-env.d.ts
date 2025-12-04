@@ -21,6 +21,7 @@ interface Window {
     getStaff: (teamId: number) => Promise<Staff[]>;
     getMatches: (teamId: number, seasonId: number) => Promise<Match[]>;
     getCompetitions: () => Promise<Competition[]>;
+    updateTrainingFocus: (focus: string) => Promise<boolean>;
 
     getGameState: () => Promise<GameState>;
     advanceDay: () => Promise<{ date: string; messages: string[] }>;

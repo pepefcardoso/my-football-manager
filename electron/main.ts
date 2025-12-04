@@ -129,6 +129,23 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle("update-training-focus", async (_, focus: string) => {
+    try {
+      const currentState = await db.select().from(gameState).limit(1);
+      if (!currentState[0]) return false;
+
+      await db
+        .update(gameState)
+        .set({ trainingFocus: focus })
+        .where(eq(gameState.id, currentState[0].id));
+
+      return true;
+    } catch (error) {
+      console.error("IPC Error [update-training-focus]:", error);
+      return false;
+    }
+  });
+
   ipcMain.handle("get-game-state", async () => {
     try {
       const state = await db.select().from(gameState).limit(1);

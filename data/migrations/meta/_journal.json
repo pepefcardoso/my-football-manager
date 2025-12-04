@@ -15,6 +15,13 @@
       "when": 1764796745942,
       "tag": "0001_striped_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1764850367567,
+      "tag": "0002_omniscient_lord_tyger",
+      "breakpoints": true
     }
   ]
 }

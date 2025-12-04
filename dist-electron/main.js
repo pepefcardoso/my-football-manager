@@ -4874,7 +4874,8 @@ const gameState = sqliteTable("game_state", {
   currentSeasonId: integer("current_season_id").references(() => seasons.id),
   managerName: text("manager_name").default("Treinador"),
   playerTeamId: integer("player_team_id").references(() => teams.id),
-  simulationSpeed: integer("simulation_speed").default(1)
+  simulationSpeed: integer("simulation_speed").default(1),
+  trainingFocus: text("training_focus").default("technical")
 });
 const teamsRelations = relations(teams, ({ many, one }) => ({
   players: many(players),
@@ -5093,6 +5094,22 @@ class PlayerRepository {
       }
     });
   }
+  async updateDailyStatsBatch(updates) {
+    await db.transaction(async (tx) => {
+      for (const u of updates) {
+        const updateData = {
+          energy: u.energy,
+          fitness: u.fitness,
+          moral: u.moral
+        };
+        if (u.overall !== void 0) updateData.overall = u.overall;
+        if (u.injuryDays !== void 0)
+          updateData.injuryDaysRemaining = u.injuryDays;
+        if (u.isInjured !== void 0) updateData.isInjured = u.isInjured;
+        await tx.update(players).set(updateData).where(eq(players.id, u.id));
+      }
+    });
+  }
 }
 const playerRepository = new PlayerRepository();
 class StaffRepository {
@@ -5197,6 +5214,322 @@ class CompetitionRepository {
   }
 }
 const competitionRepository = new CompetitionRepository();
+var StaffRole = /* @__PURE__ */ ((StaffRole2) => {
+  StaffRole2["HEAD_COACH"] = "head_coach";
+  StaffRole2["ASSISTANT_COACH"] = "assistant_coach";
+  StaffRole2["FITNESS_COACH"] = "fitness_coach";
+  StaffRole2["MEDICAL_DOCTOR"] = "medical_doctor";
+  StaffRole2["PHYSIOTHERAPIST"] = "physiotherapist";
+  StaffRole2["SCOUT"] = "scout";
+  StaffRole2["FOOTBALL_DIRECTOR"] = "football_director";
+  StaffRole2["EXECUTIVE_DIRECTOR"] = "executive_director";
+  return StaffRole2;
+})(StaffRole || {});
+var TrainingFocus = /* @__PURE__ */ ((TrainingFocus2) => {
+  TrainingFocus2["PHYSICAL"] = "physical";
+  TrainingFocus2["TECHNICAL"] = "technical";
+  TrainingFocus2["TACTICAL"] = "tactical";
+  TrainingFocus2["REST"] = "rest";
+  return TrainingFocus2;
+})(TrainingFocus || {});
+class StaffService {
+  async getStaffImpact(teamId) {
+    const allStaff = await staffRepository.findByTeamId(teamId);
+    const medics = allStaff.filter((s) => s.role === StaffRole.MEDICAL_DOCTOR);
+    const fitnessCoaches = allStaff.filter(
+      (s) => s.role === StaffRole.FITNESS_COACH
+    );
+    const coaches = allStaff.filter(
+      (s) => s.role === StaffRole.HEAD_COACH || s.role === StaffRole.ASSISTANT_COACH
+    );
+    const scouts = allStaff.filter((s) => s.role === StaffRole.SCOUT);
+    return {
+      injuryRecoveryMultiplier: this.calculateMedicalImpact(medics),
+      energyRecoveryBonus: this.calculateFitnessImpact(fitnessCoaches),
+      tacticalAnalysisBonus: this.calculateCoachingImpact(coaches),
+      scoutingAccuracy: this.calculateScoutingImpact(scouts)
+    };
+  }
+  calculateMedicalImpact(medics) {
+    if (medics.length === 0) return 1;
+    const maxOverall = Math.max(...medics.map((m) => m.overall));
+    const reduction = maxOverall * 0.4 / 100;
+    return 1 - reduction;
+  }
+  calculateFitnessImpact(coaches) {
+    if (coaches.length === 0) return 0;
+    const avgOverall = coaches.reduce((acc, c) => acc + c.overall, 0) / coaches.length;
+    return Math.round(avgOverall * 0.1);
+  }
+  calculateCoachingImpact(coaches) {
+    if (coaches.length === 0) return 0;
+    let impactScore = 0;
+    let count = 0;
+    coaches.forEach((c) => {
+      const weight = c.role === StaffRole.HEAD_COACH ? 1 : 0.5;
+      impactScore += c.overall * weight;
+      count += weight;
+    });
+    const weightedAvg = count > 0 ? impactScore / count : 0;
+    return Math.round(weightedAvg * 0.2);
+  }
+  calculateScoutingImpact(scouts) {
+    if (scouts.length === 0) return 15;
+    const bestScout = Math.max(...scouts.map((s) => s.overall));
+    return Math.max(0, 10 - bestScout / 10);
+  }
+}
+class RandomEngine {
+  static getInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+  static chance(percentage) {
+    return Math.random() * 100 < percentage;
+  }
+  static getNormalDistribution(mean, stdDev) {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    const num = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    return Math.round(num * stdDev + mean);
+  }
+  static pickOne(items) {
+    return items[this.getInt(0, items.length - 1)];
+  }
+}
+class GameEngine {
+  currentDate;
+  gameState = null;
+  constructor(initialDate) {
+    this.currentDate = initialDate ? new Date(initialDate) : /* @__PURE__ */ new Date("2025-01-01");
+  }
+  setGameState(state) {
+    this.gameState = state;
+  }
+  getGameState() {
+    return this.gameState;
+  }
+  getCurrentDate() {
+    return this.currentDate.toISOString().split("T")[0];
+  }
+  advanceDay() {
+    this.currentDate.setDate(this.currentDate.getDate() + 1);
+    return this.getCurrentDate();
+  }
+  advanceDays(days) {
+    for (let i = 0; i < days; i++) {
+      this.advanceDay();
+    }
+    return this.getCurrentDate();
+  }
+  getWeekday() {
+    const days = [
+      "Domingo",
+      "Segunda",
+      "Terça",
+      "Quarta",
+      "Quinta",
+      "Sexta",
+      "Sábado"
+    ];
+    return days[this.currentDate.getDay()];
+  }
+  isMatchDay() {
+    const day = this.currentDate.getDay();
+    return day === 3 || day === 6;
+  }
+  async processDailyUpdate() {
+    const updates = {
+      date: this.getCurrentDate(),
+      playersUpdated: 0,
+      matchesPlayed: [],
+      injuries: [],
+      suspensions: [],
+      contractExpiries: [],
+      financialChanges: []
+    };
+    return updates;
+  }
+  calculatePlayerMoralChange(result, teamReputation, opponentReputation) {
+    const reputationDiff = opponentReputation - teamReputation;
+    if (result === "win") {
+      return Math.max(5, Math.min(15, 10 + reputationDiff / 500));
+    } else if (result === "loss") {
+      return Math.min(-5, Math.max(-15, -10 - reputationDiff / 500));
+    } else {
+      return reputationDiff > 0 ? 2 : -2;
+    }
+  }
+  calculateEnergyRecovery(restDays, staffEnergyBonus, trainingCenterQuality) {
+    const baseRecovery = restDays * 15;
+    const coachBonus = staffEnergyBonus;
+    const facilityBonus = (trainingCenterQuality - 50) * 0.1;
+    return Math.min(100, baseRecovery + coachBonus + facilityBonus);
+  }
+  calculateInjuryRisk(fitness, energy, age, physical) {
+    let risk = 0;
+    if (fitness < 70) risk += (70 - fitness) * 0.5;
+    if (energy < 50) risk += (50 - energy) * 0.8;
+    if (age > 30) risk += (age - 30) * 2;
+    risk -= (physical - 50) * 0.3;
+    return Math.max(0, Math.min(100, risk));
+  }
+  applyMatchFatigue(player, minutesPlayed) {
+    const fatigueAmount = minutesPlayed * 0.5;
+    const newEnergy = Math.max(0, player.energy - fatigueAmount);
+    return {
+      ...player,
+      energy: Math.round(newEnergy)
+    };
+  }
+  calculatePlayerForm(recentPerformances) {
+    if (recentPerformances.length === 0) return 50;
+    const average = recentPerformances.reduce((sum, val) => sum + val, 0) / recentPerformances.length;
+    return Math.round(Math.max(0, Math.min(100, average)));
+  }
+  shouldInjuryOccur(injuryRisk) {
+    return Math.random() * 100 < injuryRisk;
+  }
+  generateInjuryDuration(severity, medicalMultiplier = 1) {
+    let baseDuration = 0;
+    switch (severity) {
+      case "light":
+        baseDuration = Math.floor(Math.random() * 7) + 3;
+        break;
+      case "moderate":
+        baseDuration = Math.floor(Math.random() * 21) + 14;
+        break;
+      case "severe":
+        baseDuration = Math.floor(Math.random() * 90) + 60;
+        break;
+    }
+    return Math.max(1, Math.round(baseDuration * medicalMultiplier));
+  }
+  canPlayerPlay(player) {
+    return !player.isInjured && // player.suspensionGamesRemaining === 0 &&
+    player.energy > 30 && player.fitness > 40;
+  }
+  getPlayerAvailabilityStatus(player) {
+    if (player.isInjured)
+      return `Lesionado (${player.injuryDaysRemaining} dias)`;
+    if (player.energy < 30) return "Exausto";
+    if (player.fitness < 40) return "Fora de forma";
+    return "Disponível";
+  }
+}
+class DailySimulationService {
+  gameEngine;
+  constructor() {
+    this.gameEngine = new GameEngine();
+  }
+  processTeamDailyLoop(players2, trainingFocus, staffImpact) {
+    const logs = [];
+    const playerUpdates = [];
+    logs.push(`Treino do dia: ${this.translateFocus(trainingFocus)}`);
+    for (const player of players2) {
+      if (player.isInjured) {
+        const newDays = Math.max(0, player.injuryDaysRemaining - 1);
+        playerUpdates.push({
+          id: player.id,
+          energy: player.energy,
+          fitness: Math.max(0, player.fitness - 1),
+          moral: player.moral,
+          injuryDays: newDays,
+          isInjured: newDays > 0
+        });
+        if (newDays === 0 && player.injuryDaysRemaining > 0) {
+          logs.push(
+            `🚑 ${player.firstName} ${player.lastName} recuperou-se da lesão.`
+          );
+        }
+        continue;
+      }
+      let energyDelta = 0;
+      let fitnessDelta = 0;
+      switch (trainingFocus) {
+        case TrainingFocus.REST:
+          energyDelta = 15 + staffImpact.energyRecoveryBonus;
+          fitnessDelta = -1;
+          break;
+        case TrainingFocus.PHYSICAL:
+          energyDelta = -10;
+          fitnessDelta = 2 + staffImpact.energyRecoveryBonus * 0.1;
+          break;
+        case TrainingFocus.TACTICAL:
+          energyDelta = -5;
+          fitnessDelta = 0;
+          break;
+        case TrainingFocus.TECHNICAL:
+          energyDelta = -7;
+          fitnessDelta = 1;
+          break;
+      }
+      const newEnergy = Math.max(0, Math.min(100, player.energy + energyDelta));
+      const newFitness = Math.max(
+        0,
+        Math.min(100, player.fitness + fitnessDelta)
+      );
+      const injuryRiskBase = (100 - player.energy) * 0.05 + (trainingFocus === TrainingFocus.PHYSICAL ? 2 : 0);
+      const mitigatedRisk = Math.max(
+        0,
+        injuryRiskBase - staffImpact.energyRecoveryBonus / 5
+      );
+      let isInjured = false;
+      let injuryDays = 0;
+      if (trainingFocus !== TrainingFocus.REST && RandomEngine.chance(mitigatedRisk)) {
+        isInjured = true;
+        injuryDays = this.gameEngine.generateInjuryDuration(
+          "light",
+          staffImpact.injuryRecoveryMultiplier
+        );
+        logs.push(
+          `🩹 ${player.firstName} ${player.lastName} sentiu uma lesão no treino (${injuryDays} dias).`
+        );
+      }
+      let newOverall = player.overall;
+      if (!isInjured && trainingFocus !== TrainingFocus.REST) {
+        const growthChance = player.age < 23 ? 5 : player.age < 29 ? 2 : 0.5;
+        const declineChance = player.age > 32 && trainingFocus === TrainingFocus.PHYSICAL ? 2 : 0;
+        if (RandomEngine.chance(growthChance)) {
+          if (player.overall < player.potential) {
+            newOverall += 1;
+            logs.push(
+              `📈 ${player.firstName} ${player.lastName} evoluiu nos treinos (+1).`
+            );
+          }
+        } else if (RandomEngine.chance(declineChance)) {
+          newOverall -= 1;
+          logs.push(
+            `jq ${player.firstName} ${player.lastName} caiu de rendimento (-1).`
+          );
+        }
+      }
+      let newMoral = player.moral;
+      if (player.moral > 50) newMoral -= 0.5;
+      if (player.moral < 50) newMoral += 0.5;
+      playerUpdates.push({
+        id: player.id,
+        energy: newEnergy,
+        fitness: newFitness,
+        moral: Math.round(newMoral),
+        overall: newOverall,
+        isInjured,
+        injuryDays
+      });
+    }
+    return { playerUpdates, logs };
+  }
+  translateFocus(focus) {
+    const map = {
+      [TrainingFocus.REST]: "Descanso e Recuperação",
+      [TrainingFocus.PHYSICAL]: "Condicionamento Físico",
+      [TrainingFocus.TACTICAL]: "Tático e Posicionamento",
+      [TrainingFocus.TECHNICAL]: "Técnico e Fundamentos"
+    };
+    return map[focus] || focus;
+  }
+}
+const dailySimulationService = new DailySimulationService();
 const __dirname$1 = path$1.dirname(fileURLToPath$1(import.meta.url));
 process.env.APP_ROOT = path$1.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
@@ -5249,20 +5582,49 @@ function registerIpcHandlers() {
   });
   ipcMain.handle("advance-day", async () => {
     try {
-      console.log("⏳ Advancing day...");
+      console.log("⏳ Advancing day process started...");
       const currentState = await db.select().from(gameState).limit(1);
       if (!currentState[0]) throw new Error("No game state found");
-      const current = new Date(currentState[0].currentDate);
-      current.setDate(current.getDate() + 1);
-      const nextDate = current.toISOString().split("T")[0];
-      await db.update(gameState).set({ currentDate: nextDate }).where(eq(gameState.id, currentState[0].id));
+      const state = currentState[0];
+      const nextDateRaw = new Date(state.currentDate);
+      nextDateRaw.setDate(nextDateRaw.getDate() + 1);
+      const nextDate = nextDateRaw.toISOString().split("T")[0];
+      const logs = [`Dia avançado para ${nextDate}`];
+      if (state.playerTeamId) {
+        const players2 = await playerRepository.findByTeamId(state.playerTeamId);
+        const staffService = new StaffService();
+        const staffImpact = await staffService.getStaffImpact(
+          state.playerTeamId
+        );
+        const focus = state.trainingFocus || TrainingFocus.TECHNICAL;
+        const simResult = dailySimulationService.processTeamDailyLoop(
+          players2,
+          focus,
+          staffImpact
+        );
+        await playerRepository.updateDailyStatsBatch(simResult.playerUpdates);
+        logs.push(...simResult.logs);
+      }
+      await db.update(gameState).set({ currentDate: nextDate }).where(eq(gameState.id, state.id));
+      console.log("✅ Daily processing complete.");
       return {
         date: nextDate,
-        messages: ["Dia avançado com sucesso"]
+        messages: logs
       };
     } catch (error) {
       console.error("IPC Error [advance-day]:", error);
       throw error;
+    }
+  });
+  ipcMain.handle("update-training-focus", async (_, focus) => {
+    try {
+      const currentState = await db.select().from(gameState).limit(1);
+      if (!currentState[0]) return false;
+      await db.update(gameState).set({ trainingFocus: focus }).where(eq(gameState.id, currentState[0].id));
+      return true;
+    } catch (error) {
+      console.error("IPC Error [update-training-focus]:", error);
+      return false;
     }
   });
   ipcMain.handle("get-game-state", async () => {
