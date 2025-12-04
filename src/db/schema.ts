@@ -183,6 +183,7 @@ export const gameState = sqliteTable("game_state", {
   managerName: text("manager_name").default("Treinador"),
   playerTeamId: integer("player_team_id").references(() => teams.id),
   simulationSpeed: integer("simulation_speed").default(1),
+  trainingFocus: text("training_focus").default("technical"),
 });
 
 export const teamsRelations = relations(teams, ({ many, one }) => ({

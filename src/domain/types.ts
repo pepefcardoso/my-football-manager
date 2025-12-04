@@ -289,3 +289,16 @@ export interface MatchListItem {
   isPlayed: boolean;
   competition: string;
 }
+
+export enum TrainingFocus {
+  PHYSICAL = "physical",
+  TECHNICAL = "technical",
+  TACTICAL = "tactical",
+  REST = "rest",
+}
+
+export interface DailyLog {
+  type: "attribute" | "injury" | "moral" | "info";
+  message: string;
+  entityId?: number;
+}

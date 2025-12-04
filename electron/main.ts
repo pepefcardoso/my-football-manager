@@ -11,6 +11,8 @@ import { db } from "../src/db/client";
 import { gameState } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { StaffService } from "../src/services/StaffService";
+import { TrainingFocus } from "../src/domain/types";
+import { dailySimulationService } from "../src/services/DailySimulationService";
 // const gameEngine = new GameEngine();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,30 +78,50 @@ function registerIpcHandlers() {
 
   ipcMain.handle("advance-day", async () => {
     try {
-      console.log("⏳ Advancing day...");
+      console.log("⏳ Advancing day process started...");
 
       const currentState = await db.select().from(gameState).limit(1);
       if (!currentState[0]) throw new Error("No game state found");
 
-      const playerTeamId = currentState[0].playerTeamId;
-      if (playerTeamId) {
-        const staffService = new StaffService();
-        const impacts = await staffService.getStaffImpact(playerTeamId);
-        console.log("📊 Impactos do Staff aplicados hoje:", impacts);
-      }
+      const state = currentState[0];
+      const nextDateRaw = new Date(state.currentDate);
+      nextDateRaw.setDate(nextDateRaw.getDate() + 1);
+      const nextDate = nextDateRaw.toISOString().split("T")[0];
 
-      const current = new Date(currentState[0].currentDate);
-      current.setDate(current.getDate() + 1);
-      const nextDate = current.toISOString().split("T")[0];
+      const logs: string[] = [`Dia avançado para ${nextDate}`];
+
+      if (state.playerTeamId) {
+        const players = await playerRepository.findByTeamId(state.playerTeamId);
+
+        const staffService = new StaffService();
+        const staffImpact = await staffService.getStaffImpact(
+          state.playerTeamId
+        );
+
+        const focus =
+          (state.trainingFocus as TrainingFocus) || TrainingFocus.TECHNICAL;
+
+        const simResult = dailySimulationService.processTeamDailyLoop(
+          players,
+          focus,
+          staffImpact
+        );
+
+        await playerRepository.updateDailyStatsBatch(simResult.playerUpdates);
+
+        logs.push(...simResult.logs);
+      }
 
       await db
         .update(gameState)
         .set({ currentDate: nextDate })
-        .where(eq(gameState.id, currentState[0].id));
+        .where(eq(gameState.id, state.id));
+
+      console.log("✅ Daily processing complete.");
 
       return {
         date: nextDate,
-        messages: ["Dia avançado com sucesso"],
+        messages: logs,
       };
     } catch (error) {
       console.error("IPC Error [advance-day]:", error);

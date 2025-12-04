@@ -118,6 +118,35 @@ export class PlayerRepository {
       }
     });
   }
+
+  async updateDailyStatsBatch(
+    updates: {
+      id: number;
+      energy: number;
+      fitness: number;
+      moral: number;
+      overall?: number;
+      injuryDays?: number;
+      isInjured?: boolean;
+    }[]
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      for (const u of updates) {
+        const updateData: any = {
+          energy: u.energy,
+          fitness: u.fitness,
+          moral: u.moral,
+        };
+
+        if (u.overall !== undefined) updateData.overall = u.overall;
+        if (u.injuryDays !== undefined)
+          updateData.injuryDaysRemaining = u.injuryDays;
+        if (u.isInjured !== undefined) updateData.isInjured = u.isInjured;
+
+        await tx.update(players).set(updateData).where(eq(players.id, u.id));
+      }
+    });
+  }
 }
 
 export const playerRepository = new PlayerRepository();
