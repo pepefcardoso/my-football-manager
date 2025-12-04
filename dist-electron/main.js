@@ -4755,7 +4755,9 @@ const players = sqliteTable("players", {
   isInjured: integer("is_injured", { mode: "boolean" }).default(false),
   injuryType: text("injury_type"),
   injuryDaysRemaining: integer("injury_days_remaining").default(0),
-  isCaptain: integer("is_captain", { mode: "boolean" }).default(false)
+  isCaptain: integer("is_captain", { mode: "boolean" }).default(false),
+  //TEMPORARIO TODO
+  suspensionGamesRemaining: integer("suspension_games_remaining").default(0)
 });
 const playerContracts = sqliteTable("player_contracts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -5225,6 +5227,19 @@ var StaffRole = /* @__PURE__ */ ((StaffRole2) => {
   StaffRole2["EXECUTIVE_DIRECTOR"] = "executive_director";
   return StaffRole2;
 })(StaffRole || {});
+var FinancialCategory = /* @__PURE__ */ ((FinancialCategory2) => {
+  FinancialCategory2["TICKET_SALES"] = "ticket_sales";
+  FinancialCategory2["TV_RIGHTS"] = "tv_rights";
+  FinancialCategory2["SPONSORS"] = "sponsors";
+  FinancialCategory2["TRANSFER_IN"] = "transfer_in";
+  FinancialCategory2["TRANSFER_OUT"] = "transfer_out";
+  FinancialCategory2["PRIZE"] = "prize";
+  FinancialCategory2["SALARY"] = "salary";
+  FinancialCategory2["STAFF_SALARY"] = "staff_salary";
+  FinancialCategory2["STADIUM_MAINTENANCE"] = "stadium_maintenance";
+  FinancialCategory2["INFRASTRUCTURE"] = "infrastructure";
+  return FinancialCategory2;
+})(FinancialCategory || {});
 var TrainingFocus = /* @__PURE__ */ ((TrainingFocus2) => {
   TrainingFocus2["PHYSICAL"] = "physical";
   TrainingFocus2["TECHNICAL"] = "technical";
@@ -5297,6 +5312,565 @@ class RandomEngine {
     return items[this.getInt(0, items.length - 1)];
   }
 }
+class MatchEngine {
+  currentMinute = 0;
+  state = "not_started";
+  homeScore = 0;
+  awayScore = 0;
+  events = [];
+  stats = {
+    homePossession: 0,
+    awayPossession: 0,
+    homeShots: 0,
+    awayShots: 0,
+    homeShotsOnTarget: 0,
+    awayShotsOnTarget: 0,
+    homeCorners: 0,
+    awayCorners: 0,
+    homeFouls: 0,
+    awayFouls: 0
+  };
+  config;
+  homeStrength;
+  awayStrength;
+  weatherMultiplier = 1;
+  constructor(config) {
+    this.config = config;
+    this.homeStrength = this.calculateTeamStrength(config.homePlayers);
+    this.awayStrength = this.calculateTeamStrength(config.awayPlayers);
+    this.applyWeatherEffects(config.weather || "sunny");
+  }
+  // ==================== CÁLCULO DE FORÇA ====================
+  calculateTeamStrength(players2) {
+    if (players2.length === 0) {
+      return {
+        overall: 50,
+        attack: 50,
+        defense: 50,
+        midfield: 50,
+        moralBonus: 0,
+        fitnessMultiplier: 1
+      };
+    }
+    const attackers = players2.filter((p) => p.position === "FW");
+    const midfielders = players2.filter((p) => p.position === "MF");
+    const defenders = players2.filter((p) => p.position === "DF");
+    const goalkeeper = players2.find((p) => p.position === "GK");
+    const calcAvg = (arr, attr) => arr.length > 0 ? arr.reduce((sum, p) => sum + (Number(p[attr]) || 0), 0) / arr.length : 50;
+    const attack = (calcAvg(attackers, "finishing") + calcAvg(attackers, "shooting") + calcAvg(attackers, "pace")) / 3;
+    const midfield = (calcAvg(midfielders, "passing") + calcAvg(midfielders, "dribbling") + calcAvg(midfielders, "pace")) / 3;
+    const defense = (calcAvg(defenders, "defending") + calcAvg(defenders, "physical") + (goalkeeper?.defending || 50)) / 3;
+    const overallAvg = players2.reduce((sum, p) => sum + p.overall, 0) / players2.length;
+    const avgMoral = players2.reduce((sum, p) => sum + p.moral, 0) / players2.length;
+    const moralBonus = (avgMoral - 50) / 100 * 10;
+    const avgEnergy = players2.reduce((sum, p) => sum + p.energy, 0) / players2.length;
+    const fitnessMultiplier = 0.7 + avgEnergy / 100 * 0.3;
+    return {
+      overall: overallAvg,
+      attack,
+      defense,
+      midfield,
+      moralBonus,
+      fitnessMultiplier
+    };
+  }
+  applyWeatherEffects(weather) {
+    switch (weather) {
+      case "rainy":
+        this.weatherMultiplier = 0.9;
+        break;
+      case "windy":
+        this.weatherMultiplier = 0.95;
+        break;
+      default:
+        this.weatherMultiplier = 1;
+    }
+  }
+  start() {
+    if (this.state !== "not_started") return;
+    this.state = "playing";
+    this.events.push({
+      minute: 0,
+      type: "shot",
+      teamId: this.config.homeTeam.id,
+      description: "⚽ A partida começou!"
+    });
+  }
+  pause() {
+    if (this.state === "playing") {
+      this.state = "paused";
+    }
+  }
+  resume() {
+    if (this.state === "paused") {
+      this.state = "playing";
+    }
+  }
+  simulateMinute() {
+    if (this.state !== "playing" || this.currentMinute >= 90) return;
+    this.currentMinute++;
+    const homeStrengthTotal = this.homeStrength.overall * 1.05 + this.homeStrength.moralBonus;
+    const awayStrengthTotal = this.awayStrength.overall + this.awayStrength.moralBonus;
+    const totalStrength = homeStrengthTotal + awayStrengthTotal;
+    const homePossessionChance = homeStrengthTotal / totalStrength * 100;
+    const isHomeAttacking = RandomEngine.chance(homePossessionChance);
+    if (isHomeAttacking) {
+      this.stats.homePossession++;
+    } else {
+      this.stats.awayPossession++;
+    }
+    if (RandomEngine.chance(20)) {
+      this.processAttack(isHomeAttacking);
+    }
+    if (RandomEngine.chance(1)) {
+      this.processRandomEvent(isHomeAttacking);
+    }
+    if (this.currentMinute >= 90) {
+      this.state = "finished";
+      this.events.push({
+        minute: 90,
+        type: "shot",
+        teamId: this.config.homeTeam.id,
+        description: `🏁 FIM DE JOGO! ${this.config.homeTeam.shortName} ${this.homeScore} x ${this.awayScore} ${this.config.awayTeam.shortName}`,
+        severity: "high"
+      });
+    }
+  }
+  processAttack(isHome) {
+    const attackingTeam = isHome ? this.config.homeTeam : this.config.awayTeam;
+    const defendingTeam = isHome ? this.config.awayTeam : this.config.homeTeam;
+    const attackingPlayers = isHome ? this.config.homePlayers : this.config.awayPlayers;
+    const defendingPlayers = isHome ? this.config.awayPlayers : this.config.homePlayers;
+    const attackStrength = isHome ? this.homeStrength.attack * this.homeStrength.fitnessMultiplier : this.awayStrength.attack * this.awayStrength.fitnessMultiplier;
+    const defenseStrength = isHome ? this.awayStrength.defense * this.awayStrength.fitnessMultiplier : this.homeStrength.defense * this.homeStrength.fitnessMultiplier;
+    if (RandomEngine.chance(40)) {
+      if (isHome) this.stats.homeShots++;
+      else this.stats.awayShots++;
+      const shooter = this.selectScorer(attackingPlayers);
+      const shotQuality = (shooter.shooting + shooter.finishing) / 2;
+      if (RandomEngine.chance(shotQuality / 100 * 60)) {
+        if (isHome) this.stats.homeShotsOnTarget++;
+        else this.stats.awayShotsOnTarget++;
+        const goalkeeper = defendingPlayers.find((p) => p.position === "GK");
+        const saveChance = goalkeeper ? (goalkeeper.defending + goalkeeper.overall) / 200 * 100 : 50;
+        const goalChance = attackStrength / (attackStrength + defenseStrength) * 100 * this.weatherMultiplier;
+        if (RandomEngine.chance(goalChance) && !RandomEngine.chance(saveChance)) {
+          if (isHome) this.homeScore++;
+          else this.awayScore++;
+          this.events.push({
+            minute: this.currentMinute,
+            type: "goal",
+            teamId: attackingTeam.id,
+            playerId: shooter.id,
+            description: `⚽ GOOOL! ${shooter.firstName} ${shooter.lastName} marca para o ${attackingTeam.shortName}!`,
+            severity: "high"
+          });
+        } else {
+          this.events.push({
+            minute: this.currentMinute,
+            type: "save",
+            teamId: defendingTeam.id,
+            playerId: goalkeeper?.id,
+            description: `🧤 Grande defesa de ${goalkeeper?.firstName || "o goleiro"}! ${shooter.firstName} quase marca.`
+          });
+        }
+      } else {
+        this.events.push({
+          minute: this.currentMinute,
+          type: "shot",
+          teamId: attackingTeam.id,
+          playerId: shooter.id,
+          description: `📉 ${shooter.firstName} ${shooter.lastName} chuta para fora.`
+        });
+      }
+    }
+    if (RandomEngine.chance(8)) {
+      if (isHome) this.stats.homeCorners++;
+      else this.stats.awayCorners++;
+      this.events.push({
+        minute: this.currentMinute,
+        type: "corner",
+        teamId: attackingTeam.id,
+        description: `🚩 Escanteio para o ${attackingTeam.shortName}.`
+      });
+    }
+  }
+  processRandomEvent(isHome) {
+    const team = isHome ? this.config.homeTeam : this.config.awayTeam;
+    const players2 = isHome ? this.config.homePlayers : this.config.awayPlayers;
+    const eventType = RandomEngine.pickOne(["foul", "yellow", "injury"]);
+    if (eventType === "foul") {
+      if (isHome) this.stats.homeFouls++;
+      else this.stats.awayFouls++;
+      const player = RandomEngine.pickOne(players2);
+      this.events.push({
+        minute: this.currentMinute,
+        type: "foul",
+        teamId: team.id,
+        playerId: player.id,
+        description: `🟨 Falta cometida por ${player.firstName} ${player.lastName}.`
+      });
+    } else if (eventType === "yellow") {
+      const player = RandomEngine.pickOne(players2);
+      this.events.push({
+        minute: this.currentMinute,
+        type: "yellow_card",
+        teamId: team.id,
+        playerId: player.id,
+        description: `🟨 Cartão amarelo para ${player.firstName} ${player.lastName}!`,
+        severity: "medium"
+      });
+    } else if (eventType === "injury") {
+      const player = RandomEngine.pickOne(players2);
+      this.events.push({
+        minute: this.currentMinute,
+        type: "injury",
+        teamId: team.id,
+        playerId: player.id,
+        description: `🩹 ${player.firstName} ${player.lastName} sente uma lesão e precisa de atendimento.`,
+        severity: "medium"
+      });
+    }
+  }
+  selectScorer(players2) {
+    const forwards = players2.filter((p) => p.position === "FW");
+    const midfielders = players2.filter((p) => p.position === "MF");
+    if (forwards.length > 0 && RandomEngine.chance(70)) {
+      return RandomEngine.pickOne(forwards);
+    }
+    if (midfielders.length > 0 && RandomEngine.chance(50)) {
+      return RandomEngine.pickOne(midfielders);
+    }
+    return RandomEngine.pickOne(players2);
+  }
+  getMatchResult() {
+    const homeRep = this.config.homeTeam.reputation || 5e3;
+    const awayRep = this.config.awayTeam.reputation || 5e3;
+    const homeWon = this.homeScore > this.awayScore;
+    const awayWon = this.awayScore > this.homeScore;
+    const playerUpdates = [];
+    for (const player of this.config.homePlayers) {
+      let moralChange = 0;
+      if (homeWon) {
+        const repDiff = awayRep - homeRep;
+        moralChange = 5 + Math.max(0, Math.min(15, repDiff / 500));
+      } else if (awayWon) {
+        const repDiff = homeRep - awayRep;
+        moralChange = -5 - Math.max(0, Math.min(15, repDiff / 500));
+      } else {
+        moralChange = awayRep > homeRep ? 2 : -2;
+      }
+      const newMoral = Math.max(0, Math.min(100, player.moral + moralChange));
+      const newEnergy = Math.max(
+        0,
+        player.energy - RandomEngine.getInt(30, 50)
+      );
+      playerUpdates.push({
+        playerId: player.id,
+        energy: newEnergy,
+        moral: Math.round(newMoral),
+        isInjured: false
+      });
+    }
+    for (const player of this.config.awayPlayers) {
+      let moralChange = 0;
+      if (awayWon) {
+        const repDiff = homeRep - awayRep;
+        moralChange = 5 + Math.max(0, Math.min(15, repDiff / 500));
+      } else if (homeWon) {
+        const repDiff = awayRep - homeRep;
+        moralChange = -5 - Math.max(0, Math.min(15, repDiff / 500));
+      } else {
+        moralChange = homeRep > awayRep ? 2 : -2;
+      }
+      const newMoral = Math.max(0, Math.min(100, player.moral + moralChange));
+      const newEnergy = Math.max(
+        0,
+        player.energy - RandomEngine.getInt(30, 50)
+      );
+      playerUpdates.push({
+        playerId: player.id,
+        energy: newEnergy,
+        moral: Math.round(newMoral),
+        isInjured: false
+      });
+    }
+    const totalPossession = this.stats.homePossession + this.stats.awayPossession;
+    const finalHomePossession = Math.round(
+      this.stats.homePossession / totalPossession * 100
+    );
+    return {
+      homeScore: this.homeScore,
+      awayScore: this.awayScore,
+      events: this.events,
+      stats: {
+        ...this.stats,
+        homePossession: finalHomePossession,
+        awayPossession: 100 - finalHomePossession
+      },
+      playerUpdates
+    };
+  }
+  getCurrentMinute() {
+    return this.currentMinute;
+  }
+  getState() {
+    return this.state;
+  }
+  getCurrentScore() {
+    return { home: this.homeScore, away: this.awayScore };
+  }
+  getEvents() {
+    return this.events;
+  }
+}
+class FinancialRepository {
+  async addRecord(record) {
+    await db.insert(financialRecords).values(record);
+  }
+  async findByTeamAndSeason(teamId, seasonId) {
+    return await db.select().from(financialRecords).where(
+      and(
+        eq(financialRecords.teamId, teamId),
+        eq(financialRecords.seasonId, seasonId)
+      )
+    );
+  }
+  async getBalance(teamId, seasonId) {
+    const records = await this.findByTeamAndSeason(teamId, seasonId);
+    let balance = 0;
+    for (const record of records) {
+      if (record.type === "income") balance += record.amount;
+      else balance -= record.amount;
+    }
+    return balance;
+  }
+}
+const financialRepository = new FinancialRepository();
+class MatchService {
+  engines = /* @__PURE__ */ new Map();
+  async initializeMatch(matchId) {
+    try {
+      const match = await matchRepository.findById(matchId);
+      if (!match) return null;
+      const homeTeamData = await teamRepository.findById(match.homeTeamId);
+      const awayTeamData = await teamRepository.findById(match.awayTeamId);
+      if (!homeTeamData || !awayTeamData) return null;
+      const mapToDomainTeam = (dbTeam) => ({
+        ...dbTeam,
+        primaryColor: dbTeam.primaryColor ?? "#000000",
+        secondaryColor: dbTeam.secondaryColor ?? "#ffffff",
+        reputation: dbTeam.reputation ?? 0,
+        budget: dbTeam.budget ?? 0,
+        stadiumCapacity: dbTeam.stadiumCapacity ?? 1e4,
+        stadiumQuality: dbTeam.stadiumQuality ?? 50,
+        trainingCenterQuality: dbTeam.trainingCenterQuality ?? 50,
+        youthAcademyQuality: dbTeam.youthAcademyQuality ?? 50,
+        fanSatisfaction: dbTeam.fanSatisfaction ?? 50,
+        fanBase: dbTeam.fanBase ?? 1e4,
+        isHuman: dbTeam.isHuman ?? false
+      });
+      const homeTeam = mapToDomainTeam(homeTeamData);
+      const awayTeam = mapToDomainTeam(awayTeamData);
+      if (!homeTeam || !awayTeam) return null;
+      const allHomePlayers = await playerRepository.findByTeamId(
+        match.homeTeamId
+      );
+      const allAwayPlayers = await playerRepository.findByTeamId(
+        match.awayTeamId
+      );
+      const homePlayers = allHomePlayers.filter((p) => !p.isInjured);
+      const awayPlayers = allAwayPlayers.filter((p) => !p.isInjured);
+      const config = {
+        homeTeam,
+        awayTeam,
+        homePlayers,
+        awayPlayers,
+        weather: match.weather
+      };
+      const engine = new MatchEngine(config);
+      this.engines.set(matchId, engine);
+      return engine;
+    } catch (error) {
+      console.error("Erro ao inicializar partida:", error);
+      return null;
+    }
+  }
+  startMatch(matchId) {
+    const engine = this.engines.get(matchId);
+    if (!engine) return false;
+    engine.start();
+    return true;
+  }
+  pauseMatch(matchId) {
+    const engine = this.engines.get(matchId);
+    if (!engine) return false;
+    engine.pause();
+    return true;
+  }
+  resumeMatch(matchId) {
+    const engine = this.engines.get(matchId);
+    if (!engine) return false;
+    engine.resume();
+    return true;
+  }
+  simulateMinute(matchId) {
+    const engine = this.engines.get(matchId);
+    if (!engine) return null;
+    const eventsBefore = engine.getEvents().length;
+    engine.simulateMinute();
+    const allEvents = engine.getEvents();
+    const newEvents = allEvents.slice(eventsBefore);
+    return {
+      currentMinute: engine.getCurrentMinute(),
+      score: engine.getCurrentScore(),
+      newEvents
+    };
+  }
+  async simulateFullMatch(matchId) {
+    const engine = this.engines.get(matchId);
+    if (!engine) {
+      const initialized = await this.initializeMatch(matchId);
+      if (!initialized) return null;
+      return this.simulateFullMatch(matchId);
+    }
+    engine.start();
+    while (engine.getCurrentMinute() < 90) {
+      engine.simulateMinute();
+    }
+    const result = engine.getMatchResult();
+    await this.saveMatchResult(matchId, result);
+    this.engines.delete(matchId);
+    return result;
+  }
+  async saveMatchResult(matchId, result) {
+    try {
+      const match = await matchRepository.findById(matchId);
+      if (!match) return;
+      const homeTeam = await teamRepository.findById(match.homeTeamId);
+      const ticketPrice = 50;
+      const attendance = homeTeam ? Math.round(
+        (homeTeam.stadiumCapacity ?? 0) * (homeTeam.fanSatisfaction ?? 50 / 100) * 0.8
+      ) : 0;
+      const ticketRevenue = attendance * ticketPrice;
+      await matchRepository.updateMatchResult(
+        matchId,
+        result.homeScore,
+        result.awayScore,
+        attendance,
+        ticketRevenue
+      );
+      const eventsToSave = result.events.filter(
+        (e) => ["goal", "yellow_card", "red_card", "injury"].includes(e.type)
+      ).map((e) => ({
+        matchId,
+        minute: e.minute,
+        type: e.type,
+        teamId: e.teamId,
+        playerId: e.playerId || null,
+        description: e.description
+      }));
+      await matchRepository.createMatchEvents(eventsToSave);
+      await playerRepository.updateDailyStatsBatch(
+        result.playerUpdates.map((u) => ({
+          id: u.playerId,
+          energy: u.energy,
+          fitness: Math.max(0, 100 - (100 - u.energy)),
+          moral: u.moral,
+          isInjured: u.isInjured,
+          injuryDays: u.injuryDays
+        }))
+      );
+      if (ticketRevenue > 0 && match.seasonId) {
+        await financialRepository.addRecord({
+          teamId: match.homeTeamId,
+          seasonId: match.seasonId,
+          date: match.date,
+          type: "income",
+          category: FinancialCategory.TICKET_SALES,
+          amount: ticketRevenue,
+          description: `Receita de bilheteira - ${attendance} torcedores`
+        });
+      }
+      if (match.competitionId && match.seasonId) {
+        await this.updateStandings(
+          match.competitionId,
+          match.seasonId,
+          match.homeTeamId,
+          match.awayTeamId,
+          result.homeScore,
+          result.awayScore
+        );
+      }
+    } catch (error) {
+      console.error("Erro ao salvar resultado da partida:", error);
+    }
+  }
+  async updateStandings(competitionId, seasonId, homeTeamId, awayTeamId, homeScore, awayScore) {
+    const homeStanding = await competitionRepository.getStandings(
+      competitionId,
+      seasonId
+    );
+    const homeData = homeStanding.find((s) => s.teamId === homeTeamId);
+    const homeWin = homeScore > awayScore;
+    const draw = homeScore === awayScore;
+    await competitionRepository.updateStanding(
+      competitionId,
+      seasonId,
+      homeTeamId,
+      {
+        played: (homeData?.played || 0) + 1,
+        wins: (homeData?.wins || 0) + (homeWin ? 1 : 0),
+        draws: (homeData?.draws || 0) + (draw ? 1 : 0),
+        losses: (homeData?.losses || 0) + (!homeWin && !draw ? 1 : 0),
+        goalsFor: (homeData?.goalsFor || 0) + homeScore,
+        goalsAgainst: (homeData?.goalsAgainst || 0) + awayScore,
+        points: (homeData?.points || 0) + (homeWin ? 3 : draw ? 1 : 0)
+      }
+    );
+    const awayData = homeStanding.find((s) => s.teamId === awayTeamId);
+    const awayWin = awayScore > homeScore;
+    await competitionRepository.updateStanding(
+      competitionId,
+      seasonId,
+      awayTeamId,
+      {
+        played: (awayData?.played || 0) + 1,
+        wins: (awayData?.wins || 0) + (awayWin ? 1 : 0),
+        draws: (awayData?.draws || 0) + (draw ? 1 : 0),
+        losses: (awayData?.losses || 0) + (!awayWin && !draw ? 1 : 0),
+        goalsFor: (awayData?.goalsFor || 0) + awayScore,
+        goalsAgainst: (awayData?.goalsAgainst || 0) + homeScore,
+        points: (awayData?.points || 0) + (awayWin ? 3 : draw ? 1 : 0)
+      }
+    );
+  }
+  getMatchState(matchId) {
+    const engine = this.engines.get(matchId);
+    if (!engine) return null;
+    return {
+      state: engine.getState(),
+      currentMinute: engine.getCurrentMinute(),
+      score: engine.getCurrentScore(),
+      events: engine.getEvents()
+    };
+  }
+  async simulateMatchesOfDate(date) {
+    const matches2 = await matchRepository.findPendingMatchesByDate(date);
+    const results = [];
+    for (const match of matches2) {
+      const result = await this.simulateFullMatch(match.id);
+      if (result) {
+        results.push({ matchId: match.id, result });
+      }
+    }
+    return {
+      matchesPlayed: results.length,
+      results
+    };
+  }
+}
+const matchService = new MatchService();
 class GameEngine {
   currentDate;
   gameState = null;
@@ -5634,6 +6208,73 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error("IPC Error [get-game-state]:", error);
       return null;
+    }
+  });
+  ipcMain.handle("start-match", async (_, matchId) => {
+    try {
+      const engine = await matchService.initializeMatch(matchId);
+      if (!engine) return false;
+      return matchService.startMatch(matchId);
+    } catch (error) {
+      console.error(`IPC Error [start-match] matchId=${matchId}:`, error);
+      return false;
+    }
+  });
+  ipcMain.handle("pause-match", async (_, matchId) => {
+    try {
+      return matchService.pauseMatch(matchId);
+    } catch (error) {
+      console.error(`IPC Error [pause-match] matchId=${matchId}:`, error);
+      return false;
+    }
+  });
+  ipcMain.handle("resume-match", async (_, matchId) => {
+    try {
+      return matchService.resumeMatch(matchId);
+    } catch (error) {
+      console.error(`IPC Error [resume-match] matchId=${matchId}:`, error);
+      return false;
+    }
+  });
+  ipcMain.handle("simulate-match-minute", async (_, matchId) => {
+    try {
+      return matchService.simulateMinute(matchId);
+    } catch (error) {
+      console.error(
+        `IPC Error [simulate-match-minute] matchId=${matchId}:`,
+        error
+      );
+      return null;
+    }
+  });
+  ipcMain.handle("simulate-full-match", async (_, matchId) => {
+    try {
+      return await matchService.simulateFullMatch(matchId);
+    } catch (error) {
+      console.error(
+        `IPC Error [simulate-full-match] matchId=${matchId}:`,
+        error
+      );
+      return null;
+    }
+  });
+  ipcMain.handle("get-match-state", async (_, matchId) => {
+    try {
+      return matchService.getMatchState(matchId);
+    } catch (error) {
+      console.error(`IPC Error [get-match-state] matchId=${matchId}:`, error);
+      return null;
+    }
+  });
+  ipcMain.handle("simulate-matches-of-date", async (_, date) => {
+    try {
+      return await matchService.simulateMatchesOfDate(date);
+    } catch (error) {
+      console.error(
+        `IPC Error [simulate-matches-of-date] date=${date}:`,
+        error
+      );
+      return { matchesPlayed: 0, results: [] };
     }
   });
 }

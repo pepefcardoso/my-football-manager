@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import type { GameState, Player, Staff } from "./domain/types";
+import type { GameState, Match, Player, Staff } from "./domain/types";
+import { MatchViewer } from "./components/MatchViewer";
 
 type Team = {
   id: number;
@@ -10,21 +11,7 @@ type Team = {
   budget: number | null;
 };
 
-declare global {
-  interface Window {
-    electronAPI: {
-      getTeams: () => Promise<Team[]>;
-      getPlayers: (teamId: number) => Promise<Player[]>;
-      getStaff: (teamId: number) => Promise<Staff[]>;
-      getGameState: () => Promise<GameState>;
-      updateTrainingFocus: (focus: string) => Promise<void>;
-      startMatch: (matchId: number) => Promise<boolean>;
-      pauseMatch: (matchId: number) => Promise<void>;
-      resumeMatch: (matchId: number) => Promise<void>;
-      
-    };
-  }
-}
+// O 'declare global' foi removido porque já está em src/electron-env.d.ts
 
 type Page =
   | "menu"
@@ -184,6 +171,9 @@ function App() {
         {currentPage === "club" && selectedTeam && <ClubOverviewPage team={selectedTeam} />}
         {currentPage === "squad" && selectedTeam && <SquadPage teamId={selectedTeam.id} />}
         {currentPage === "staff" && selectedTeam && <StaffPage teamId={selectedTeam.id} />}
+        {currentPage === "matches" && selectedTeam && (
+          <MatchesPage teamId={selectedTeam.id} teams={teams} />
+        )}
         {currentPage === "youth" && <PlaceholderPage title="Categorias de Base" />}
         {currentPage === "scouting" && <PlaceholderPage title="Scouting" />}
         {currentPage === "finances" && <PlaceholderPage title="Finanças" />}
@@ -191,6 +181,132 @@ function App() {
         {currentPage === "matches" && <PlaceholderPage title="Próximas Partidas" />}
         {currentPage === "calendar" && <PlaceholderPage title="Calendário" />}
       </main>
+    </div>
+  );
+}
+
+function MatchesPage({ teamId, teams }: { teamId: number; teams: Team[] }) {
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
+  useEffect(() => {
+    const loadMatches = async () => {
+      setLoading(true);
+      try {
+        const state = await window.electronAPI.getGameState();
+        if (state && state.currentSeasonId) {
+          const data = await window.electronAPI.getMatches(teamId, state.currentSeasonId);
+          setMatches(data);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar partidas:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMatches();
+  }, [teamId]);
+
+  if (selectedMatch) {
+    const homeTeam = teams.find((t) => t.id === selectedMatch.homeTeamId);
+    const awayTeam = teams.find((t) => t.id === selectedMatch.awayTeamId);
+
+    return (
+      <div className="h-full flex flex-col">
+        <div className="bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center">
+          <button
+            onClick={() => setSelectedMatch(null)}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded text-sm text-slate-200 flex items-center gap-2 transition-colors"
+          >
+            ← Voltar à Lista
+          </button>
+          <h2 className="text-lg font-semibold text-white">Simulação de Partida</h2>
+          <div className="w-24"></div>
+        </div>
+
+        <MatchViewer
+          matchId={selectedMatch.id}
+          homeTeamName={homeTeam?.name || "Casa"}
+          awayTeamName={awayTeam?.name || "Fora"}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8">
+      <header className="mb-6">
+        <h2 className="text-3xl font-light text-white mb-1">Próximas Partidas</h2>
+        <p className="text-slate-400 text-sm">Calendário da Temporada</p>
+      </header>
+
+      {loading ? (
+        <div className="flex justify-center p-10">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {matches.length === 0 && <p className="text-slate-500">Nenhuma partida encontrada.</p>}
+
+          {matches.map((match) => {
+            const isHome = match.homeTeamId === teamId;
+            const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
+            const opponent = teams.find((t) => t.id === opponentId);
+
+            return (
+              <div
+                key={match.id}
+                className="bg-slate-900 border border-slate-800 p-4 rounded-lg flex items-center justify-between hover:border-slate-700 transition-colors"
+              >
+                <div className="flex items-center gap-4 w-1/3">
+                  <div className="text-slate-400 text-sm font-mono w-16">
+                    {new Date(match.date).toLocaleDateString("pt-PT", { day: "2-digit", month: "short" })}
+                  </div>
+                  <div className="font-medium text-slate-200">
+                    {isHome ? (
+                      <span><span className="text-emerald-400 font-bold mr-2">C</span> vs {opponent?.name}</span>
+                    ) : (
+                      <span><span className="text-yellow-400 font-bold mr-2">F</span> @ {opponent?.name}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="font-bold text-xl text-slate-300">
+                  {match.isPlayed ? (
+                    <span>{match.homeScore} - {match.awayScore}</span>
+                  ) : (
+                    <span className="text-slate-600">- : -</span>
+                  )}
+                </div>
+
+                <div className="w-1/3 flex justify-end">
+                  {!match.isPlayed ? (
+                    <button
+                      onClick={() => setSelectedMatch(match)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded transition-colors shadow-lg shadow-emerald-900/20"
+                    >
+                      Jogar
+                    </button>
+                  ) : (
+                    <span className={`text-xs font-bold px-3 py-1 rounded border ${(isHome && (match.homeScore || 0) > (match.awayScore || 0)) || (!isHome && (match.awayScore || 0) > (match.homeScore || 0))
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : (match.homeScore === match.awayScore)
+                        ? "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                        : "bg-red-500/10 text-red-400 border-red-500/20"
+                      }`}>
+                      {(isHome && (match.homeScore || 0) > (match.awayScore || 0)) || (!isHome && (match.awayScore || 0) > (match.homeScore || 0))
+                        ? "VITÓRIA"
+                        : (match.homeScore === match.awayScore) ? "EMPATE" : "DERROTA"
+                      }
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -292,6 +408,15 @@ function ClubOverviewPage({ team }: { team: Team }) {
   };
 
   useEffect(() => {
+    const fetchGameState = async () => {
+      try {
+        const state = await window.electronAPI.getGameState();
+        setGameState(state);
+      } catch (error) {
+        console.error("Erro ao carregar estado do jogo:", error);
+      }
+    };
+
     fetchGameState();
   }, []);
 
@@ -322,9 +447,9 @@ function ClubOverviewPage({ team }: { team: Team }) {
       </div>
 
       {gameState && (
-        <TrainingControl 
-          currentFocus={gameState.trainingFocus || "technical"} 
-          onUpdate={fetchGameState} 
+        <TrainingControl
+          currentFocus={/*gameState.trainingFocus ||*/ "technical"}
+          onUpdate={fetchGameState}
         />
       )}
     </div>
@@ -357,11 +482,10 @@ function TrainingControl({ currentFocus, onUpdate }: { currentFocus: string, onU
             key={opt.id}
             onClick={() => handleFocusChange(opt.id)}
             disabled={saving}
-            className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
-              currentFocus === opt.id
-                ? "bg-emerald-600/20 border-emerald-500 text-white"
-                : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700"
-            }`}
+            className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${currentFocus === opt.id
+              ? "bg-emerald-600/20 border-emerald-500 text-white"
+              : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700"
+              }`}
           >
             <span className="text-2xl">{opt.icon}</span>
             <span className="text-sm font-medium">{opt.label}</span>
@@ -564,7 +688,7 @@ function PlayerTable({ players }: { players: Player[] }) {
                 </span>
               </td>
               <td className="p-4 text-right text-slate-300 font-mono text-xs">
-                {formatCurrency(player.salary)}/ano
+                {formatCurrency(player.salary || 0)}
               </td>
               <td className="p-4 text-center">
                 <div className="flex justify-center gap-2">
@@ -573,15 +697,15 @@ function PlayerTable({ players }: { players: Player[] }) {
                       LES
                     </span>
                   )}
-                  {player.suspensionGamesRemaining > 0 && (
+                  {player.suspensionGamesRemaining && player.suspensionGamesRemaining > 0 ? (
                     <span className="text-red-500 bg-red-500/10 px-2 py-0.5 rounded text-xs font-bold border border-red-500/20" title="Suspenso">
                       SUS
                     </span>
-                  )}
+                  ) : null}
                   {player.isYouth && (
                     <span className="text-cyan-400 text-xs" title="Base">🎓</span>
                   )}
-                  {!player.isInjured && player.suspensionGamesRemaining === 0 && (
+                  {!player.isInjured && (!player.suspensionGamesRemaining || player.suspensionGamesRemaining === 0) && (
                     <span className="text-emerald-500 text-xs">OK</span>
                   )}
                 </div>

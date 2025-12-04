@@ -1,0 +1,1 @@
+ALTER TABLE `players` ADD `suspension_games_remaining` integer DEFAULT 0;

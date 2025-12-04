@@ -48,6 +48,9 @@ export const players = sqliteTable("players", {
   injuryType: text("injury_type"),
   injuryDaysRemaining: integer("injury_days_remaining").default(0),
   isCaptain: integer("is_captain", { mode: "boolean" }).default(false),
+
+  //TEMPORARIO TODO
+  suspensionGamesRemaining: integer("suspension_games_remaining").default(0),
 });
 
 export const playerContracts = sqliteTable("player_contracts", {

@@ -86,6 +86,12 @@ export interface Player {
   injuryDaysRemaining: number;
   isCaptain: boolean;
   contract?: PlayerContract;
+
+  //TEMPORARIO TODO
+  salary?: number;
+  contractEnd?: string | null;
+  releaseClause?: number | null;
+  suspensionGamesRemaining?: number;
 }
 
 export interface PlayerContract {
