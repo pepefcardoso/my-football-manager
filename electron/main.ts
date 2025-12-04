@@ -10,6 +10,7 @@ import { competitionRepository } from "../src/data/repositories/CompetitionRepos
 import { db } from "../src/db/client";
 import { gameState } from "../src/db/schema";
 import { eq } from "drizzle-orm";
+import { StaffService } from "../src/services/StaffService";
 // const gameEngine = new GameEngine();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,6 +81,13 @@ function registerIpcHandlers() {
       const currentState = await db.select().from(gameState).limit(1);
       if (!currentState[0]) throw new Error("No game state found");
 
+      const playerTeamId = currentState[0].playerTeamId;
+      if (playerTeamId) {
+        const staffService = new StaffService();
+        const impacts = await staffService.getStaffImpact(playerTeamId);
+        console.log("📊 Impactos do Staff aplicados hoje:", impacts);
+      }
+
       const current = new Date(currentState[0].currentDate);
       current.setDate(current.getDate() + 1);
       const nextDate = current.toISOString().split("T")[0];
@@ -118,7 +126,7 @@ function createWindow() {
     height: 800,
     icon: path.join(process.env.VITE_PUBLIC as string, "electron-vite.svg"),
     webPreferences: {
-      preload: path.join(__dirname, "preload.mjs"), 
+      preload: path.join(__dirname, "preload.mjs"),
       nodeIntegration: false,
       contextIsolation: true,
     },

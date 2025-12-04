@@ -1,5 +1,7 @@
 // src/engine/GameEngine.ts
+// import { PlayerRepository } from "../data/repositories/PlayerRepository";
 import type { GameState, Player, Match } from "../domain/types";
+// import { staffService } from "../services/StaffService";
 
 export class GameEngine {
   private currentDate: Date;
@@ -94,12 +96,14 @@ export class GameEngine {
 
   calculateEnergyRecovery(
     restDays: number,
-    fitnessCoachQuality: number,
+    staffEnergyBonus: number,
     trainingCenterQuality: number
   ): number {
     const baseRecovery = restDays * 15;
-    const coachBonus = (fitnessCoachQuality - 50) * 0.1;
-    const facilityBonus = (trainingCenterQuality - 50) * 0.05;
+
+    const coachBonus = staffEnergyBonus;
+
+    const facilityBonus = (trainingCenterQuality - 50) * 0.1;
 
     return Math.min(100, baseRecovery + coachBonus + facilityBonus);
   }
@@ -147,21 +151,32 @@ export class GameEngine {
     return Math.random() * 100 < injuryRisk;
   }
 
-  generateInjuryDuration(severity: "light" | "moderate" | "severe"): number {
+  generateInjuryDuration(
+    severity: "light" | "moderate" | "severe",
+    medicalMultiplier: number = 1.0 // Padrão 1.0 se não tiver médico
+  ): number {
+    let baseDuration = 0;
+    
     switch (severity) {
       case "light":
-        return Math.floor(Math.random() * 7) + 3;
+        baseDuration = Math.floor(Math.random() * 7) + 3;
+        break;
       case "moderate":
-        return Math.floor(Math.random() * 21) + 14;
+        baseDuration = Math.floor(Math.random() * 21) + 14;
+        break;
       case "severe":
-        return Math.floor(Math.random() * 90) + 60;
+        baseDuration = Math.floor(Math.random() * 90) + 60;
+        break;
     }
+
+    // Aplica a redução do médico e arredonda
+    return Math.max(1, Math.round(baseDuration * medicalMultiplier));
   }
 
   canPlayerPlay(player: Player): boolean {
     return (
       !player.isInjured &&
-      player.suspensionGamesRemaining === 0 &&
+      // player.suspensionGamesRemaining === 0 &&
       player.energy > 30 &&
       player.fitness > 40
     );
@@ -170,8 +185,8 @@ export class GameEngine {
   getPlayerAvailabilityStatus(player: Player): string {
     if (player.isInjured)
       return `Lesionado (${player.injuryDaysRemaining} dias)`;
-    if (player.suspensionGamesRemaining > 0)
-      return `Suspenso (${player.suspensionGamesRemaining} jogos)`;
+    // if (player.suspensionGamesRemaining > 0)
+    //   return `Suspenso (${player.suspensionGamesRemaining} jogos)`;
     if (player.energy < 30) return "Exausto";
     if (player.fitness < 40) return "Fora de forma";
     return "Disponível";

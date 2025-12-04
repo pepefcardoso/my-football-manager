@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "../../db/client";
 import { competitions, competitionStandings } from "../../db/schema";
 
@@ -68,4 +68,3 @@ export class CompetitionRepository {
 }
 
 export const competitionRepository = new CompetitionRepository();
-import { and } from "drizzle-orm";
