@@ -5,6 +5,7 @@ import { teamRepository } from "../repositories/TeamRepository";
 import { playerRepository } from "../repositories/PlayerRepository";
 import { competitionRepository } from "../repositories/CompetitionRepository";
 import { seasonRepository } from "../repositories/SeasonRepository";
+import { infrastructureService } from "./InfrastructureService";
 
 export class FinanceService {
   /**
@@ -71,8 +72,25 @@ export class FinanceService {
         throw new Error(`Time ${teamId} não encontrado`);
       }
 
+      const infraMaintenance = infrastructureService.calculateMonthlyMaintenance(
+        team.stadiumCapacity || 10000,
+        team.stadiumQuality || 50
+      );
+
+      if (infraMaintenance > 0) {
+        await financialRepository.addRecord({
+          teamId,
+          seasonId,
+          date: currentDate,
+          type: "expense",
+          category: FinancialCategory.STADIUM_MAINTENANCE,
+          amount: infraMaintenance,
+          description: `Manutenção de Estádio e Instalações`
+        });
+      }
+
       const currentBudget = team.budget ?? 0;
-      const totalExpense = wageBill.total;
+      const totalExpense = wageBill.total + infraMaintenance;
 
       const newBudget = currentBudget - totalExpense;
 

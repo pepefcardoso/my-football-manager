@@ -179,7 +179,6 @@ export class MatchEngine {
           });
         }
       } else {
-        // Chute fora (mantém lógica original)
         this.events.push({
           minute: this.currentMinute,
           type: MatchEventType.SHOT,

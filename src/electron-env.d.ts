@@ -75,6 +75,16 @@ declare global {
         severity: "none" | "warning" | "critical";
       }>;
 
+      upgradeInfrastructure: (
+        type:
+          | "expand_stadium"
+          | "upgrade_stadium"
+          | "upgrade_training"
+          | "upgrade_youth",
+        teamId: number,
+        seasonId: number
+      ) => Promise<{ success: boolean; message: string }>;
+
       saveGame: () => Promise<boolean>;
       loadGame: () => Promise<boolean>;
     };

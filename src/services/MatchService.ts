@@ -8,6 +8,7 @@ import { FinancialCategory } from "../domain/enums";
 import { MatchEngine } from "../engine/MatchEngine";
 import type { MatchConfig, MatchResult } from "../domain/types";
 import { FinanceService } from "./FinanceService";
+import { marketingService } from "./MarketingService";
 
 export class MatchService {
   private engines: Map<number, MatchEngine> = new Map();
@@ -247,6 +248,32 @@ export class MatchService {
           result.awayScore
         );
       }
+
+      const homeTeamRep = homeTeam.reputation || 0;
+      const awayTeam = await teamRepository.findById(match.awayTeamId!);
+      const awayTeamRep = awayTeam?.reputation || 0;
+
+      let homeResult: "win" | "draw" | "loss" = "draw";
+      if (result.homeScore > result.awayScore) homeResult = "win";
+      else if (result.homeScore < result.awayScore) homeResult = "loss";
+
+      await marketingService.updateFanSatisfactionAfterMatch(
+        match.homeTeamId!,
+        homeResult,
+        true,
+        awayTeamRep
+      );
+
+      let awayResult: "win" | "draw" | "loss" = "draw";
+      if (result.awayScore > result.homeScore) awayResult = "win";
+      else if (result.awayScore < result.homeScore) awayResult = "loss";
+
+      await marketingService.updateFanSatisfactionAfterMatch(
+        match.awayTeamId!,
+        awayResult,
+        false,
+        homeTeamRep
+      );
     } catch (error) {
       console.error("❌ Erro ao salvar resultado da partida:", error);
       throw error;

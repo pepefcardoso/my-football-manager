@@ -15,6 +15,7 @@ import { TrainingFocus } from "../src/domain/enums";
 import { matchService } from "../src/services/MatchService";
 import { FinanceService } from "../src/services/FinanceService";
 import { contractService } from "../src/services/ContractService";
+import { infrastructureService } from "../src/services/InfrastructureService";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -379,7 +380,6 @@ function registerIpcHandlers() {
     "get-financial-records",
     async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
       try {
-        // Agora este método existe no Service (após o passo 1 acima)
         return await FinanceService.getFinancialRecords(teamId, seasonId);
       } catch (error) {
         console.error(
@@ -402,6 +402,37 @@ function registerIpcHandlers() {
       return null;
     }
   });
+
+  ipcMain.handle(
+    "upgrade-infrastructure",
+    async (_event, type, teamId, seasonId) => {
+      if (type === "expand_stadium") {
+        return await infrastructureService.expandStadium(teamId, seasonId);
+      }
+      if (type === "upgrade_stadium") {
+        return await infrastructureService.upgradeFacility(
+          teamId,
+          seasonId,
+          "stadium"
+        );
+      }
+      if (type === "upgrade_training") {
+        return await infrastructureService.upgradeFacility(
+          teamId,
+          seasonId,
+          "training"
+        );
+      }
+      if (type === "upgrade_youth") {
+        return await infrastructureService.upgradeFacility(
+          teamId,
+          seasonId,
+          "youth"
+        );
+      }
+      return { success: false, message: "Tipo de operação inválido" };
+    }
+  );
 }
 
 let win: BrowserWindow | null;

@@ -12,6 +12,7 @@ import MatchesPage from "./components/pages/MatchesPage";
 import PlaceholderPage from "./components/pages/PlaceholderPage";
 import type { Team } from "./domain/models";
 import FinancesPage from "./components/pages/FinancesPage";
+import InfrastructurePage from "./components/pages/InfrastructurePage";
 
 function App() {
   const view = useGameStore((state) => state.view);
@@ -94,7 +95,7 @@ function App() {
         {activePage === "youth" && <PlaceholderPage title="Categorias de Base" />}
         {activePage === "scouting" && <PlaceholderPage title="Scouting" />}
         {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}
-        {activePage === "infrastructure" && <PlaceholderPage title="Infraestrutura" />}
+        {activePage === "infrastructure" && <InfrastructurePage teamId={userTeam.id} />}
         {activePage === "calendar" && <PlaceholderPage title="Calendário" />}
       </MainLayout>
     );

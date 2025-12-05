@@ -56,7 +56,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
             {gameState && (
                 <TrainingControl
-                    currentFocus={/*gameState.trainingFocus ||*/ "technical"}
+                    currentFocus={gameState.trainingFocus || "technical"}
                     onUpdate={fetchGameState}
                 />
             )}

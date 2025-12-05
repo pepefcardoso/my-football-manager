@@ -28,4 +28,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("get-financial-records", { teamId, seasonId }),
   getFinancialHealth: (teamId: number) =>
     ipcRenderer.invoke("get-financial-health", teamId),
+  upgradeInfrastructure: (action: string, teamId: number, seasonId: number) =>
+    ipcRenderer.invoke("upgrade-infrastructure", { action, teamId, seasonId }),
 });
