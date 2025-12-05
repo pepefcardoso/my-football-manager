@@ -8,7 +8,8 @@ export class MarketingService {
     teamId: number,
     result: "win" | "draw" | "loss",
     isHomeGame: boolean,
-    opponentReputation: number
+    opponentReputation: number,
+    ticketPrice: number = 50
   ): Promise<void> {
     const team = await teamRepository.findById(teamId);
     if (!team) return;
@@ -17,8 +18,8 @@ export class MarketingService {
     const teamReputation = team.reputation || 0;
 
     let change = 0;
-    const reputationDiff = opponentReputation - teamReputation;
 
+    const reputationDiff = opponentReputation - teamReputation;
     if (result === "win") {
       change = 2 + Math.max(0, reputationDiff / 1000);
       if (isHomeGame) change += 1;
@@ -32,6 +33,23 @@ export class MarketingService {
       else change = 0;
     }
 
+    if (isHomeGame) {
+      const fairPrice = 50;
+      const reputationTolerance = teamReputation / 1000;
+
+      const adjustedFairPrice = fairPrice + reputationTolerance * 5;
+
+      if (ticketPrice > adjustedFairPrice * 1.5) {
+        change -= 2;
+        console.log(
+          "📉 Penalidade de satisfação por preço alto de ingresso applied."
+        );
+      } else if (ticketPrice < adjustedFairPrice * 0.5) {
+        change += 1;
+        console.log("📈 Bônus de satisfação por preço popular applied.");
+      }
+    }
+
     change = Math.max(-5, Math.min(5, Math.round(change)));
 
     const newSatisfaction = Math.max(
@@ -41,9 +59,6 @@ export class MarketingService {
 
     if (newSatisfaction !== currentSatisfaction) {
       await teamRepository.update(teamId, { fanSatisfaction: newSatisfaction });
-      console.log(
-        `📣 Satisfação da torcida atualizada: ${currentSatisfaction} -> ${newSatisfaction} (Mudança: ${change})`
-      );
     }
   }
 }
