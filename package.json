@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "seed": "npm rebuild better-sqlite3 && tsx src/db/seed.ts && npm run rebuild",
-    "db:push": "drizzle-kit push",
+    "db:push": "npm rebuild better-sqlite3 && drizzle-kit push && npm run rebuild",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {

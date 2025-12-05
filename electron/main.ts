@@ -449,15 +449,6 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("get-scouting-list", async (_, teamId: number) => {
-    try {
-      return await scoutingService.getScoutingList(teamId);
-    } catch (error) {
-      logger.error(`IPC Error [get-scouting-list] teamId=${teamId}:`, error);
-      return [];
-    }
-  });
-
   ipcMain.handle(
     "assign-scout",
     async (_, { scoutId, playerId }: { scoutId: number; playerId: number }) => {

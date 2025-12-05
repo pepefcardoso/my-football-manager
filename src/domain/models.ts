@@ -1,5 +1,4 @@
 import type {
-  CompetitionFormat,
   FinancialCategory,
   MatchEventType,
   Position,
@@ -90,10 +89,12 @@ export interface Competition {
   shortName: string;
   country: string;
   tier: number;
-  format: CompetitionFormat | string;
   teams: number;
   prize: number;
   reputation: number;
+  type: "league" | "cup" | string;
+  priority: number;
+  config?: Record<string, any>;
 }
 
 export interface CompetitionStanding {

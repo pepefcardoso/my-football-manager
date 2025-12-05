@@ -87,7 +87,9 @@ export const competitions = sqliteTable("competitions", {
   shortName: text("short_name").notNull(),
   country: text("country").notNull(),
   tier: integer("tier").default(1),
-  format: text("format").notNull(),
+  type: text("type").notNull().default("league"),
+  priority: integer("priority").default(1),
+  config: text("config", { mode: "json" }),
   teams: integer("teams").default(20),
   prize: real("prize").default(0),
   reputation: integer("reputation").default(0),
@@ -105,6 +107,20 @@ export const competitionStandings = sqliteTable("competition_standings", {
   goalsFor: integer("goals_for").default(0),
   goalsAgainst: integer("goals_against").default(0),
   points: integer("points").default(0),
+});
+
+export const playerCompetitionStats = sqliteTable("player_competition_stats", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  playerId: integer("player_id").references(() => players.id),
+  teamId: integer("team_id").references(() => teams.id),
+  competitionId: integer("competition_id").references(() => competitions.id),
+  seasonId: integer("season_id").references(() => seasons.id),
+  matches: integer("matches").default(0),
+  goals: integer("goals").default(0),
+  assists: integer("assists").default(0),
+  yellowCards: integer("yellow_cards").default(0),
+  redCards: integer("red_cards").default(0),
+  averageRating: real("average_rating").default(0),
 });
 
 export const seasons = sqliteTable("seasons", {

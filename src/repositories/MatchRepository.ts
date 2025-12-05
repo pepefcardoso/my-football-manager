@@ -70,6 +70,11 @@ export class MatchRepository {
       await db.insert(matchEvents).values(events);
     }
   }
+
+  async createMany(matchesData: MatchInsert[]): Promise<void> {
+    if (matchesData.length === 0) return;
+    await db.insert(matches).values(matchesData);
+  }
 }
 
 export const matchRepository = new MatchRepository();

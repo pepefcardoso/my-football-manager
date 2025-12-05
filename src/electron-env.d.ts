@@ -6,6 +6,7 @@ import type {
   Match,
   Competition,
   GameState,
+  CompetitionStanding,
 } from "./domain/types";
 import type { MatchResult } from "./engine/MatchEngine";
 
@@ -40,6 +41,23 @@ declare global {
       }>;
 
       getCompetitions: () => Promise<Competition[]>;
+
+      getStandings: (
+        competitionId: number,
+        seasonId: number
+      ) => Promise<(CompetitionStanding & { team: Team | null })[]>;
+      getTopScorers: (
+        competitionId: number,
+        seasonId: number
+      ) => Promise<
+        {
+          id: number;
+          name: string;
+          teamName: string;
+          goals: number;
+          matches: number;
+        }[]
+      >;
 
       getGameState: () => Promise<GameState>;
       advanceDay: () => Promise<{ date: string; messages: string[] }>;

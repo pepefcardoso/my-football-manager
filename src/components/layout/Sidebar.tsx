@@ -112,6 +112,13 @@ function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
                         >
                             Calendário
                         </NavButton>
+                        <NavButton
+                            active={activePage === "competitions"}
+                            onClick={() => onNavigate("competitions")}
+                            icon="🏆"
+                        >
+                            Competições
+                        </NavButton>
                     </>
                 )}
             </nav>

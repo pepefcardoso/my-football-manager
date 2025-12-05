@@ -8,4 +8,5 @@ export type MenuOption =
   | "finances"
   | "infrastructure"
   | "matches"
+  | "competitions"
   | "calendar";

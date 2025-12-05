@@ -16,8 +16,10 @@ export enum LogLevel {
  * Configuração do Logger.
  * Em produção, podemos mudar o minLevel para WARN ou ERROR.
  */
+const isProduction = process.env.NODE_ENV === 'production';
+
 const CONFIG = {
-  minLevel: import.meta.env.PROD ? LogLevel.WARN : LogLevel.DEBUG,
+  minLevel: isProduction ? LogLevel.WARN : LogLevel.DEBUG,
   useColors: true,
 };
 

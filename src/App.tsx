@@ -14,6 +14,7 @@ import FinancesPage from "./components/pages/FinancesPage";
 import InfrastructurePage from "./components/pages/InfrastructurePage";
 import { Logger } from "./lib/Logger";
 import ScoutingPage from "./components/pages/ScoutingPage";
+import StandingsPage from "./components/pages/StandingsPage";
 
 const logger = new Logger("App");
 
@@ -100,6 +101,7 @@ function App() {
         {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}
         {activePage === "infrastructure" && <InfrastructurePage teamId={userTeam.id} />}
         {activePage === "calendar" && <PlaceholderPage title="Calendário" />}
+        {activePage === "competitions" && <StandingsPage />}
       </MainLayout>
     );
   }

@@ -1,7 +1,9 @@
 import type { GameState, Match, Player } from "../domain/models";
+import type { MatchResult, GameEvent } from "../domain/types";
 import { FinanceService } from "../services/FinanceService";
 import { contractService } from "../services/ContractService";
 import { Logger } from "../lib/Logger";
+import { matchService } from "../services/MatchService";
 
 const logger = new Logger("GameEngine");
 
@@ -62,10 +64,13 @@ export class GameEngine {
       date: this.getCurrentDate(),
       playersUpdated: 0,
       matchesPlayed: [],
+      matchResults: [],
       injuries: [],
       suspensions: [],
       contractExpiries: [],
       financialChanges: [],
+      news: [],
+      logs: [],
     };
 
     if (this.gameState?.currentSeasonId && this.gameState?.playerTeamId) {
@@ -92,6 +97,23 @@ export class GameEngine {
             });
           }
         }
+
+        const simulationResults = await matchService.simulateMatchesOfDate(
+          dateStr
+        );
+
+        if (simulationResults.matchesPlayed > 0) {
+          updates.matchResults = simulationResults.results.map((r) => r.result);
+          // Aqui você pode converter os resultados para o formato de Match se necessário para a UI
+          // updates.matchesPlayed = ...
+
+          logger.info(
+            `${simulationResults.matchesPlayed} partidas simuladas neste dia.`
+          );
+        }
+
+        // TODO: Treinamento e Recuperação Diária de Jogadores
+        // Implementar usando DailySimulationService (já existe no projeto)
 
         // Opcional: Verificar saúde financeira diariamente para aplicar penalidades imediatas
         // await FinanceService.checkFinancialHealth(teamId);
@@ -227,10 +249,13 @@ export interface DailyUpdateResult {
   date: string;
   playersUpdated: number;
   matchesPlayed: Match[];
+  matchResults: MatchResult[];
   injuries: InjuryEvent[];
   suspensions: SuspensionEvent[];
   contractExpiries: ContractExpiryEvent[];
   financialChanges: FinancialChange[];
+  news: GameEvent[];
+  logs: string[];
 }
 
 export interface InjuryEvent {
