@@ -13,21 +13,21 @@ interface ScheduledMatch {
 
 export class CalendarService {
   /**
-   * Gera o calendário completo para uma lista de competições
+   * Gera o calendário intercalado (Ligas nos FDS, Copas no Meio da Semana)
    */
   async scheduleSeason(
     competitions: Competition[],
     allTeams: number[]
   ): Promise<ScheduledMatch[]> {
-    const sortedComps = competitions.sort(
-      (a, b) => (b.priority || 0) - (a.priority || 0)
-    );
-
     const allMatchesToSave: ScheduledMatch[] = [];
 
-    for (const comp of sortedComps) {
-      const compTeams = allTeams.slice(0, comp.teams);
+    const compFixtures: Record<
+      number,
+      { fixtures: MatchPair[]; priority: number; type: string }
+    > = {};
 
+    for (const comp of competitions) {
+      const compTeams = allTeams.slice(0, comp.teams);
       let fixtures: MatchPair[] = [];
 
       if (comp.type === "league") {
@@ -36,71 +36,68 @@ export class CalendarService {
         fixtures = CompetitionScheduler.generateKnockoutPairings(compTeams, 1);
       }
 
-      const scheduledMatches = this.allocateDates(fixtures, comp);
-      allMatchesToSave.push(...scheduledMatches);
+      compFixtures[comp.id] = {
+        fixtures,
+        priority: comp.priority || 1,
+        type: comp.type,
+      };
+    }
+
+    const startDate = new Date("2025-01-20");
+    const endDate = new Date("2025-12-01");
+    const currentDate = new Date(startDate);
+
+    const currentRoundMap: Record<number, number> = {};
+    competitions.forEach((c) => (currentRoundMap[c.id] = 1));
+
+    while (currentDate <= endDate) {
+      const dayOfWeek = currentDate.getDay();
+      const dateStr = currentDate.toISOString().split("T")[0];
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const isMidweek = dayOfWeek === 3;
+
+      const activeCompetitions = competitions.sort(
+        (a, b) => (b.priority || 0) - (a.priority || 0)
+      );
+
+      for (const comp of activeCompetitions) {
+        const info = compFixtures[comp.id];
+        const roundToSchedule = currentRoundMap[comp.id];
+
+        const roundMatches = info.fixtures.filter(
+          (f) => f.round === roundToSchedule
+        );
+        if (roundMatches.length === 0) continue;
+
+        let shouldSchedule = false;
+
+        if (info.type === "league" && isWeekend) {
+          if (dayOfWeek === 6) shouldSchedule = true;
+        } else if (info.type !== "league" && isMidweek) {
+          shouldSchedule = true;
+        }
+
+        if (shouldSchedule) {
+          for (const fixture of roundMatches) {
+            allMatchesToSave.push({
+              competitionId: comp.id,
+              seasonId: 1,
+              homeTeamId: fixture.homeTeamId,
+              awayTeamId: fixture.awayTeamId,
+              date: dateStr,
+              round: roundToSchedule,
+              isPlayed: false,
+            });
+          }
+
+          currentRoundMap[comp.id]++;
+          break;
+        }
+      }
+
+      currentDate.setDate(currentDate.getDate() + 1);
     }
 
     return allMatchesToSave;
-  }
-
-  private allocateDates(
-    fixtures: MatchPair[],
-    comp: Competition
-  ): ScheduledMatch[] {
-    const scheduled: ScheduledMatch[] = [];
-
-    const currentData = new Date("2025-01-15");
-
-    if (comp.priority === 2) {
-      currentData.setMonth(4);
-      currentData.setDate(1);
-    }
-
-    const maxRounds = Math.max(...fixtures.map((f) => f.round));
-
-    for (let r = 1; r <= maxRounds; r++) {
-      const roundFixtures = fixtures.filter((f) => f.round === r);
-
-      const matchDate = this.findNextSlot(currentData, comp.priority || 1);
-
-      for (const fixture of roundFixtures) {
-        scheduled.push({
-          competitionId: comp.id,
-          seasonId: 1,
-          homeTeamId: fixture.homeTeamId,
-          awayTeamId: fixture.awayTeamId,
-          date: matchDate,
-          round: r,
-          isPlayed: false,
-        });
-      }
-
-      const daysToJump = comp.priority === 3 ? 14 : comp.priority === 2 ? 7 : 4;
-
-      currentData.setTime(new Date(matchDate).getTime());
-      currentData.setDate(currentData.getDate() + daysToJump);
-    }
-
-    return scheduled;
-  }
-
-  private findNextSlot(startDate: Date, priority: number): string {
-    const date = new Date(startDate);
-
-    while (true) {
-      const dayOfWeek = date.getDay();
-
-      if (priority === 2) {
-        if (dayOfWeek === 0 || dayOfWeek === 6) break;
-      } else if (priority === 3) {
-        if (dayOfWeek === 2 || dayOfWeek === 3 || dayOfWeek === 4) break;
-      } else {
-        break;
-      }
-
-      date.setDate(date.getDate() + 1);
-    }
-
-    return date.toISOString().split("T")[0];
   }
 }

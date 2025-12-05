@@ -1,3 +1,6 @@
+import { RandomEngine } from "../engine/RandomEngine";
+import type { MatchSelect } from "../repositories/MatchRepository";
+
 export interface MatchPair {
   homeTeamId: number;
   awayTeamId: number;
@@ -80,6 +83,43 @@ export class CompetitionScheduler {
         });
       }
     }
+    return fixtures;
+  }
+
+  /**
+   * Gera os confrontos da próxima fase baseados nos vencedores da fase anterior.
+   * Assume jogo único. Se houve empate, simula um vencedor (pênaltis técnicos).
+   */
+  static generateNextRoundPairings(
+    completedMatches: MatchSelect[],
+    nextRoundNumber: number
+  ): MatchPair[] {
+    const winners: number[] = [];
+
+    for (const match of completedMatches) {
+      if (match.homeScore === null || match.awayScore === null) continue;
+
+      if (match.homeScore > match.awayScore) {
+        winners.push(match.homeTeamId!);
+      } else if (match.awayScore > match.homeScore) {
+        winners.push(match.awayTeamId!);
+      } else {
+        const homeWin = RandomEngine.chance(50);
+        winners.push(homeWin ? match.homeTeamId! : match.awayTeamId!);
+      }
+    }
+
+    const fixtures: MatchPair[] = [];
+    for (let i = 0; i < winners.length; i += 2) {
+      if (i + 1 < winners.length) {
+        fixtures.push({
+          homeTeamId: winners[i],
+          awayTeamId: winners[i + 1],
+          round: nextRoundNumber,
+        });
+      }
+    }
+
     return fixtures;
   }
 }

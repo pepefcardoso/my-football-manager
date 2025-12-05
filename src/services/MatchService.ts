@@ -10,6 +10,7 @@ import type { MatchConfig, MatchResult } from "../domain/types";
 import { FinanceService } from "./FinanceService";
 import { marketingService } from "./MarketingService";
 import { Logger } from "../lib/Logger";
+import { CompetitionScheduler } from "./CompetitionScheduler";
 
 const logger = new Logger("MatchService");
 
@@ -165,7 +166,7 @@ export class MatchService {
           matchImportance = FinanceService.getMatchImportance(
             comp.tier || 3,
             match.round ?? undefined,
-            comp.format === "knockout"
+            comp.type === "knockout"
           );
         }
       }
@@ -277,9 +278,71 @@ export class MatchService {
         false,
         homeTeamRep
       );
+
+      await this.checkCupProgression(matchId);
     } catch (error) {
       logger.error("❌ Erro ao salvar resultado da partida:", error);
       throw error;
+    }
+  }
+
+  private async checkCupProgression(matchId: number): Promise<void> {
+    try {
+      const match = await matchRepository.findById(matchId);
+      if (!match || !match.competitionId || !match.seasonId || !match.round)
+        return;
+
+      const competition = (await competitionRepository.findAll()).find(
+        (c) => c.id === match.competitionId
+      );
+
+      if (!competition || competition.type === "league") return;
+
+      const allMatchesInRound = await matchRepository.findByTeamAndSeason(
+        0,
+        match.seasonId
+      );
+      const roundMatches = allMatchesInRound.filter(
+        (m) =>
+          m.competitionId === match.competitionId && m.round === match.round
+      );
+
+      const pending = roundMatches.some((m) => !m.isPlayed);
+      if (pending) return;
+
+      const nextRound = match.round + 1;
+
+      if (roundMatches.length === 1) {
+        logger.info(`🏆 Competição ${competition.name} encerrada!`);
+        return;
+      }
+
+      const nextFixtures = CompetitionScheduler.generateNextRoundPairings(
+        roundMatches,
+        nextRound
+      );
+
+      const lastMatchDate = new Date(match.date);
+      lastMatchDate.setDate(lastMatchDate.getDate() + 14);
+      const nextDateStr = lastMatchDate.toISOString().split("T")[0];
+
+      const matchesToSave = nextFixtures.map((f) => ({
+        competitionId: competition.id,
+        seasonId: match.seasonId,
+        homeTeamId: f.homeTeamId,
+        awayTeamId: f.awayTeamId,
+        date: nextDateStr,
+        round: nextRound,
+        isPlayed: false,
+        weather: "sunny",
+      }));
+
+      await matchRepository.createMany(matchesToSave as any);
+      logger.info(
+        `Próxima fase da ${competition.name} gerada: ${matchesToSave.length} partidas.`
+      );
+    } catch (error) {
+      logger.error("Erro ao processar progressão de copa:", error);
     }
   }
 

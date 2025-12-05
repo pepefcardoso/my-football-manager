@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { competitions, competitionStandings } from "../db/schema";
 import { db } from "../lib/db";
 
@@ -26,6 +26,7 @@ export class CompetitionRepository {
       orderBy: (standings, { desc }) => [
         desc(standings.points),
         desc(standings.wins),
+        desc(sql`(${standings.goalsFor} - ${standings.goalsAgainst})`),
         desc(standings.goalsFor),
       ],
       with: {
