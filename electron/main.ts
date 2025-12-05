@@ -374,6 +374,34 @@ function registerIpcHandlers() {
       return { matchesPlayed: 0, results: [] };
     }
   });
+
+  ipcMain.handle(
+    "get-financial-records",
+    async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
+      try {
+        // Agora este método existe no Service (após o passo 1 acima)
+        return await FinanceService.getFinancialRecords(teamId, seasonId);
+      } catch (error) {
+        console.error(
+          `IPC Error [get-financial-records] teamId=${teamId} seasonId=${seasonId}:`,
+          error
+        );
+        return [];
+      }
+    }
+  );
+
+  ipcMain.handle("get-financial-health", async (_, teamId: number) => {
+    try {
+      return await FinanceService.checkFinancialHealth(teamId);
+    } catch (error) {
+      console.error(
+        `IPC Error [get-financial-health] teamId=${teamId}:`,
+        error
+      );
+      return null;
+    }
+  });
 }
 
 let win: BrowserWindow | null;

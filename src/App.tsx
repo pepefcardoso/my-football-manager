@@ -11,6 +11,7 @@ import StaffPage from "./components/pages/StaffPage";
 import MatchesPage from "./components/pages/MatchesPage";
 import PlaceholderPage from "./components/pages/PlaceholderPage";
 import type { Team } from "./domain/models";
+import FinancesPage from "./components/pages/FinancesPage";
 
 function App() {
   const view = useGameStore((state) => state.view);
@@ -47,7 +48,6 @@ function App() {
   if (view === 'team_selection') {
     return (
       <div className="h-screen w-full bg-slate-950 overflow-auto">
-        {/* Botão de voltar */}
         <div className="p-4">
           <button
             onClick={resetGame}
@@ -66,7 +66,6 @@ function App() {
     );
   }
 
-  // Jogo Ativo (Game Loop)
   if (view === 'game_loop' && userTeam) {
     return (
       <MainLayout
@@ -94,7 +93,7 @@ function App() {
 
         {activePage === "youth" && <PlaceholderPage title="Categorias de Base" />}
         {activePage === "scouting" && <PlaceholderPage title="Scouting" />}
-        {activePage === "finances" && <PlaceholderPage title="Finanças" />}
+        {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}
         {activePage === "infrastructure" && <PlaceholderPage title="Infraestrutura" />}
         {activePage === "calendar" && <PlaceholderPage title="Calendário" />}
       </MainLayout>

@@ -24,4 +24,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("get-match-state", matchId),
   simulateMatchesOfDate: (date: string) =>
     ipcRenderer.invoke("simulate-matches-of-date", date),
+  getFinancialRecords: (teamId: number, seasonId: number) =>
+    ipcRenderer.invoke("get-financial-records", { teamId, seasonId }),
+  getFinancialHealth: (teamId: number) =>
+    ipcRenderer.invoke("get-financial-health", teamId),
 });

@@ -66,6 +66,15 @@ declare global {
         staffCount: number;
       } | null>;
 
+      getFinancialRecords: (teamId: number, seasonId: number) => Promise<any[]>;
+      getFinancialHealth: (teamId: number) => Promise<{
+        isHealthy: boolean;
+        currentBudget: number;
+        hasTransferBan: boolean;
+        penaltiesApplied: string[];
+        severity: "none" | "warning" | "critical";
+      }>;
+
       saveGame: () => Promise<boolean>;
       loadGame: () => Promise<boolean>;
     };

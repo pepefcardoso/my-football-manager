@@ -3,6 +3,8 @@ import { contractService } from "./ContractService";
 import { financialRepository } from "../repositories/FinancialRepository";
 import { teamRepository } from "../repositories/TeamRepository";
 import { playerRepository } from "../repositories/PlayerRepository";
+import { competitionRepository } from "../repositories/CompetitionRepository";
+import { seasonRepository } from "../repositories/SeasonRepository";
 
 export class FinanceService {
   /**
@@ -258,6 +260,43 @@ export class FinanceService {
           `Satisfação da torcida reduzida em ${Math.abs(fanPenalty)} pontos`
         );
 
+        if (severity === "critical") {
+          const activeSeason = await seasonRepository.findActiveSeason();
+          if (activeSeason) {
+            const competitions = await competitionRepository.findAll();
+            const mainComp =
+              competitions.find((c) => c.tier === 1) || competitions[0];
+
+            if (mainComp) {
+              const standings = await competitionRepository.getStandings(
+                mainComp.id,
+                activeSeason.id
+              );
+              const teamStanding = standings.find((s) => s.teamId === teamId);
+
+              if (teamStanding && (teamStanding.points ?? 0) > 0) {
+                const pointsPenalty = 3;
+
+                await competitionRepository.updateStanding(
+                  mainComp.id,
+                  activeSeason.id,
+                  teamId,
+                  {
+                    points: Math.max(
+                      0,
+                      (teamStanding.points ?? 0) - pointsPenalty
+                    ),
+                  }
+                );
+
+                penaltiesApplied.push(
+                  `Punição na Liga: Perda de ${pointsPenalty} pontos na tabela do ${mainComp.name}`
+                );
+              }
+            }
+          }
+        }
+
         console.log(`⚠️ CRISE FINANCEIRA - ${team.name}`);
         console.log(`   Dívida: €${debtAmount.toLocaleString("pt-PT")}`);
         console.log(`   Severidade: ${severity.toUpperCase()}`);
@@ -318,5 +357,15 @@ export class FinanceService {
         "pt-PT"
       )})`,
     };
+  }
+
+  /**
+   * Obtém os registros financeiros de um time em uma temporada específica
+   * @param teamId ID do time
+   * @param seasonId ID da temporada
+   * @returns Lista de registros financeiros
+   */
+  static async getFinancialRecords(teamId: number, seasonId: number) {
+    return await financialRepository.findByTeamAndSeason(teamId, seasonId);
   }
 }
