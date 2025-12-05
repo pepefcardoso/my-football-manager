@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import Badge from "../common/Badge";
 import { MatchViewer } from "../features/match/MatchViewer";
 import type { Match, Team } from "../../domain/models";
+import { Logger } from "../../lib/Logger";
+
+const logger = new Logger("MatchesPage");
 
 function MatchesPage({ teamId, teams }: { teamId: number; teams: Team[] }) {
     const [matches, setMatches] = useState<Match[]>([]);
@@ -18,7 +21,7 @@ function MatchesPage({ teamId, teams }: { teamId: number; teams: Team[] }) {
                     setMatches(data);
                 }
             } catch (error) {
-                console.error("Erro ao carregar partidas:", error);
+                logger.error("Erro ao carregar partidas:", error);
             } finally {
                 setLoading(false);
             }

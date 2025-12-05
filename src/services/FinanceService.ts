@@ -6,6 +6,9 @@ import { playerRepository } from "../repositories/PlayerRepository";
 import { competitionRepository } from "../repositories/CompetitionRepository";
 import { seasonRepository } from "../repositories/SeasonRepository";
 import { infrastructureService } from "./InfrastructureService";
+import { Logger } from "../lib/Logger";
+
+const logger = new Logger("FinanceService");
 
 export class FinanceService {
   /**
@@ -125,7 +128,7 @@ export class FinanceService {
         "pt-PT"
       )} | Orçamento: €${newBudget.toLocaleString("pt-PT")} (${budgetStatus})`;
 
-      console.log(`💸 ${message}`);
+      logger.info(message);
 
       return {
         success: true,
@@ -136,7 +139,7 @@ export class FinanceService {
         message,
       };
     } catch (error) {
-      console.error("❌ Erro ao processar despesas mensais:", error);
+      logger.error("Erro ao processar despesas mensais:", error);
       return {
         success: false,
         totalExpense: 0,
@@ -315,10 +318,10 @@ export class FinanceService {
           }
         }
 
-        console.log(`⚠️ CRISE FINANCEIRA - ${team.name}`);
-        console.log(`   Dívida: €${debtAmount.toLocaleString("pt-PT")}`);
-        console.log(`   Severidade: ${severity.toUpperCase()}`);
-        penaltiesApplied.forEach((p) => console.log(`   • ${p}`));
+        logger.info(`CRISE FINANCEIRA - ${team.name}`);
+        logger.info(`Dívida: €${debtAmount.toLocaleString("pt-PT")}`);
+        logger.info(`Severidade: ${severity.toUpperCase()}`);
+        penaltiesApplied.forEach((p) => logger.info(`   • ${p}`));
       }
 
       return {
@@ -329,7 +332,7 @@ export class FinanceService {
         severity,
       };
     } catch (error) {
-      console.error("❌ Erro ao verificar saúde financeira:", error);
+      logger.error("Erro ao verificar saúde financeira:", error);
       throw error;
     }
   }

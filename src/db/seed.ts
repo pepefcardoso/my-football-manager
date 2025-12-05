@@ -16,6 +16,9 @@ import {
   competitionStandings,
 } from "./schema";
 import { eq } from "drizzle-orm";
+import { Logger } from "../lib/Logger";
+
+const logger = new Logger("Seed");
 
 const FIRST_NAMES = [
   "João",
@@ -262,9 +265,8 @@ function generateStaffMember(teamId: number, role: string) {
 }
 
 async function main() {
-  console.log("🌱 Iniciando Seed do Banco de Dados...\n");
-
-  console.log("🧹 Limpando dados antigos (na ordem correta)...");
+  logger.info("Iniciando Seed do Banco de Dados...");
+  logger.info("Limpando dados antigos...");
 
   await db.delete(matchEvents);
   await db.delete(scoutingReports);
@@ -280,7 +282,7 @@ async function main() {
   await db.delete(seasons);
   await db.delete(teams);
 
-  console.log("⚽ Criando times...");
+  logger.info("Criando times...");
   const insertedTeams = await db
     .insert(teams)
     .values(
@@ -302,9 +304,9 @@ async function main() {
     )
     .returning({ id: teams.id, name: teams.name });
 
-  console.log(`✅ ${insertedTeams.length} times criados`);
+  logger.info(`${insertedTeams.length} times criados`);
 
-  console.log("🏃 Criando jogadores e contratos...");
+  logger.info("Criando jogadores e contratos...");
 
   let totalPlayers = 0;
 
@@ -372,9 +374,9 @@ async function main() {
     }
   }
 
-  console.log(`✅ ${totalPlayers} jogadores e contratos criados`);
+  logger.info(`${totalPlayers} jogadores e contratos criados`);
+  logger.info("Criando staff técnico...");
 
-  console.log("👔 Criando staff técnico...");
   const allStaff = [];
   for (const team of insertedTeams) {
     for (const role of STAFF_ROLES) {
@@ -382,9 +384,10 @@ async function main() {
     }
   }
   const insertedStaff = await db.insert(staff).values(allStaff).returning();
-  console.log(`✅ ${insertedStaff.length} profissionais criados`);
 
-  console.log("🏆 Criando competições...");
+  logger.info(`${insertedStaff.length} profissionais criados`);
+  logger.info("Criando competições...");
+
   await db.insert(competitions).values([
     {
       name: "Campeonato Nacional",
@@ -417,9 +420,10 @@ async function main() {
       reputation: 9000,
     },
   ]);
-  console.log("✅ Competições criadas");
 
-  console.log("📅 Criando temporada...");
+  logger.info("Competições criadas");
+  logger.info("Criando temporada...");
+
   const [season] = await db
     .insert(seasons)
     .values({
@@ -429,9 +433,10 @@ async function main() {
       isActive: true,
     })
     .returning();
-  console.log(`✅ Temporada ${season.year} criada`);
 
-  console.log("🎮 Criando estado do jogo...");
+  logger.info(`Temporada ${season.year} criada`);
+  logger.info("Criando estado do jogo...");
+
   await db.insert(gameState).values({
     currentDate: "2025-01-15",
     currentSeasonId: season.id,
@@ -439,21 +444,19 @@ async function main() {
     playerTeamId: insertedTeams[0].id,
     simulationSpeed: 1,
   });
-  console.log("✅ Estado inicial criado");
 
-  console.log("\n" + "=".repeat(50));
-  console.log("✅ SEED CONCLUÍDO COM SUCESSO!");
-  console.log("=".repeat(50));
-  console.log(`📊 Resumo:`);
-  console.log(`   • ${insertedTeams.length} times`);
-  console.log(`   • ${totalPlayers} jogadores`);
-  console.log(`   • ${insertedStaff.length} profissionais`);
-  console.log(`   • 3 competições`);
-  console.log(`   • 1 temporada ativa`);
-  console.log("\n💾 Banco de dados: game.db");
+  logger.info("Estado inicial criado");
+  logger.info("SEED CONCLUÍDO COM SUCESSO!");
+  logger.info("Resumo da operação:");
+  logger.info(`• ${insertedTeams.length} times`);
+  logger.info(`• ${totalPlayers} jogadores`);
+  logger.info(`• ${insertedStaff.length} profissionais`);
+  logger.info(`• 3 competições`);
+  logger.info(`• 1 temporada ativa`);
+  logger.info("Banco de dados pronto: database.sqlite");
 }
 
 main().catch((err) => {
-  console.error("❌ Erro no seed:", err);
+  logger.error("Erro no seed:", err);
   process.exit(1);
 });

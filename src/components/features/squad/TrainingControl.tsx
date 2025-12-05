@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { Logger } from "../../../lib/Logger";
 
 interface TrainingControlProps {
   currentFocus: string;
@@ -39,6 +40,8 @@ const FOCUS_OPTIONS: readonly FocusOption[] = [
   },
 ] as const;
 
+const logger = new Logger("TrainingControl");
+
 function TrainingControl({ currentFocus, onUpdate }: TrainingControlProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,7 @@ function TrainingControl({ currentFocus, onUpdate }: TrainingControlProps) {
           setError("Não foi possível atualizar o foco do treino.");
         }
       } catch (err) {
-        console.error("Erro ao atualizar foco de treino:", err);
+        logger.error("Erro ao atualizar foco de treino:", err);
         setError("Erro ao atualizar. Tente novamente.");
       } finally {
         setSaving(false);

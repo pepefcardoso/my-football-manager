@@ -1,3 +1,4 @@
+import { Logger } from "../../lib/Logger";
 import { useGameStore } from "../../store/useGameStore";
 
 function StartPage() {
@@ -7,9 +8,10 @@ function StartPage() {
     const handleNewGame = () => {
         setView('team_selection');
     };
+    const logger = new Logger('StartPage');
 
     const handleLoadGame = async () => {
-        console.log("Abrir modal de load...");
+        logger.info("Abrir modal de load...");
         const success = await window.electronAPI.loadGame();
         if (success) {
             alert("Funcionalidade de Load em desenvolvimento!");

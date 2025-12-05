@@ -1,6 +1,9 @@
 import type { GameState, Match, Player } from "../domain/models";
 import { FinanceService } from "../services/FinanceService";
 import { contractService } from "../services/ContractService";
+import { Logger } from "../lib/Logger";
+
+const logger = new Logger("GameEngine");
 
 export class GameEngine {
   private currentDate: Date;
@@ -93,7 +96,7 @@ export class GameEngine {
         // Opcional: Verificar saúde financeira diariamente para aplicar penalidades imediatas
         // await FinanceService.checkFinancialHealth(teamId);
       } catch (error) {
-        console.error("Erro no processamento financeiro diário:", error);
+        logger.error("Erro no processamento financeiro diário:", error);
       }
     }
 

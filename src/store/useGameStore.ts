@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Team } from "../domain/models";
 import type { MenuOption } from "../domain/constants";
+import { Logger } from "../lib/Logger";
 
 interface GameState {
   view: "start_screen" | "team_selection" | "game_loop";
@@ -17,6 +18,8 @@ interface GameState {
   advanceDate: (newDate: string) => void;
   resetGame: () => void;
 }
+
+const logger = new Logger("GameStore");
 
 export const useGameStore = create<GameState>((set) => ({
   view: "start_screen",
@@ -36,7 +39,7 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   loadGame: (saveData) => {
-    console.log("Load game logic here", saveData);
+    logger.info("Load game logic here", saveData);
     set({ view: "game_loop" });
   },
 

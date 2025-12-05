@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Staff } from "../../domain/models";
 import StaffTable from "../features/staff/StaffTable";
+import { Logger } from "../../lib/Logger";
+
+const logger = new Logger("StaffPage");
 
 function StaffPage({ teamId }: { teamId: number }) {
     const [staff, setStaff] = useState<Staff[]>([]);
@@ -14,7 +17,7 @@ function StaffPage({ teamId }: { teamId: number }) {
                 const sorted = data.sort((a: Staff, b: Staff) => a.role.localeCompare(b.role));
                 setStaff(sorted);
             } catch (error) {
-                console.error("Erro ao buscar staff:", error);
+                logger.error("Erro ao buscar staff:", error);
             } finally {
                 setLoading(false);
             }

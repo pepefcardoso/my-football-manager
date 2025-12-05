@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import TrainingControl from "../features/squad/TrainingControl";
 import type { GameState, Team } from "../../domain/models";
 import StatCard from "../common/StatCard";
+import { Logger } from "../../lib/Logger";
+
+const logger = new Logger("ClubOverviewPage");
 
 function ClubOverviewPage({ team }: { team: Team }) {
     const [gameState, setGameState] = useState<GameState | null>(null);
@@ -11,7 +14,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
             const state = await window.electronAPI.getGameState();
             setGameState(state);
         } catch (error) {
-            console.error("Erro ao carregar estado do jogo:", error);
+            logger.error("Erro ao carregar estado do jogo:", error);
         }
     };
 
@@ -21,7 +24,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
                 const state = await window.electronAPI.getGameState();
                 setGameState(state);
             } catch (error) {
-                console.error("Erro ao carregar estado do jogo:", error);
+                logger.error("Erro ao carregar estado do jogo:", error);
             }
         };
 

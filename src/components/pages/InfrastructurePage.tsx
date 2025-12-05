@@ -2,11 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import type { Team, GameState } from "../../domain/models";
 import { formatCurrency } from "../../utils/formatters";
 import StatCard from "../common/StatCard";
+import { Logger } from "../../lib/Logger";
 
 interface InfraActionResponse {
     success: boolean;
     message: string;
 }
+
+const logger = new Logger('InfrastructurePage');
 
 function InfrastructurePage({ teamId }: { teamId: number }) {
     const [team, setTeam] = useState<Team | null>(null);
@@ -23,7 +26,7 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
             const state = await window.electronAPI.getGameState();
             setGameState(state);
         } catch (error) {
-            console.error("Erro ao carregar dados:", error);
+            logger.error("Erro ao carregar dados:", error);
         }
     }, [teamId]);
 
@@ -44,7 +47,7 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
             setActionMessage({ type: result.success ? 'success' : 'error', text: result.message });
             if (result.success) refreshData();
         } catch (error) {
-            console.error(error);
+            logger.error("Erro ao expandir estádio:", error);
             setActionMessage({ type: 'error', text: "Erro ao processar solicitação." });
         } finally {
             setLoading(false);
@@ -64,7 +67,7 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
             setActionMessage({ type: result.success ? 'success' : 'error', text: result.message });
             if (result.success) refreshData();
         } catch (error) {
-            console.error(error);
+            logger.error("Erro ao processar solicitação:", error);
             setActionMessage({ type: 'error', text: "Erro ao processar solicitação." });
         } finally {
             setLoading(false);

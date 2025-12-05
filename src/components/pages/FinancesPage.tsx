@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { formatCurrency } from "../../utils/formatters";
 import type { FinancialRecord } from "../../domain/models";
 import FinancialChart from "../features/finance/FinancialChart";
+import { Logger } from "../../lib/Logger";
+
+const logger = new Logger("FinancesPage");
 
 function FinancesPage({ teamId }: { teamId: number }) {
     const [records, setRecords] = useState<FinancialRecord[]>([]);
@@ -23,7 +26,7 @@ function FinancesPage({ teamId }: { teamId: number }) {
                 setHealth(healthData);
 
             } catch (error) {
-                console.error("Erro ao carregar finanças:", error);
+                logger.error("Erro ao carregar finanças:", error);
             } finally {
                 setLoading(false);
             }

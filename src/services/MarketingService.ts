@@ -1,4 +1,7 @@
+import { Logger } from "../lib/Logger";
 import { teamRepository } from "../repositories/TeamRepository";
+
+const logger = new Logger("MarketingService");
 
 export class MarketingService {
   /**
@@ -41,12 +44,12 @@ export class MarketingService {
 
       if (ticketPrice > adjustedFairPrice * 1.5) {
         change -= 2;
-        console.log(
-          "📉 Penalidade de satisfação por preço alto de ingresso applied."
+        logger.info(
+          "Penalidade de satisfação por preço alto de ingresso applied."
         );
       } else if (ticketPrice < adjustedFairPrice * 0.5) {
         change += 1;
-        console.log("📈 Bônus de satisfação por preço popular applied.");
+        logger.info("Bônus de satisfação por preço popular applied.");
       }
     }
 

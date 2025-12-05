@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { MatchState } from "../domain/enums";
 import type { MatchEvent } from "../domain/models";
+import { Logger } from "../lib/Logger";
 
 interface MatchSimulationState {
   matchId: number;
@@ -23,6 +24,8 @@ interface UseMatchSimulationReturn {
   setSpeed: (speed: number) => void;
   speed: number;
 }
+
+const logger = new Logger("useMatchSimulation");
 
 export function useMatchSimulation(): UseMatchSimulationReturn {
   const [simulation, setSimulation] = useState<MatchSimulationState | null>(
@@ -149,7 +152,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
 
         startInterval(matchId, speed);
       } catch (error) {
-        console.error("Erro ao iniciar partida:", error);
+        logger.error("Erro ao iniciar partida:", error);
         setSimulation((prev) =>
           prev
             ? {
@@ -232,7 +235,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
         );
       }
     } catch (error) {
-      console.error("Erro ao simular partida:", error);
+      logger.error("Erro ao simular partida:", error);
       setSimulation((prev) =>
         prev
           ? {

@@ -16,8 +16,10 @@ import { matchService } from "../src/services/MatchService";
 import { FinanceService } from "../src/services/FinanceService";
 import { contractService } from "../src/services/ContractService";
 import { infrastructureService } from "../src/services/InfrastructureService";
+import { Logger } from "../src/lib/Logger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const logger = new Logger("electron-main");
 
 process.env.APP_ROOT = path.join(__dirname, "..");
 
@@ -34,7 +36,7 @@ function registerIpcHandlers() {
     try {
       return await teamRepository.findAll();
     } catch (error) {
-      console.error("IPC Error [get-teams]:", error);
+      logger.error("IPC Error [get-teams]:", error);
       return [];
     }
   });
@@ -43,7 +45,7 @@ function registerIpcHandlers() {
     try {
       return await playerRepository.findByTeamId(teamId);
     } catch (error) {
-      console.error(`IPC Error [get-players] teamId=${teamId}:`, error);
+      logger.error(`IPC Error [get-players] teamId=${teamId}:`, error);
       return [];
     }
   });
@@ -52,7 +54,7 @@ function registerIpcHandlers() {
     try {
       return await staffRepository.findByTeamId(teamId);
     } catch (error) {
-      console.error(`IPC Error [get-staff] teamId=${teamId}:`, error);
+      logger.error(`IPC Error [get-staff] teamId=${teamId}:`, error);
       return [];
     }
   });
@@ -63,7 +65,7 @@ function registerIpcHandlers() {
       try {
         return await matchRepository.findByTeamAndSeason(teamId, seasonId);
       } catch (error) {
-        console.error(`IPC Error [get-matches]:`, error);
+        logger.error(`IPC Error [get-matches]:`, error);
         return [];
       }
     }
@@ -73,14 +75,14 @@ function registerIpcHandlers() {
     try {
       return await competitionRepository.findAll();
     } catch (error) {
-      console.error("IPC Error [get-competitions]:", error);
+      logger.error("IPC Error [get-competitions]:", error);
       return [];
     }
   });
 
   ipcMain.handle("advance-day", async () => {
     try {
-      console.log("⏳ Advancing day process started...");
+      logger.info("Advancing day process started...");
 
       const currentState = await db.select().from(gameState).limit(1);
       if (!currentState[0]) throw new Error("No game state found");
@@ -93,8 +95,8 @@ function registerIpcHandlers() {
       const logs: string[] = [`📅 Dia avançado para ${nextDate}`];
 
       if (FinanceService.isPayDay(nextDate) && state.currentSeasonId) {
-        console.log(
-          "💰 Dia de pagamento detectado! Processando salários mensais..."
+        logger.info(
+          "Dia de pagamento detectado! Processando salários mensais..."
         );
 
         const allTeams = await teamRepository.findAll();
@@ -232,14 +234,14 @@ function registerIpcHandlers() {
         .set({ currentDate: nextDate })
         .where(eq(gameState.id, state.id));
 
-      console.log("✅ Daily processing complete.");
+      logger.info("Daily processing complete.");
 
       return {
         date: nextDate,
         messages: logs,
       };
     } catch (error) {
-      console.error("IPC Error [advance-day]:", error);
+      logger.error("IPC Error [advance-day]:", error);
       throw error;
     }
   });
@@ -256,7 +258,7 @@ function registerIpcHandlers() {
 
       return true;
     } catch (error) {
-      console.error("IPC Error [update-training-focus]:", error);
+      logger.error("IPC Error [update-training-focus]:", error);
       return false;
     }
   });
@@ -266,7 +268,7 @@ function registerIpcHandlers() {
       const state = await db.select().from(gameState).limit(1);
       return state[0];
     } catch (error) {
-      console.error("IPC Error [get-game-state]:", error);
+      logger.error("IPC Error [get-game-state]:", error);
       return null;
     }
   });
@@ -275,7 +277,7 @@ function registerIpcHandlers() {
     try {
       return await FinanceService.checkFinancialHealth(teamId);
     } catch (error) {
-      console.error(
+      logger.error(
         `IPC Error [check-financial-health] teamId=${teamId}:`,
         error
       );
@@ -287,7 +289,7 @@ function registerIpcHandlers() {
     try {
       return await FinanceService.canMakeTransfers(teamId);
     } catch (error) {
-      console.error(`IPC Error [can-make-transfers] teamId=${teamId}:`, error);
+      logger.error(`IPC Error [can-make-transfers] teamId=${teamId}:`, error);
       return { allowed: false, reason: "Erro ao verificar permissões" };
     }
   });
@@ -296,7 +298,7 @@ function registerIpcHandlers() {
     try {
       return await contractService.calculateMonthlyWageBill(teamId);
     } catch (error) {
-      console.error(`IPC Error [get-wage-bill] teamId=${teamId}:`, error);
+      logger.error(`IPC Error [get-wage-bill] teamId=${teamId}:`, error);
       return null;
     }
   });
@@ -308,7 +310,7 @@ function registerIpcHandlers() {
 
       return matchService.startMatch(matchId);
     } catch (error) {
-      console.error(`IPC Error [start-match] matchId=${matchId}:`, error);
+      logger.error(`IPC Error [start-match] matchId=${matchId}:`, error);
       return false;
     }
   });
@@ -317,7 +319,7 @@ function registerIpcHandlers() {
     try {
       return matchService.pauseMatch(matchId);
     } catch (error) {
-      console.error(`IPC Error [pause-match] matchId=${matchId}:`, error);
+      logger.error(`IPC Error [pause-match] matchId=${matchId}:`, error);
       return false;
     }
   });
@@ -326,7 +328,7 @@ function registerIpcHandlers() {
     try {
       return matchService.resumeMatch(matchId);
     } catch (error) {
-      console.error(`IPC Error [resume-match] matchId=${matchId}:`, error);
+      logger.error(`IPC Error [resume-match] matchId=${matchId}:`, error);
       return false;
     }
   });
@@ -335,7 +337,7 @@ function registerIpcHandlers() {
     try {
       return matchService.simulateMinute(matchId);
     } catch (error) {
-      console.error(
+      logger.error(
         `IPC Error [simulate-match-minute] matchId=${matchId}:`,
         error
       );
@@ -347,7 +349,7 @@ function registerIpcHandlers() {
     try {
       return await matchService.simulateFullMatch(matchId);
     } catch (error) {
-      console.error(
+      logger.error(
         `IPC Error [simulate-full-match] matchId=${matchId}:`,
         error
       );
@@ -359,7 +361,7 @@ function registerIpcHandlers() {
     try {
       return matchService.getMatchState(matchId);
     } catch (error) {
-      console.error(`IPC Error [get-match-state] matchId=${matchId}:`, error);
+      logger.error(`IPC Error [get-match-state] matchId=${matchId}:`, error);
       return null;
     }
   });
@@ -368,7 +370,7 @@ function registerIpcHandlers() {
     try {
       return await matchService.simulateMatchesOfDate(date);
     } catch (error) {
-      console.error(
+      logger.error(
         `IPC Error [simulate-matches-of-date] date=${date}:`,
         error
       );
@@ -382,7 +384,7 @@ function registerIpcHandlers() {
       try {
         return await FinanceService.getFinancialRecords(teamId, seasonId);
       } catch (error) {
-        console.error(
+        logger.error(
           `IPC Error [get-financial-records] teamId=${teamId} seasonId=${seasonId}:`,
           error
         );
@@ -395,7 +397,7 @@ function registerIpcHandlers() {
     try {
       return await FinanceService.checkFinancialHealth(teamId);
     } catch (error) {
-      console.error(
+      logger.error(
         `IPC Error [get-financial-health] teamId=${teamId}:`,
         error
       );

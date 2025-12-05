@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useEffect, useState } from "react";
 import { useGameStore } from "./store/useGameStore";
 import MainLayout from "./components/layout/MainLayout";
@@ -13,6 +12,9 @@ import PlaceholderPage from "./components/pages/PlaceholderPage";
 import type { Team } from "./domain/models";
 import FinancesPage from "./components/pages/FinancesPage";
 import InfrastructurePage from "./components/pages/InfrastructurePage";
+import { Logger } from "./lib/Logger";
+
+const logger = new Logger("App");
 
 function App() {
   const view = useGameStore((state) => state.view);
@@ -33,7 +35,7 @@ function App() {
           const data = await window.electronAPI.getTeams();
           setTeams(data);
         } catch (error) {
-          console.error("Erro ao carregar times:", error);
+          logger.error("Erro ao carregar times:", error);
         } finally {
           setLoadingTeams(false);
         }

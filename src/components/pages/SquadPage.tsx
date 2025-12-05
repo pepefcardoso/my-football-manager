@@ -1,8 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import PlayerTable from "../features/squad/PlayerTable";
 import type { Player } from "../../domain/models";
+import { Logger } from "../../lib/Logger";
 
 type FilterType = "all" | "starters";
+
+const logger = new Logger("SquadPage");
 
 function SquadPage({ teamId }: { teamId: number }) {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -22,7 +25,7 @@ function SquadPage({ teamId }: { teamId: number }) {
         );
         setPlayers(sorted);
       } catch (err) {
-        console.error("Erro ao buscar jogadores:", err);
+        logger.error("Erro ao buscar jogadores:", err);
         setError("Não foi possível carregar os jogadores. Tente novamente.");
       } finally {
         setLoading(false);

@@ -3,22 +3,22 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Logger } from "./Logger";
 
 let dbPath: string;
+const logger = new Logger("Database");
 
 if (process.env.NODE_ENV === "development") {
   dbPath = path.join(process.cwd(), "data", "database.sqlite");
-}
-else if ((process as any).resourcesPath) {
+} else if ((process as any).resourcesPath) {
   dbPath = path.join((process as any).resourcesPath, "database.sqlite");
-}
-else {
+} else {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   dbPath = path.join(__dirname, "../../data/database.sqlite");
 }
 
-console.log("📁 Database path:", dbPath);
+logger.info("📁 Database path:", dbPath);
 
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");

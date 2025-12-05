@@ -9,6 +9,9 @@ import { MatchEngine } from "../engine/MatchEngine";
 import type { MatchConfig, MatchResult } from "../domain/types";
 import { FinanceService } from "./FinanceService";
 import { marketingService } from "./MarketingService";
+import { Logger } from "../lib/Logger";
+
+const logger = new Logger("MatchService");
 
 export class MatchService {
   private engines: Map<number, MatchEngine> = new Map();
@@ -66,7 +69,7 @@ export class MatchService {
 
       return engine;
     } catch (error) {
-      console.error("Erro ao inicializar partida:", error);
+      logger.error("Erro ao inicializar partida:", error);
       return null;
     }
   }
@@ -223,7 +226,7 @@ export class MatchService {
           ),
         });
 
-        console.log(
+        logger.info(
           `💰 Receita de bilheteria registrada: €${ticketRevenue.toLocaleString(
             "pt-PT"
           )} (${attendance} torcedores)`
@@ -275,7 +278,7 @@ export class MatchService {
         homeTeamRep
       );
     } catch (error) {
-      console.error("❌ Erro ao salvar resultado da partida:", error);
+      logger.error("❌ Erro ao salvar resultado da partida:", error);
       throw error;
     }
   }

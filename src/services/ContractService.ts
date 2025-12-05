@@ -5,8 +5,11 @@ import { FinancialCategory } from "../domain/enums";
 import { db } from "../lib/db";
 import { playerContracts } from "../db/schema";
 import { eq, and } from "drizzle-orm";
+import { Logger } from "../lib/Logger";
 
 export class ContractService {
+  private logger = new Logger("ContractService");
+
   /**
    * Calcula a folha salarial mensal total de um time
    * Inclui jogadores e equipe técnica
@@ -53,7 +56,7 @@ export class ContractService {
         staffCount: staffMembers.length,
       };
     } catch (error) {
-      console.error("❌ Erro ao calcular folha salarial:", error);
+      this.logger.error("Erro ao calcular folha salarial:", error);
       throw error;
     }
   }
@@ -86,8 +89,8 @@ export class ContractService {
 
         await playerRepository.update(contract.playerId, { teamId: null });
 
-        console.log(
-          `📋 Contrato expirado: Jogador ID ${contract.playerId} liberado`
+        this.logger.info(
+          `Contrato expirado: Jogador ID ${contract.playerId} liberado`
         );
       }
 
@@ -98,7 +101,7 @@ export class ContractService {
 
       for (const member of expiredStaff) {
         await staffRepository.fire(member.id);
-        console.log(`📋 Contrato expirado: Staff ID ${member.id} liberado`);
+        this.logger.info(`Contrato expirado: Staff ID ${member.id} liberado`);
       }
 
       return {
@@ -106,7 +109,7 @@ export class ContractService {
         staffReleased: expiredStaff.length,
       };
     } catch (error) {
-      console.error("❌ Erro ao verificar contratos expirando:", error);
+      this.logger.error("Erro ao verificar contratos expirando:", error);
       return { playersReleased: 0, staffReleased: 0 };
     }
   }
@@ -190,11 +193,11 @@ export class ContractService {
         })
         .where(eq(playerContracts.id, currentContract[0].id));
 
-      console.log(
-        `✅ Contrato renovado: Jogador ${playerId} - €${newWage.toLocaleString()}/ano até ${newEndDate}`
+      this.logger.info(
+        `Contrato renovado: Jogador ${playerId} - €${newWage.toLocaleString()}/ano até ${newEndDate}`
       );
     } catch (error) {
-      console.error("❌ Erro ao renovar contrato:", error);
+      this.logger.error("Erro ao renovar contrato:", error);
       throw error;
     }
   }
