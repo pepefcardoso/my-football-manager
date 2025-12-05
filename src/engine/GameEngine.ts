@@ -1,4 +1,6 @@
 import type { GameState, Match, Player } from "../domain/models";
+import { FinanceService } from "../services/FinanceService";
+import { contractService } from "../services/ContractService";
 
 export class GameEngine {
   private currentDate: Date;
@@ -63,14 +65,43 @@ export class GameEngine {
       financialChanges: [],
     };
 
+    if (this.gameState?.currentSeasonId && this.gameState?.playerTeamId) {
+      const seasonId = this.gameState.currentSeasonId;
+      const teamId = this.gameState.playerTeamId;
+      const dateStr = this.getCurrentDate();
+
+      try {
+        await contractService.processDailyWages(teamId, dateStr, seasonId);
+
+        if (FinanceService.isPayDay(dateStr)) {
+          const expenseResult = await FinanceService.processMonthlyExpenses(
+            teamId,
+            dateStr,
+            seasonId
+          );
+
+          if (expenseResult.success) {
+            updates.financialChanges.push({
+              type: "expense",
+              amount: expenseResult.totalExpense,
+              category: "monthly_wages",
+              description: expenseResult.message,
+            });
+          }
+        }
+
+        // Opcional: Verificar saúde financeira diariamente para aplicar penalidades imediatas
+        // await FinanceService.checkFinancialHealth(teamId);
+      } catch (error) {
+        console.error("Erro no processamento financeiro diário:", error);
+      }
+    }
+
     // Atualizar jogadores (moral, energia, fitness)
-    // Implementar após ter acesso ao DB
+    // Implementar após ter acesso ao DB (PlayerRepository)
 
     // Processar partidas do dia
-    // Implementar motor de partidas
-
-    // Processar finanças diárias
-    // Implementar após ter sistema financeiro
+    // Implementar motor de partidas (MatchService)
 
     return updates;
   }
@@ -153,7 +184,7 @@ export class GameEngine {
     medicalMultiplier: number = 1.0
   ): number {
     let baseDuration = 0;
-    
+
     switch (severity) {
       case "light":
         baseDuration = Math.floor(Math.random() * 7) + 3;
