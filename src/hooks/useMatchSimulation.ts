@@ -20,12 +20,15 @@ interface UseMatchSimulationReturn {
   resumeMatch: () => void;
   simulateToEnd: () => Promise<void>;
   reset: () => void;
+  setSpeed: (speed: number) => void;
+  speed: number;
 }
 
 export function useMatchSimulation(): UseMatchSimulationReturn {
   const [simulation, setSimulation] = useState<MatchSimulationState | null>(
     null
   );
+  const [speed, setSpeedState] = useState<number>(1);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const clearSimulationInterval = useCallback(() => {
@@ -40,6 +43,70 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
       clearSimulationInterval();
     };
   }, [clearSimulationInterval]);
+
+  const runSimulationStep = useCallback(
+    async (matchId: number) => {
+      const update = await window.electronAPI.simulateMatchMinute(matchId);
+
+      if (!update) {
+        clearSimulationInterval();
+        return;
+      }
+
+      setSimulation((prev) => {
+        if (!prev) return null;
+
+        const newEvents = [...prev.events, ...update.newEvents];
+
+        if (update.currentMinute >= 90) {
+          clearSimulationInterval();
+          return {
+            ...prev,
+            state: MatchState.FINISHED,
+            currentMinute: 90,
+            homeScore: update.score.home,
+            awayScore: update.score.away,
+            events: newEvents,
+          };
+        }
+
+        return {
+          ...prev,
+          currentMinute: update.currentMinute,
+          homeScore: update.score.home,
+          awayScore: update.score.away,
+          events: newEvents,
+        };
+      });
+    },
+    [clearSimulationInterval]
+  );
+
+  const startInterval = useCallback(
+    (matchId: number, currentSpeed: number) => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+
+      let delay = 500;
+      if (currentSpeed >= 4) delay = 50;
+      else if (currentSpeed >= 2) delay = 200;
+
+      intervalRef.current = setInterval(
+        () => runSimulationStep(matchId),
+        delay
+      );
+    },
+    [runSimulationStep]
+  );
+
+  const setSpeed = useCallback(
+    (newSpeed: number) => {
+      setSpeedState(newSpeed);
+      if (simulation && simulation.state === MatchState.PLAYING) {
+        startInterval(simulation.matchId, newSpeed);
+      }
+    },
+    [simulation, startInterval]
+  );
 
   const startMatch = useCallback(
     async (matchId: number) => {
@@ -80,40 +147,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
             : null
         );
 
-        intervalRef.current = setInterval(async () => {
-          const update = await window.electronAPI.simulateMatchMinute(matchId);
-
-          if (!update) {
-            clearSimulationInterval();
-            return;
-          }
-
-          setSimulation((prev) => {
-            if (!prev) return null;
-
-            const newEvents = [...prev.events, ...update.newEvents];
-
-            if (update.currentMinute >= 90) {
-              clearSimulationInterval();
-              return {
-                ...prev,
-                state: MatchState.FINISHED,
-                currentMinute: update.currentMinute,
-                homeScore: update.score.home,
-                awayScore: update.score.away,
-                events: newEvents,
-              };
-            }
-
-            return {
-              ...prev,
-              currentMinute: update.currentMinute,
-              homeScore: update.score.home,
-              awayScore: update.score.away,
-              events: newEvents,
-            };
-          });
-        }, 500);
+        startInterval(matchId, speed);
       } catch (error) {
         console.error("Erro ao iniciar partida:", error);
         setSimulation((prev) =>
@@ -127,7 +161,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
         );
       }
     },
-    [clearSimulationInterval]
+    [startInterval, speed]
   );
 
   const pauseMatch = useCallback(() => {
@@ -160,44 +194,8 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
     );
 
     window.electronAPI.resumeMatch(simulation.matchId);
-
-    intervalRef.current = setInterval(async () => {
-      const update = await window.electronAPI.simulateMatchMinute(
-        simulation.matchId
-      );
-
-      if (!update) {
-        clearSimulationInterval();
-        return;
-      }
-
-      setSimulation((prev) => {
-        if (!prev) return null;
-
-        const newEvents = [...prev.events, ...update.newEvents];
-
-        if (update.currentMinute >= 90) {
-          clearSimulationInterval();
-          return {
-            ...prev,
-            state: MatchState.FINISHED,
-            currentMinute: update.currentMinute,
-            homeScore: update.score.home,
-            awayScore: update.score.away,
-            events: newEvents,
-          };
-        }
-
-        return {
-          ...prev,
-          currentMinute: update.currentMinute,
-          homeScore: update.score.home,
-          awayScore: update.score.away,
-          events: newEvents,
-        };
-      });
-    }, 500);
-  }, [simulation, clearSimulationInterval]);
+    startInterval(simulation.matchId, speed);
+  }, [simulation, startInterval, speed]);
 
   const simulateToEnd = useCallback(async () => {
     if (!simulation) return;
@@ -259,5 +257,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
     resumeMatch,
     simulateToEnd,
     reset,
+    setSpeed,
+    speed,
   };
 }

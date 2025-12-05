@@ -35,8 +35,14 @@ export class MatchEngine {
 
   constructor(config: MatchConfig) {
     this.config = config;
-    this.homeStrength = TeamStrengthCalculator.calculate(config.homePlayers);
-    this.awayStrength = TeamStrengthCalculator.calculate(config.awayPlayers);
+    this.homeStrength = TeamStrengthCalculator.calculate(
+      config.homePlayers,
+      config.homeTacticalBonus || 0
+    );
+    this.awayStrength = TeamStrengthCalculator.calculate(
+      config.awayPlayers,
+      config.awayTacticalBonus || 0
+    );
     this.applyWeatherEffects(config.weather || "sunny");
   }
 
@@ -160,16 +166,7 @@ export class MatchEngine {
           RandomEngine.chance(goalChance) &&
           !RandomEngine.chance(saveChance)
         ) {
-          if (isHome) this.homeScore++;
-          else this.awayScore++;
-
-          this.events.push({
-            minute: this.currentMinute,
-            type: MatchEventType.GOAL,
-            teamId: attackingTeam.id,
-            playerId: shooter.id,
-            description: `⚽ GOOOL! ${shooter.firstName} ${shooter.lastName} marca para o ${attackingTeam.shortName}!`,
-          });
+          this.handleGoalScored(isHome, attackingTeam.id, shooter);
         } else {
           this.events.push({
             minute: this.currentMinute,
@@ -178,16 +175,17 @@ export class MatchEngine {
             playerId: goalkeeper ? goalkeeper.id : null,
             description: `🧤 Grande defesa de ${
               goalkeeper?.firstName || "o goleiro"
-            }! ${shooter.firstName} quase marca.`,
+            }!`,
           });
         }
       } else {
+        // Chute fora (mantém lógica original)
         this.events.push({
           minute: this.currentMinute,
           type: MatchEventType.SHOT,
           teamId: attackingTeam.id,
           playerId: shooter.id,
-          description: `📉 ${shooter.firstName} ${shooter.lastName} chuta para fora.`,
+          description: `📉 ${shooter.firstName} chuta para fora.`,
         });
       }
     }
@@ -204,6 +202,49 @@ export class MatchEngine {
         description: `🚩 Escanteio para o ${attackingTeam.shortName}.`,
       });
     }
+  }
+
+  private handleGoalScored(isHome: boolean, teamId: number, shooter: Player) {
+    if (RandomEngine.chance(10)) {
+      this.events.push({
+        minute: this.currentMinute,
+        type: MatchEventType.VAR_CHECK,
+        teamId: null,
+        playerId: null,
+        description:
+          "🖥️ VAR em ação! Analisando possível irregularidade no gol...",
+      });
+
+      if (RandomEngine.chance(30)) {
+        this.events.push({
+          minute: this.currentMinute,
+          type: MatchEventType.OFFSIDE,
+          teamId: teamId,
+          playerId: shooter.id,
+          description: `❌ GOL ANULADO! O VAR identificou impedimento de ${shooter.firstName}.`,
+        });
+        return;
+      } else {
+        this.events.push({
+          minute: this.currentMinute,
+          type: MatchEventType.VAR_CHECK,
+          teamId: teamId,
+          playerId: null,
+          description: "✅ Gol confirmado após revisão.",
+        });
+      }
+    }
+
+    if (isHome) this.homeScore++;
+    else this.awayScore++;
+
+    this.events.push({
+      minute: this.currentMinute,
+      type: MatchEventType.GOAL,
+      teamId: teamId,
+      playerId: shooter.id,
+      description: `⚽ GOOOL! ${shooter.firstName} ${shooter.lastName} marca!`,
+    });
   }
 
   private processRandomEvent(isHome: boolean): void {

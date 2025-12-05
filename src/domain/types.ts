@@ -87,6 +87,8 @@ export interface MatchConfig {
   homePlayers: Player[];
   awayPlayers: Player[];
   weather?: "sunny" | "rainy" | "cloudy" | "windy";
+  homeTacticalBonus?: number; 
+  awayTacticalBonus?: number;
 }
 
 export interface MatchEventData {

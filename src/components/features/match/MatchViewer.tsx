@@ -21,6 +21,8 @@ export function MatchViewer({
     resumeMatch,
     simulateToEnd,
     reset,
+    speed,
+    setSpeed,
   } = useMatchSimulation();
 
   const handleStart = () => {
@@ -58,12 +60,13 @@ export function MatchViewer({
         state={simulation.state}
         isLoading={simulation.isLoading}
         error={simulation.error}
+        speed={speed}
+        onSpeedChange={setSpeed}
         onPause={pauseMatch}
         onResume={resumeMatch}
         onSimulateToEnd={simulateToEnd}
         onReset={reset}
       />
-
       <MatchEvents events={simulation.events} />
     </div>
   );

@@ -3,7 +3,10 @@ import type { TeamStrength } from "../domain/types";
 import { Position } from "../domain/enums";
 
 export class TeamStrengthCalculator {
-  public static calculate(players: Player[]): TeamStrength {
+  public static calculate(
+    players: Player[],
+    tacticalBonus: number = 0
+  ): TeamStrength {
     if (players.length === 0) return this.getDefaultStrength();
 
     let totalOverall = 0;
@@ -40,11 +43,13 @@ export class TeamStrengthCalculator {
     const getAvg = (set: { sum: number; count: number }) =>
       set.count > 0 ? set.sum / set.count : 50;
 
+    const tacticalMultiplier = 1 + tacticalBonus / 100;
+
     return {
       overall: totalOverall / players.length,
-      attack: getAvg(stats.attack),
-      midfield: getAvg(stats.midfield),
-      defense: getAvg(stats.defense),
+      attack: getAvg(stats.attack) * tacticalMultiplier,
+      midfield: getAvg(stats.midfield) * tacticalMultiplier,
+      defense: getAvg(stats.defense) * tacticalMultiplier,
       moralBonus: (totalMoral / players.length - 50) / 10,
       fitnessMultiplier: 0.7 + (totalEnergy / players.length / 100) * 0.3,
     };

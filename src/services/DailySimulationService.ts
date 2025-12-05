@@ -1,7 +1,8 @@
 import { RandomEngine } from "../engine/RandomEngine";
 import { GameEngine } from "../engine/GameEngine";
+import { AttributeCalculator } from "../engine/AttributeCalculator";
 import type { Player } from "../domain/models";
-import { TrainingFocus } from "../domain/enums";
+import { TrainingFocus, Position } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
 
 export interface PlayerTrainingUpdate {
@@ -12,6 +13,13 @@ export interface PlayerTrainingUpdate {
   overall: number;
   isInjured: boolean;
   injuryDays: number;
+  finishing?: number;
+  passing?: number;
+  dribbling?: number;
+  defending?: number;
+  physical?: number;
+  pace?: number;
+  shooting?: number;
 }
 
 export interface TeamTrainingResult {
@@ -110,26 +118,54 @@ export class DailySimulationService {
         );
       }
 
-      let newOverall = player.overall;
+      let attributesChanged = false;
+      const updatedStats = {
+        finishing: player.finishing,
+        passing: player.passing,
+        dribbling: player.dribbling,
+        defending: player.defending,
+        physical: player.physical,
+        pace: player.pace,
+        shooting: player.shooting,
+      };
 
       if (!isInjured && trainingFocus !== TrainingFocus.REST) {
-        const growthChance = player.age < 23 ? 5 : player.age < 29 ? 2 : 0.5;
-        const declineChance =
-          player.age > 32 && trainingFocus === TrainingFocus.PHYSICAL ? 2 : 0;
+        const growthChance = player.age < 21 ? 15 : player.age < 25 ? 8 : 2;
 
         if (RandomEngine.chance(growthChance)) {
-          if (player.overall < player.potential) {
-            newOverall += 1;
-            logs.push(
-              `📈 ${player.firstName} ${player.lastName} evoluiu nos treinos (+1).`
-            );
+          if (trainingFocus === TrainingFocus.TECHNICAL) {
+            const attr = RandomEngine.pickOne([
+              "passing",
+              "dribbling",
+              "shooting",
+              "finishing",
+            ] as const);
+            if (updatedStats[attr] < 99) {
+              updatedStats[attr]++;
+              attributesChanged = true;
+              logs.push(
+                `📈 ${player.firstName} ${player.lastName} melhorou em ${attr}!`
+              );
+            }
+          } else if (trainingFocus === TrainingFocus.PHYSICAL) {
+            const attr = RandomEngine.pickOne(["physical", "pace"] as const);
+            if (updatedStats[attr] < 99) {
+              updatedStats[attr]++;
+              attributesChanged = true;
+              logs.push(
+                `💪 ${player.firstName} ${player.lastName} melhorou em ${attr}!`
+              );
+            }
           }
-        } else if (RandomEngine.chance(declineChance)) {
-          newOverall -= 1;
-          logs.push(
-            `📉 ${player.firstName} ${player.lastName} caiu de rendimento (-1).`
-          );
         }
+      }
+
+      let newOverall = player.overall;
+      if (attributesChanged) {
+        newOverall = AttributeCalculator.calculateOverall(
+          player.position as Position,
+          updatedStats
+        );
       }
 
       let newMoral = player.moral;
@@ -144,6 +180,7 @@ export class DailySimulationService {
         overall: newOverall,
         isInjured: isInjured,
         injuryDays: injuryDays,
+        ...updatedStats,
       });
     }
 
