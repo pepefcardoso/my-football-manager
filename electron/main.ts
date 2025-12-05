@@ -13,6 +13,8 @@ import { dailySimulationService } from "../src/services/DailySimulationService";
 import { db } from "../src/lib/db";
 import { TrainingFocus } from "../src/domain/enums";
 import { matchService } from "../src/services/MatchService";
+import { FinanceService } from "../src/services/FinanceService";
+import { contractService } from "../src/services/ContractService";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -87,7 +89,82 @@ function registerIpcHandlers() {
       nextDateRaw.setDate(nextDateRaw.getDate() + 1);
       const nextDate = nextDateRaw.toISOString().split("T")[0];
 
-      const logs: string[] = [`Dia avançado para ${nextDate}`];
+      const logs: string[] = [`📅 Dia avançado para ${nextDate}`];
+
+      if (FinanceService.isPayDay(nextDate) && state.currentSeasonId) {
+        console.log(
+          "💰 Dia de pagamento detectado! Processando salários mensais..."
+        );
+
+        const allTeams = await teamRepository.findAll();
+
+        for (const team of allTeams) {
+          const result = await FinanceService.processMonthlyExpenses(
+            team.id,
+            nextDate,
+            state.currentSeasonId
+          );
+
+          if (result.success) {
+            logs.push(
+              `💸 ${
+                team.name
+              }: Despesas mensais €${result.totalExpense.toLocaleString(
+                "pt-PT"
+              )}`
+            );
+            logs.push(
+              `   └─ Jogadores: €${result.playerWages.toLocaleString(
+                "pt-PT"
+              )} | Staff: €${result.staffWages.toLocaleString("pt-PT")}`
+            );
+
+            const health = await FinanceService.checkFinancialHealth(team.id);
+
+            if (!health.isHealthy) {
+              logs.push(`⚠️ ${team.name}: CRISE FINANCEIRA DETECTADA`);
+              logs.push(
+                `   └─ Orçamento: €${health.currentBudget.toLocaleString(
+                  "pt-PT"
+                )} (${health.severity.toUpperCase()})`
+              );
+
+              health.penaltiesApplied.forEach((penalty) => {
+                logs.push(`   └─ ⚠️ ${penalty}`);
+              });
+
+              if (health.severity === "critical") {
+                logs.push(`   └─ 🚨 ATENÇÃO: Situação financeira CRÍTICA!`);
+              }
+            } else {
+              logs.push(
+                `   └─ Orçamento: €${result.newBudget.toLocaleString(
+                  "pt-PT"
+                )} ✅`
+              );
+            }
+          } else {
+            logs.push(`❌ ${team.name}: Erro ao processar despesas`);
+          }
+        }
+      }
+
+      if (state.playerTeamId && !FinanceService.isPayDay(nextDate)) {
+        const health = await FinanceService.checkFinancialHealth(
+          state.playerTeamId
+        );
+
+        if (!health.isHealthy) {
+          logs.push(`⚠️ Alerta: Seu clube ainda está com orçamento negativo`);
+          logs.push(
+            `   └─ Saldo: €${health.currentBudget.toLocaleString("pt-PT")}`
+          );
+
+          if (health.hasTransferBan) {
+            logs.push(`   └─ 🚫 Transfer Ban ativo - Contratações bloqueadas`);
+          }
+        }
+      }
 
       if (state.playerTeamId) {
         const players = await playerRepository.findByTeamId(state.playerTeamId);
@@ -109,6 +186,44 @@ function registerIpcHandlers() {
         await playerRepository.updateDailyStatsBatch(simResult.playerUpdates);
 
         logs.push(...simResult.logs);
+      }
+
+      if (state.currentSeasonId) {
+        const expirations = await contractService.checkExpiringContracts(
+          nextDate
+        );
+
+        if (expirations.playersReleased > 0) {
+          logs.push(
+            `📋 ${expirations.playersReleased} jogador(es) liberado(s) por término de contrato`
+          );
+        }
+
+        if (expirations.staffReleased > 0) {
+          logs.push(
+            `📋 ${expirations.staffReleased} membro(s) do staff liberado(s) por término de contrato`
+          );
+        }
+      }
+
+      if (state.currentSeasonId) {
+        const matchResults = await matchService.simulateMatchesOfDate(nextDate);
+
+        if (matchResults.matchesPlayed > 0) {
+          logs.push(`⚽ ${matchResults.matchesPlayed} partida(s) simulada(s)`);
+
+          for (const { matchId, result } of matchResults.results) {
+            const match = await matchRepository.findById(matchId);
+            if (match) {
+              const homeTeam = await teamRepository.findById(match.homeTeamId!);
+              const awayTeam = await teamRepository.findById(match.awayTeamId!);
+
+              logs.push(
+                `   └─ ${homeTeam?.shortName} ${result.homeScore} x ${result.awayScore} ${awayTeam?.shortName}`
+              );
+            }
+          }
+        }
       }
 
       await db
@@ -151,6 +266,36 @@ function registerIpcHandlers() {
       return state[0];
     } catch (error) {
       console.error("IPC Error [get-game-state]:", error);
+      return null;
+    }
+  });
+
+  ipcMain.handle("check-financial-health", async (_, teamId: number) => {
+    try {
+      return await FinanceService.checkFinancialHealth(teamId);
+    } catch (error) {
+      console.error(
+        `IPC Error [check-financial-health] teamId=${teamId}:`,
+        error
+      );
+      return null;
+    }
+  });
+
+  ipcMain.handle("can-make-transfers", async (_, teamId: number) => {
+    try {
+      return await FinanceService.canMakeTransfers(teamId);
+    } catch (error) {
+      console.error(`IPC Error [can-make-transfers] teamId=${teamId}:`, error);
+      return { allowed: false, reason: "Erro ao verificar permissões" };
+    }
+  });
+
+  ipcMain.handle("get-wage-bill", async (_, teamId: number) => {
+    try {
+      return await contractService.calculateMonthlyWageBill(teamId);
+    } catch (error) {
+      console.error(`IPC Error [get-wage-bill] teamId=${teamId}:`, error);
       return null;
     }
   });

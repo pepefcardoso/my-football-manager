@@ -7,6 +7,7 @@ import type { Team } from "../domain/models";
 import { FinancialCategory } from "../domain/enums";
 import { MatchEngine } from "../engine/MatchEngine";
 import type { MatchConfig, MatchResult } from "../domain/types";
+import { FinanceService } from "./FinanceService";
 
 export class MatchService {
   private engines: Map<number, MatchEngine> = new Map();
@@ -137,6 +138,10 @@ export class MatchService {
     return result;
   }
 
+  /**
+   * Salva o resultado completo da partida no banco de dados
+   * Inclui: placar, eventos, atualizações de jogadores, receitas e classificação
+   */
   private async saveMatchResult(
     matchId: number,
     result: MatchResult
@@ -146,15 +151,28 @@ export class MatchService {
       if (!match) return;
 
       const homeTeam = await teamRepository.findById(match.homeTeamId!);
-      const ticketPrice = 50;
-      const attendance = homeTeam
-        ? Math.round(
-            (homeTeam.stadiumCapacity ?? 0) *
-              (homeTeam.fanSatisfaction ?? 50 / 100) *
-              0.8
-          )
-        : 0;
-      const ticketRevenue = attendance * ticketPrice;
+      if (!homeTeam) return;
+
+      let matchImportance = 1.0;
+      if (match.competitionId) {
+        const competition = await competitionRepository.findAll();
+        const comp = competition.find((c) => c.id === match.competitionId);
+        if (comp) {
+          matchImportance = FinanceService.getMatchImportance(
+            comp.tier || 3,
+            match.round ?? undefined,
+            comp.format === "knockout"
+          );
+        }
+      }
+
+      const { revenue: ticketRevenue, attendance } =
+        FinanceService.calculateMatchDayRevenue(
+          homeTeam.stadiumCapacity ?? 10000,
+          homeTeam.fanSatisfaction ?? 50,
+          matchImportance,
+          50
+        );
 
       await matchRepository.updateMatchResult(
         matchId,
@@ -198,8 +216,25 @@ export class MatchService {
           type: "income",
           category: FinancialCategory.TICKET_SALES,
           amount: ticketRevenue,
-          description: `Receita de bilheteira - ${attendance} torcedores`,
+          description: FinanceService.getTransactionDescription(
+            FinancialCategory.TICKET_SALES,
+            `${attendance.toLocaleString("pt-PT")} torcedores presentes`
+          ),
         });
+
+        console.log(
+          `💰 Receita de bilheteria registrada: €${ticketRevenue.toLocaleString(
+            "pt-PT"
+          )} (${attendance} torcedores)`
+        );
+      }
+
+      if (ticketRevenue > 0) {
+        const currentBudget = homeTeam.budget ?? 0;
+        await teamRepository.updateBudget(
+          match.homeTeamId!,
+          currentBudget + ticketRevenue
+        );
       }
 
       if (match.competitionId && match.seasonId) {
@@ -213,10 +248,14 @@ export class MatchService {
         );
       }
     } catch (error) {
-      console.error("Erro ao salvar resultado da partida:", error);
+      console.error("❌ Erro ao salvar resultado da partida:", error);
+      throw error;
     }
   }
 
+  /**
+   * Atualiza a tabela de classificação após uma partida
+   */
   private async updateStandings(
     competitionId: number,
     seasonId: number,

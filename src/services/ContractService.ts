@@ -2,38 +2,129 @@ import { playerRepository } from "../repositories/PlayerRepository";
 import { staffRepository } from "../repositories/StaffRepository";
 import { financialRepository } from "../repositories/FinancialRepository";
 import { FinancialCategory } from "../domain/enums";
+import { db } from "../lib/db";
+import { playerContracts } from "../db/schema";
+import { eq, and } from "drizzle-orm";
 
 export class ContractService {
+  /**
+   * Calcula a folha salarial mensal total de um time
+   * Inclui jogadores e equipe técnica
+   * @param teamId ID do time
+   * @returns Objeto com detalhamento dos salários
+   */
+  async calculateMonthlyWageBill(teamId: number): Promise<{
+    playerWages: number;
+    staffWages: number;
+    total: number;
+    playerCount: number;
+    staffCount: number;
+  }> {
+    try {
+      const activeContracts = await db
+        .select()
+        .from(playerContracts)
+        .where(
+          and(
+            eq(playerContracts.teamId, teamId),
+            eq(playerContracts.status, "active")
+          )
+        );
+
+      const playerWagesAnnual = activeContracts.reduce(
+        (sum, contract) => sum + (contract.wage || 0),
+        0
+      );
+      const playerWagesMonthly = Math.round(playerWagesAnnual / 12);
+
+      const staffMembers = await staffRepository.findByTeamId(teamId);
+
+      const staffWagesAnnual = staffMembers.reduce(
+        (sum, member) => sum + (member.salary || 0),
+        0
+      );
+      const staffWagesMonthly = Math.round(staffWagesAnnual / 12);
+
+      return {
+        playerWages: playerWagesMonthly,
+        staffWages: staffWagesMonthly,
+        total: playerWagesMonthly + staffWagesMonthly,
+        playerCount: activeContracts.length,
+        staffCount: staffMembers.length,
+      };
+    } catch (error) {
+      console.error("❌ Erro ao calcular folha salarial:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verifica contratos que estão expirando na data atual
+   * @param currentDate Data no formato YYYY-MM-DD
+   * @returns Número de contratos liberados
+   */
   async checkExpiringContracts(currentDate: string): Promise<{
     playersReleased: number;
     staffReleased: number;
   }> {
-    // Implementar lógica para verificar contratos expirando na data atual
+    try {
+      const expiringPlayerContracts = await db
+        .select()
+        .from(playerContracts)
+        .where(
+          and(
+            eq(playerContracts.endDate, currentDate),
+            eq(playerContracts.status, "active")
+          )
+        );
 
-    return { playersReleased: 0, staffReleased: 0 };
+      for (const contract of expiringPlayerContracts) {
+        await db
+          .update(playerContracts)
+          .set({ status: "expired" })
+          .where(eq(playerContracts.id, contract.id));
+
+        await playerRepository.update(contract.playerId, { teamId: null });
+
+        console.log(
+          `📋 Contrato expirado: Jogador ID ${contract.playerId} liberado`
+        );
+      }
+
+      const expiringStaff = await staffRepository.findByTeamId(0);
+      const expiredStaff = expiringStaff.filter(
+        (s) => s.contractEnd === currentDate
+      );
+
+      for (const member of expiredStaff) {
+        await staffRepository.fire(member.id);
+        console.log(`📋 Contrato expirado: Staff ID ${member.id} liberado`);
+      }
+
+      return {
+        playersReleased: expiringPlayerContracts.length,
+        staffReleased: expiredStaff.length,
+      };
+    } catch (error) {
+      console.error("❌ Erro ao verificar contratos expirando:", error);
+      return { playersReleased: 0, staffReleased: 0 };
+    }
   }
 
-  async calculateDailyWageBill(teamId: number): Promise<number> {
-    const players = await playerRepository.findByTeamId(teamId);
-    const staff = await staffRepository.findByTeamId(teamId);
-
-    const playerWages = players.reduce((sum) => sum + (0), 0);
-    const staffWages = staff.reduce((sum, s) => sum + (s.salary || 0), 0);
-
-    return Math.round((playerWages + staffWages) / 365);
-  }
-
+  /**
+   * Processa pagamento de salários diários para jogadores e staff
+   * @param teamId ID do time
+   * @param currentDate Data atual (YYYY-MM-DD)
+   * @param seasonId ID da temporada atual
+   */
   async processDailyWages(
     teamId: number,
     currentDate: string,
     seasonId: number
   ): Promise<void> {
-    // const players = await playerRepository.findByTeamId(teamId);
     const staffMembers = await staffRepository.findByTeamId(teamId);
 
     const playerTotal = 1000;
-      // BUSCAR PELO CONRTATO
-      // players.reduce((sum, p) => sum + (p.salary || 0), 0) / 365;
     const staffTotal =
       staffMembers.reduce((sum, s) => sum + (s.salary || 0), 0) / 365;
 
@@ -62,15 +153,50 @@ export class ContractService {
     }
   }
 
+  /**
+   * Renova contrato de um jogador com novos termos
+   * @param playerId ID do jogador
+   * @param newWage Novo salário anual
+   * @param newEndDate Nova data de término (YYYY-MM-DD)
+   */
   async renewPlayerContract(
     playerId: number,
-    newSalary: number,
+    newWage: number,
     newEndDate: string
   ): Promise<void> {
-    await playerRepository.update(playerId, {
-      salary: newSalary,
-      contractEnd: newEndDate,
-    });
+    try {
+      const currentContract = await db
+        .select()
+        .from(playerContracts)
+        .where(
+          and(
+            eq(playerContracts.playerId, playerId),
+            eq(playerContracts.status, "active")
+          )
+        )
+        .limit(1);
+
+      if (currentContract.length === 0) {
+        throw new Error(
+          `Nenhum contrato ativo encontrado para jogador ${playerId}`
+        );
+      }
+
+      await db
+        .update(playerContracts)
+        .set({
+          wage: newWage,
+          endDate: newEndDate,
+        })
+        .where(eq(playerContracts.id, currentContract[0].id));
+
+      console.log(
+        `✅ Contrato renovado: Jogador ${playerId} - €${newWage.toLocaleString()}/ano até ${newEndDate}`
+      );
+    } catch (error) {
+      console.error("❌ Erro ao renovar contrato:", error);
+      throw error;
+    }
   }
 }
 

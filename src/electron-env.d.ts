@@ -13,17 +13,12 @@ declare global {
   interface Window {
     electronAPI: {
       getTeams: () => Promise<Team[]>;
+
       getPlayers: (teamId: number) => Promise<Player[]>;
+
       getStaff: (teamId: number) => Promise<Staff[]>;
+
       getMatches: (teamId: number, seasonId: number) => Promise<Match[]>;
-      getCompetitions: () => Promise<Competition[]>;
-      updateTrainingFocus: (focus: string) => Promise<boolean>;
-
-      getGameState: () => Promise<GameState>;
-      advanceDay: () => Promise<{ date: string; messages: string[] }>;
-      saveGame: () => Promise<boolean>;
-      loadGame: () => Promise<boolean>;
-
       startMatch: (matchId: number) => Promise<boolean>;
       pauseMatch: (matchId: number) => Promise<boolean>;
       resumeMatch: (matchId: number) => Promise<boolean>;
@@ -43,6 +38,36 @@ declare global {
         matchesPlayed: number;
         results: Array<{ matchId: number; result: MatchResult }>;
       }>;
+
+      getCompetitions: () => Promise<Competition[]>;
+
+      getGameState: () => Promise<GameState>;
+      advanceDay: () => Promise<{ date: string; messages: string[] }>;
+      updateTrainingFocus: (focus: string) => Promise<boolean>;
+
+      checkFinancialHealth: (teamId: number) => Promise<{
+        isHealthy: boolean;
+        currentBudget: number;
+        hasTransferBan: boolean;
+        penaltiesApplied: string[];
+        severity: "none" | "warning" | "critical";
+      } | null>;
+
+      canMakeTransfers: (teamId: number) => Promise<{
+        allowed: boolean;
+        reason?: string;
+      }>;
+
+      getWageBill: (teamId: number) => Promise<{
+        playerWages: number;
+        staffWages: number;
+        total: number;
+        playerCount: number;
+        staffCount: number;
+      } | null>;
+
+      saveGame: () => Promise<boolean>;
+      loadGame: () => Promise<boolean>;
     };
   }
 }
