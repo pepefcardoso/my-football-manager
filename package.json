@@ -10,14 +10,15 @@
     "preview": "vite preview",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "seed": "npm rebuild better-sqlite3 && tsx src/db/seed.ts && npm run rebuild",
-    "db:push": "drizzle-kit push", 
+    "db:push": "drizzle-kit push",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
     "drizzle-orm": "^0.44.7",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
