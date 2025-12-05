@@ -30,4 +30,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("get-financial-health", teamId),
   upgradeInfrastructure: (action: string, teamId: number, seasonId: number) =>
     ipcRenderer.invoke("upgrade-infrastructure", { action, teamId, seasonId }),
+  getScoutedPlayer: (playerId: number, teamId: number) =>
+    ipcRenderer.invoke("get-scouted-player", { playerId, teamId }),
+  getScoutingList: (teamId: number) =>
+    ipcRenderer.invoke("get-scouting-list", teamId),
+  assignScout: (scoutId: number, playerId: number) =>
+    ipcRenderer.invoke("assign-scout", { scoutId, playerId }),
 });

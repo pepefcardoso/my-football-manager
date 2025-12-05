@@ -13,6 +13,7 @@ import type { Team } from "./domain/models";
 import FinancesPage from "./components/pages/FinancesPage";
 import InfrastructurePage from "./components/pages/InfrastructurePage";
 import { Logger } from "./lib/Logger";
+import ScoutingPage from "./components/pages/ScoutingPage";
 
 const logger = new Logger("App");
 
@@ -95,7 +96,7 @@ function App() {
         {activePage === "matches" && <MatchesPage teamId={userTeam.id} teams={teams} />}
 
         {activePage === "youth" && <PlaceholderPage title="Categorias de Base" />}
-        {activePage === "scouting" && <PlaceholderPage title="Scouting" />}
+        {activePage === "scouting" && <ScoutingPage teamId={userTeam.id} />}
         {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}
         {activePage === "infrastructure" && <InfrastructurePage teamId={userTeam.id} />}
         {activePage === "calendar" && <PlaceholderPage title="Calendário" />}

@@ -15,6 +15,7 @@ import { TrainingFocus } from "../src/domain/enums";
 import { matchService } from "../src/services/MatchService";
 import { FinanceService } from "../src/services/FinanceService";
 import { contractService } from "../src/services/ContractService";
+import { scoutingService } from "../src/services/ScoutingService";
 import { infrastructureService } from "../src/services/InfrastructureService";
 import { Logger } from "../src/lib/Logger";
 
@@ -229,6 +230,12 @@ function registerIpcHandlers() {
         }
       }
 
+      try {
+        await scoutingService.processDailyScouting(nextDate);
+      } catch (error) {
+        logger.error("Erro ao processar scouting diário:", error);
+      }
+
       await db
         .update(gameState)
         .set({ currentDate: nextDate })
@@ -370,10 +377,7 @@ function registerIpcHandlers() {
     try {
       return await matchService.simulateMatchesOfDate(date);
     } catch (error) {
-      logger.error(
-        `IPC Error [simulate-matches-of-date] date=${date}:`,
-        error
-      );
+      logger.error(`IPC Error [simulate-matches-of-date] date=${date}:`, error);
       return { matchesPlayed: 0, results: [] };
     }
   });
@@ -397,10 +401,7 @@ function registerIpcHandlers() {
     try {
       return await FinanceService.checkFinancialHealth(teamId);
     } catch (error) {
-      logger.error(
-        `IPC Error [get-financial-health] teamId=${teamId}:`,
-        error
-      );
+      logger.error(`IPC Error [get-financial-health] teamId=${teamId}:`, error);
       return null;
     }
   });
@@ -433,6 +434,42 @@ function registerIpcHandlers() {
         );
       }
       return { success: false, message: "Tipo de operação inválido" };
+    }
+  );
+
+  ipcMain.handle("get-scouted-player", async (_, { playerId, teamId }) => {
+    try {
+      return await scoutingService.getScoutedPlayer(playerId, teamId);
+    } catch (error) {
+      logger.error(
+        `IPC Error [get-scouted-player] playerId=${playerId} teamId=${teamId}:`,
+        error
+      );
+      return null;
+    }
+  });
+
+  ipcMain.handle("get-scouting-list", async (_, teamId: number) => {
+    try {
+      return await scoutingService.getScoutingList(teamId);
+    } catch (error) {
+      logger.error(`IPC Error [get-scouting-list] teamId=${teamId}:`, error);
+      return [];
+    }
+  });
+
+  ipcMain.handle(
+    "assign-scout",
+    async (_, { scoutId, playerId }: { scoutId: number; playerId: number }) => {
+      try {
+        return await scoutingService.assignScoutToPlayer(scoutId, playerId);
+      } catch (error) {
+        logger.error(
+          `IPC Error [assign-scout] scoutId=${scoutId} playerId=${playerId}:`,
+          error
+        );
+        return false;
+      }
     }
   );
 }

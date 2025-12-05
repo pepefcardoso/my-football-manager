@@ -85,6 +85,10 @@ declare global {
         seasonId: number
       ) => Promise<{ success: boolean; message: string }>;
 
+      getScoutedPlayer: (playerId: number, teamId: number) => Promise<any>;
+      getScoutingList: (teamId: number) => Promise<any[]>;
+      assignScout: (scoutId: number, playerId: number) => Promise<boolean>;
+
       saveGame: () => Promise<boolean>;
       loadGame: () => Promise<boolean>;
     };
