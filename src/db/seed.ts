@@ -388,40 +388,86 @@ async function main() {
   logger.info(`${insertedStaff.length} profissionais criados`);
   logger.info("Criando competições...");
 
+  logger.info("Criando competições com hierarquia temporal...");
+
   await db.insert(competitions).values([
     {
-      name: "Campeonato Nacional",
-      shortName: "CN",
+      name: "Campeonato Estadual Catarinense",
+      shortName: "CEC",
+      country: "Brasil",
+      tier: 3,
+      type: "league",
+      teams: 12,
+      prize: 500000,
+      reputation: 3000,
+      priority: 3,
+      window: "state",
+      startMonth: 1,
+      endMonth: 4,
+    },
+
+    {
+      name: "Campeonato Nacional Brasileiro",
+      shortName: "CNB",
       country: "Brasil",
       tier: 1,
       type: "league",
       teams: 12,
       prize: 5000000,
       reputation: 8000,
+      priority: 1,
+      window: "national",
+      startMonth: 5,
+      endMonth: 12,
     },
+
     {
-      name: "Copa Nacional",
+      name: "Copa Nacional do Brasil",
       shortName: "Copa",
       country: "Brasil",
       tier: 1,
-      type: "cup",
+      type: "knockout",
       teams: 16,
       prize: 2000000,
       reputation: 7000,
+      priority: 2,
+      window: "national",
+      startMonth: 5,
+      endMonth: 11,
     },
+
     {
-      name: "Libertadores Sul-Americana",
-      shortName: "LSA",
+      name: "Copa Libertadores Sul-Americana",
+      shortName: "CLSA",
       country: "Sul América",
       tier: 1,
       type: "group_knockout",
       teams: 16,
       prize: 10000000,
-      reputation: 9000,
+      reputation: 9500,
+      priority: 1,
+      window: "continental",
+      startMonth: 5,
+      endMonth: 11,
+    },
+    {
+      name: "Copa Sul-Americana",
+      shortName: "CSA",
+      country: "Sul América",
+      tier: 2,
+      type: "knockout",
+      teams: 16,
+      prize: 3000000,
+      reputation: 7500,
+      priority: 2,
+      window: "continental",
+      startMonth: 5,
+      endMonth: 10,
     },
   ]);
 
-  logger.info("Competições criadas");
+  logger.info("Competições criadas com janelas temporais");
+
   logger.info("Criando temporada...");
 
   const [season] = await db

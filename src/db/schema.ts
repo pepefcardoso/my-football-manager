@@ -93,6 +93,9 @@ export const competitions = sqliteTable("competitions", {
   teams: integer("teams").default(20),
   prize: real("prize").default(0),
   reputation: integer("reputation").default(0),
+  window: text("window").default("national"),
+  startMonth: integer("start_month").default(1),
+  endMonth: integer("end_month").default(12),
 });
 
 export const competitionStandings = sqliteTable("competition_standings", {
