@@ -10,6 +10,7 @@ interface ScheduledMatch {
   date: string;
   round: number;
   isPlayed: boolean;
+  groupName?: string;
 }
 
 interface CompetitionWindow {
@@ -22,6 +23,7 @@ interface CompetitionWindow {
   priority: number;
   teams: number;
   fixtures: MatchPair[];
+  groupStructure?: Record<string, number[]>;
 }
 
 const logger = new Logger("CalendarService");
@@ -72,10 +74,28 @@ export class CalendarService {
     return competitions.map((comp) => {
       const compTeams = allTeams.slice(0, comp.teams);
       let fixtures: MatchPair[] = [];
+      let groupStructure: Record<string, number[]> | undefined;
 
-      if (comp.type === "league") {
+      if (comp.type === "group_knockout") {
+        logger.info(`📊 Gerando fase de grupos para ${comp.name}`);
+
+        const groupStage = CompetitionScheduler.generateGroupStageFixtures(
+          compTeams,
+          4,
+          true
+        );
+
+        fixtures = groupStage.fixtures;
+        groupStructure = groupStage.groups;
+
+        logger.info(
+          `   └─ ${Object.keys(groupStage.groups).length} grupos criados com ${
+            fixtures.length
+          } partidas`
+        );
+      } else if (comp.type === "league") {
         fixtures = CompetitionScheduler.generateLeagueFixtures(compTeams, true);
-      } else {
+      } else if (comp.type === "knockout") {
         fixtures = CompetitionScheduler.generateKnockoutPairings(compTeams, 1);
       }
 
@@ -89,6 +109,7 @@ export class CalendarService {
         priority: comp.priority || 1,
         teams: comp.teams,
         fixtures,
+        groupStructure,
       };
     });
   }
@@ -298,7 +319,7 @@ export class CalendarService {
     const occupiedTeams = occupiedDates.get(date)!;
 
     for (const match of matches) {
-      allMatches.push({
+      const scheduledMatch: ScheduledMatch = {
         competitionId,
         seasonId,
         homeTeamId: match.homeTeamId,
@@ -306,7 +327,13 @@ export class CalendarService {
         date,
         round: match.round,
         isPlayed: false,
-      });
+      };
+
+      if (match.groupName) {
+        scheduledMatch.groupName = match.groupName;
+      }
+
+      allMatches.push(scheduledMatch);
 
       occupiedTeams.add(match.homeTeamId);
       occupiedTeams.add(match.awayTeamId);
