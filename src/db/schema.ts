@@ -104,6 +104,7 @@ export const competitionStandings = sqliteTable("competition_standings", {
   seasonId: integer("season_id").references(() => seasons.id),
   teamId: integer("team_id").references(() => teams.id),
   groupName: text("group_name"),
+  phase: text("phase").default("regular"),
   played: integer("played").default(0),
   wins: integer("wins").default(0),
   draws: integer("draws").default(0),

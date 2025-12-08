@@ -109,6 +109,8 @@ export interface CompetitionStanding {
   goalsFor: number;
   goalsAgainst: number;
   points: number;
+  groupName?: string | null;
+  phase?: string | null;
 }
 
 export interface Season {
