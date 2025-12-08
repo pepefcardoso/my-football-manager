@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react"; // Adicione useCallback
 import { useGameStore } from "./store/useGameStore";
 import MainLayout from "./components/layout/MainLayout";
 import Sidebar from "./components/layout/Sidebar";
@@ -29,22 +29,23 @@ function App() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
 
+  const handleLoadTeams = useCallback(async () => {
+    setLoadingTeams(true);
+    try {
+      const data = await window.electronAPI.getTeams();
+      setTeams(data);
+    } catch (error) {
+      logger.error("Erro ao carregar times:", error);
+    } finally {
+      setLoadingTeams(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (view === 'team_selection' && teams.length === 0) {
-      const loadTeams = async () => {
-        setLoadingTeams(true);
-        try {
-          const data = await window.electronAPI.getTeams();
-          setTeams(data);
-        } catch (error) {
-          logger.error("Erro ao carregar times:", error);
-        } finally {
-          setLoadingTeams(false);
-        }
-      };
-      loadTeams();
+      handleLoadTeams();
     }
-  }, [view, teams.length]);
+  }, [view, teams.length, handleLoadTeams]);
 
   if (view === 'start_screen') {
     return <StartPage />;
@@ -64,7 +65,7 @@ function App() {
         <MenuPage
           teams={teams}
           loading={loadingTeams}
-          onLoadTeams={() => { }}
+          onLoadTeams={handleLoadTeams}
           onSelectTeam={startGame}
         />
       </div>

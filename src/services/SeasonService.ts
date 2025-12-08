@@ -1,10 +1,16 @@
-// src/services/SeasonService.ts
 import { seasonRepository } from "../repositories/SeasonRepository";
 import { competitionRepository } from "../repositories/CompetitionRepository";
 import { teamRepository } from "../repositories/TeamRepository";
 import { matchRepository } from "../repositories/MatchRepository";
 import { CalendarService } from "./CalendarService";
 import { Logger } from "../lib/Logger";
+
+export interface SeasonSummary {
+  seasonYear: number;
+  championName: string;
+  promotedTeams: number[];
+  relegatedTeams: number[];
+}
 
 export class SeasonService {
   private calendarService: CalendarService;
@@ -70,44 +76,61 @@ export class SeasonService {
     }
   }
 
-  async processEndOfSeason(currentSeasonId: number): Promise<void> {
+  /**
+   * Processa o fim da temporada e retorna um resumo
+   */
+  async processEndOfSeason(
+    currentSeasonId: number
+  ): Promise<SeasonSummary | null> {
     this.logger.info("Iniciando processamento de fim de temporada...");
 
     const competitions = await competitionRepository.findAll();
+    const activeSeason = await seasonRepository.findActiveSeason();
+
+    if (!activeSeason) return null;
 
     const tier1 = competitions.find((c) => c.tier === 1 && c.type === "league");
     const tier2 = competitions.find((c) => c.tier === 2 && c.type === "league");
 
-    if (tier1 && tier2) {
+    let championName = "Desconhecido";
+    let relegated: number[] = [];
+    let promoted: number[] = [];
+
+    if (tier1) {
       const standingsT1 = await competitionRepository.getStandings(
         tier1.id,
         currentSeasonId
       );
+
+      if (standingsT1.length > 0) {
+        championName = standingsT1[0].team?.name || "Desconhecido";
+
+        const numberToSwap = 4;
+        relegated = standingsT1.slice(-numberToSwap).map((s) => s.teamId!);
+      }
+    }
+
+    if (tier2) {
       const standingsT2 = await competitionRepository.getStandings(
         tier2.id,
         currentSeasonId
       );
-
       const numberToSwap = 4;
-
-      const relegated = standingsT1.slice(-numberToSwap).map((s) => s.teamId);
-
-      const promoted = standingsT2.slice(0, numberToSwap).map((s) => s.teamId);
-
-      this.logger.info(`Rebaixados: ${relegated.join(", ")}`);
-      this.logger.info(`Promovidos: ${promoted.join(", ")}`);
-
-      // NOTA: Como não temos tabela de ligação competition_teams explicita no schema atual,
-      // a persistência disso dependeria de onde salvamos a "configuração inicial da próxima temporada".
-      // Para este exemplo, vamos registrar logs e poderíamos atualizar um campo "tier" no time se existisse,
-      // ou preparar a lista para o startNewSeason do próximo ano.
-
-      // TODO: Salvar histórico de trocas ou atualizar metadados dos times
+      promoted = standingsT2.slice(0, numberToSwap).map((s) => s.teamId!);
     }
-    const activeSeason = await seasonRepository.findActiveSeason();
-    if (activeSeason) {
-      await this.startNewSeason(activeSeason.year + 1);
-    }
+
+    this.logger.info(`Campeão: ${championName}`);
+    this.logger.info(`Rebaixados: ${relegated.join(", ")}`);
+    this.logger.info(`Promovidos: ${promoted.join(", ")}`);
+
+    await this.startNewSeason(activeSeason.year + 1);
+
+    return {
+      seasonYear: activeSeason.year,
+      championName,
+      promotedTeams: promoted,
+      relegatedTeams: relegated,
+    };
   }
 }
 

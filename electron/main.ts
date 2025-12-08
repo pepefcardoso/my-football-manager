@@ -8,7 +8,8 @@ import { matchRepository } from "../src/repositories/MatchRepository";
 import { competitionRepository } from "../src/repositories/CompetitionRepository";
 import { gameState } from "../src/db/schema";
 import { eq } from "drizzle-orm";
-import { StaffService } from "../src/services/StaffService";
+import { staffService } from "../src/services/StaffService";
+import { seasonService } from "../src/services/SeasonService";
 import { dailySimulationService } from "../src/services/DailySimulationService";
 import { db } from "../src/lib/db";
 import { TrainingFocus } from "../src/domain/enums";
@@ -18,6 +19,7 @@ import { contractService } from "../src/services/ContractService";
 import { scoutingService } from "../src/services/ScoutingService";
 import { infrastructureService } from "../src/services/InfrastructureService";
 import { Logger } from "../src/lib/Logger";
+import { seasonRepository } from "../src/repositories/SeasonRepository";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = new Logger("electron-main");
@@ -93,13 +95,43 @@ function registerIpcHandlers() {
       nextDateRaw.setDate(nextDateRaw.getDate() + 1);
       const nextDate = nextDateRaw.toISOString().split("T")[0];
 
-      const logs: string[] = [`📅 Dia avançado para ${nextDate}`];
+      const logs = [`📅 Dia avançado para ${nextDate}`];
+
+      const [, month, day] = nextDate.split("-").map(Number);
+
+      if (month === 12 && day === 15) {
+        const activeSeason = await seasonRepository.findActiveSeason();
+
+        if (activeSeason) {
+          const summary = await seasonService.processEndOfSeason(
+            activeSeason.id
+          );
+
+          if (summary) {
+            logs.push(`🏆 TEMPORADA ${summary.seasonYear} ENCERRADA!`);
+            logs.push(`🥇 Campeão Nacional: ${summary.championName}`);
+            logs.push(`📅 Temporada ${summary.seasonYear + 1} iniciada.`);
+
+            const nextSeasonStart = `${summary.seasonYear + 1}-01-15`;
+
+            await db
+              .update(gameState)
+              .set({
+                currentDate: nextSeasonStart,
+                currentSeasonId: activeSeason.id + 1,
+              })
+              .where(eq(gameState.id, state.id));
+
+            return {
+              date: nextSeasonStart,
+              messages: logs,
+              seasonRollover: summary,
+            };
+          }
+        }
+      }
 
       if (FinanceService.isPayDay(nextDate) && state.currentSeasonId) {
-        logger.info(
-          "Dia de pagamento detectado! Processando salários mensais..."
-        );
-
         const allTeams = await teamRepository.findAll();
 
         for (const team of allTeams) {
@@ -172,8 +204,6 @@ function registerIpcHandlers() {
 
       if (state.playerTeamId) {
         const players = await playerRepository.findByTeamId(state.playerTeamId);
-
-        const staffService = new StaffService();
         const staffImpact = await staffService.getStaffImpact(
           state.playerTeamId
         );
