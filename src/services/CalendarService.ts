@@ -29,11 +29,25 @@ interface CompetitionWindow {
 const logger = new Logger("CalendarService");
 
 export class CalendarService {
+  private continentalCompIds: Set<number> = new Set();
+
   async scheduleSeason(
     competitions: Competition[],
     allTeams: number[]
   ): Promise<ScheduledMatch[]> {
     logger.info("🗓️ Iniciando agendamento hierárquico da temporada...");
+
+    this.continentalCompIds.clear();
+    competitions.forEach((c) => {
+      if (
+        c.type === "group_knockout" ||
+        (c as any).window === "continental" ||
+        c.name.includes("Libertadores") ||
+        c.name.includes("Sul-Americana")
+      ) {
+        this.continentalCompIds.add(c.id);
+      }
+    });
 
     const allMatchesToSave: ScheduledMatch[] = [];
     const occupiedDates = new Map<string, Set<number>>();
@@ -140,7 +154,9 @@ export class CalendarService {
           if (dayOfWeek === 6 || dayOfWeek === 0) {
             const dateStr = currentDate.toISOString().split("T")[0];
 
-            if (this.canScheduleMatches(round, dateStr, occupiedDates)) {
+            if (
+              this.canScheduleMatches(round, dateStr, occupiedDates, allMatches)
+            ) {
               this.addMatches(
                 comp.id,
                 1,
@@ -189,7 +205,9 @@ export class CalendarService {
           if (dayOfWeek === 6 || dayOfWeek === 0) {
             const dateStr = currentDate.toISOString().split("T")[0];
 
-            if (this.canScheduleMatches(round, dateStr, occupiedDates)) {
+            if (
+              this.canScheduleMatches(round, dateStr, occupiedDates, allMatches)
+            ) {
               this.addMatches(
                 comp.id,
                 1,
@@ -238,7 +256,9 @@ export class CalendarService {
           if (dayOfWeek === 3) {
             const dateStr = currentDate.toISOString().split("T")[0];
 
-            if (this.canScheduleMatches(round, dateStr, occupiedDates)) {
+            if (
+              this.canScheduleMatches(round, dateStr, occupiedDates, allMatches)
+            ) {
               this.addMatches(
                 comp.id,
                 1,
@@ -280,12 +300,55 @@ export class CalendarService {
   }
 
   /**
-   * Verifica se todos os times da rodada estão livres na data
+   * Verifica conflito direto de data
+   */
+  private hasTeamConflict(
+    teamId: number,
+    date: string,
+    existingMatches: ScheduledMatch[]
+  ): boolean {
+    return existingMatches.some(
+      (m) =>
+        m.date === date && (m.homeTeamId === teamId || m.awayTeamId === teamId)
+    );
+  }
+
+  /**
+   * Verifica se o time precisa de descanso (jogo continental nas últimas 48h)
+   */
+  private needsRest(
+    teamId: number,
+    currentDate: string,
+    existingMatches: ScheduledMatch[]
+  ): boolean {
+    const targetDate = new Date(currentDate);
+    const twoDaysAgo = new Date(targetDate);
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const oneDayAgo = new Date(targetDate);
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+    const datesToCheck = [
+      twoDaysAgo.toISOString().split("T")[0],
+      oneDayAgo.toISOString().split("T")[0],
+    ];
+
+    return existingMatches.some((m) => {
+      const isContinental = this.continentalCompIds.has(m.competitionId);
+      const isTeamInvolved = m.homeTeamId === teamId || m.awayTeamId === teamId;
+      const isRecent = datesToCheck.includes(m.date);
+
+      return isContinental && isTeamInvolved && isRecent;
+    });
+  }
+
+  /**
+   * Verifica se todos os times da rodada estão livres na data e respeitam o descanso
    */
   private canScheduleMatches(
     matches: MatchPair[],
     date: string,
-    occupiedDates: Map<string, Set<number>>
+    occupiedDates: Map<string, Set<number>>,
+    allMatches: ScheduledMatch[]
   ): boolean {
     const occupiedTeams = occupiedDates.get(date) || new Set<number>();
 
@@ -294,6 +357,23 @@ export class CalendarService {
         occupiedTeams.has(match.homeTeamId) ||
         occupiedTeams.has(match.awayTeamId)
       ) {
+        return false;
+      }
+
+      if (
+        this.hasTeamConflict(match.homeTeamId, date, allMatches) ||
+        this.hasTeamConflict(match.awayTeamId, date, allMatches)
+      ) {
+        return false;
+      }
+
+      if (
+        this.needsRest(match.homeTeamId, date, allMatches) ||
+        this.needsRest(match.awayTeamId, date, allMatches)
+      ) {
+        logger.warn(
+          `⚠️ Conflito de descanso detectado em ${date}. Tentando próxima data.`
+        );
         return false;
       }
     }
