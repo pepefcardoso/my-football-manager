@@ -72,7 +72,6 @@ export class MatchService {
           (c) => c.id === match.competitionId
         );
 
-
         if (
           competition &&
           (competition.type === "knockout" ||
@@ -145,11 +144,7 @@ export class MatchService {
       return this.simulateFullMatch(matchId);
     }
 
-    engine.start();
-
-    while (engine.getCurrentMinute() < 90) {
-      engine.simulateMinute();
-    }
+    engine.simulateToCompletion();
 
     const result = engine.getMatchResult();
 

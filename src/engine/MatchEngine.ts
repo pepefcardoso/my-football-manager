@@ -6,6 +6,7 @@ import type {
   MatchResult,
   TeamStrength,
 } from "../domain/types";
+import { GameBalance } from "./GameBalanceConfig";
 import { RandomEngine } from "./RandomEngine";
 import { TeamStrengthCalculator } from "./TeamStrengthCalculator";
 
@@ -49,16 +50,11 @@ export class MatchEngine {
   }
 
   private applyWeatherEffects(weather: string): void {
-    switch (weather) {
-      case "rainy":
-        this.weatherMultiplier = 0.9;
-        break;
-      case "windy":
-        this.weatherMultiplier = 0.95;
-        break;
-      default:
-        this.weatherMultiplier = 1.0;
-    }
+    const penalty =
+      GameBalance.MATCH.WEATHER_PENALTY[
+        weather as keyof typeof GameBalance.MATCH.WEATHER_PENALTY
+      ];
+    this.weatherMultiplier = penalty || 1.0;
   }
 
   public start(): void {
@@ -85,6 +81,16 @@ export class MatchEngine {
     }
   }
 
+  /**
+   * Simula a partida inteira do início ao fim de uma vez
+   */
+  public simulateToCompletion(): void {
+    this.start();
+    while (this.currentMinute < 90) {
+      this.simulateMinute();
+    }
+  }
+
   public simulateMinute(): void {
     if (this.state !== MatchState.PLAYING) return;
 
@@ -94,7 +100,8 @@ export class MatchEngine {
     this.currentMinute++;
 
     const homeStrengthTotal =
-      this.homeStrength.overall * 1.05 + this.homeStrength.moralBonus;
+      this.homeStrength.overall * GameBalance.MATCH.HOME_ADVANTAGE +
+      this.homeStrength.moralBonus;
     const awayStrengthTotal =
       this.awayStrength.overall + this.awayStrength.moralBonus;
     const totalStrength = homeStrengthTotal + awayStrengthTotal;
@@ -108,11 +115,11 @@ export class MatchEngine {
       this.stats.awayPossession++;
     }
 
-    if (RandomEngine.chance(20)) {
+    if (RandomEngine.chance(GameBalance.MATCH.ATTACK_CHANCE_PER_MINUTE)) {
       this.processAttack(isHomeAttacking);
     }
 
-    if (RandomEngine.chance(1)) {
+    if (RandomEngine.chance(GameBalance.MATCH.RANDOM_EVENT_CHANCE_PER_MINUTE)) {
       this.processRandomEvent(isHomeAttacking);
     }
 
@@ -318,21 +325,25 @@ export class MatchEngine {
       ? this.awayStrength.defense * this.awayStrength.fitnessMultiplier
       : this.homeStrength.defense * this.homeStrength.fitnessMultiplier;
 
-    if (RandomEngine.chance(40)) {
+    if (RandomEngine.chance(GameBalance.MATCH.SHOT_CHANCE_IN_ATTACK)) {
       if (isHome) this.stats.homeShots++;
       else this.stats.awayShots++;
 
       const shooter = this.selectScorer(attackingPlayers);
       const shotQuality = (shooter.shooting + shooter.finishing) / 2;
 
-      if (RandomEngine.chance((shotQuality / 100) * 60)) {
+      if (
+        RandomEngine.chance(
+          (shotQuality / 100) * (GameBalance.MATCH.SHOT_ACCURACY_BASE * 100)
+        )
+      ) {
         if (isHome) this.stats.homeShotsOnTarget++;
         else this.stats.awayShotsOnTarget++;
 
         const goalkeeper = defendingPlayers.find((p) => p.position === "GK");
         const saveChance = goalkeeper
           ? ((goalkeeper.defending + goalkeeper.overall) / 200) * 100
-          : 50;
+          : GameBalance.MATCH.SAVE_CHANCE_BASE;
 
         const goalChance =
           (attackStrength / (attackStrength + defenseStrength)) *
@@ -369,7 +380,7 @@ export class MatchEngine {
       }
     }
 
-    if (RandomEngine.chance(8)) {
+    if (RandomEngine.chance(GameBalance.MATCH.CORNER_CHANCE)) {
       if (isHome) this.stats.homeCorners++;
       else this.stats.awayCorners++;
 
@@ -384,7 +395,7 @@ export class MatchEngine {
   }
 
   private handleGoalScored(isHome: boolean, teamId: number, shooter: Player) {
-    if (RandomEngine.chance(10)) {
+    if (RandomEngine.chance(GameBalance.MATCH.VAR_CHECK_PROBABILITY)) {
       this.events.push({
         minute: this.currentMinute,
         type: MatchEventType.VAR_CHECK,
@@ -394,7 +405,7 @@ export class MatchEngine {
           "🖥️ VAR em ação! Analisando possível irregularidade no gol...",
       });
 
-      if (RandomEngine.chance(30)) {
+      if (RandomEngine.chance(GameBalance.MATCH.VAR_OVERTURN_PROBABILITY)) {
         this.events.push({
           minute: this.currentMinute,
           type: MatchEventType.OFFSIDE,
