@@ -25,6 +25,7 @@ export enum StaffRole {
 
 export enum MatchEventType {
   GOAL = "goal",
+  ASSIST = "assist",
   YELLOW_CARD = "yellow_card",
   RED_CARD = "red_card",
   SUBSTITUTION = "substitution",

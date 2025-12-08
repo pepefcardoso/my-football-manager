@@ -414,6 +414,18 @@ export class MatchEngine {
     if (isHome) this.homeScore++;
     else this.awayScore++;
 
+    const assistProvider = this.getLastPassProvider(isHome, shooter);
+
+    if (assistProvider) {
+      this.events.push({
+        minute: this.currentMinute,
+        type: MatchEventType.ASSIST,
+        teamId: teamId,
+        playerId: assistProvider.id,
+        description: `🎯 Passe perfeito de ${assistProvider.firstName} para o gol!`,
+      });
+    }
+
     this.events.push({
       minute: this.currentMinute,
       type: MatchEventType.GOAL,
@@ -583,6 +595,25 @@ export class MatchEngine {
       },
       playerUpdates,
     };
+  }
+
+  private getLastPassProvider(isHome: boolean, shooter: Player): Player | null {
+    const players = isHome ? this.config.homePlayers : this.config.awayPlayers;
+
+    if (!RandomEngine.chance(70)) return null;
+
+    const candidates = players.filter(
+      (p) => p.id !== shooter.id && !p.isInjured
+    );
+
+    if (candidates.length === 0) return null;
+
+    const midfielders = candidates.filter((p) => p.position === "MF");
+    if (midfielders.length > 0 && RandomEngine.chance(60)) {
+      return RandomEngine.pickOne(midfielders);
+    }
+
+    return RandomEngine.pickOne(candidates);
   }
 
   public getCurrentMinute(): number {

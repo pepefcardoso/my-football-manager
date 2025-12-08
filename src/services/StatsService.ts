@@ -3,6 +3,7 @@ import { db } from "../lib/db";
 import { playerCompetitionStats } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import type { MatchResult } from "../domain/types";
+import { MatchEventType } from "../domain/enums";
 
 export class StatsService {
   /**
@@ -41,9 +42,10 @@ export class StatsService {
         red: 0,
       };
 
-      if (event.type === "goal") current.goals++;
-      if (event.type === "yellow_card") current.yellow++;
-      if (event.type === "red_card") current.red++;
+      if (event.type === MatchEventType.GOAL) current.goals++;
+      if (event.type === MatchEventType.ASSIST) current.assists++;
+      if (event.type === MatchEventType.YELLOW_CARD) current.yellow++;
+      if (event.type === MatchEventType.RED_CARD) current.red++;
 
       statsMap.set(event.playerId, current);
     });
@@ -70,6 +72,7 @@ export class StatsService {
           .set({
             matches: (existing.matches ?? 0) + 1,
             goals: (existing.goals ?? 0) + stats.goals,
+            assists: (existing.assists ?? 0) + stats.assists,
             yellowCards: (existing.yellowCards ?? 0) + stats.yellow,
             redCards: (existing.redCards ?? 0) + stats.red,
           })
@@ -82,6 +85,7 @@ export class StatsService {
           seasonId,
           matches: 1,
           goals: stats.goals,
+          assists: stats.assists,
           yellowCards: stats.yellow,
           redCards: stats.red,
         });
@@ -102,10 +106,10 @@ export class StatsService {
         eq(playerCompetitionStats.competitionId, competitionId),
         eq(playerCompetitionStats.seasonId, seasonId)
       ),
-      orderBy: (stats, { desc }) => [desc(stats.goals)],
+      orderBy: (stats, { desc }) => [desc(stats.goals), desc(stats.assists)],
       limit: limit,
       with: {
-        // player: true // Requer configuração no schema relations
+        // player: true
       },
     });
   }

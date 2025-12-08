@@ -13,6 +13,7 @@ interface PlayerStatRow {
   name: string;
   teamName: string;
   goals: number;
+  assists?: number;
   matches: number;
 }
 
@@ -167,11 +168,10 @@ function StandingsPage() {
                 setSelectedCompId(comp.id);
                 setSelectedGroup("all");
               }}
-              className={`px-3 py-1 rounded text-sm transition-colors ${
-                selectedCompId === comp.id
+              className={`px-3 py-1 rounded text-sm transition-colors ${selectedCompId === comp.id
                   ? "bg-emerald-600 text-white"
                   : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-              }`}
+                }`}
             >
               {comp.shortName}
             </button>
@@ -182,21 +182,19 @@ function StandingsPage() {
       <div className="flex mb-6 border-b border-slate-800">
         <button
           onClick={() => setActiveTab("table")}
-          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === "table"
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "table"
               ? "border-emerald-500 text-emerald-400"
               : "border-transparent text-slate-400 hover:text-white"
-          }`}
+            }`}
         >
           {isGroupCompetition ? "Fase de Grupos" : "Tabela Classificativa"}
         </button>
         <button
           onClick={() => setActiveTab("stats")}
-          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === "stats"
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "stats"
               ? "border-emerald-500 text-emerald-400"
               : "border-transparent text-slate-400 hover:text-white"
-          }`}
+            }`}
         >
           Estatísticas de Jogadores
         </button>
@@ -210,11 +208,10 @@ function StandingsPage() {
               <button
                 key={groupName}
                 onClick={() => setSelectedGroup(groupName)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedGroup === groupName
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedGroup === groupName
                     ? "bg-blue-600 text-white"
                     : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-                }`}
+                  }`}
               >
                 Grupo {groupName}
               </button>
@@ -259,11 +256,10 @@ function StandingsPage() {
                   {groupStandings[selectedGroup]?.map((row, index) => (
                     <tr key={row.teamId} className="hover:bg-slate-800/50">
                       <td
-                        className={`p-4 text-center font-mono ${
-                          index < 2
+                        className={`p-4 text-center font-mono ${index < 2
                             ? "text-emerald-400 border-l-2 border-l-emerald-500"
                             : "text-slate-500"
-                        }`}
+                          }`}
                       >
                         {index + 1}
                       </td>
@@ -300,10 +296,10 @@ function StandingsPage() {
               </table>
               {(!groupStandings[selectedGroup] ||
                 groupStandings[selectedGroup].length === 0) && (
-                <div className="p-8 text-center text-slate-500">
-                  Nenhuma classificação disponível para este grupo.
-                </div>
-              )}
+                  <div className="p-8 text-center text-slate-500">
+                    Nenhuma classificação disponível para este grupo.
+                  </div>
+                )}
             </div>
           )}
 
@@ -331,13 +327,12 @@ function StandingsPage() {
                   {standings.map((row, index) => (
                     <tr key={row.id} className="hover:bg-slate-800/50">
                       <td
-                        className={`p-4 text-center font-mono ${
-                          index < 4
+                        className={`p-4 text-center font-mono ${index < 4
                             ? "text-blue-400 border-l-2 border-l-blue-500"
                             : index > standings.length - 4
-                            ? "text-red-400 border-l-2 border-l-red-500"
-                            : "text-slate-500"
-                        }`}
+                              ? "text-red-400 border-l-2 border-l-red-500"
+                              : "text-slate-500"
+                          }`}
                       >
                         {index + 1}
                       </td>
@@ -396,9 +391,8 @@ function StandingsPage() {
                     <th className="p-4">Jogador</th>
                     <th className="p-4">Clube</th>
                     <th className="p-4 text-center">Jogos</th>
-                    <th className="p-4 text-center font-bold text-white">
-                      Gols
-                    </th>
+                    <th className="p-4 text-center font-bold text-white">Gols</th>
+                    <th className="p-4 text-center text-emerald-400">Assis.</th>
                     <th className="p-4 text-center">Média</th>
                   </tr>
                 </thead>
@@ -415,8 +409,11 @@ function StandingsPage() {
                       <td className="p-4 text-center text-slate-400">
                         {player.matches}
                       </td>
-                      <td className="p-4 text-center font-bold text-emerald-400">
+                      <td className="p-4 text-center font-bold text-white">
                         {player.goals}
+                      </td>
+                      <td className="p-4 text-center text-emerald-400 font-mono">
+                        {player.assists || 0}
                       </td>
                       <td className="p-4 text-center text-slate-500">
                         {(player.goals / (player.matches || 1)).toFixed(2)}

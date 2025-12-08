@@ -55,6 +55,7 @@ declare global {
           name: string;
           teamName: string;
           goals: number;
+          assists: number;
           matches: number;
         }[]
       >;
