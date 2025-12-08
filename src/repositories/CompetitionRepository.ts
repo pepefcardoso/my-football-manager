@@ -1,5 +1,5 @@
-import { eq, and, sql } from "drizzle-orm";
-import { competitions, competitionStandings } from "../db/schema";
+import { eq, and, sql, or, desc } from "drizzle-orm";
+import { competitions, competitionStandings, matches } from "../db/schema";
 import { db } from "../lib/db";
 
 export type CompetitionSelect = typeof competitions.$inferSelect;
@@ -65,6 +65,36 @@ export class CompetitionRepository {
         .set(data)
         .where(eq(competitionStandings.id, existing[0].id));
     }
+  }
+
+  async getTeamForm(
+    teamId: number,
+    competitionId: number,
+    seasonId: number
+  ): Promise<("W" | "D" | "L")[]> {
+    const lastMatches = await db
+      .select()
+      .from(matches)
+      .where(
+        and(
+          eq(matches.competitionId, competitionId),
+          eq(matches.seasonId, seasonId),
+          eq(matches.isPlayed, true),
+          or(eq(matches.homeTeamId, teamId), eq(matches.awayTeamId, teamId))
+        )
+      )
+      .orderBy(desc(matches.date))
+      .limit(5);
+
+    return lastMatches.map((m) => {
+      const isHome = m.homeTeamId === teamId;
+      const teamScore = isHome ? m.homeScore || 0 : m.awayScore || 0;
+      const oppScore = isHome ? m.awayScore || 0 : m.homeScore || 0;
+
+      if (teamScore > oppScore) return "W";
+      if (teamScore < oppScore) return "L";
+      return "D";
+    });
   }
 }
 

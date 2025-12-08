@@ -59,6 +59,7 @@ function StandingsPage() {
   const [topScorers, setTopScorers] = useState<PlayerStatRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<string>("all");
+  const [teamForms, setTeamForms] = useState<Record<number, string[]>>({});
 
   const currentSeasonId = 1;
 
@@ -148,6 +149,40 @@ function StandingsPage() {
     loadData();
   }, [selectedCompId, activeTab, currentSeasonId, competitions, selectedGroup]);
 
+  useEffect(() => {
+    const loadForms = async () => {
+      if (
+        activeTab !== "table" ||
+        standings.length === 0 ||
+        !selectedCompId
+      )
+        return;
+
+      const forms: Record<number, string[]> = {};
+
+      await Promise.all(
+        standings.map(async (row) => {
+          if (!row.teamId) return;
+          try {
+            const form = await window.electronAPI.getTeamForm(
+              row.teamId,
+              selectedCompId,
+              currentSeasonId
+            );
+            forms[row.teamId] = form;
+          } catch (error) {
+            logger.error(`Erro ao carregar forma do time ${row.teamId}`, error);
+            forms[row.teamId] = [];
+          }
+        })
+      );
+
+      setTeamForms(forms);
+    };
+
+    loadForms();
+  }, [standings, selectedCompId, activeTab, currentSeasonId]);
+
   const selectedComp = competitions.find((c) => c.id === selectedCompId);
   const isGroupCompetition = selectedComp?.type === "group_knockout";
   const hasGroups = Object.keys(groupStandings).length > 0;
@@ -157,7 +192,9 @@ function StandingsPage() {
       <header className="mb-6 flex justify-between items-end">
         <div>
           <h2 className="text-3xl font-light text-white mb-1">Competições</h2>
-          <p className="text-slate-400 text-sm">Classificação e Estatísticas</p>
+          <p className="text-slate-400 text-sm">
+            Classificação e Estatísticas
+          </p>
         </div>
 
         <div className="flex gap-2">
@@ -169,8 +206,8 @@ function StandingsPage() {
                 setSelectedGroup("all");
               }}
               className={`px-3 py-1 rounded text-sm transition-colors ${selectedCompId === comp.id
-                  ? "bg-emerald-600 text-white"
-                  : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                ? "bg-emerald-600 text-white"
+                : "bg-slate-800 text-slate-400 hover:bg-slate-700"
                 }`}
             >
               {comp.shortName}
@@ -183,8 +220,8 @@ function StandingsPage() {
         <button
           onClick={() => setActiveTab("table")}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "table"
-              ? "border-emerald-500 text-emerald-400"
-              : "border-transparent text-slate-400 hover:text-white"
+            ? "border-emerald-500 text-emerald-400"
+            : "border-transparent text-slate-400 hover:text-white"
             }`}
         >
           {isGroupCompetition ? "Fase de Grupos" : "Tabela Classificativa"}
@@ -192,8 +229,8 @@ function StandingsPage() {
         <button
           onClick={() => setActiveTab("stats")}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "stats"
-              ? "border-emerald-500 text-emerald-400"
-              : "border-transparent text-slate-400 hover:text-white"
+            ? "border-emerald-500 text-emerald-400"
+            : "border-transparent text-slate-400 hover:text-white"
             }`}
         >
           Estatísticas de Jogadores
@@ -209,8 +246,8 @@ function StandingsPage() {
                 key={groupName}
                 onClick={() => setSelectedGroup(groupName)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedGroup === groupName
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-800 text-slate-400 hover:bg-slate-700"
                   }`}
               >
                 Grupo {groupName}
@@ -257,8 +294,8 @@ function StandingsPage() {
                     <tr key={row.teamId} className="hover:bg-slate-800/50">
                       <td
                         className={`p-4 text-center font-mono ${index < 2
-                            ? "text-emerald-400 border-l-2 border-l-emerald-500"
-                            : "text-slate-500"
+                          ? "text-emerald-400 border-l-2 border-l-emerald-500"
+                          : "text-slate-500"
                           }`}
                       >
                         {index + 1}
@@ -328,10 +365,10 @@ function StandingsPage() {
                     <tr key={row.id} className="hover:bg-slate-800/50">
                       <td
                         className={`p-4 text-center font-mono ${index < 4
-                            ? "text-blue-400 border-l-2 border-l-blue-500"
-                            : index > standings.length - 4
-                              ? "text-red-400 border-l-2 border-l-red-500"
-                              : "text-slate-500"
+                          ? "text-blue-400 border-l-2 border-l-blue-500"
+                          : index > standings.length - 4
+                            ? "text-red-400 border-l-2 border-l-red-500"
+                            : "text-slate-500"
                           }`}
                       >
                         {index + 1}
@@ -365,9 +402,28 @@ function StandingsPage() {
                       </td>
                       <td className="p-4 text-center">
                         <div className="flex justify-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                          <span className="w-2 h-2 rounded-full bg-slate-600"></span>
+                          {(teamForms[row.teamId!] || []).map((result, i) => (
+                            <span
+                              key={i}
+                              title={
+                                result === "W"
+                                  ? "Vitória"
+                                  : result === "D"
+                                    ? "Empate"
+                                    : "Derrota"
+                              }
+                              className={`w-2 h-2 rounded-full ${result === "W"
+                                ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                                : result === "D"
+                                  ? "bg-slate-500"
+                                  : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                                }`}
+                            />
+                          ))}
+                          {(!teamForms[row.teamId!] ||
+                            teamForms[row.teamId!].length === 0) && (
+                              <span className="text-slate-600 text-xs">-</span>
+                            )}
                         </div>
                       </td>
                     </tr>
@@ -391,7 +447,9 @@ function StandingsPage() {
                     <th className="p-4">Jogador</th>
                     <th className="p-4">Clube</th>
                     <th className="p-4 text-center">Jogos</th>
-                    <th className="p-4 text-center font-bold text-white">Gols</th>
+                    <th className="p-4 text-center font-bold text-white">
+                      Gols
+                    </th>
                     <th className="p-4 text-center text-emerald-400">Assis.</th>
                     <th className="p-4 text-center">Média</th>
                   </tr>

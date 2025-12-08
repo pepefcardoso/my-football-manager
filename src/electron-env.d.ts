@@ -42,6 +42,12 @@ declare global {
 
       getCompetitions: () => Promise<Competition[]>;
 
+      getTeamForm: (
+        teamId: number,
+        competitionId: number,
+        seasonId: number
+      ) => Promise<("W" | "D" | "L")[]>;
+
       getStandings: (
         competitionId: number,
         seasonId: number

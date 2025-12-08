@@ -502,6 +502,14 @@ function registerIpcHandlers() {
       return [];
     }
   });
+
+  ipcMain.handle("getTeamForm", async (_, teamId, competitionId, seasonId) => {
+    return await competitionRepository.getTeamForm(
+      teamId,
+      competitionId,
+      seasonId
+    );
+  });
 }
 
 let win: BrowserWindow | null;
