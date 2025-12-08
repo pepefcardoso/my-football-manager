@@ -65,7 +65,24 @@ export class MatchService {
         weather: match.weather as any,
       };
 
-      const engine = new MatchEngine(config);
+      let isKnockout = false;
+      if (match.competitionId) {
+        const competitions = await competitionRepository.findAll();
+        const competition = competitions.find(
+          (c) => c.id === match.competitionId
+        );
+
+
+        if (
+          competition &&
+          (competition.type === "knockout" ||
+            competition.type === "group_knockout")
+        ) {
+          isKnockout = true;
+        }
+      }
+
+      const engine = new MatchEngine(config, isKnockout);
       this.engines.set(matchId, engine);
 
       return engine;

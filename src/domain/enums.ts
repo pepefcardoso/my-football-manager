@@ -37,6 +37,7 @@ export enum MatchEventType {
   CORNER = "corner",
   OFFSIDE = "offside",
   FINISHED = "finished",
+  PENALTY_SHOOTOUT = "penalty_shootout",
 }
 
 export enum TransferType {
