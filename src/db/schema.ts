@@ -275,3 +275,80 @@ export const matchesRelations = relations(matches, ({ one, many }) => ({
   }),
   events: many(matchEvents),
 }));
+
+export const scoutingReportsRelations = relations(
+  scoutingReports,
+  ({ one }) => ({
+    player: one(players, {
+      fields: [scoutingReports.playerId],
+      references: [players.id],
+    }),
+    scout: one(staff, {
+      fields: [scoutingReports.scoutId],
+      references: [staff.id],
+    }),
+    team: one(teams, {
+      fields: [scoutingReports.teamId],
+      references: [teams.id],
+    }),
+  })
+);
+
+export const transfersRelations = relations(transfers, ({ one }) => ({
+  player: one(players, {
+    fields: [transfers.playerId],
+    references: [players.id],
+  }),
+  fromTeam: one(teams, {
+    fields: [transfers.fromTeamId],
+    references: [teams.id],
+  }),
+  toTeam: one(teams, {
+    fields: [transfers.toTeamId],
+    references: [teams.id],
+  }),
+  season: one(seasons, {
+    fields: [transfers.seasonId],
+    references: [seasons.id],
+  }),
+}));
+
+export const competitionStandingsRelations = relations(
+  competitionStandings,
+  ({ one }) => ({
+    competition: one(competitions, {
+      fields: [competitionStandings.competitionId],
+      references: [competitions.id],
+    }),
+    team: one(teams, {
+      fields: [competitionStandings.teamId],
+      references: [teams.id],
+    }),
+    season: one(seasons, {
+      fields: [competitionStandings.seasonId],
+      references: [seasons.id],
+    }),
+  })
+);
+
+export const playerCompetitionStatsRelations = relations(
+  playerCompetitionStats,
+  ({ one }) => ({
+    player: one(players, {
+      fields: [playerCompetitionStats.playerId],
+      references: [players.id],
+    }),
+    team: one(teams, {
+      fields: [playerCompetitionStats.teamId],
+      references: [teams.id],
+    }),
+    competition: one(competitions, {
+      fields: [playerCompetitionStats.competitionId],
+      references: [competitions.id],
+    }),
+    season: one(seasons, {
+      fields: [playerCompetitionStats.seasonId],
+      references: [seasons.id],
+    }),
+  })
+);

@@ -1,4 +1,3 @@
-import { AttributeCalculator } from "../engine/AttributeCalculator";
 import { db } from "../lib/db";
 import {
   teams,
@@ -14,264 +13,31 @@ import {
   scoutingReports,
   transfers,
   competitionStandings,
+  playerCompetitionStats,
 } from "./schema";
-import { eq } from "drizzle-orm";
 import { Logger } from "../lib/Logger";
+import { TEAMS_DATA } from "./seeds/data";
+import {
+  generatePlayer,
+  generateStaffMember,
+  randomInt,
+} from "./seeds/generators";
+import { quickSimulateMatch } from "./seeds/match-simulator";
+import { CompetitionScheduler } from "../services/CompetitionScheduler";
+import { eq } from "drizzle-orm";
+import { Position, StaffRole, FinancialCategory } from "../domain/enums";
 
 const logger = new Logger("Seed");
 
-const FIRST_NAMES = [
-  "João",
-  "Pedro",
-  "Tiago",
-  "Lucas",
-  "Mateus",
-  "Gabriel",
-  "Rafael",
-  "Bruno",
-  "André",
-  "Miguel",
-  "Rui",
-  "Nuno",
-  "Ricardo",
-  "Diogo",
-  "Gonçalo",
-  "Carlos",
-  "Fernando",
-  "Manuel",
-  "Paulo",
-  "António",
-];
-
-const LAST_NAMES = [
-  "Silva",
-  "Santos",
-  "Ferreira",
-  "Pereira",
-  "Oliveira",
-  "Costa",
-  "Rodrigues",
-  "Martins",
-  "Gomes",
-  "Lopes",
-  "Almeida",
-  "Carvalho",
-  "Sousa",
-  "Ribeiro",
-  "Rocha",
-  "Monteiro",
-];
-
-const TEAMS_DATA = [
-  {
-    name: "Red Eagles",
-    short: "RED",
-    primary: "#ef4444",
-    secondary: "#ffffff",
-    rep: 8500,
-    budget: 50000000,
-  },
-  {
-    name: "Blue Dragons",
-    short: "BLU",
-    primary: "#3b82f6",
-    secondary: "#ffffff",
-    rep: 8200,
-    budget: 48000000,
-  },
-  {
-    name: "Green Lions",
-    short: "GRN",
-    primary: "#22c55e",
-    secondary: "#ffffff",
-    rep: 7800,
-    budget: 45000000,
-  },
-  {
-    name: "White Warriors",
-    short: "WHT",
-    primary: "#f8fafc",
-    secondary: "#0f172a",
-    rep: 7200,
-    budget: 38000000,
-  },
-  {
-    name: "Black Panthers",
-    short: "BLK",
-    primary: "#1e293b",
-    secondary: "#fbbf24",
-    rep: 6800,
-    budget: 35000000,
-  },
-  {
-    name: "Golden Suns",
-    short: "GLD",
-    primary: "#eab308",
-    secondary: "#1e293b",
-    rep: 6200,
-    budget: 30000000,
-  },
-  {
-    name: "Silver Stars",
-    short: "SLV",
-    primary: "#94a3b8",
-    secondary: "#0f172a",
-    rep: 5800,
-    budget: 25000000,
-  },
-  {
-    name: "Purple Knights",
-    short: "PRP",
-    primary: "#a855f7",
-    secondary: "#ffffff",
-    rep: 5400,
-    budget: 22000000,
-  },
-  {
-    name: "Orange Tigers",
-    short: "ORG",
-    primary: "#f97316",
-    secondary: "#ffffff",
-    rep: 5000,
-    budget: 20000000,
-  },
-  {
-    name: "Cyan Dolphins",
-    short: "CYN",
-    primary: "#06b6d4",
-    secondary: "#ffffff",
-    rep: 4600,
-    budget: 18000000,
-  },
-  {
-    name: "Pink Flamingos",
-    short: "PNK",
-    primary: "#ec4899",
-    secondary: "#ffffff",
-    rep: 4200,
-    budget: 15000000,
-  },
-  {
-    name: "Brown Bears",
-    short: "BRN",
-    primary: "#92400e",
-    secondary: "#fef3c7",
-    rep: 3800,
-    budget: 12000000,
-  },
-];
-
-const STAFF_ROLES = [
-  "head_coach",
-  "assistant_coach",
-  "fitness_coach",
-  "medical_doctor",
-  "physiotherapist",
-  "scout",
-] as const;
-
-function random<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function generatePlayer(teamId: number, position: string, isYouth = false) {
-  const age = isYouth ? randomInt(16, 19) : randomInt(18, 34);
-
-  let finishing = randomInt(40, 80);
-  let passing = randomInt(40, 80);
-  let dribbling = randomInt(40, 80);
-  let defending = randomInt(40, 80);
-  let physical = randomInt(50, 85);
-  let pace = randomInt(50, 85);
-  let shooting = randomInt(40, 80);
-
-  if (position === "GK") {
-    defending = randomInt(60, 90);
-    finishing = randomInt(20, 40);
-    dribbling = randomInt(30, 50);
-  } else if (position === "DF") {
-    defending = randomInt(65, 90);
-    physical = randomInt(65, 90);
-    finishing = randomInt(30, 55);
-  } else if (position === "MF") {
-    passing = randomInt(65, 90);
-    dribbling = randomInt(60, 85);
-  } else if (position === "FW") {
-    finishing = randomInt(65, 90);
-    shooting = randomInt(65, 90);
-    pace = randomInt(65, 90);
-  }
-
-  const overall = AttributeCalculator.calculateOverall(position as any, {
-    finishing,
-    passing,
-    dribbling,
-    defending,
-    physical,
-    pace,
-    shooting,
-  });
-
-  const potential = overall + randomInt(0, Math.max(0, 95 - overall));
-
-  return {
-    teamId,
-    firstName: random(FIRST_NAMES),
-    lastName: random(LAST_NAMES),
-    age,
-    nationality: "BRA",
-    position,
-    preferredFoot: Math.random() > 0.3 ? "right" : "left",
-    overall,
-    potential,
-    finishing,
-    passing,
-    dribbling,
-    defending,
-    physical,
-    pace,
-    shooting,
-    moral: randomInt(70, 100),
-    energy: randomInt(90, 100),
-    fitness: randomInt(80, 100),
-    form: randomInt(40, 70),
-    isFullyScounted: !isYouth,
-    scoutingProgress: isYouth ? 0 : 100,
-    isYouth,
-    youthLevel: isYouth ? "sub-20" : null,
-    isInjured: false,
-    isCaptain: false,
-  };
-}
-
-function generateStaffMember(teamId: number, role: string) {
-  return {
-    teamId,
-    firstName: random(FIRST_NAMES),
-    lastName: random(LAST_NAMES),
-    age: randomInt(35, 65),
-    nationality: "BRA",
-    role,
-    overall: randomInt(50, 85),
-    salary: randomInt(15000, 80000),
-    contractEnd: `${2025 + randomInt(1, 3)}-12-31`,
-    specialization:
-      role === "scout" ? random(["south_america", "europe", "youth"]) : null,
-  };
-}
-
 async function main() {
-  logger.info("Iniciando Seed do Banco de Dados...");
-  logger.info("Limpando dados antigos...");
+  logger.info("🌱 Iniciando Seed Completo do Banco de Dados...");
 
+  logger.info("🗑️  Limpando dados antigos...");
   await db.delete(matchEvents);
   await db.delete(scoutingReports);
   await db.delete(transfers);
   await db.delete(competitionStandings);
+  await db.delete(playerCompetitionStats);
   await db.delete(playerContracts);
   await db.delete(financialRecords);
   await db.delete(gameState);
@@ -282,7 +48,18 @@ async function main() {
   await db.delete(seasons);
   await db.delete(teams);
 
-  logger.info("Criando times...");
+  logger.info("📅 Criando Temporada 2025...");
+  const [season] = await db
+    .insert(seasons)
+    .values({
+      year: 2025,
+      startDate: "2025-01-15",
+      endDate: "2025-12-15",
+      isActive: true,
+    })
+    .returning();
+
+  logger.info("🛡️  Criando Times...");
   const insertedTeams = await db
     .insert(teams)
     .values(
@@ -302,175 +79,287 @@ async function main() {
         fanBase: randomInt(50000, 500000),
       }))
     )
-    .returning({ id: teams.id, name: teams.name });
+    .returning();
 
-  logger.info(`${insertedTeams.length} times criados`);
+  const humanTeam = insertedTeams[0];
+  await db
+    .update(teams)
+    .set({ isHuman: true })
+    .where(eq(teams.id, humanTeam.id));
 
-  logger.info("Criando jogadores e contratos...");
-
+  logger.info("🏃 Criando Elencos e Staff...");
   let totalPlayers = 0;
+  const allScouts: { id: number; teamId: number }[] = [];
 
   for (const team of insertedTeams) {
-    const currentTeamPlayers = [];
-    const teamContractsData = [];
-
-    const squad = [
-      ...Array(3).fill("GK"),
-      ...Array(8).fill("DF"),
-      ...Array(8).fill("MF"),
-      ...Array(6).fill("FW"),
+    const squadStructure = [
+      ...Array(3).fill(Position.GK),
+      ...Array(8).fill(Position.DF),
+      ...Array(8).fill(Position.MF),
+      ...Array(6).fill(Position.FW),
     ];
 
-    for (const pos of squad) {
+    const teamPlayers = [];
+
+    for (const pos of squadStructure) {
       const pData = generatePlayer(team.id, pos, false);
       const [newPlayer] = await db.insert(players).values(pData).returning();
-      currentTeamPlayers.push(newPlayer);
+      teamPlayers.push(newPlayer);
 
-      teamContractsData.push({
+      await db.insert(playerContracts).values({
         playerId: newPlayer.id,
         teamId: team.id,
         startDate: "2024-01-01",
         endDate: `${2025 + randomInt(1, 4)}-12-31`,
-        wage: newPlayer.overall * 1000 + randomInt(5000, 20000),
-        releaseClause: newPlayer.overall * 100000 + randomInt(500000, 2000000),
+        wage: newPlayer.overall * 800 + randomInt(1000, 5000),
+        releaseClause: newPlayer.overall * 50000 + randomInt(500000, 2000000),
         type: "professional",
         status: "active",
       });
     }
 
-    for (let i = 0; i < 15; i++) {
-      const pData = generatePlayer(team.id, random(["DF", "MF", "FW"]), true);
-      const [newYouthPlayer] = await db
-        .insert(players)
-        .values(pData)
-        .returning();
+    for (let i = 0; i < 10; i++) {
+      const positions = [Position.GK, Position.DF, Position.MF, Position.FW];
+      const pData = generatePlayer(team.id, positions[randomInt(0, 3)], true);
+      const [youthPlayer] = await db.insert(players).values(pData).returning();
 
-      teamContractsData.push({
-        playerId: newYouthPlayer.id,
+      await db.insert(playerContracts).values({
+        playerId: youthPlayer.id,
         teamId: team.id,
         startDate: "2024-01-01",
         endDate: "2026-12-31",
-        wage: randomInt(500, 2000),
+        wage: randomInt(200, 800),
         releaseClause: randomInt(100000, 500000),
         type: "youth",
         status: "active",
       });
     }
 
-    if (teamContractsData.length > 0) {
-      await db.insert(playerContracts).values(teamContractsData as any);
-    }
-
-    totalPlayers += squad.length + 15;
-
-    if (currentTeamPlayers.length > 0) {
-      const captain = currentTeamPlayers.reduce((best, current) =>
-        current.overall > best.overall ? current : best
+    if (teamPlayers.length > 0) {
+      const captain = teamPlayers.reduce((prev, current) =>
+        prev.overall > current.overall ? prev : current
       );
       await db
         .update(players)
         .set({ isCaptain: true })
         .where(eq(players.id, captain.id));
     }
-  }
 
-  logger.info(`${totalPlayers} jogadores e contratos criados`);
-  logger.info("Criando staff técnico...");
+    totalPlayers += squadStructure.length + 10;
 
-  const allStaff = [];
-  for (const team of insertedTeams) {
-    for (const role of STAFF_ROLES) {
-      allStaff.push(generateStaffMember(team.id, role));
+    const roles = Object.values(StaffRole);
+    for (const role of roles) {
+      const count = role === StaffRole.SCOUT ? 3 : 1;
+      for (let k = 0; k < count; k++) {
+        const sData = generateStaffMember(team.id, role);
+        const [newStaff] = await db.insert(staff).values(sData).returning();
+        if (role === StaffRole.SCOUT) {
+          allScouts.push({ id: newStaff.id, teamId: team.id });
+        }
+      }
+    }
+
+    if (team.isHuman) {
+      await db.insert(financialRecords).values([
+        {
+          teamId: team.id,
+          seasonId: season.id,
+          date: "2025-01-01",
+          type: "income",
+          category: FinancialCategory.SPONSORS,
+          amount: 5000000,
+          description: "Pagamento Patrocínio Master",
+        },
+        {
+          teamId: team.id,
+          seasonId: season.id,
+          date: "2025-01-05",
+          type: "expense",
+          category: FinancialCategory.INFRASTRUCTURE,
+          amount: 200000,
+          description: "Manutenção Pré-temporada",
+        },
+        {
+          teamId: team.id,
+          seasonId: season.id,
+          date: "2025-01-10",
+          type: "income",
+          category: FinancialCategory.TV_RIGHTS,
+          amount: 2000000,
+          description: "Cota de TV (Parcela 1)",
+        },
+      ]);
     }
   }
-  const insertedStaff = await db.insert(staff).values(allStaff).returning();
 
-  logger.info(`${insertedStaff.length} profissionais criados`);
-  logger.info("Criando competições...");
-
-  logger.info("Criando competições com hierarquia temporal...");
-
-  await db.insert(competitions).values([
-    {
-      name: "Campeonato Estadual Catarinense",
-      shortName: "CEC",
-      country: "Brasil",
-      tier: 3,
-      type: "league",
-      teams: 12,
-      prize: 500000,
-      reputation: 3000,
-      priority: 3,
-      window: "state",
-      startMonth: 1,
-      endMonth: 4,
-    },
-
-    {
+  logger.info("🏆 Criando Competições...");
+  const [cnb] = await db
+    .insert(competitions)
+    .values({
       name: "Campeonato Nacional Brasileiro",
       shortName: "CNB",
       country: "Brasil",
       tier: 1,
       type: "league",
       teams: 12,
-      prize: 5000000,
+      prize: 15000000,
       reputation: 8000,
       priority: 1,
       window: "national",
       startMonth: 5,
       endMonth: 12,
-    },
+    })
+    .returning();
 
-    {
-      name: "Copa Nacional do Brasil",
-      shortName: "Copa",
-      country: "Brasil",
-      tier: 1,
-      type: "knockout",
-      teams: 16,
-      prize: 2000000,
-      reputation: 7000,
-      priority: 2,
-      window: "national",
-      startMonth: 5,
-      endMonth: 11,
-    },
+  await db.insert(competitions).values({
+    name: "Copa Nacional",
+    shortName: "Copa",
+    country: "Brasil",
+    tier: 1,
+    type: "knockout",
+    teams: 16,
+    prize: 8000000,
+    reputation: 7000,
+    priority: 2,
+    window: "national",
+    startMonth: 5,
+    endMonth: 11,
+  });
 
-    {
-      name: "Copa Libertadores Sul-Americana",
-      shortName: "CLSA",
-      country: "Sul América",
-      tier: 1,
-      type: "group_knockout",
-      teams: 16,
-      prize: 10000000,
-      reputation: 9500,
-      priority: 1,
-      window: "continental",
-      startMonth: 5,
-      endMonth: 11,
-    },
-    {
-      name: "Copa Sul-Americana",
-      shortName: "CSA",
-      country: "Sul América",
-      tier: 2,
-      type: "knockout",
-      teams: 16,
-      prize: 3000000,
-      reputation: 7500,
-      priority: 2,
-      window: "continental",
-      startMonth: 5,
-      endMonth: 10,
-    },
-  ]);
+  await db.insert(competitions).values({
+    name: "Estadual",
+    shortName: "EST",
+    country: "Brasil",
+    tier: 3,
+    type: "league",
+    teams: 12,
+    prize: 1000000,
+    reputation: 3000,
+    priority: 3,
+    window: "state",
+    startMonth: 1,
+    endMonth: 4,
+  });
 
-  logger.info("Competições criadas com janelas temporais");
+  logger.info("🔍 Gerando dados de Scouting iniciais...");
+  const otherTeamsPlayers = await db.query.players.findMany({
+    where: (players, { ne }) => ne(players.teamId, humanTeam.id),
+    limit: 10,
+  });
 
-  logger.info("Criando temporada...");
+  const humanScouts = allScouts.filter((s) => s.teamId === humanTeam.id);
 
-  const [season] = await db
+  if (humanScouts.length > 0 && otherTeamsPlayers.length > 0) {
+    const reports = otherTeamsPlayers.map((p, index) => ({
+      playerId: p.id,
+      teamId: humanTeam.id,
+      scoutId: humanScouts[index % humanScouts.length].id,
+      date: "2025-01-14",
+      progress: randomInt(20, 80),
+      overallEstimate: Math.round(p.overall * (randomInt(90, 110) / 100)),
+      potentialEstimate: Math.round(p.potential * (randomInt(90, 110) / 100)),
+      notes: "Jogador observado durante a pré-temporada.",
+      recommendation: p.overall > 70 ? "Contratar" : "Observar",
+    }));
+    await db.insert(scoutingReports).values(reports);
+  }
+
+  logger.info("📜 Gerando Histórico da Temporada 2024...");
+  const [season2024] = await db
+    .insert(seasons)
+    .values({
+      year: 2024,
+      startDate: "2024-01-15",
+      endDate: "2024-12-15",
+      isActive: false,
+    })
+    .returning();
+
+  const teamIds = insertedTeams.map((t) => t.id);
+  const fixtures2024 = CompetitionScheduler.generateLeagueFixtures(
+    teamIds,
+    true
+  );
+
+  const standingsMap = new Map<
+    number,
+    { w: number; d: number; l: number; gf: number; ga: number; pts: number }
+  >();
+  teamIds.forEach((id) =>
+    standingsMap.set(id, { w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 })
+  );
+
+  const historyMatches = [];
+
+  for (const fixture of fixtures2024) {
+    const homeTeam = insertedTeams.find((t) => t.id === fixture.homeTeamId)!;
+    const awayTeam = insertedTeams.find((t) => t.id === fixture.awayTeamId)!;
+
+    const result = quickSimulateMatch(
+      homeTeam.reputation!,
+      awayTeam.reputation!
+    );
+
+    const homeStats = standingsMap.get(homeTeam.id)!;
+    const awayStats = standingsMap.get(awayTeam.id)!;
+
+    homeStats.gf += result.homeScore;
+    homeStats.ga += result.awayScore;
+    awayStats.gf += result.awayScore;
+    awayStats.ga += result.homeScore;
+
+    if (result.homeScore > result.awayScore) {
+      homeStats.w++;
+      homeStats.pts += 3;
+      awayStats.l++;
+    } else if (result.awayScore > result.homeScore) {
+      awayStats.w++;
+      awayStats.pts += 3;
+      homeStats.l++;
+    } else {
+      homeStats.d++;
+      homeStats.pts += 1;
+      awayStats.d++;
+      awayStats.pts += 1;
+    }
+
+    historyMatches.push({
+      competitionId: cnb.id,
+      seasonId: season2024.id,
+      homeTeamId: homeTeam.id,
+      awayTeamId: awayTeam.id,
+      date: "2024-06-01",
+      round: fixture.round,
+      homeScore: result.homeScore,
+      awayScore: result.awayScore,
+      isPlayed: true,
+      attendance: randomInt(10000, homeTeam.stadiumCapacity!),
+      ticketRevenue: 0,
+      weather: "sunny",
+    });
+  }
+
+  await db.insert(matches).values(historyMatches);
+
+  const standingsInserts = [];
+  for (const [tId, stats] of standingsMap.entries()) {
+    standingsInserts.push({
+      competitionId: cnb.id,
+      seasonId: season2024.id,
+      teamId: tId,
+      played: (teamIds.length - 1) * 2,
+      wins: stats.w,
+      draws: stats.d,
+      losses: stats.l,
+      goalsFor: stats.gf,
+      goalsAgainst: stats.ga,
+      points: stats.pts,
+    });
+  }
+  await db.insert(competitionStandings).values(standingsInserts);
+
+  logger.info("📅 Iniciando Temporada Ativa 2025...");
+  const [season2025] = await db
     .insert(seasons)
     .values({
       year: 2025,
@@ -480,29 +369,59 @@ async function main() {
     })
     .returning();
 
-  logger.info(`Temporada ${season.year} criada`);
-  logger.info("Criando estado do jogo...");
+  const fixtures2025 = CompetitionScheduler.generateLeagueFixtures(
+    teamIds,
+    true
+  );
+  const futureMatches = fixtures2025.map((f) => {
+    const roundDate = new Date("2025-05-01");
+    roundDate.setDate(roundDate.getDate() + f.round * 7);
 
-  await db.insert(gameState).values({
-    currentDate: "2025-01-15",
-    currentSeasonId: season.id,
-    managerName: "Treinador",
-    playerTeamId: insertedTeams[0].id,
-    simulationSpeed: 1,
+    return {
+      competitionId: cnb.id,
+      seasonId: season2025.id,
+      homeTeamId: f.homeTeamId,
+      awayTeamId: f.awayTeamId,
+      date: roundDate.toISOString().split("T")[0],
+      round: f.round,
+      isPlayed: false,
+      weather: "sunny",
+    };
   });
 
-  logger.info("Estado inicial criado");
-  logger.info("SEED CONCLUÍDO COM SUCESSO!");
-  logger.info("Resumo da operação:");
-  logger.info(`• ${insertedTeams.length} times`);
-  logger.info(`• ${totalPlayers} jogadores`);
-  logger.info(`• ${insertedStaff.length} profissionais`);
-  logger.info(`• 3 competições`);
-  logger.info(`• 1 temporada ativa`);
-  logger.info("Banco de dados pronto: database.sqlite");
+  await db.insert(matches).values(futureMatches);
+
+  const zeroStandings = insertedTeams.map((t) => ({
+    competitionId: cnb.id,
+    seasonId: season2025.id,
+    teamId: t.id,
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    points: 0,
+  }));
+  await db.insert(competitionStandings).values(zeroStandings);
+
+  logger.info("💾 Salvando Estado Inicial...");
+  await db.insert(gameState).values({
+    currentDate: "2025-01-15",
+    currentSeasonId: season2025.id,
+    managerName: "Treinador",
+    playerTeamId: humanTeam.id,
+    simulationSpeed: 1,
+    trainingFocus: "technical",
+  });
+
+  logger.info("✅ SEED CONCLUÍDO COM SUCESSO!");
+  logger.info(`• ${insertedTeams.length} times criados.`);
+  logger.info(`• ${totalPlayers} jogadores gerados.`);
+  logger.info(`• Dados financeiros e de scouting iniciados.`);
 }
 
 main().catch((err) => {
-  logger.error("Erro no seed:", err);
+  logger.error("❌ Erro no seed:", err);
   process.exit(1);
 });
