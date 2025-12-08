@@ -8,6 +8,16 @@ import { Logger } from "../../lib/Logger";
 
 const logger = new Logger("StandingsPage");
 
+interface GoalkeeperStatRow {
+  id: number;
+  name: string;
+  teamName: string;
+  cleanSheets: number;
+  saves: number;
+  goalsConceded: number;
+  matches: number;
+}
+
 interface PlayerStatRow {
   id: number;
   name: string;
@@ -49,7 +59,7 @@ interface GroupStanding {
 }
 
 function StandingsPage() {
-  const [activeTab, setActiveTab] = useState<"table" | "stats">("table");
+  const [activeTab, setActiveTab] = useState<"table" | "stats" | "keepers">("table");
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [selectedCompId, setSelectedCompId] = useState<number | null>(null);
   const [standings, setStandings] = useState<StandingData[]>([]);
@@ -57,6 +67,7 @@ function StandingsPage() {
     Record<string, GroupStanding[]>
   >({});
   const [topScorers, setTopScorers] = useState<PlayerStatRow[]>([]);
+  const [topGoalkeepers, setTopGoalkeepers] = useState<GoalkeeperStatRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<string>("all");
   const [teamForms, setTeamForms] = useState<Record<number, string[]>>({});
@@ -131,11 +142,24 @@ function StandingsPage() {
             if (Object.keys(grouped).length > 0 && selectedGroup === "all") {
               setSelectedGroup(Object.keys(grouped)[0]);
             }
-          } else {
+          }
+          else {
             setStandings(data);
             setGroupStandings({});
           }
-        } else {
+        } else if (activeTab === "keepers") {
+          const data = await api.getTopGoalkeepers(selectedCompId, currentSeasonId);
+
+          const enhancedData = await Promise.all(data.map(async (item: any) => {
+            return {
+              ...item,
+              name: item.name || "Goleiro " + item.playerId,
+              teamName: item.teamName || "Time",
+            };
+          }));
+          setTopGoalkeepers(enhancedData);
+        }
+        else {
           const data = await api.getTopScorers(selectedCompId, currentSeasonId);
           setTopScorers(data);
         }
@@ -253,6 +277,40 @@ function StandingsPage() {
                 Grupo {groupName}
               </button>
             ))}
+        </div>
+      )}
+
+      {!loading && activeTab === "keepers" && (
+        <div className="bg-slate-900/50 rounded-lg border border-slate-800 overflow-hidden">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-900 text-slate-400 font-semibold uppercase text-xs">
+              <tr>
+                <th className="p-4 w-12 text-center">#</th>
+                <th className="p-4">Jogador</th>
+                <th className="p-4">Clube</th>
+                <th className="p-4 text-center">Jogos</th>
+                <th className="p-4 text-center font-bold text-white" title="Jogos sem sofrer gols">Clean Sheets</th>
+                <th className="p-4 text-center text-emerald-400">Defesas</th>
+                <th className="p-4 text-center text-red-400">Gols Sofridos</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {topGoalkeepers.map((keeper, index) => (
+                <tr key={index} className="hover:bg-slate-800/50">
+                  <td className="p-4 text-center text-slate-500 font-mono">{index + 1}</td>
+                  <td className="p-4 font-medium text-white">{keeper.name}</td>
+                  <td className="p-4 text-slate-400">{keeper.teamName}</td>
+                  <td className="p-4 text-center text-slate-400">{keeper.matches}</td>
+                  <td className="p-4 text-center font-bold text-white">{keeper.cleanSheets}</td>
+                  <td className="p-4 text-center text-emerald-400 font-mono">{keeper.saves}</td>
+                  <td className="p-4 text-center text-red-400 font-mono">{keeper.goalsConceded}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {topGoalkeepers.length === 0 && (
+            <div className="p-8 text-center text-slate-500">Nenhuma estatística de goleiros disponível.</div>
+          )}
         </div>
       )}
 

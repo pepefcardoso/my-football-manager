@@ -125,6 +125,10 @@ export const playerCompetitionStats = sqliteTable("player_competition_stats", {
   yellowCards: integer("yellow_cards").default(0),
   redCards: integer("red_cards").default(0),
   averageRating: real("average_rating").default(0),
+  saves: integer("saves").default(0),
+  cleanSheets: integer("clean_sheets").default(0),
+  goalsConceded: integer("goals_conceded").default(0),
+  minutesPlayed: integer("minutes_played").default(0),
 });
 
 export const seasons = sqliteTable("seasons", {

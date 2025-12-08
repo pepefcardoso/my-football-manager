@@ -345,6 +345,9 @@ export class MatchEngine {
         ) {
           this.handleGoalScored(isHome, attackingTeam.id, shooter);
         } else {
+          if (isHome) this.stats.awayShotsOnTarget++;
+          else this.stats.homeShotsOnTarget++;
+
           this.events.push({
             minute: this.currentMinute,
             type: MatchEventType.SAVE,
