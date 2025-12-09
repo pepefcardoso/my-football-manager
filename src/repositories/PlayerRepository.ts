@@ -108,12 +108,12 @@ export class PlayerRepository {
   async updateConditionBatch(
     updates: { id: number; energy: number; fitness: number }[]
   ): Promise<void> {
-    await db.transaction(async (tx) => {
+    db.transaction((tx) => {
       for (const update of updates) {
-        await tx
-          .update(players)
+        tx.update(players)
           .set({ energy: update.energy, fitness: update.fitness })
-          .where(eq(players.id, update.id));
+          .where(eq(players.id, update.id))
+          .run();
       }
     });
   }
@@ -129,7 +129,7 @@ export class PlayerRepository {
       isInjured?: boolean;
     }[]
   ): Promise<void> {
-    await db.transaction(async (tx) => {
+    db.transaction((tx) => {
       for (const u of updates) {
         const updateData: any = {
           energy: u.energy,
@@ -142,7 +142,7 @@ export class PlayerRepository {
           updateData.injuryDaysRemaining = u.injuryDays;
         if (u.isInjured !== undefined) updateData.isInjured = u.isInjured;
 
-        await tx.update(players).set(updateData).where(eq(players.id, u.id));
+        tx.update(players).set(updateData).where(eq(players.id, u.id)).run();
       }
     });
   }

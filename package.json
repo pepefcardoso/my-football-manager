@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-orm": "^0.45.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zustand": "^5.0.9"
@@ -28,7 +28,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.22",
-    "drizzle-kit": "^0.18.1",
+    "drizzle-kit": "^0.31.8",
     "electron": "^39.2.4",
     "electron-builder": "^26.0.12",
     "eslint": "^9.39.1",

@@ -44,7 +44,6 @@ export class PlayingState implements IMatchState {
 
   simulateMinute(): void {
     const currentMinute = this.context.getCurrentMinute();
-
     const maxMinute = 90;
 
     if (currentMinute >= maxMinute) {
@@ -212,11 +211,13 @@ export class PlayingState implements IMatchState {
     const shooter = result.shooter;
     const keeper = result.goalkeeper;
 
-    this.context.updateShots(
-      attackingTeamIsHome,
-      result.totalShots,
-      result.shotsOnTarget
-    );
+    if (result.totalShots > 0) {
+      this.context.updateShots(
+        attackingTeamIsHome,
+        result.totalShots,
+        result.shotsOnTarget
+      );
+    }
 
     const narrateContext: NarratorContext = {
       player: shooter,
@@ -227,13 +228,12 @@ export class PlayingState implements IMatchState {
 
     switch (result.outcome) {
       case "goal": {
-        if (this.processVAR(attacker.data.id, shooter!)) {
+        if (!shooter) return;
+
+        if (this.processVAR(attacker.data.id, shooter)) {
           this.context.addScore(attackingTeamIsHome);
 
-          const assist = this.getLastPassProvider(
-            attackingTeamIsHome,
-            shooter!
-          );
+          const assist = this.getLastPassProvider(attackingTeamIsHome, shooter);
           if (assist) {
             const assistDesc = MatchNarrator.getEventDescription(
               MatchEventType.ASSIST,
@@ -256,7 +256,7 @@ export class PlayingState implements IMatchState {
             this.context.getCurrentMinute(),
             MatchEventType.GOAL,
             attacker.data.id,
-            shooter!.id,
+            shooter.id,
             goalDesc
           );
         }
@@ -280,6 +280,8 @@ export class PlayingState implements IMatchState {
 
       case "miss":
       case "blocked": {
+        if (!shooter) return;
+
         const missDesc = MatchNarrator.getEventDescription(
           MatchEventType.SHOT,
           narrateContext
@@ -288,13 +290,15 @@ export class PlayingState implements IMatchState {
           this.context.getCurrentMinute(),
           MatchEventType.SHOT,
           attacker.data.id,
-          shooter!.id,
+          shooter.id,
           missDesc
         );
         break;
       }
 
       case "offside": {
+        if (!shooter) return;
+
         const offsideDesc = MatchNarrator.getEventDescription(
           MatchEventType.OFFSIDE,
           narrateContext
@@ -303,7 +307,7 @@ export class PlayingState implements IMatchState {
           this.context.getCurrentMinute(),
           MatchEventType.OFFSIDE,
           attacker.data.id,
-          shooter!.id,
+          shooter.id,
           offsideDesc
         );
         break;

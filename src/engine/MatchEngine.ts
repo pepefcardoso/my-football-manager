@@ -9,6 +9,7 @@ import type {
 import { GameBalance } from "./GameBalanceConfig";
 import { RandomEngine } from "./RandomEngine";
 import { TeamStrengthCalculator } from "./TeamStrengthCalculator";
+import { DomainToEngineAdapter } from "./adapters/DomainToEngineAdapter";
 import type { IMatchState } from "./match/states/IMatchState";
 import { NotStartedState } from "./match/states/NotStartedState";
 
@@ -60,18 +61,18 @@ export class MatchEngine {
     this.homeStrength = TeamStrengthCalculator.calculate({
       id: config.homeTeam.id.toString(),
       tacticalBonus: config.homeTacticalBonus || 0,
-      players: config.homePlayers.map(
-        (p) => ({ ...p, id: p.id.toString() } as any)
+      players: config.homePlayers.map((p) =>
+        DomainToEngineAdapter.toEnginePlayer(p)
       ),
-    } as any);
+    });
 
     this.awayStrength = TeamStrengthCalculator.calculate({
       id: config.awayTeam.id.toString(),
       tacticalBonus: config.awayTacticalBonus || 0,
-      players: config.awayPlayers.map(
-        (p) => ({ ...p, id: p.id.toString() } as any)
+      players: config.awayPlayers.map((p) =>
+        DomainToEngineAdapter.toEnginePlayer(p)
       ),
-    } as any);
+    });
 
     this.applyWeatherEffects(config.weather || "sunny");
   }

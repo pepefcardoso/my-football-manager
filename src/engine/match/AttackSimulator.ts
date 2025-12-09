@@ -34,12 +34,6 @@ export interface AttackResult {
   additionalInfo?: Record<string, any>;
 }
 
-/**
- * AttackSimulator
- *
- * Responsabilidade: Decidir o resultado de um ataque (gol, defesa, chute fora, etc).
- * Princípio: Open/Closed - pode ser estendido para diferentes tipos de ataque sem modificar.
- */
 export class AttackSimulator {
   private context: AttackContext;
   private rng: RandomEngine;
@@ -49,10 +43,6 @@ export class AttackSimulator {
     this.rng = rng;
   }
 
-  /**
-   * Simula um ataque completo e retorna o resultado
-   * NÃO altera o estado da partida, apenas retorna o resultado puro.
-   */
   simulate(): AttackResult {
     const result: AttackResult = {
       outcome: "miss",
@@ -78,7 +68,6 @@ export class AttackSimulator {
     result.shooter = shooter;
 
     const shotQuality = this.calculateShotQuality(shooter);
-
     const shotOnTarget = this.isShotOnTarget(shotQuality);
 
     if (!shotOnTarget) {
@@ -97,30 +86,23 @@ export class AttackSimulator {
       return result;
     }
 
-    const goalScored = this.resolveGoalAttempt(shooter, goalkeeper);
+    const attemptOutcome = this.resolveGoalAttempt(shooter, goalkeeper);
 
-    if (goalScored) {
-      result.outcome = "goal";
-    } else {
-      result.outcome = "save";
+    result.outcome = attemptOutcome;
+
+    if (attemptOutcome === "blocked") {
+      result.wasBlocked = true;
     }
 
     return result;
   }
 
-  /**
-   * Decide se o ataque vai gerar um chute
-   */
   private shouldGenerateShot(): boolean {
     return this.rng.chance(GameBalance.MATCH.SHOT_CHANCE_IN_ATTACK);
   }
 
-  /**
-   * Seleciona o jogador que vai chutar (priorizando atacantes)
-   */
   private selectShooter(): Player | undefined {
     const { attackingPlayers } = this.context;
-
     if (attackingPlayers.length === 0) return undefined;
 
     const forwards = attackingPlayers.filter((p) => p.position === "FW");
@@ -136,23 +118,14 @@ export class AttackSimulator {
     return this.rng.pickOne(attackingPlayers) || undefined;
   }
 
-  /**
-   * Calcula a qualidade do chute baseado nos atributos do jogador
-   */
   private calculateShotQuality(shooter: Player): number {
     const { shooting = 50, finishing = 50, overall = 50 } = shooter;
-
     const quality = shooting * 0.4 + finishing * 0.4 + overall * 0.2;
-
     return Math.round(quality);
   }
 
-  /**
-   * Verifica se o chute vai no gol (não para fora)
-   */
   private isShotOnTarget(shotQuality: number): boolean {
     const { weatherMultiplier } = this.context;
-
     const baseAccuracy = GameBalance.MATCH.SHOT_ACCURACY_BASE;
     const accuracyChance =
       baseAccuracy * (shotQuality / 100) * weatherMultiplier * 100;
@@ -160,30 +133,27 @@ export class AttackSimulator {
     return this.rng.chance(accuracyChance);
   }
 
-  /**
-   * Seleciona o goleiro da defesa
-   */
   private selectGoalkeeper(): Player | undefined {
     const { defendingPlayers } = this.context;
     return defendingPlayers.find((p) => p.position === "GK");
   }
 
-  /**
-   * Verifica se há impedimento (15% de chance quando há gol)
-   */
   private checkOffside(): boolean {
     return this.rng.chance(GameBalance.MATCH.OFFSIDE_IN_GOAL_PROBABILITY);
   }
 
   /**
-   * Resolve a disputa final: gol vs defesa
-   * Considera força do ataque, defesa, goleiro e clima
+   * Resolve a disputa final e retorna o tipo de resultado
    */
-  private resolveGoalAttempt(shooter: Player, goalkeeper?: Player): boolean {
+  private resolveGoalAttempt(
+    shooter: Player,
+    goalkeeper?: Player
+  ): "goal" | "save" | "blocked" {
     const { attackingStrength, defendingStrength, weatherMultiplier } =
       this.context;
 
     const shooterBonus = (shooter.shooting + shooter.finishing) / 200;
+
     const attackPower =
       attackingStrength.attack *
       attackingStrength.fitnessMultiplier *
@@ -192,28 +162,29 @@ export class AttackSimulator {
     const defensePower =
       defendingStrength.defense * defendingStrength.fitnessMultiplier;
 
+    const totalPower = attackPower + defensePower;
+    const passDefenseChance =
+      (attackPower / totalPower) * 100 * weatherMultiplier;
+
+    if (!this.rng.chance(passDefenseChance)) {
+      return "blocked";
+    }
+
     let saveChance = GameBalance.MATCH.SAVE_CHANCE_BASE;
 
     if (goalkeeper) {
       const goalkeeperQuality =
         (goalkeeper.defending + goalkeeper.overall) / 200;
-      saveChance = goalkeeperQuality * 100;
+      saveChance = 30 + goalkeeperQuality * 50;
     }
 
-    const totalStrength = attackPower + defensePower;
-    const goalChance = (attackPower / totalStrength) * 100 * weatherMultiplier;
+    if (!this.rng.chance(saveChance)) {
+      return "goal";
+    }
 
-    const beatDefense = this.rng.chance(goalChance);
-    if (!beatDefense) return false;
-
-    const beatGoalkeeper = !this.rng.chance(saveChance);
-
-    return beatGoalkeeper;
+    return "save";
   }
 
-  /**
-   * Simula um ataque de escanteio (contexto diferente)
-   */
   simulateCornerKick(): AttackResult {
     const result: AttackResult = {
       outcome: "miss",
@@ -223,7 +194,7 @@ export class AttackSimulator {
       wasBlocked: false,
     };
 
-    const cornerGoalChance = 10;
+    const cornerGoalChance = 12;
 
     if (this.rng.chance(cornerGoalChance)) {
       const shooter = this.selectShooter();
@@ -235,8 +206,14 @@ export class AttackSimulator {
         result.outcome = "miss";
       }
     } else {
-      if (this.rng.chance(50)) {
+      const rand = this.rng.getInt(1, 100);
+
+      if (rand <= 40) {
         result.outcome = "save";
+        result.shotsOnTarget = 1;
+      } else if (rand <= 70) {
+        result.outcome = "blocked";
+        result.wasBlocked = true;
         result.shotsOnTarget = 1;
       } else {
         result.outcome = "miss";
@@ -246,9 +223,6 @@ export class AttackSimulator {
     return result;
   }
 
-  /**
-   * Simula uma cobrança de pênalti
-   */
   simulatePenalty(shooter: Player): AttackResult {
     const result: AttackResult = {
       outcome: "miss",
@@ -277,9 +251,6 @@ export class AttackSimulator {
     return result;
   }
 
-  /**
-   * Factory method: cria um simulador a partir de dados simplificados
-   */
   static fromTeams(
     attackingTeam: {
       strength: TeamStrength;
