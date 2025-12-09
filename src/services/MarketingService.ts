@@ -92,11 +92,3 @@ export class MarketingService {
     }
   }
 }
-
-export function createMarketingService(
-  repos: IRepositoryContainer
-): MarketingService {
-  return new MarketingService(repos);
-}
-
-export const marketingService = new MarketingService(repositoryContainer);

@@ -207,9 +207,3 @@ export class StatsService {
     }
   }
 }
-
-export function createStatsService(repos: IRepositoryContainer): StatsService {
-  return new StatsService(repos);
-}
-
-export const statsService = new StatsService(repositoryContainer);

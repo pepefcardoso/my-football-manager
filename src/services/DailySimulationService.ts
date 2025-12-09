@@ -240,13 +240,3 @@ export class DailySimulationService {
     return map[focus] || focus;
   }
 }
-
-export function createDailySimulationService(
-  repos: IRepositoryContainer
-): DailySimulationService {
-  return new DailySimulationService(repos);
-}
-
-export const dailySimulationService = new DailySimulationService(
-  repositoryContainer
-);

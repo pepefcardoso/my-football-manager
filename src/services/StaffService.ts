@@ -210,10 +210,3 @@ export class StaffService {
     };
   }
 }
-
-/**
- * Factory function para criar instância com DI
- */
-export function createStaffService(repos: IRepositoryContainer): StaffService {
-  return new StaffService(repos);
-}

@@ -27,9 +27,6 @@ export class ContractService {
     this.logger = new Logger("ContractService");
   }
 
-  /**
-   * Calcula a folha salarial mensal total de um time
-   */
   async calculateMonthlyWageBill(teamId: number): Promise<WageBillDetails> {
     this.logger.debug(`Calculando folha salarial para o time ${teamId}`);
 
@@ -52,9 +49,6 @@ export class ContractService {
     }
   }
 
-  /**
-   * Verifica contratos que estão expirando na data atual
-   */
   async checkExpiringContracts(
     currentDate: string
   ): Promise<ContractExpirationResult> {
@@ -73,9 +67,6 @@ export class ContractService {
     }
   }
 
-  /**
-   * Processa pagamento de salários diários (pro-rata)
-   */
   async processDailyWages(
     teamId: number,
     currentDate: string,
@@ -117,9 +108,6 @@ export class ContractService {
     }
   }
 
-  /**
-   * Renova contrato de um jogador com novos termos
-   */
   async renewPlayerContract(
     playerId: number,
     newWage: number,
@@ -162,9 +150,6 @@ export class ContractService {
     }
   }
 
-  /**
-   * Calcula salários mensais dos jogadores
-   */
   private async calculatePlayerWages(teamId: number): Promise<{
     monthly: number;
     count: number;
@@ -190,9 +175,6 @@ export class ContractService {
     };
   }
 
-  /**
-   * Calcula salários mensais do staff
-   */
   private async calculateStaffWages(teamId: number): Promise<{
     monthly: number;
     count: number;
@@ -210,9 +192,6 @@ export class ContractService {
     };
   }
 
-  /**
-   * Processa contratos de jogadores que expiram na data
-   */
   private async processExpiringPlayerContracts(
     currentDate: string
   ): Promise<number> {
@@ -242,9 +221,6 @@ export class ContractService {
     return expiringContracts.length;
   }
 
-  /**
-   * Processa contratos de staff que expiram na data
-   */
   private async processExpiringStaffContracts(
     currentDate: string
   ): Promise<number> {
@@ -258,13 +234,4 @@ export class ContractService {
 
     return expiredStaff.length;
   }
-}
-
-/**
- * Factory function para criar instância com DI
- */
-export function createContractService(
-  repos: IRepositoryContainer
-): ContractService {
-  return new ContractService(repos);
 }

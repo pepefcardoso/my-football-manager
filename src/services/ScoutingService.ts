@@ -224,11 +224,3 @@ export class ScoutingService {
     };
   }
 }
-
-export function createScoutingService(
-  repos: IRepositoryContainer
-): ScoutingService {
-  return new ScoutingService(repos);
-}
-
-export const scoutingService = new ScoutingService(repositoryContainer);

@@ -26,7 +26,6 @@ interface CompetitionWindow {
   groupStructure?: Record<string, number[]>;
 }
 
-// Interface auxiliar para tipagem segura das propriedades de agendamento
 interface SchedulableCompetition extends Competition {
   window?: "state" | "national" | "continental";
   startMonth?: number;
@@ -37,7 +36,6 @@ export class CalendarService {
   private continentalCompIds: Set<number> = new Set();
   private logger: Logger;
 
-  // Removido 'repos' pois não é utilizado na lógica algorítmica
   constructor() {
     this.logger = new Logger("CalendarService");
   }
@@ -50,7 +48,6 @@ export class CalendarService {
 
     this.continentalCompIds.clear();
 
-    // Casting seguro usando a interface auxiliar
     (competitions as SchedulableCompetition[]).forEach((c) => {
       if (
         c.type === "group_knockout" ||
@@ -108,7 +105,7 @@ export class CalendarService {
     );
 
     return competitions.map((compRaw) => {
-      const comp = compRaw as SchedulableCompetition; // Cast seguro
+      const comp = compRaw as SchedulableCompetition;
       const compTeams = allTeams.slice(0, comp.teams);
       let fixtures: MatchPair[] = [];
       let groupStructure: Record<string, number[]> | undefined;
@@ -144,10 +141,6 @@ export class CalendarService {
       };
     });
   }
-
-  // ... (Restante dos métodos scheduleStateCompetitions, scheduleNationalCompetitions,
-  // scheduleContinentalCompetitions, processSchedulingLoop, etc. permanecem inalterados,
-  // pois não apresentavam erros de tipo ou lógica)
 
   private scheduleStateCompetitions(
     windows: CompetitionWindow[],

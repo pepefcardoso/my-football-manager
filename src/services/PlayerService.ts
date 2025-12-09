@@ -78,11 +78,3 @@ export class PlayerService {
     }
   }
 }
-
-export function createPlayerService(
-  repos: IRepositoryContainer
-): PlayerService {
-  return new PlayerService(repos);
-}
-
-export const playerService = new PlayerService(repositoryContainer);

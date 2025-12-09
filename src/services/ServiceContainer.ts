@@ -5,7 +5,7 @@ import { ContractService } from "./ContractService";
 import { DailySimulationService } from "./DailySimulationService";
 import { FinanceService } from "./FinanceService";
 import { InfrastructureService } from "./InfrastructureService";
-import type { IServiceContainer } from "./IServiceCOntainer";
+import type { IServiceContainer } from "./IServiceContainer";
 import { MarketingService } from "./MarketingService";
 import { MatchService } from "./MatchService";
 import { PlayerService } from "./PlayerService";
@@ -38,17 +38,14 @@ export class ServiceContainer implements IServiceContainer {
     this.staff = new StaffService(repos);
     this.stats = new StatsService(repos);
     this.dailySimulation = new DailySimulationService(repos);
+
     this.finance = new FinanceService(
       repos,
       this.contract,
       this.infrastructure
     );
     this.season = new SeasonService(repos, this.calendar);
-    this.match = new MatchService(
-      repos,
-      this.marketing,
-      this.stats
-    );
+    this.match = new MatchService(repos, this.marketing, this.stats);
   }
 }
 

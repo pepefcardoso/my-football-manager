@@ -174,13 +174,3 @@ export class InfrastructureService {
     }
   }
 }
-
-export function createInfrastructureService(
-  repos: IRepositoryContainer
-): InfrastructureService {
-  return new InfrastructureService(repos);
-}
-
-export const infrastructureService = new InfrastructureService(
-  repositoryContainer
-);
