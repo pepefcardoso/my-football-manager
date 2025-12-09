@@ -13,9 +13,9 @@ import {
   MatchRevenueConfig,
 } from "./config/ServiceConstants";
 
-const logger = new Logger("FinanceService");
-
 export class FinanceService {
+  private static logger = new Logger("FinanceService");
+
   /**
    * Calcula a receita de bilheteria de uma partida com base em múltiplos fatores
    * @param stadiumCapacity Capacidade total do estádio
@@ -77,6 +77,10 @@ export class FinanceService {
     staffWages: number;
     message: string;
   }> {
+    this.logger.info(
+      `Processando despesas mensais para time ${teamId} em ${currentDate}`
+    );
+
     try {
       const wageBill = await contractService.calculateMonthlyWageBill(teamId);
 
@@ -139,7 +143,7 @@ export class FinanceService {
         "pt-PT"
       )} | Orçamento: €${newBudget.toLocaleString("pt-PT")} (${budgetStatus})`;
 
-      logger.info(message);
+      this.logger.info(message);
 
       return {
         success: true,
@@ -150,7 +154,7 @@ export class FinanceService {
         message,
       };
     } catch (error) {
-      logger.error("Erro ao processar despesas mensais:", error);
+      this.logger.error("Erro ao processar despesas mensais:", error);
       return {
         success: false,
         totalExpense: 0,
@@ -185,13 +189,9 @@ export class FinanceService {
     isKnockout: boolean = false
   ): number {
     let importance = 1.0;
-
     if (competitionTier === 1) importance *= 1.2;
-
     if (isKnockout) importance *= 1.3;
-
     if (round && round > 30) importance *= 1.2;
-
     return Math.min(2.0, importance);
   }
 
@@ -336,10 +336,10 @@ export class FinanceService {
           }
         }
 
-        logger.info(`CRISE FINANCEIRA - ${team.name}`);
-        logger.info(`Dívida: €${debtAmount.toLocaleString("pt-PT")}`);
-        logger.info(`Severidade: ${severity.toUpperCase()}`);
-        penaltiesApplied.forEach((p) => logger.info(`   • ${p}`));
+        this.logger.info(`CRISE FINANCEIRA - ${team.name}`);
+        this.logger.info(`Dívida: €${debtAmount.toLocaleString("pt-PT")}`);
+        this.logger.info(`Severidade: ${severity.toUpperCase()}`);
+        penaltiesApplied.forEach((p) => this.logger.info(`   • ${p}`));
       }
 
       return {
@@ -350,7 +350,7 @@ export class FinanceService {
         severity,
       };
     } catch (error) {
-      logger.error("Erro ao verificar saúde financeira:", error);
+      this.logger.error("Erro ao verificar saúde financeira:", error);
       throw error;
     }
   }

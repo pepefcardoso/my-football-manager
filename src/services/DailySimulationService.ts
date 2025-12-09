@@ -4,6 +4,7 @@ import { AttributeCalculator } from "../engine/AttributeCalculator";
 import type { Player } from "../domain/models";
 import { TrainingFocus, Position } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
+import { Logger } from "../lib/Logger";
 
 export interface PlayerTrainingUpdate {
   id: number;
@@ -29,9 +30,11 @@ export interface TeamTrainingResult {
 
 export class DailySimulationService {
   private gameEngine: GameEngine;
+  private logger: Logger;
 
   constructor() {
     this.gameEngine = new GameEngine();
+    this.logger = new Logger("DailySimulationService");
   }
 
   public processTeamDailyLoop(
@@ -39,152 +42,183 @@ export class DailySimulationService {
     trainingFocus: TrainingFocus,
     staffImpact: TeamStaffImpact
   ): TeamTrainingResult {
+    this.logger.info(
+      `🏋️ Iniciando treino diário. Foco: ${trainingFocus.toUpperCase()} | Jogadores: ${
+        players.length
+      }`
+    );
+    this.logger.debug("Impacto do Staff aplicado:", staffImpact);
+
     const logs: string[] = [];
     const playerUpdates: PlayerTrainingUpdate[] = [];
 
     logs.push(`Treino do dia: ${this.translateFocus(trainingFocus)}`);
 
-    for (const player of players) {
-      if (player.isInjured) {
-        const newDays = Math.max(0, player.injuryDaysRemaining - 1);
-        playerUpdates.push({
-          id: player.id,
-          energy: player.energy,
-          fitness: Math.max(0, player.fitness - 1),
-          moral: player.moral,
-          overall: player.overall,
-          injuryDays: newDays,
-          isInjured: newDays > 0,
-        });
+    try {
+      for (const player of players) {
+        if (player.isInjured) {
+          const newDays = Math.max(0, player.injuryDaysRemaining - 1);
 
-        if (newDays === 0 && player.injuryDaysRemaining > 0) {
-          logs.push(
-            `🚑 ${player.firstName} ${player.lastName} recuperou-se da lesão.`
+          playerUpdates.push({
+            id: player.id,
+            energy: player.energy,
+            fitness: Math.max(0, player.fitness - 1),
+            moral: player.moral,
+            overall: player.overall,
+            injuryDays: newDays,
+            isInjured: newDays > 0,
+          });
+
+          if (newDays === 0 && player.injuryDaysRemaining > 0) {
+            const msg = `🚑 ${player.firstName} ${player.lastName} recuperou-se da lesão.`;
+            logs.push(msg);
+            this.logger.info(
+              `[Recuperação] Jogador ${player.id} está recuperado.`
+            );
+          }
+          continue;
+        }
+
+        let energyDelta = 0;
+        let fitnessDelta = 0;
+
+        switch (trainingFocus) {
+          case TrainingFocus.REST:
+            energyDelta = 15 + staffImpact.energyRecoveryBonus;
+            fitnessDelta = -1;
+            break;
+          case TrainingFocus.PHYSICAL:
+            energyDelta = -10;
+            fitnessDelta = 2 + staffImpact.energyRecoveryBonus * 0.1;
+            break;
+          case TrainingFocus.TACTICAL:
+            energyDelta = -5;
+            fitnessDelta = 0;
+            break;
+          case TrainingFocus.TECHNICAL:
+            energyDelta = -7;
+            fitnessDelta = 1;
+            break;
+        }
+
+        const newEnergy = Math.max(
+          0,
+          Math.min(100, player.energy + energyDelta)
+        );
+        const newFitness = Math.max(
+          0,
+          Math.min(100, player.fitness + fitnessDelta)
+        );
+
+        const injuryRiskBase =
+          (100 - player.energy) * 0.05 +
+          (trainingFocus === TrainingFocus.PHYSICAL ? 2 : 0);
+
+        const mitigatedRisk = Math.max(
+          0,
+          injuryRiskBase - staffImpact.energyRecoveryBonus / 5
+        );
+
+        let isInjured = false;
+        let injuryDays = 0;
+
+        if (
+          trainingFocus !== TrainingFocus.REST &&
+          RandomEngine.chance(mitigatedRisk)
+        ) {
+          isInjured = true;
+          injuryDays = this.gameEngine.generateInjuryDuration(
+            "light",
+            staffImpact.injuryRecoveryMultiplier
+          );
+
+          const msg = `🩹 ${player.firstName} ${player.lastName} sentiu uma lesão no treino (${injuryDays} dias).`;
+          logs.push(msg);
+          this.logger.warn(
+            `[Lesão] Jogador ${
+              player.id
+            } lesionado por ${injuryDays} dias. Risco era ${mitigatedRisk.toFixed(
+              2
+            )}%`
           );
         }
-        continue;
-      }
 
-      let energyDelta = 0;
-      let fitnessDelta = 0;
+        let attributesChanged = false;
+        const updatedStats = {
+          finishing: player.finishing,
+          passing: player.passing,
+          dribbling: player.dribbling,
+          defending: player.defending,
+          physical: player.physical,
+          pace: player.pace,
+          shooting: player.shooting,
+        };
 
-      switch (trainingFocus) {
-        case TrainingFocus.REST:
-          energyDelta = 15 + staffImpact.energyRecoveryBonus;
-          fitnessDelta = -1;
-          break;
-        case TrainingFocus.PHYSICAL:
-          energyDelta = -10;
-          fitnessDelta = 2 + staffImpact.energyRecoveryBonus * 0.1;
-          break;
-        case TrainingFocus.TACTICAL:
-          energyDelta = -5;
-          fitnessDelta = 0;
-          break;
-        case TrainingFocus.TECHNICAL:
-          energyDelta = -7;
-          fitnessDelta = 1;
-          break;
-      }
+        if (!isInjured && trainingFocus !== TrainingFocus.REST) {
+          const growthChance = player.age < 21 ? 15 : player.age < 25 ? 8 : 2;
 
-      const newEnergy = Math.max(0, Math.min(100, player.energy + energyDelta));
-      const newFitness = Math.max(
-        0,
-        Math.min(100, player.fitness + fitnessDelta)
-      );
-
-      const injuryRiskBase =
-        (100 - player.energy) * 0.05 +
-        (trainingFocus === TrainingFocus.PHYSICAL ? 2 : 0);
-      const mitigatedRisk = Math.max(
-        0,
-        injuryRiskBase - staffImpact.energyRecoveryBonus / 5
-      );
-
-      let isInjured = false;
-      let injuryDays = 0;
-
-      if (
-        trainingFocus !== TrainingFocus.REST &&
-        RandomEngine.chance(mitigatedRisk)
-      ) {
-        isInjured = true;
-        injuryDays = this.gameEngine.generateInjuryDuration(
-          "light",
-          staffImpact.injuryRecoveryMultiplier
-        );
-        logs.push(
-          `🩹 ${player.firstName} ${player.lastName} sentiu uma lesão no treino (${injuryDays} dias).`
-        );
-      }
-
-      let attributesChanged = false;
-      const updatedStats = {
-        finishing: player.finishing,
-        passing: player.passing,
-        dribbling: player.dribbling,
-        defending: player.defending,
-        physical: player.physical,
-        pace: player.pace,
-        shooting: player.shooting,
-      };
-
-      if (!isInjured && trainingFocus !== TrainingFocus.REST) {
-        const growthChance = player.age < 21 ? 15 : player.age < 25 ? 8 : 2;
-
-        if (RandomEngine.chance(growthChance)) {
-          if (trainingFocus === TrainingFocus.TECHNICAL) {
-            const attr = RandomEngine.pickOne([
-              "passing",
-              "dribbling",
-              "shooting",
-              "finishing",
-            ] as const);
-            if (updatedStats[attr] < 99) {
-              updatedStats[attr]++;
-              attributesChanged = true;
-              logs.push(
-                `📈 ${player.firstName} ${player.lastName} melhorou em ${attr}!`
-              );
-            }
-          } else if (trainingFocus === TrainingFocus.PHYSICAL) {
-            const attr = RandomEngine.pickOne(["physical", "pace"] as const);
-            if (updatedStats[attr] < 99) {
-              updatedStats[attr]++;
-              attributesChanged = true;
-              logs.push(
-                `💪 ${player.firstName} ${player.lastName} melhorou em ${attr}!`
-              );
+          if (RandomEngine.chance(growthChance)) {
+            if (trainingFocus === TrainingFocus.TECHNICAL) {
+              const attr = RandomEngine.pickOne([
+                "passing",
+                "dribbling",
+                "shooting",
+                "finishing",
+              ] as const);
+              if (updatedStats[attr] < 99) {
+                updatedStats[attr]++;
+                attributesChanged = true;
+                logs.push(
+                  `📈 ${player.firstName} ${player.lastName} melhorou em ${attr}!`
+                );
+                this.logger.debug(`[Evolução] Jogador ${player.id} +1 ${attr}`);
+              }
+            } else if (trainingFocus === TrainingFocus.PHYSICAL) {
+              const attr = RandomEngine.pickOne(["physical", "pace"] as const);
+              if (updatedStats[attr] < 99) {
+                updatedStats[attr]++;
+                attributesChanged = true;
+                logs.push(
+                  `💪 ${player.firstName} ${player.lastName} melhorou em ${attr}!`
+                );
+                this.logger.debug(`[Evolução] Jogador ${player.id} +1 ${attr}`);
+              }
             }
           }
         }
+
+        let newOverall = player.overall;
+        if (attributesChanged) {
+          newOverall = AttributeCalculator.calculateOverall(
+            player.position as Position,
+            updatedStats
+          );
+        }
+
+        let newMoral = player.moral;
+        if (player.moral > 50) newMoral -= 0.5;
+        if (player.moral < 50) newMoral += 0.5;
+
+        playerUpdates.push({
+          id: player.id,
+          energy: newEnergy,
+          fitness: newFitness,
+          moral: Math.round(newMoral),
+          overall: newOverall,
+          isInjured: isInjured,
+          injuryDays: injuryDays,
+          ...updatedStats,
+        });
       }
 
-      let newOverall = player.overall;
-      if (attributesChanged) {
-        newOverall = AttributeCalculator.calculateOverall(
-          player.position as Position,
-          updatedStats
-        );
-      }
-
-      let newMoral = player.moral;
-      if (player.moral > 50) newMoral -= 0.5;
-      if (player.moral < 50) newMoral += 0.5;
-
-      playerUpdates.push({
-        id: player.id,
-        energy: newEnergy,
-        fitness: newFitness,
-        moral: Math.round(newMoral),
-        overall: newOverall,
-        isInjured: isInjured,
-        injuryDays: injuryDays,
-        ...updatedStats,
-      });
+      this.logger.info(
+        `Treino finalizado. ${playerUpdates.length} jogadores processados.`
+      );
+      return { playerUpdates, logs };
+    } catch (error) {
+      this.logger.error("❌ Erro crítico no loop de treino diário:", error);
+      return { playerUpdates: [], logs: ["Erro interno ao processar treino."] };
     }
-
-    return { playerUpdates, logs };
   }
 
   private translateFocus(focus: TrainingFocus): string {

@@ -1,33 +1,65 @@
 import { StaffRole } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
 import { staffRepository } from "../repositories/StaffRepository";
+import { Logger } from "../lib/Logger";
 
 export class StaffService {
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("StaffService");
+  }
+
   async getStaffImpact(teamId: number): Promise<TeamStaffImpact> {
-    const allStaff = await staffRepository.findByTeamId(teamId);
-
-    const medics = allStaff.filter((s) => s.role === StaffRole.MEDICAL_DOCTOR);
-    const fitnessCoaches = allStaff.filter(
-      (s) => s.role === StaffRole.FITNESS_COACH
+    this.logger.debug(
+      `Calculando impacto da equipe técnica para o time ${teamId}...`
     );
-    const coaches = allStaff.filter(
-      (s) =>
-        s.role === StaffRole.HEAD_COACH || s.role === StaffRole.ASSISTANT_COACH
-    );
-    const scouts = allStaff.filter((s) => s.role === StaffRole.SCOUT);
 
-    return {
-      injuryRecoveryMultiplier: this.calculateMedicalImpact(medics),
-      energyRecoveryBonus: this.calculateFitnessImpact(fitnessCoaches),
-      tacticalAnalysisBonus: this.calculateCoachingImpact(coaches),
-      scoutingAccuracy: this.calculateScoutingImpact(scouts),
-      youthDevelopmentRate: this.calculateYouthDevelopmentImpact(scouts),
-    };
+    try {
+      const allStaff = await staffRepository.findByTeamId(teamId);
+
+      const medics = allStaff.filter(
+        (s) => s.role === StaffRole.MEDICAL_DOCTOR
+      );
+      const fitnessCoaches = allStaff.filter(
+        (s) => s.role === StaffRole.FITNESS_COACH
+      );
+      const coaches = allStaff.filter(
+        (s) =>
+          s.role === StaffRole.HEAD_COACH ||
+          s.role === StaffRole.ASSISTANT_COACH
+      );
+      const scouts = allStaff.filter((s) => s.role === StaffRole.SCOUT);
+
+      const impact: TeamStaffImpact = {
+        injuryRecoveryMultiplier: this.calculateMedicalImpact(medics),
+        energyRecoveryBonus: this.calculateFitnessImpact(fitnessCoaches),
+        tacticalAnalysisBonus: this.calculateCoachingImpact(coaches),
+        scoutingAccuracy: this.calculateScoutingImpact(scouts),
+        youthDevelopmentRate: this.calculateYouthDevelopmentImpact(scouts),
+      };
+
+      this.logger.debug("Bônus calculados:", impact);
+
+      return impact;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao calcular impacto do staff para time ${teamId}:`,
+        error
+      );
+
+      return {
+        injuryRecoveryMultiplier: 1.0,
+        energyRecoveryBonus: 0,
+        tacticalAnalysisBonus: 0,
+        scoutingAccuracy: 10,
+        youthDevelopmentRate: 0,
+      };
+    }
   }
 
   private calculateYouthDevelopmentImpact(scouts: any[]): number {
     if (scouts.length === 0) return 0;
-
     const bestScout = Math.max(...scouts.map((s) => s.overall));
     return Math.round(bestScout * 0.1);
   }
@@ -38,7 +70,7 @@ export class StaffService {
     const maxOverall = Math.max(...medics.map((m) => m.overall));
 
     const reduction = (maxOverall * 0.4) / 100;
-    return 1.0 - reduction;
+    return Number((1.0 - reduction).toFixed(2));
   }
 
   private calculateFitnessImpact(coaches: any[]): number {

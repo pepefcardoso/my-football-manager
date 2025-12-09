@@ -5,8 +5,15 @@ import { eq, and } from "drizzle-orm";
 import type { MatchResult } from "../domain/types";
 import { MatchEventType } from "../domain/enums";
 import { matchRepository } from "../repositories/MatchRepository";
+import { Logger } from "../lib/Logger";
 
 export class StatsService {
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("StatsService");
+  }
+
   /**
    * Atualiza tabela e estatísticas de jogadores após uma partida
    */
@@ -16,11 +23,29 @@ export class StatsService {
     seasonId: number,
     result: MatchResult
   ): Promise<void> {
-    // TODO: Mover lógica do MatchService.updateStandings para cá
-    const match = await matchRepository.findById(matchId);
-    if (!match) return;
+    this.logger.info(
+      `Processando estatísticas da partida ${matchId} (Comp: ${competitionId})...`
+    );
 
-    await this.updatePlayerStats(competitionId, seasonId, result, match);
+    try {
+      const match = await matchRepository.findById(matchId);
+      if (!match) {
+        this.logger.warn(
+          `Partida ${matchId} não encontrada. Estatísticas ignoradas.`
+        );
+        return;
+      }
+
+      await this.updatePlayerStats(competitionId, seasonId, result, match);
+      this.logger.info(
+        `Estatísticas atualizadas com sucesso para a partida ${matchId}.`
+      );
+    } catch (error) {
+      this.logger.error(
+        `Erro ao processar estatísticas da partida ${matchId}:`,
+        error
+      );
+    }
   }
 
   private async updatePlayerStats(
@@ -30,6 +55,9 @@ export class StatsService {
     match: any
   ) {
     const events = result.events;
+    this.logger.debug(
+      `Analisando ${events.length} eventos para estatísticas individuais...`
+    );
 
     const statsMap = new Map<
       number,
@@ -66,6 +94,8 @@ export class StatsService {
       ...result.playerUpdates.map((u) => u.playerId),
       ...Array.from(statsMap.keys()),
     ]);
+
+    let updatedCount = 0;
 
     for (const playerId of allPlayerIds) {
       const player = await playerRepository.findById(playerId);
@@ -136,7 +166,12 @@ export class StatsService {
           minutesPlayed: 90,
         });
       }
+      updatedCount++;
     }
+
+    this.logger.debug(
+      `Estatísticas individuais atualizadas para ${updatedCount} jogadores.`
+    );
   }
 
   async getTopGoalkeepers(
@@ -144,22 +179,28 @@ export class StatsService {
     seasonId: number,
     limit: number = 10
   ) {
-    return await db.query.playerCompetitionStats.findMany({
-      where: and(
-        eq(playerCompetitionStats.competitionId, competitionId),
-        eq(playerCompetitionStats.seasonId, seasonId)
-      ),
-      orderBy: (stats, { desc }) => [
-        desc(stats.cleanSheets),
-        desc(stats.saves),
-      ],
-      limit: limit,
-      with: {
-        // Necessário configurar relação no schema se quiser o objeto player completo aqui,
-        // ou fazer join manual. Assumindo que o Drizzle relation 'player' existe:
-        // player: true
-      },
-    });
+    this.logger.debug(
+      `Buscando top ${limit} goleiros (Comp: ${competitionId})`
+    );
+    try {
+      return await db.query.playerCompetitionStats.findMany({
+        where: and(
+          eq(playerCompetitionStats.competitionId, competitionId),
+          eq(playerCompetitionStats.seasonId, seasonId)
+        ),
+        orderBy: (stats, { desc }) => [
+          desc(stats.cleanSheets),
+          desc(stats.saves),
+        ],
+        limit: limit,
+        with: {
+          // Relações seriam carregadas aqui
+        },
+      });
+    } catch (error) {
+      this.logger.error("Erro ao buscar top goleiros:", error);
+      return [];
+    }
   }
 
   /**
@@ -170,17 +211,25 @@ export class StatsService {
     seasonId: number,
     limit: number = 10
   ) {
-    return await db.query.playerCompetitionStats.findMany({
-      where: and(
-        eq(playerCompetitionStats.competitionId, competitionId),
-        eq(playerCompetitionStats.seasonId, seasonId)
-      ),
-      orderBy: (stats, { desc }) => [desc(stats.goals), desc(stats.assists)],
-      limit: limit,
-      with: {
-        // player: true
-      },
-    });
+    this.logger.debug(
+      `Buscando top ${limit} artilheiros (Comp: ${competitionId})`
+    );
+    try {
+      return await db.query.playerCompetitionStats.findMany({
+        where: and(
+          eq(playerCompetitionStats.competitionId, competitionId),
+          eq(playerCompetitionStats.seasonId, seasonId)
+        ),
+        orderBy: (stats, { desc }) => [desc(stats.goals), desc(stats.assists)],
+        limit: limit,
+        with: {
+          // player: true
+        },
+      });
+    } catch (error) {
+      this.logger.error("Erro ao buscar top artilheiros:", error);
+      return [];
+    }
   }
 }
 

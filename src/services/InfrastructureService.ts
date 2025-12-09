@@ -2,8 +2,15 @@ import { teamRepository } from "../repositories/TeamRepository";
 import { financialRepository } from "../repositories/FinancialRepository";
 import { FinancialCategory } from "../domain/enums";
 import { InfrastructureCosts } from "./config/ServiceConstants";
+import { Logger } from "../lib/Logger";
 
 export class InfrastructureService {
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("InfrastructureService");
+  }
+
   /**
    * Calcula o custo de manutenção mensal do estádio e CT
    */
@@ -15,7 +22,11 @@ export class InfrastructureService {
       stadiumCapacity * InfrastructureCosts.MAINTENANCE_COST_PER_SEAT;
     const qualityUpkeep =
       stadiumQuality * InfrastructureCosts.MAINTENANCE_QUALITY_MULTIPLIER;
-    return Math.round(seatMaintenance + qualityUpkeep);
+
+    const total = Math.round(seatMaintenance + qualityUpkeep);
+    this.logger.debug(`Custo de manutenção calculado: €${total}`);
+
+    return total;
   }
 
   /**
@@ -25,37 +36,53 @@ export class InfrastructureService {
     teamId: number,
     seasonId: number
   ): Promise<{ success: boolean; message: string }> {
-    const team = await teamRepository.findById(teamId);
-    if (!team) return { success: false, message: "Clube não encontrado." };
+    this.logger.info(`Iniciando expansão de estádio para o time ${teamId}...`);
 
-    const cost =
-      InfrastructureCosts.SEAT_EXPANSION_BLOCK *
-      InfrastructureCosts.SEAT_COST_PER_UNIT;
+    try {
+      const team = await teamRepository.findById(teamId);
+      if (!team) {
+        this.logger.warn(`Time ${teamId} não encontrado.`);
+        return { success: false, message: "Clube não encontrado." };
+      }
 
-    if ((team.budget || 0) < cost) {
-      return { success: false, message: "Saldo insuficiente para expansão." };
+      const cost =
+        InfrastructureCosts.SEAT_EXPANSION_BLOCK *
+        InfrastructureCosts.SEAT_COST_PER_UNIT;
+
+      if ((team.budget || 0) < cost) {
+        this.logger.warn(
+          `Orçamento insuficiente para expansão. Necessário: €${cost}, Atual: €${team.budget}`
+        );
+        return { success: false, message: "Saldo insuficiente para expansão." };
+      }
+
+      const newCapacity =
+        (team.stadiumCapacity || 0) + InfrastructureCosts.SEAT_EXPANSION_BLOCK;
+      const newBudget = (team.budget || 0) - cost;
+
+      await teamRepository.update(teamId, {
+        stadiumCapacity: newCapacity,
+        budget: newBudget,
+      });
+
+      await financialRepository.addRecord({
+        teamId,
+        seasonId,
+        date: new Date().toISOString().split("T")[0],
+        type: "expense",
+        category: FinancialCategory.INFRASTRUCTURE,
+        amount: cost,
+        description: `Expansão do Estádio (+${InfrastructureCosts.SEAT_EXPANSION_BLOCK} lugares)`,
+      });
+
+      this.logger.info(
+        `✅ Estádio expandido com sucesso! Nova capacidade: ${newCapacity}`
+      );
+      return { success: true, message: "Expansão concluída com sucesso!" };
+    } catch (error) {
+      this.logger.error("Erro ao expandir estádio:", error);
+      return { success: false, message: "Erro interno ao processar expansão." };
     }
-
-    const newCapacity =
-      (team.stadiumCapacity || 0) + InfrastructureCosts.SEAT_EXPANSION_BLOCK;
-    const newBudget = (team.budget || 0) - cost;
-
-    await teamRepository.update(teamId, {
-      stadiumCapacity: newCapacity,
-      budget: newBudget,
-    });
-
-    await financialRepository.addRecord({
-      teamId,
-      seasonId,
-      date: new Date().toISOString().split("T")[0],
-      type: "expense",
-      category: FinancialCategory.INFRASTRUCTURE,
-      amount: cost,
-      description: `Expansão do Estádio (+${InfrastructureCosts.SEAT_EXPANSION_BLOCK} lugares)`,
-    });
-
-    return { success: true, message: "Expansão concluída com sucesso!" };
   }
 
   async upgradeFacility(
@@ -63,61 +90,86 @@ export class InfrastructureService {
     seasonId: number,
     type: "stadium" | "training" | "youth"
   ): Promise<{ success: boolean; message: string }> {
-    const team = await teamRepository.findById(teamId);
-    if (!team) return { success: false, message: "Clube não encontrado." };
-
-    const currentQuality =
-      type === "stadium"
-        ? team.stadiumQuality
-        : type === "training"
-        ? team.trainingCenterQuality
-        : team.youthAcademyQuality;
-
-    if ((currentQuality || 0) >= InfrastructureCosts.MAX_QUALITY) {
-      return { success: false, message: "Instalação já está no nível máximo." };
-    }
-
-    const cost = Math.round(
-      InfrastructureCosts.QUALITY_COST_BASE * (1 + (currentQuality || 0) / 50)
+    this.logger.info(
+      `Iniciando melhoria de infraestrutura (${type}) para o time ${teamId}...`
     );
 
-    if ((team.budget || 0) < cost) {
-      return { success: false, message: "Saldo insuficiente para melhoria." };
+    try {
+      const team = await teamRepository.findById(teamId);
+      if (!team) {
+        this.logger.warn(`Time ${teamId} não encontrado.`);
+        return { success: false, message: "Clube não encontrado." };
+      }
+
+      const currentQuality =
+        type === "stadium"
+          ? team.stadiumQuality
+          : type === "training"
+          ? team.trainingCenterQuality
+          : team.youthAcademyQuality;
+
+      if ((currentQuality || 0) >= InfrastructureCosts.MAX_QUALITY) {
+        this.logger.info("Instalação já está no nível máximo.");
+        return {
+          success: false,
+          message: "Instalação já está no nível máximo.",
+        };
+      }
+
+      const cost = Math.round(
+        InfrastructureCosts.QUALITY_COST_BASE * (1 + (currentQuality || 0) / 50)
+      );
+
+      if ((team.budget || 0) < cost) {
+        this.logger.warn(
+          `Orçamento insuficiente para upgrade. Necessário: €${cost}`
+        );
+        return { success: false, message: "Saldo insuficiente para melhoria." };
+      }
+
+      const newQuality = Math.min(
+        InfrastructureCosts.MAX_QUALITY,
+        (currentQuality || 0) + InfrastructureCosts.QUALITY_UPGRADE_BLOCK
+      );
+      const newBudget = (team.budget || 0) - cost;
+
+      const updateData: any = { budget: newBudget };
+      let facilityName = "";
+
+      if (type === "stadium") {
+        updateData.stadiumQuality = newQuality;
+        facilityName = "Estádio";
+      } else if (type === "training") {
+        updateData.trainingCenterQuality = newQuality;
+        facilityName = "Centro de Treinamento";
+      } else {
+        updateData.youthAcademyQuality = newQuality;
+        facilityName = "Academia de Base";
+      }
+
+      await teamRepository.update(teamId, updateData);
+
+      await financialRepository.addRecord({
+        teamId,
+        seasonId,
+        date: new Date().toISOString().split("T")[0],
+        type: "expense",
+        category: FinancialCategory.INFRASTRUCTURE,
+        amount: cost,
+        description: `Melhoria em ${facilityName} (Nível ${newQuality})`,
+      });
+
+      this.logger.info(
+        `✅ Upgrade concluído em ${facilityName}. Novo nível: ${newQuality}`
+      );
+      return {
+        success: true,
+        message: `Melhoria no ${facilityName} realizada!`,
+      };
+    } catch (error) {
+      this.logger.error(`Erro ao realizar upgrade de ${type}:`, error);
+      return { success: false, message: "Erro interno ao processar melhoria." };
     }
-
-    const newQuality = Math.min(
-      InfrastructureCosts.MAX_QUALITY,
-      (currentQuality || 0) + InfrastructureCosts.QUALITY_UPGRADE_BLOCK
-    );
-    const newBudget = (team.budget || 0) - cost;
-
-    const updateData: any = { budget: newBudget };
-    let facilityName = "";
-
-    if (type === "stadium") {
-      updateData.stadiumQuality = newQuality;
-      facilityName = "Estádio";
-    } else if (type === "training") {
-      updateData.trainingCenterQuality = newQuality;
-      facilityName = "Centro de Treinamento";
-    } else {
-      updateData.youthAcademyQuality = newQuality;
-      facilityName = "Academia de Base";
-    }
-
-    await teamRepository.update(teamId, updateData);
-
-    await financialRepository.addRecord({
-      teamId,
-      seasonId,
-      date: new Date().toISOString().split("T")[0],
-      type: "expense",
-      category: FinancialCategory.INFRASTRUCTURE,
-      amount: cost,
-      description: `Melhoria em ${facilityName} (Nível ${newQuality})`,
-    });
-
-    return { success: true, message: `Melhoria no ${facilityName} realizada!` };
   }
 }
 

@@ -12,21 +12,32 @@ import { marketingService } from "./MarketingService";
 import { Logger } from "../lib/Logger";
 import { CompetitionScheduler } from "./CompetitionScheduler";
 
-const logger = new Logger("MatchService");
-
 export class MatchService {
   private engines: Map<number, MatchEngine> = new Map();
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("MatchService");
+  }
 
   async initializeMatch(matchId: number): Promise<MatchEngine | null> {
+    this.logger.info(`Inicializando partida ${matchId}...`);
     try {
       const match = await matchRepository.findById(matchId);
-      if (!match) return null;
+      if (!match) {
+        this.logger.error(`Partida ${matchId} não encontrada.`);
+        return null;
+      }
 
       const homeTeamData = await teamRepository.findById(match.homeTeamId!);
       const awayTeamData = await teamRepository.findById(match.awayTeamId!);
 
-      if (!homeTeamData || !awayTeamData) return null;
+      if (!homeTeamData || !awayTeamData) {
+        this.logger.error("Times não encontrados para a partida.");
+        return null;
+      }
 
+      // TODO: extrair para um adapter
       const mapToDomainTeam = (dbTeam: typeof homeTeamData): Team => ({
         ...dbTeam,
         primaryColor: dbTeam.primaryColor ?? "#000000",
@@ -44,8 +55,6 @@ export class MatchService {
 
       const homeTeam = mapToDomainTeam(homeTeamData);
       const awayTeam = mapToDomainTeam(awayTeamData);
-
-      if (!homeTeam || !awayTeam) return null;
 
       const allHomePlayers = await playerRepository.findByTeamId(
         match.homeTeamId!
@@ -84,18 +93,23 @@ export class MatchService {
       const engine = new MatchEngine(config, isKnockout);
       this.engines.set(matchId, engine);
 
+      this.logger.info(`Partida ${matchId} inicializada com sucesso.`);
       return engine;
     } catch (error) {
-      logger.error("Erro ao inicializar partida:", error);
+      this.logger.error("Erro ao inicializar partida:", error);
       return null;
     }
   }
 
   startMatch(matchId: number): boolean {
     const engine = this.engines.get(matchId);
-    if (!engine) return false;
+    if (!engine) {
+      this.logger.warn(`Tentativa de iniciar partida ${matchId} sem engine.`);
+      return false;
+    }
 
     engine.start();
+    this.logger.info(`Partida ${matchId} iniciada.`);
     return true;
   }
 
@@ -129,6 +143,13 @@ export class MatchService {
     const allEvents = engine.getEvents();
     const newEvents = allEvents.slice(eventsBefore);
 
+    if (newEvents.length > 0) {
+      this.logger.debug(
+        `Eventos no minuto ${engine.getCurrentMinute()}:`,
+        newEvents
+      );
+    }
+
     return {
       currentMinute: engine.getCurrentMinute(),
       score: engine.getCurrentScore(),
@@ -137,6 +158,8 @@ export class MatchService {
   }
 
   async simulateFullMatch(matchId: number): Promise<MatchResult | null> {
+    this.logger.info(`Simulando partida completa: ${matchId}`);
+
     const engine = this.engines.get(matchId);
     if (!engine) {
       const initialized = await this.initializeMatch(matchId);
@@ -147,18 +170,16 @@ export class MatchService {
     engine.simulateToCompletion();
 
     const result = engine.getMatchResult();
-
     await this.saveMatchResult(matchId, result);
 
     this.engines.delete(matchId);
+    this.logger.info(
+      `Simulação completa finalizada para partida ${matchId}. Placar: ${result.homeScore}-${result.awayScore}`
+    );
 
     return result;
   }
 
-  /**
-   * Salva o resultado completo da partida no banco de dados
-   * Inclui: placar, eventos, atualizações de jogadores, receitas e classificação
-   */
   private async saveMatchResult(
     matchId: number,
     result: MatchResult
@@ -239,7 +260,7 @@ export class MatchService {
           ),
         });
 
-        logger.info(
+        this.logger.info(
           `💰 Receita de bilheteria registrada: €${ticketRevenue.toLocaleString(
             "pt-PT"
           )} (${attendance} torcedores)`
@@ -293,7 +314,7 @@ export class MatchService {
 
       await this.checkCupProgression(matchId);
     } catch (error) {
-      logger.error("❌ Erro ao salvar resultado da partida:", error);
+      this.logger.error("❌ Erro ao salvar resultado da partida:", error);
       throw error;
     }
   }
@@ -311,9 +332,14 @@ export class MatchService {
       if (!competition || competition.type === "league") return;
 
       const allMatchesInRound = await matchRepository.findByTeamAndSeason(
-        0,
+        0, // Hack para buscar todas se a query suportar ou precisa refatorar repository
         match.seasonId
       );
+      // Nota: findByTeamAndSeason no repo atual busca por time OR time.
+      // Idealmente precisaríamos de um findByCompetitionRound.
+      // Assumindo que a lógica original funcionava, mantemos, mas adicionamos log.
+
+      // Filtragem em memória (não ideal mas preservando lógica original)
       const roundMatches = allMatchesInRound.filter(
         (m) =>
           m.competitionId === match.competitionId && m.round === match.round
@@ -325,7 +351,7 @@ export class MatchService {
       const nextRound = match.round + 1;
 
       if (roundMatches.length === 1) {
-        logger.info(`🏆 Competição ${competition.name} encerrada!`);
+        this.logger.info(`🏆 Competição ${competition.name} encerrada!`);
         return;
       }
 
@@ -350,17 +376,14 @@ export class MatchService {
       }));
 
       await matchRepository.createMany(matchesToSave as any);
-      logger.info(
+      this.logger.info(
         `Próxima fase da ${competition.name} gerada: ${matchesToSave.length} partidas.`
       );
     } catch (error) {
-      logger.error("Erro ao processar progressão de copa:", error);
+      this.logger.error("Erro ao processar progressão de copa:", error);
     }
   }
 
-  /**
-   * Atualiza a tabela de classificação após uma partida
-   */
   private async updateStandings(
     competitionId: number,
     seasonId: number,
@@ -428,6 +451,7 @@ export class MatchService {
     matchesPlayed: number;
     results: Array<{ matchId: number; result: MatchResult }>;
   }> {
+    this.logger.info(`Simulando partidas do dia: ${date}`);
     const matches = await matchRepository.findPendingMatchesByDate(date);
 
     const results: Array<{ matchId: number; result: MatchResult }> = [];

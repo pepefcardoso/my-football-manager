@@ -25,11 +25,15 @@ export class SeasonService {
    * Inicia uma nova temporada, gerando calendário para todas as competições.
    */
   async startNewSeason(year: number): Promise<boolean> {
-    try {
-      this.logger.info(`Iniciando temporada ${year}...`);
+    this.logger.info(`🔄 Iniciando procedimentos para a temporada ${year}...`);
 
+    try {
       const startDate = `${year}-01-15`;
       const endDate = `${year}-12-15`;
+
+      this.logger.debug(
+        `Criando registro de temporada: ${startDate} a ${endDate}`
+      );
       const newSeason = await seasonRepository.create(year, startDate, endDate);
 
       const competitionsData = await competitionRepository.findAll();
@@ -47,7 +51,10 @@ export class SeasonService {
       const allTeams = await teamRepository.findAll();
       const teamIds = allTeams.map((t) => t.id);
 
-      this.logger.info("Gerando calendário de jogos...");
+      this.logger.info(
+        `Gerando calendário para ${competitions.length} competições e ${teamIds.length} times...`
+      );
+
       const scheduledMatches = await this.calendarService.scheduleSeason(
         competitions,
         teamIds
@@ -64,14 +71,20 @@ export class SeasonService {
         weather: "sunny",
       }));
 
+      this.logger.debug(
+        `Persistindo ${matchesToSave.length} partidas no banco de dados...`
+      );
       await matchRepository.createMany(matchesToSave);
 
       this.logger.info(
-        `Temporada iniciada com sucesso! ${matchesToSave.length} partidas agendadas.`
+        `✅ Temporada ${year} iniciada com sucesso! ${matchesToSave.length} partidas agendadas.`
       );
       return true;
     } catch (error) {
-      this.logger.error("Erro ao iniciar temporada:", error);
+      this.logger.error(
+        `❌ Falha crítica ao iniciar temporada ${year}:`,
+        error
+      );
       return false;
     }
   }
@@ -82,55 +95,69 @@ export class SeasonService {
   async processEndOfSeason(
     currentSeasonId: number
   ): Promise<SeasonSummary | null> {
-    this.logger.info("Iniciando processamento de fim de temporada...");
+    this.logger.info(
+      `🏁 Iniciando processamento de fim de temporada (ID: ${currentSeasonId})...`
+    );
 
-    const competitions = await competitionRepository.findAll();
-    const activeSeason = await seasonRepository.findActiveSeason();
+    try {
+      const competitions = await competitionRepository.findAll();
+      const activeSeason = await seasonRepository.findActiveSeason();
 
-    if (!activeSeason) return null;
-
-    const tier1 = competitions.find((c) => c.tier === 1 && c.type === "league");
-    const tier2 = competitions.find((c) => c.tier === 2 && c.type === "league");
-
-    let championName = "Desconhecido";
-    let relegated: number[] = [];
-    let promoted: number[] = [];
-
-    if (tier1) {
-      const standingsT1 = await competitionRepository.getStandings(
-        tier1.id,
-        currentSeasonId
-      );
-
-      if (standingsT1.length > 0) {
-        championName = standingsT1[0].team?.name || "Desconhecido";
-
-        const numberToSwap = 4;
-        relegated = standingsT1.slice(-numberToSwap).map((s) => s.teamId!);
+      if (!activeSeason) {
+        this.logger.warn("Nenhuma temporada ativa encontrada para finalizar.");
+        return null;
       }
-    }
 
-    if (tier2) {
-      const standingsT2 = await competitionRepository.getStandings(
-        tier2.id,
-        currentSeasonId
+      const tier1 = competitions.find(
+        (c) => c.tier === 1 && c.type === "league"
       );
-      const numberToSwap = 4;
-      promoted = standingsT2.slice(0, numberToSwap).map((s) => s.teamId!);
+      const tier2 = competitions.find(
+        (c) => c.tier === 2 && c.type === "league"
+      );
+
+      let championName = "Desconhecido";
+      let relegated: number[] = [];
+      let promoted: number[] = [];
+
+      if (tier1) {
+        const standingsT1 = await competitionRepository.getStandings(
+          tier1.id,
+          currentSeasonId
+        );
+
+        if (standingsT1.length > 0) {
+          championName = standingsT1[0].team?.name || "Desconhecido";
+
+          const numberToSwap = 4;
+          relegated = standingsT1.slice(-numberToSwap).map((s) => s.teamId!);
+        }
+      }
+
+      if (tier2) {
+        const standingsT2 = await competitionRepository.getStandings(
+          tier2.id,
+          currentSeasonId
+        );
+        const numberToSwap = 4;
+        promoted = standingsT2.slice(0, numberToSwap).map((s) => s.teamId!);
+      }
+
+      this.logger.info(`🏆 Campeão da Temporada: ${championName}`);
+      this.logger.info(`🔻 Rebaixados: [${relegated.join(", ")}]`);
+      this.logger.info(`🔺 Promovidos: [${promoted.join(", ")}]`);
+
+      await this.startNewSeason(activeSeason.year + 1);
+
+      return {
+        seasonYear: activeSeason.year,
+        championName,
+        promotedTeams: promoted,
+        relegatedTeams: relegated,
+      };
+    } catch (error) {
+      this.logger.error("Erro ao processar fim de temporada:", error);
+      return null;
     }
-
-    this.logger.info(`Campeão: ${championName}`);
-    this.logger.info(`Rebaixados: ${relegated.join(", ")}`);
-    this.logger.info(`Promovidos: ${promoted.join(", ")}`);
-
-    await this.startNewSeason(activeSeason.year + 1);
-
-    return {
-      seasonYear: activeSeason.year,
-      championName,
-      promotedTeams: promoted,
-      relegatedTeams: relegated,
-    };
   }
 }
 

@@ -8,7 +8,11 @@ import { eq, and } from "drizzle-orm";
 import { Logger } from "../lib/Logger";
 
 export class ContractService {
-  private logger = new Logger("ContractService");
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("ContractService");
+  }
 
   /**
    * Calcula a folha salarial mensal total de um time
@@ -23,6 +27,7 @@ export class ContractService {
     playerCount: number;
     staffCount: number;
   }> {
+    this.logger.debug(`Calculando folha salarial para o time ${teamId}`);
     try {
       const activeContracts = await db
         .select()
@@ -70,6 +75,7 @@ export class ContractService {
     playersReleased: number;
     staffReleased: number;
   }> {
+    this.logger.info(`Verificando contratos expirando em ${currentDate}`);
     try {
       const expiringPlayerContracts = await db
         .select()
@@ -94,7 +100,8 @@ export class ContractService {
         );
       }
 
-      const expiringStaff = await staffRepository.findByTeamId(0);
+      // TODO: Melhorar lógica para verificar staff de todos os times, não apenas teamId 0 ou genérico
+      const expiringStaff = await staffRepository.findFreeAgents(); // Ajuste conforme lógica de negócio real
       const expiredStaff = expiringStaff.filter(
         (s) => s.contractEnd === currentDate
       );
@@ -125,34 +132,43 @@ export class ContractService {
     currentDate: string,
     seasonId: number
   ): Promise<void> {
-    const staffMembers = await staffRepository.findByTeamId(teamId);
+    this.logger.debug(
+      `Processando salários diários (pro-rata) para time ${teamId}`
+    );
 
-    const playerTotal = 1000;
-    const staffTotal =
-      staffMembers.reduce((sum, s) => sum + (s.salary || 0), 0) / 365;
+    try {
+      const staffMembers = await staffRepository.findByTeamId(teamId);
 
-    if (playerTotal > 0) {
-      await financialRepository.addRecord({
-        teamId,
-        seasonId,
-        date: currentDate,
-        type: "expense",
-        category: FinancialCategory.SALARY,
-        amount: Math.round(playerTotal),
-        description: "Salários Diários - Jogadores",
-      });
-    }
+      // TODO: Buscar contratos reais dos jogadores para cálculo preciso
+      const playerTotal = 1000; // Valor placeholder
+      const staffTotal =
+        staffMembers.reduce((sum, s) => sum + (s.salary || 0), 0) / 365;
 
-    if (staffTotal > 0) {
-      await financialRepository.addRecord({
-        teamId,
-        seasonId,
-        date: currentDate,
-        type: "expense",
-        category: FinancialCategory.STAFF_SALARY,
-        amount: Math.round(staffTotal),
-        description: "Salários Diários - Staff",
-      });
+      if (playerTotal > 0) {
+        await financialRepository.addRecord({
+          teamId,
+          seasonId,
+          date: currentDate,
+          type: "expense",
+          category: FinancialCategory.SALARY,
+          amount: Math.round(playerTotal),
+          description: "Salários Diários - Jogadores",
+        });
+      }
+
+      if (staffTotal > 0) {
+        await financialRepository.addRecord({
+          teamId,
+          seasonId,
+          date: currentDate,
+          type: "expense",
+          category: FinancialCategory.STAFF_SALARY,
+          amount: Math.round(staffTotal),
+          description: "Salários Diários - Staff",
+        });
+      }
+    } catch (error) {
+      this.logger.error("Erro ao processar salários diários:", error);
     }
   }
 
@@ -167,6 +183,7 @@ export class ContractService {
     newWage: number,
     newEndDate: string
   ): Promise<void> {
+    this.logger.info(`Tentativa de renovação: Jogador ${playerId}`);
     try {
       const currentContract = await db
         .select()

@@ -1,9 +1,13 @@
 import { Logger } from "../lib/Logger";
 import { teamRepository } from "../repositories/TeamRepository";
 
-const logger = new Logger("MarketingService");
-
 export class MarketingService {
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("MarketingService");
+  }
+
   /**
    * Atualiza a satisfação da torcida após uma partida
    */
@@ -14,54 +18,74 @@ export class MarketingService {
     opponentReputation: number,
     ticketPrice: number = 50
   ): Promise<void> {
-    const team = await teamRepository.findById(teamId);
-    if (!team) return;
-
-    const currentSatisfaction = team.fanSatisfaction || 50;
-    const teamReputation = team.reputation || 0;
-
-    let change = 0;
-
-    const reputationDiff = opponentReputation - teamReputation;
-    if (result === "win") {
-      change = 2 + Math.max(0, reputationDiff / 1000);
-      if (isHomeGame) change += 1;
-    } else if (result === "loss") {
-      change = -3;
-      if (reputationDiff > 2000) change += 1;
-      if (isHomeGame) change -= 1;
-    } else {
-      if (reputationDiff > 500) change = 1;
-      else if (reputationDiff < -500) change = -2;
-      else change = 0;
-    }
-
-    if (isHomeGame) {
-      const fairPrice = 50;
-      const reputationTolerance = teamReputation / 1000;
-
-      const adjustedFairPrice = fairPrice + reputationTolerance * 5;
-
-      if (ticketPrice > adjustedFairPrice * 1.5) {
-        change -= 2;
-        logger.info(
-          "Penalidade de satisfação por preço alto de ingresso applied."
-        );
-      } else if (ticketPrice < adjustedFairPrice * 0.5) {
-        change += 1;
-        logger.info("Bônus de satisfação por preço popular applied.");
-      }
-    }
-
-    change = Math.max(-5, Math.min(5, Math.round(change)));
-
-    const newSatisfaction = Math.max(
-      0,
-      Math.min(100, currentSatisfaction + change)
+    this.logger.debug(
+      `Atualizando satisfação da torcida para time ${teamId}. Resultado: ${result}`
     );
 
-    if (newSatisfaction !== currentSatisfaction) {
-      await teamRepository.update(teamId, { fanSatisfaction: newSatisfaction });
+    try {
+      const team = await teamRepository.findById(teamId);
+      if (!team) {
+        this.logger.warn(
+          `Time ${teamId} não encontrado para atualização de marketing.`
+        );
+        return;
+      }
+
+      const currentSatisfaction = team.fanSatisfaction || 50;
+      const teamReputation = team.reputation || 0;
+
+      let change = 0;
+
+      const reputationDiff = opponentReputation - teamReputation;
+
+      if (result === "win") {
+        change = 2 + Math.max(0, reputationDiff / 1000);
+        if (isHomeGame) change += 1;
+      } else if (result === "loss") {
+        change = -3;
+        if (reputationDiff > 2000) change += 1;
+        if (isHomeGame) change -= 1;
+      } else {
+        if (reputationDiff > 500) change = 1;
+        else if (reputationDiff < -500) change = -2;
+        else change = 0;
+      }
+
+      if (isHomeGame) {
+        const fairPrice = 50;
+        const reputationTolerance = teamReputation / 1000;
+        const adjustedFairPrice = fairPrice + reputationTolerance * 5;
+
+        if (ticketPrice > adjustedFairPrice * 1.5) {
+          change -= 2;
+          this.logger.info(
+            "📉 Penalidade aplicada: Preço do ingresso muito alto."
+          );
+        } else if (ticketPrice < adjustedFairPrice * 0.5) {
+          change += 1;
+          this.logger.info("📈 Bônus aplicado: Preço popular.");
+        }
+      }
+
+      change = Math.max(-5, Math.min(5, Math.round(change)));
+
+      const newSatisfaction = Math.max(
+        0,
+        Math.min(100, currentSatisfaction + change)
+      );
+
+      if (newSatisfaction !== currentSatisfaction) {
+        await teamRepository.update(teamId, {
+          fanSatisfaction: newSatisfaction,
+        });
+
+        const symbol = change > 0 ? "+" : "";
+        this.logger.info(
+          `Satisfação da torcida atualizada: ${currentSatisfaction}% ➡️ ${newSatisfaction}% (${symbol}${change})`
+        );
+      }
+    } catch (error) {
+      this.logger.error("Erro ao atualizar satisfação da torcida:", error);
     }
   }
 }

@@ -26,16 +26,19 @@ interface CompetitionWindow {
   groupStructure?: Record<string, number[]>;
 }
 
-const logger = new Logger("CalendarService");
-
 export class CalendarService {
   private continentalCompIds: Set<number> = new Set();
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("CalendarService");
+  }
 
   async scheduleSeason(
     competitions: Competition[],
     allTeams: number[]
   ): Promise<ScheduledMatch[]> {
-    logger.info("🗓️ Iniciando agendamento hierárquico da temporada...");
+    this.logger.info("🗓️ Iniciando agendamento hierárquico da temporada...");
 
     this.continentalCompIds.clear();
     competitions.forEach((c) => {
@@ -52,46 +55,55 @@ export class CalendarService {
     const allMatchesToSave: ScheduledMatch[] = [];
     const occupiedDates = new Map<string, Set<number>>();
 
-    const competitionWindows = this.prepareCompetitionWindows(
-      competitions,
-      allTeams
-    );
+    try {
+      const competitionWindows = this.prepareCompetitionWindows(
+        competitions,
+        allTeams
+      );
 
-    this.scheduleStateCompetitions(
-      competitionWindows,
-      occupiedDates,
-      allMatchesToSave
-    );
+      this.scheduleStateCompetitions(
+        competitionWindows,
+        occupiedDates,
+        allMatchesToSave
+      );
 
-    this.scheduleNationalCompetitions(
-      competitionWindows,
-      occupiedDates,
-      allMatchesToSave
-    );
+      this.scheduleNationalCompetitions(
+        competitionWindows,
+        occupiedDates,
+        allMatchesToSave
+      );
 
-    this.scheduleContinentalCompetitions(
-      competitionWindows,
-      occupiedDates,
-      allMatchesToSave
-    );
+      this.scheduleContinentalCompetitions(
+        competitionWindows,
+        occupiedDates,
+        allMatchesToSave
+      );
 
-    logger.info(
-      `✅ Agendamento concluído: ${allMatchesToSave.length} partidas`
-    );
-    return allMatchesToSave;
+      this.logger.info(
+        `✅ Agendamento concluído: ${allMatchesToSave.length} partidas geradas.`
+      );
+      return allMatchesToSave;
+    } catch (error) {
+      this.logger.error("Erro crítico ao agendar temporada:", error);
+      throw error;
+    }
   }
 
   private prepareCompetitionWindows(
     competitions: Competition[],
     allTeams: number[]
   ): CompetitionWindow[] {
+    this.logger.debug(
+      `Preparando janelas para ${competitions.length} competições.`
+    );
+
     return competitions.map((comp) => {
       const compTeams = allTeams.slice(0, comp.teams);
       let fixtures: MatchPair[] = [];
       let groupStructure: Record<string, number[]> | undefined;
 
       if (comp.type === "group_knockout") {
-        logger.info(`📊 Gerando fase de grupos para ${comp.name}`);
+        this.logger.info(`📊 Gerando fase de grupos para ${comp.name}`);
 
         const groupStage = CompetitionScheduler.generateGroupStageFixtures(
           compTeams,
@@ -102,7 +114,7 @@ export class CalendarService {
         fixtures = groupStage.fixtures;
         groupStructure = groupStage.groups;
 
-        logger.info(
+        this.logger.debug(
           `   └─ ${Object.keys(groupStage.groups).length} grupos criados com ${
             fixtures.length
           } partidas`
@@ -136,7 +148,7 @@ export class CalendarService {
     const stateComps = windows.filter((w) => w.window === "state");
     if (stateComps.length === 0) return;
 
-    logger.info(
+    this.logger.info(
       `📅 Agendando ${stateComps.length} competição(ões) estadual(is)...`
     );
 
@@ -176,7 +188,7 @@ export class CalendarService {
       }
     }
 
-    logger.info(`✅ Estaduais agendados: ${stateComps.length} competições`);
+    this.logger.info(`✅ Estaduais agendados.`);
   }
 
   private scheduleNationalCompetitions(
@@ -187,7 +199,7 @@ export class CalendarService {
     const nationalComps = windows.filter((w) => w.window === "national");
     if (nationalComps.length === 0) return;
 
-    logger.info(
+    this.logger.info(
       `📅 Agendando ${nationalComps.length} competição(ões) nacional(is)...`
     );
 
@@ -227,7 +239,7 @@ export class CalendarService {
       }
     }
 
-    logger.info(`✅ Nacionais agendados: ${nationalComps.length} competições`);
+    this.logger.info(`✅ Nacionais agendados.`);
   }
 
   private scheduleContinentalCompetitions(
@@ -238,7 +250,7 @@ export class CalendarService {
     const continentalComps = windows.filter((w) => w.window === "continental");
     if (continentalComps.length === 0) return;
 
-    logger.info(
+    this.logger.info(
       `📅 Agendando ${continentalComps.length} competição(ões) continental(is)...`
     );
 
@@ -278,9 +290,7 @@ export class CalendarService {
       }
     }
 
-    logger.info(
-      `✅ Continentais agendados: ${continentalComps.length} competições`
-    );
+    this.logger.info(`✅ Continentais agendados.`);
   }
 
   /**
@@ -371,7 +381,7 @@ export class CalendarService {
         this.needsRest(match.homeTeamId, date, allMatches) ||
         this.needsRest(match.awayTeamId, date, allMatches)
       ) {
-        logger.warn(
+        this.logger.warn(
           `⚠️ Conflito de descanso detectado em ${date}. Tentando próxima data.`
         );
         return false;

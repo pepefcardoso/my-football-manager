@@ -3,6 +3,7 @@ import { staffRepository } from "../repositories/StaffRepository";
 import { playerRepository } from "../repositories/PlayerRepository";
 import { RandomEngine } from "../engine/RandomEngine";
 import type { Player } from "../domain/models";
+import { Logger } from "../lib/Logger";
 
 export interface MaskedAttribute {
   value: number | string;
@@ -21,6 +22,12 @@ export interface ScoutedPlayerView extends Player {
 }
 
 export class ScoutingService {
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("ScoutingService");
+  }
+
   /**
    * Aplica o Fog of War a um jogador baseado no time que o visualiza
    */
@@ -28,26 +35,39 @@ export class ScoutingService {
     playerId: number,
     viewerTeamId: number
   ): Promise<ScoutedPlayerView | null> {
-    const player = await playerRepository.findById(playerId);
-    if (!player) return null;
+    try {
+      const player = await playerRepository.findById(playerId);
+      if (!player) {
+        this.logger.warn(`Jogador ${playerId} não encontrado para scouting.`);
+        return null;
+      }
 
-    if (player.teamId === viewerTeamId) {
-      return this.createFullVisibilityView(player);
+      if (player.teamId === viewerTeamId) {
+        return this.createFullVisibilityView(player);
+      }
+
+      const report = await scoutingRepository.findByPlayerAndTeam(
+        playerId,
+        viewerTeamId
+      );
+      const progress = report ? report.progress || 0 : 0;
+
+      return this.createMaskedView(
+        player,
+        progress,
+        report ? report.date : null
+      );
+    } catch (error) {
+      this.logger.error("Erro ao processar getScoutedPlayer", error);
+      throw error;
     }
-
-    const report = await scoutingRepository.findByPlayerAndTeam(
-      playerId,
-      viewerTeamId
-    );
-    const progress = report ? report.progress || 0 : 0;
-
-    return this.createMaskedView(player, progress, report ? report.date : null);
   }
 
   /**
    * Lista todos os jogadores observados por um time
    */
   async getScoutingList(teamId: number) {
+    this.logger.debug(`Buscando lista de observação para o time ${teamId}`);
     return await scoutingRepository.findByTeam(teamId);
   }
 
@@ -58,12 +78,20 @@ export class ScoutingService {
     scoutId: number,
     playerId: number
   ): Promise<boolean> {
+    this.logger.info(`Atribuindo olheiro ${scoutId} ao jogador ${playerId}...`);
+
     try {
       const scout = await staffRepository.findById(scoutId);
-      if (!scout || !scout.teamId) return false;
+      if (!scout || !scout.teamId) {
+        this.logger.warn("Olheiro inválido ou sem time.");
+        return false;
+      }
 
       const player = await playerRepository.findById(playerId);
-      if (!player) return false;
+      if (!player) {
+        this.logger.warn("Jogador alvo não encontrado.");
+        return false;
+      }
 
       const date = new Date().toISOString().split("T")[0];
 
@@ -76,9 +104,10 @@ export class ScoutingService {
         notes: "Observação iniciada",
       });
 
+      this.logger.info("Olheiro atribuído com sucesso.");
       return true;
     } catch (error) {
-      console.error("Erro ao atribuir olheiro:", error);
+      this.logger.error("Erro ao atribuir olheiro:", error);
       return false;
     }
   }
@@ -87,22 +116,32 @@ export class ScoutingService {
    * Processa a evolução diária dos olheiros
    */
   async processDailyScouting(currentDate: string) {
-    const activeReports = await scoutingRepository.findActiveReports();
+    this.logger.info(`Processando scouting diário para ${currentDate}`);
+    try {
+      const activeReports = await scoutingRepository.findActiveReports();
+      let updatesCount = 0;
 
-    for (const report of activeReports) {
-      if (!report.scoutId || (report.progress || 0) >= 100) continue;
+      for (const report of activeReports) {
+        if (!report.scoutId || (report.progress || 0) >= 100) continue;
 
-      const scout = await staffRepository.findById(report.scoutId);
-      if (!scout) continue;
+        const scout = await staffRepository.findById(report.scoutId);
+        if (!scout) continue;
 
-      const dailyProgress =
-        Math.round(scout.overall / 10) + RandomEngine.getInt(1, 5);
+        const dailyProgress =
+          Math.round(scout.overall / 10) + RandomEngine.getInt(1, 5);
 
-      await scoutingRepository.upsert({
-        ...report,
-        date: currentDate,
-        progress: dailyProgress,
-      });
+        await scoutingRepository.upsert({
+          ...report,
+          date: currentDate,
+          progress: dailyProgress,
+        });
+        updatesCount++;
+      }
+      this.logger.info(
+        `Scouting diário finalizado. ${updatesCount} relatórios atualizados.`
+      );
+    } catch (error) {
+      this.logger.error("Erro no processamento diário de scouting", error);
     }
   }
 
