@@ -5,6 +5,8 @@ import type { Player } from "../domain/models";
 import { TrainingFocus, Position } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
 import { Logger } from "../lib/Logger";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export interface PlayerTrainingUpdate {
   id: number;
@@ -31,17 +33,19 @@ export interface TeamTrainingResult {
 export class DailySimulationService {
   private gameEngine: GameEngine;
   private logger: Logger;
+  private repos: IRepositoryContainer;
 
-  constructor() {
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
     this.gameEngine = new GameEngine();
     this.logger = new Logger("DailySimulationService");
   }
 
-  public processTeamDailyLoop(
+  public async processTeamDailyLoop(
     players: Player[],
     trainingFocus: TrainingFocus,
     staffImpact: TeamStaffImpact
-  ): TeamTrainingResult {
+  ): Promise<TeamTrainingResult> {
     this.logger.info(
       `🏋️ Iniciando treino diário. Foco: ${trainingFocus.toUpperCase()} | Jogadores: ${
         players.length
@@ -144,7 +148,8 @@ export class DailySimulationService {
         }
 
         let attributesChanged = false;
-        const updatedStats = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updatedStats: any = {
           finishing: player.finishing,
           passing: player.passing,
           dribbling: player.dribbling,
@@ -211,8 +216,12 @@ export class DailySimulationService {
         });
       }
 
+      if (playerUpdates.length > 0) {
+        await this.repos.players.updateDailyStatsBatch(playerUpdates);
+      }
+
       this.logger.info(
-        `Treino finalizado. ${playerUpdates.length} jogadores processados.`
+        `Treino finalizado. ${playerUpdates.length} jogadores processados e atualizados.`
       );
       return { playerUpdates, logs };
     } catch (error) {
@@ -232,4 +241,12 @@ export class DailySimulationService {
   }
 }
 
-export const dailySimulationService = new DailySimulationService();
+export function createDailySimulationService(
+  repos: IRepositoryContainer
+): DailySimulationService {
+  return new DailySimulationService(repos);
+}
+
+export const dailySimulationService = new DailySimulationService(
+  repositoryContainer
+);

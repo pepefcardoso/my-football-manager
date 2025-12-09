@@ -1,11 +1,8 @@
 import { FinancialCategory } from "../domain/enums";
-import { contractService } from "./ContractService";
-import { financialRepository } from "../repositories/FinancialRepository";
-import { teamRepository } from "../repositories/TeamRepository";
-import { playerRepository } from "../repositories/PlayerRepository";
-import { competitionRepository } from "../repositories/CompetitionRepository";
-import { seasonRepository } from "../repositories/SeasonRepository";
-import { infrastructureService } from "./InfrastructureService";
+import { ContractService } from "./ContractService";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
+import { infrastructureService } from "./InfrastructureService"; // TODO REFACTOR
 import { Logger } from "../lib/Logger";
 import {
   FinancialThresholds,
@@ -14,7 +11,15 @@ import {
 } from "./config/ServiceConstants";
 
 export class FinanceService {
-  private static logger = new Logger("FinanceService");
+  private logger: Logger;
+  private repos: IRepositoryContainer;
+  private contractService: ContractService;
+
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
+    this.contractService = new ContractService(repositories);
+    this.logger = new Logger("FinanceService");
+  }
 
   /**
    * Calcula a receita de bilheteria de uma partida com base em múltiplos fatores
@@ -65,7 +70,7 @@ export class FinanceService {
    * @param seasonId ID da temporada atual
    * @returns Objeto com detalhes da transação
    */
-  static async processMonthlyExpenses(
+  async processMonthlyExpenses(
     teamId: number,
     currentDate: string,
     seasonId: number
@@ -82,9 +87,11 @@ export class FinanceService {
     );
 
     try {
-      const wageBill = await contractService.calculateMonthlyWageBill(teamId);
+      const wageBill = await this.contractService.calculateMonthlyWageBill(
+        teamId
+      );
 
-      const team = await teamRepository.findById(teamId);
+      const team = await this.repos.teams.findById(teamId);
       if (!team) {
         throw new Error(`Time ${teamId} não encontrado`);
       }
@@ -96,7 +103,7 @@ export class FinanceService {
         );
 
       if (infraMaintenance > 0) {
-        await financialRepository.addRecord({
+        await this.repos.financial.addRecord({
           teamId,
           seasonId,
           date: currentDate,
@@ -112,10 +119,10 @@ export class FinanceService {
 
       const newBudget = currentBudget - totalExpense;
 
-      await teamRepository.updateBudget(teamId, newBudget);
+      await this.repos.teams.updateBudget(teamId, newBudget);
 
       if (wageBill.playerWages > 0) {
-        await financialRepository.addRecord({
+        await this.repos.financial.addRecord({
           teamId,
           seasonId,
           date: currentDate,
@@ -127,7 +134,7 @@ export class FinanceService {
       }
 
       if (wageBill.staffWages > 0) {
-        await financialRepository.addRecord({
+        await this.repos.financial.addRecord({
           teamId,
           seasonId,
           date: currentDate,
@@ -225,7 +232,7 @@ export class FinanceService {
    * @param teamId ID do time
    * @returns Objeto com status financeiro e penalidades aplicadas
    */
-  static async checkFinancialHealth(teamId: number): Promise<{
+  async checkFinancialHealth(teamId: number): Promise<{
     isHealthy: boolean;
     currentBudget: number;
     hasTransferBan: boolean;
@@ -233,7 +240,7 @@ export class FinanceService {
     severity: "none" | "warning" | "critical";
   }> {
     try {
-      const team = await teamRepository.findById(teamId);
+      const team = await this.repos.teams.findById(teamId);
       if (!team) {
         throw new Error(`Time ${teamId} não encontrado`);
       }
@@ -254,7 +261,7 @@ export class FinanceService {
           severity = "warning";
         }
 
-        const players = await playerRepository.findByTeamId(teamId);
+        const players = await this.repos.players.findByTeamId(teamId);
         const moralPenalty =
           severity === "critical"
             ? PenaltyWeights.MORAL_CRITICAL
@@ -268,7 +275,7 @@ export class FinanceService {
         }));
 
         if (playerUpdates.length > 0) {
-          await playerRepository.updateDailyStatsBatch(playerUpdates);
+          await this.repos.players.updateDailyStatsBatch(playerUpdates);
           penaltiesApplied.push(
             `Moral dos jogadores reduzida em ${Math.abs(
               moralPenalty
@@ -291,7 +298,7 @@ export class FinanceService {
           (team.fanSatisfaction ?? 50) + fanPenalty
         );
 
-        await teamRepository.update(teamId, {
+        await this.repos.teams.update(teamId, {
           fanSatisfaction: newFanSatisfaction,
         });
 
@@ -300,14 +307,14 @@ export class FinanceService {
         );
 
         if (severity === "critical") {
-          const activeSeason = await seasonRepository.findActiveSeason();
+          const activeSeason = await this.repos.seasons.findActiveSeason();
           if (activeSeason) {
-            const competitions = await competitionRepository.findAll();
+            const competitions = await this.repos.competitions.findAll();
             const mainComp =
               competitions.find((c) => c.tier === 1) || competitions[0];
 
             if (mainComp) {
-              const standings = await competitionRepository.getStandings(
+              const standings = await this.repos.competitions.getStandings(
                 mainComp.id,
                 activeSeason.id
               );
@@ -316,7 +323,7 @@ export class FinanceService {
               if (teamStanding && (teamStanding.points ?? 0) > 0) {
                 const pointsPenalty = PenaltyWeights.POINTS_DEDUCTION;
 
-                await competitionRepository.updateStanding(
+                await this.repos.competitions.updateStanding(
                   mainComp.id,
                   activeSeason.id,
                   teamId,
@@ -360,7 +367,7 @@ export class FinanceService {
    * @param teamId ID do time
    * @returns true se pode contratar, false se está sob transfer ban
    */
-  static async canMakeTransfers(teamId: number): Promise<{
+  async canMakeTransfers(teamId: number): Promise<{
     allowed: boolean;
     reason?: string;
   }> {
@@ -406,7 +413,18 @@ export class FinanceService {
    * @param seasonId ID da temporada
    * @returns Lista de registros financeiros
    */
-  static async getFinancialRecords(teamId: number, seasonId: number) {
-    return await financialRepository.findByTeamAndSeason(teamId, seasonId);
+  async getFinancialRecords(teamId: number, seasonId: number) {
+    return await this.repos.financial.findByTeamAndSeason(teamId, seasonId);
   }
 }
+
+/**
+ * Factory e Exportação da Instância Global (Singleton)
+ */
+export function createFinanceService(
+  repos: IRepositoryContainer
+): FinanceService {
+  return new FinanceService(repos);
+}
+
+export const financeService = new FinanceService(repositoryContainer);

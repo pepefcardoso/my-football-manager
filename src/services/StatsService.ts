@@ -1,16 +1,15 @@
-import { playerRepository } from "../repositories/PlayerRepository";
-import { db } from "../lib/db";
-import { playerCompetitionStats } from "../db/schema";
-import { eq, and } from "drizzle-orm";
 import type { MatchResult } from "../domain/types";
 import { MatchEventType } from "../domain/enums";
-import { matchRepository } from "../repositories/MatchRepository";
 import { Logger } from "../lib/Logger";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class StatsService {
   private logger: Logger;
+  private repos: IRepositoryContainer;
 
-  constructor() {
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
     this.logger = new Logger("StatsService");
   }
 
@@ -28,7 +27,7 @@ export class StatsService {
     );
 
     try {
-      const match = await matchRepository.findById(matchId);
+      const match = await this.repos.matches.findById(matchId);
       if (!match) {
         this.logger.warn(
           `Partida ${matchId} não encontrada. Estatísticas ignoradas.`
@@ -98,7 +97,7 @@ export class StatsService {
     let updatedCount = 0;
 
     for (const playerId of allPlayerIds) {
-      const player = await playerRepository.findById(playerId);
+      const player = await this.repos.players.findById(playerId);
       if (!player || !player.teamId) continue;
 
       const stats = statsMap.get(playerId) || {
@@ -122,35 +121,26 @@ export class StatsService {
         }
       }
 
-      const existing = await db
-        .select()
-        .from(playerCompetitionStats)
-        .where(
-          and(
-            eq(playerCompetitionStats.playerId, playerId),
-            eq(playerCompetitionStats.competitionId, competitionId),
-            eq(playerCompetitionStats.seasonId, seasonId)
-          )
-        )
-        .get();
+      const existing = await this.repos.competitions.findPlayerStats(
+        playerId,
+        competitionId,
+        seasonId
+      );
 
       if (existing) {
-        await db
-          .update(playerCompetitionStats)
-          .set({
-            matches: (existing.matches ?? 0) + 1,
-            goals: (existing.goals ?? 0) + stats.goals,
-            assists: (existing.assists ?? 0) + stats.assists,
-            yellowCards: (existing.yellowCards ?? 0) + stats.yellow,
-            redCards: (existing.redCards ?? 0) + stats.red,
-            saves: (existing.saves ?? 0) + stats.saves,
-            cleanSheets: (existing.cleanSheets ?? 0) + cleanSheet,
-            goalsConceded: (existing.goalsConceded ?? 0) + goalsConceded,
-            minutesPlayed: (existing.minutesPlayed ?? 0) + 90,
-          })
-          .where(eq(playerCompetitionStats.id, existing.id));
+        await this.repos.competitions.updatePlayerStats(existing.id, {
+          matches: (existing.matches ?? 0) + 1,
+          goals: (existing.goals ?? 0) + stats.goals,
+          assists: (existing.assists ?? 0) + stats.assists,
+          yellowCards: (existing.yellowCards ?? 0) + stats.yellow,
+          redCards: (existing.redCards ?? 0) + stats.red,
+          saves: (existing.saves ?? 0) + stats.saves,
+          cleanSheets: (existing.cleanSheets ?? 0) + cleanSheet,
+          goalsConceded: (existing.goalsConceded ?? 0) + goalsConceded,
+          minutesPlayed: (existing.minutesPlayed ?? 0) + 90,
+        });
       } else {
-        await db.insert(playerCompetitionStats).values({
+        await this.repos.competitions.createPlayerStats({
           playerId,
           teamId: player.teamId,
           competitionId,
@@ -183,20 +173,11 @@ export class StatsService {
       `Buscando top ${limit} goleiros (Comp: ${competitionId})`
     );
     try {
-      return await db.query.playerCompetitionStats.findMany({
-        where: and(
-          eq(playerCompetitionStats.competitionId, competitionId),
-          eq(playerCompetitionStats.seasonId, seasonId)
-        ),
-        orderBy: (stats, { desc }) => [
-          desc(stats.cleanSheets),
-          desc(stats.saves),
-        ],
-        limit: limit,
-        with: {
-          // Relações seriam carregadas aqui
-        },
-      });
+      return await this.repos.competitions.getTopGoalkeepers(
+        competitionId,
+        seasonId,
+        limit
+      );
     } catch (error) {
       this.logger.error("Erro ao buscar top goleiros:", error);
       return [];
@@ -215,17 +196,11 @@ export class StatsService {
       `Buscando top ${limit} artilheiros (Comp: ${competitionId})`
     );
     try {
-      return await db.query.playerCompetitionStats.findMany({
-        where: and(
-          eq(playerCompetitionStats.competitionId, competitionId),
-          eq(playerCompetitionStats.seasonId, seasonId)
-        ),
-        orderBy: (stats, { desc }) => [desc(stats.goals), desc(stats.assists)],
-        limit: limit,
-        with: {
-          // player: true
-        },
-      });
+      return await this.repos.competitions.getTopScorers(
+        competitionId,
+        seasonId,
+        limit
+      );
     } catch (error) {
       this.logger.error("Erro ao buscar top artilheiros:", error);
       return [];
@@ -233,4 +208,8 @@ export class StatsService {
   }
 }
 
-export const statsService = new StatsService();
+export function createStatsService(repos: IRepositoryContainer): StatsService {
+  return new StatsService(repos);
+}
+
+export const statsService = new StatsService(repositoryContainer);

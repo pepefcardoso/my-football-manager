@@ -1,9 +1,8 @@
-import { scoutingRepository } from "../repositories/ScoutingRepository";
-import { staffRepository } from "../repositories/StaffRepository";
-import { playerRepository } from "../repositories/PlayerRepository";
 import { RandomEngine } from "../engine/RandomEngine";
 import type { Player } from "../domain/models";
 import { Logger } from "../lib/Logger";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export interface MaskedAttribute {
   value: number | string;
@@ -23,8 +22,10 @@ export interface ScoutedPlayerView extends Player {
 
 export class ScoutingService {
   private logger: Logger;
+  private repos: IRepositoryContainer;
 
-  constructor() {
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
     this.logger = new Logger("ScoutingService");
   }
 
@@ -36,7 +37,7 @@ export class ScoutingService {
     viewerTeamId: number
   ): Promise<ScoutedPlayerView | null> {
     try {
-      const player = await playerRepository.findById(playerId);
+      const player = await this.repos.players.findById(playerId);
       if (!player) {
         this.logger.warn(`Jogador ${playerId} não encontrado para scouting.`);
         return null;
@@ -46,7 +47,7 @@ export class ScoutingService {
         return this.createFullVisibilityView(player);
       }
 
-      const report = await scoutingRepository.findByPlayerAndTeam(
+      const report = await this.repos.scouting.findByPlayerAndTeam(
         playerId,
         viewerTeamId
       );
@@ -68,7 +69,7 @@ export class ScoutingService {
    */
   async getScoutingList(teamId: number) {
     this.logger.debug(`Buscando lista de observação para o time ${teamId}`);
-    return await scoutingRepository.findByTeam(teamId);
+    return await this.repos.scouting.findByTeam(teamId);
   }
 
   /**
@@ -81,13 +82,13 @@ export class ScoutingService {
     this.logger.info(`Atribuindo olheiro ${scoutId} ao jogador ${playerId}...`);
 
     try {
-      const scout = await staffRepository.findById(scoutId);
+      const scout = await this.repos.staff.findById(scoutId);
       if (!scout || !scout.teamId) {
         this.logger.warn("Olheiro inválido ou sem time.");
         return false;
       }
 
-      const player = await playerRepository.findById(playerId);
+      const player = await this.repos.players.findById(playerId);
       if (!player) {
         this.logger.warn("Jogador alvo não encontrado.");
         return false;
@@ -95,7 +96,7 @@ export class ScoutingService {
 
       const date = new Date().toISOString().split("T")[0];
 
-      await scoutingRepository.upsert({
+      await this.repos.scouting.upsert({
         teamId: scout.teamId,
         playerId: playerId,
         scoutId: scoutId,
@@ -118,19 +119,19 @@ export class ScoutingService {
   async processDailyScouting(currentDate: string) {
     this.logger.info(`Processando scouting diário para ${currentDate}`);
     try {
-      const activeReports = await scoutingRepository.findActiveReports();
+      const activeReports = await this.repos.scouting.findActiveReports();
       let updatesCount = 0;
 
       for (const report of activeReports) {
         if (!report.scoutId || (report.progress || 0) >= 100) continue;
 
-        const scout = await staffRepository.findById(report.scoutId);
+        const scout = await this.repos.staff.findById(report.scoutId);
         if (!scout) continue;
 
         const dailyProgress =
           Math.round(scout.overall / 10) + RandomEngine.getInt(1, 5);
 
-        await scoutingRepository.upsert({
+        await this.repos.scouting.upsert({
           ...report,
           date: currentDate,
           progress: dailyProgress,
@@ -224,4 +225,10 @@ export class ScoutingService {
   }
 }
 
-export const scoutingService = new ScoutingService();
+export function createScoutingService(
+  repos: IRepositoryContainer
+): ScoutingService {
+  return new ScoutingService(repos);
+}
+
+export const scoutingService = new ScoutingService(repositoryContainer);

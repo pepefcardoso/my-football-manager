@@ -1,9 +1,7 @@
-import { seasonRepository } from "../repositories/SeasonRepository";
-import { competitionRepository } from "../repositories/CompetitionRepository";
-import { teamRepository } from "../repositories/TeamRepository";
-import { matchRepository } from "../repositories/MatchRepository";
 import { CalendarService } from "./CalendarService";
 import { Logger } from "../lib/Logger";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export interface SeasonSummary {
   seasonYear: number;
@@ -15,9 +13,11 @@ export interface SeasonSummary {
 export class SeasonService {
   private calendarService: CalendarService;
   private logger: Logger;
+  private repos: IRepositoryContainer;
 
-  constructor() {
-    this.calendarService = new CalendarService();
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
+    this.calendarService = new CalendarService(repositories);
     this.logger = new Logger("SeasonService");
   }
 
@@ -34,9 +34,13 @@ export class SeasonService {
       this.logger.debug(
         `Criando registro de temporada: ${startDate} a ${endDate}`
       );
-      const newSeason = await seasonRepository.create(year, startDate, endDate);
+      const newSeason = await this.repos.seasons.create(
+        year,
+        startDate,
+        endDate
+      );
 
-      const competitionsData = await competitionRepository.findAll();
+      const competitionsData = await this.repos.competitions.findAll();
 
       const competitions = competitionsData.map((c) => ({
         ...c,
@@ -48,7 +52,7 @@ export class SeasonService {
         config: (c.config as any) || {},
       }));
 
-      const allTeams = await teamRepository.findAll();
+      const allTeams = await this.repos.teams.findAll();
       const teamIds = allTeams.map((t) => t.id);
 
       this.logger.info(
@@ -74,7 +78,7 @@ export class SeasonService {
       this.logger.debug(
         `Persistindo ${matchesToSave.length} partidas no banco de dados...`
       );
-      await matchRepository.createMany(matchesToSave);
+      await this.repos.matches.createMany(matchesToSave);
 
       this.logger.info(
         `✅ Temporada ${year} iniciada com sucesso! ${matchesToSave.length} partidas agendadas.`
@@ -89,9 +93,6 @@ export class SeasonService {
     }
   }
 
-  /**
-   * Processa o fim da temporada e retorna um resumo
-   */
   async processEndOfSeason(
     currentSeasonId: number
   ): Promise<SeasonSummary | null> {
@@ -100,8 +101,8 @@ export class SeasonService {
     );
 
     try {
-      const competitions = await competitionRepository.findAll();
-      const activeSeason = await seasonRepository.findActiveSeason();
+      const competitions = await this.repos.competitions.findAll();
+      const activeSeason = await this.repos.seasons.findActiveSeason();
 
       if (!activeSeason) {
         this.logger.warn("Nenhuma temporada ativa encontrada para finalizar.");
@@ -120,7 +121,7 @@ export class SeasonService {
       let promoted: number[] = [];
 
       if (tier1) {
-        const standingsT1 = await competitionRepository.getStandings(
+        const standingsT1 = await this.repos.competitions.getStandings(
           tier1.id,
           currentSeasonId
         );
@@ -134,7 +135,7 @@ export class SeasonService {
       }
 
       if (tier2) {
-        const standingsT2 = await competitionRepository.getStandings(
+        const standingsT2 = await this.repos.competitions.getStandings(
           tier2.id,
           currentSeasonId
         );
@@ -161,4 +162,10 @@ export class SeasonService {
   }
 }
 
-export const seasonService = new SeasonService();
+export function createSeasonService(
+  repos: IRepositoryContainer
+): SeasonService {
+  return new SeasonService(repos);
+}
+
+export const seasonService = new SeasonService(repositoryContainer);

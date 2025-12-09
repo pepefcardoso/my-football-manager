@@ -1,15 +1,15 @@
 import { AttributeCalculator } from "../engine/AttributeCalculator";
-import { playerRepository } from "../repositories/PlayerRepository";
-import { players } from "../db/schema";
-import { eq } from "drizzle-orm";
-import { db } from "../lib/db";
-import type { Position } from "../domain/enums";
+import { Position } from "../domain/enums";
 import { Logger } from "../lib/Logger";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class PlayerService {
   private logger: Logger;
+  private repos: IRepositoryContainer;
 
-  constructor() {
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
     this.logger = new Logger("PlayerService");
   }
 
@@ -18,7 +18,7 @@ export class PlayerService {
    */
   async updatePlayerOverall(playerId: number): Promise<void> {
     try {
-      const player = await playerRepository.findById(playerId);
+      const player = await this.repos.players.findById(playerId);
 
       if (!player) {
         this.logger.warn(
@@ -41,7 +41,7 @@ export class PlayerService {
       );
 
       if (newOverall !== player.overall) {
-        await playerRepository.update(playerId, { overall: newOverall });
+        await this.repos.players.update(playerId, { overall: newOverall });
         this.logger.info(
           `Overall atualizado: ${player.firstName} ${player.lastName} (${player.position}) ${player.overall} ➡️ ${newOverall}`
         );
@@ -62,15 +62,7 @@ export class PlayerService {
     this.logger.debug(`Buscando jogador ${playerId} e contrato ativo...`);
 
     try {
-      const result = await db.query.players.findFirst({
-        where: eq(players.id, playerId),
-        with: {
-          contracts: {
-            where: (contracts, { eq }) => eq(contracts.status, "active"),
-            limit: 1,
-          },
-        },
-      });
+      const result = await this.repos.players.findById(playerId);
 
       if (!result) {
         this.logger.warn(`Jogador ${playerId} não encontrado.`);
@@ -87,4 +79,10 @@ export class PlayerService {
   }
 }
 
-export const playerService = new PlayerService();
+export function createPlayerService(
+  repos: IRepositoryContainer
+): PlayerService {
+  return new PlayerService(repos);
+}
+
+export const playerService = new PlayerService(repositoryContainer);

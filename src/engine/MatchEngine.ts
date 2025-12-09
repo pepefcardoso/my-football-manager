@@ -52,7 +52,7 @@ export class MatchEngine {
   private awayStrength: TeamStrength;
   private weatherMultiplier: number = 1.0;
 
-  constructor(config: MatchConfig, seed?: number) {
+  constructor(config: MatchConfig, isKnockout: boolean, seed?: number) {
     this.config = config;
     const matchSeed = seed || Date.now();
     this.rng = new RandomEngine(matchSeed);

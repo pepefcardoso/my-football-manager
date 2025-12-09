@@ -1,64 +1,50 @@
-import { playerRepository } from "../repositories/PlayerRepository";
-import { staffRepository } from "../repositories/StaffRepository";
-import { financialRepository } from "../repositories/FinancialRepository";
 import { FinancialCategory } from "../domain/enums";
 import { db } from "../lib/db";
 import { playerContracts } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import { Logger } from "../lib/Logger";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+
+export interface WageBillDetails {
+  playerWages: number;
+  staffWages: number;
+  total: number;
+  playerCount: number;
+  staffCount: number;
+}
+
+export interface ContractExpirationResult {
+  playersReleased: number;
+  staffReleased: number;
+}
 
 export class ContractService {
-  private logger: Logger;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
-  constructor() {
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
     this.logger = new Logger("ContractService");
   }
 
   /**
    * Calcula a folha salarial mensal total de um time
-   * Inclui jogadores e equipe técnica
-   * @param teamId ID do time
-   * @returns Objeto com detalhamento dos salários
    */
-  async calculateMonthlyWageBill(teamId: number): Promise<{
-    playerWages: number;
-    staffWages: number;
-    total: number;
-    playerCount: number;
-    staffCount: number;
-  }> {
+  async calculateMonthlyWageBill(teamId: number): Promise<WageBillDetails> {
     this.logger.debug(`Calculando folha salarial para o time ${teamId}`);
+
     try {
-      const activeContracts = await db
-        .select()
-        .from(playerContracts)
-        .where(
-          and(
-            eq(playerContracts.teamId, teamId),
-            eq(playerContracts.status, "active")
-          )
-        );
-
-      const playerWagesAnnual = activeContracts.reduce(
-        (sum, contract) => sum + (contract.wage || 0),
-        0
-      );
-      const playerWagesMonthly = Math.round(playerWagesAnnual / 12);
-
-      const staffMembers = await staffRepository.findByTeamId(teamId);
-
-      const staffWagesAnnual = staffMembers.reduce(
-        (sum, member) => sum + (member.salary || 0),
-        0
-      );
-      const staffWagesMonthly = Math.round(staffWagesAnnual / 12);
+      const [playerWages, staffWages] = await Promise.all([
+        this.calculatePlayerWages(teamId),
+        this.calculateStaffWages(teamId),
+      ]);
 
       return {
-        playerWages: playerWagesMonthly,
-        staffWages: staffWagesMonthly,
-        total: playerWagesMonthly + staffWagesMonthly,
-        playerCount: activeContracts.length,
-        staffCount: staffMembers.length,
+        playerWages: playerWages.monthly,
+        staffWages: staffWages.monthly,
+        total: playerWages.monthly + staffWages.monthly,
+        playerCount: playerWages.count,
+        staffCount: staffWages.count,
       };
     } catch (error) {
       this.logger.error("Erro ao calcular folha salarial:", error);
@@ -68,53 +54,19 @@ export class ContractService {
 
   /**
    * Verifica contratos que estão expirando na data atual
-   * @param currentDate Data no formato YYYY-MM-DD
-   * @returns Número de contratos liberados
    */
-  async checkExpiringContracts(currentDate: string): Promise<{
-    playersReleased: number;
-    staffReleased: number;
-  }> {
+  async checkExpiringContracts(
+    currentDate: string
+  ): Promise<ContractExpirationResult> {
     this.logger.info(`Verificando contratos expirando em ${currentDate}`);
+
     try {
-      const expiringPlayerContracts = await db
-        .select()
-        .from(playerContracts)
-        .where(
-          and(
-            eq(playerContracts.endDate, currentDate),
-            eq(playerContracts.status, "active")
-          )
-        );
+      const [playersReleased, staffReleased] = await Promise.all([
+        this.processExpiringPlayerContracts(currentDate),
+        this.processExpiringStaffContracts(currentDate),
+      ]);
 
-      for (const contract of expiringPlayerContracts) {
-        await db
-          .update(playerContracts)
-          .set({ status: "expired" })
-          .where(eq(playerContracts.id, contract.id));
-
-        await playerRepository.update(contract.playerId, { teamId: null });
-
-        this.logger.info(
-          `Contrato expirado: Jogador ID ${contract.playerId} liberado`
-        );
-      }
-
-      // TODO: Melhorar lógica para verificar staff de todos os times, não apenas teamId 0 ou genérico
-      const expiringStaff = await staffRepository.findFreeAgents(); // Ajuste conforme lógica de negócio real
-      const expiredStaff = expiringStaff.filter(
-        (s) => s.contractEnd === currentDate
-      );
-
-      for (const member of expiredStaff) {
-        await staffRepository.fire(member.id);
-        this.logger.info(`Contrato expirado: Staff ID ${member.id} liberado`);
-      }
-
-      return {
-        playersReleased: expiringPlayerContracts.length,
-        staffReleased: expiredStaff.length,
-      };
+      return { playersReleased, staffReleased };
     } catch (error) {
       this.logger.error("Erro ao verificar contratos expirando:", error);
       return { playersReleased: 0, staffReleased: 0 };
@@ -122,48 +74,41 @@ export class ContractService {
   }
 
   /**
-   * Processa pagamento de salários diários para jogadores e staff
-   * @param teamId ID do time
-   * @param currentDate Data atual (YYYY-MM-DD)
-   * @param seasonId ID da temporada atual
+   * Processa pagamento de salários diários (pro-rata)
    */
   async processDailyWages(
     teamId: number,
     currentDate: string,
     seasonId: number
   ): Promise<void> {
-    this.logger.debug(
-      `Processando salários diários (pro-rata) para time ${teamId}`
-    );
+    this.logger.debug(`Processando salários diários para time ${teamId}`);
 
     try {
-      const staffMembers = await staffRepository.findByTeamId(teamId);
+      const wageBill = await this.calculateMonthlyWageBill(teamId);
 
-      // TODO: Buscar contratos reais dos jogadores para cálculo preciso
-      const playerTotal = 1000; // Valor placeholder
-      const staffTotal =
-        staffMembers.reduce((sum, s) => sum + (s.salary || 0), 0) / 365;
+      const dailyPlayerWages = Math.round(wageBill.playerWages / 30);
+      const dailyStaffWages = Math.round(wageBill.staffWages / 30);
 
-      if (playerTotal > 0) {
-        await financialRepository.addRecord({
+      if (dailyPlayerWages > 0) {
+        await this.repos.financial.addRecord({
           teamId,
           seasonId,
           date: currentDate,
           type: "expense",
           category: FinancialCategory.SALARY,
-          amount: Math.round(playerTotal),
+          amount: dailyPlayerWages,
           description: "Salários Diários - Jogadores",
         });
       }
 
-      if (staffTotal > 0) {
-        await financialRepository.addRecord({
+      if (dailyStaffWages > 0) {
+        await this.repos.financial.addRecord({
           teamId,
           seasonId,
           date: currentDate,
           type: "expense",
           category: FinancialCategory.STAFF_SALARY,
-          amount: Math.round(staffTotal),
+          amount: dailyStaffWages,
           description: "Salários Diários - Staff",
         });
       }
@@ -174,9 +119,6 @@ export class ContractService {
 
   /**
    * Renova contrato de um jogador com novos termos
-   * @param playerId ID do jogador
-   * @param newWage Novo salário anual
-   * @param newEndDate Nova data de término (YYYY-MM-DD)
    */
   async renewPlayerContract(
     playerId: number,
@@ -184,6 +126,7 @@ export class ContractService {
     newEndDate: string
   ): Promise<void> {
     this.logger.info(`Tentativa de renovação: Jogador ${playerId}`);
+
     try {
       const currentContract = await db
         .select()
@@ -218,6 +161,110 @@ export class ContractService {
       throw error;
     }
   }
+
+  /**
+   * Calcula salários mensais dos jogadores
+   */
+  private async calculatePlayerWages(teamId: number): Promise<{
+    monthly: number;
+    count: number;
+  }> {
+    const activeContracts = await db
+      .select()
+      .from(playerContracts)
+      .where(
+        and(
+          eq(playerContracts.teamId, teamId),
+          eq(playerContracts.status, "active")
+        )
+      );
+
+    const annualTotal = activeContracts.reduce(
+      (sum, contract) => sum + (contract.wage || 0),
+      0
+    );
+
+    return {
+      monthly: Math.round(annualTotal / 12),
+      count: activeContracts.length,
+    };
+  }
+
+  /**
+   * Calcula salários mensais do staff
+   */
+  private async calculateStaffWages(teamId: number): Promise<{
+    monthly: number;
+    count: number;
+  }> {
+    const staffMembers = await this.repos.staff.findByTeamId(teamId);
+
+    const annualTotal = staffMembers.reduce(
+      (sum, member) => sum + (member.salary || 0),
+      0
+    );
+
+    return {
+      monthly: Math.round(annualTotal / 12),
+      count: staffMembers.length,
+    };
+  }
+
+  /**
+   * Processa contratos de jogadores que expiram na data
+   */
+  private async processExpiringPlayerContracts(
+    currentDate: string
+  ): Promise<number> {
+    const expiringContracts = await db
+      .select()
+      .from(playerContracts)
+      .where(
+        and(
+          eq(playerContracts.endDate, currentDate),
+          eq(playerContracts.status, "active")
+        )
+      );
+
+    for (const contract of expiringContracts) {
+      await db
+        .update(playerContracts)
+        .set({ status: "expired" })
+        .where(eq(playerContracts.id, contract.id));
+
+      await this.repos.players.update(contract.playerId, { teamId: null });
+
+      this.logger.info(
+        `Contrato expirado: Jogador ID ${contract.playerId} liberado`
+      );
+    }
+
+    return expiringContracts.length;
+  }
+
+  /**
+   * Processa contratos de staff que expiram na data
+   */
+  private async processExpiringStaffContracts(
+    currentDate: string
+  ): Promise<number> {
+    const allStaff = await this.repos.staff.findFreeAgents();
+    const expiredStaff = allStaff.filter((s) => s.contractEnd === currentDate);
+
+    for (const member of expiredStaff) {
+      await this.repos.staff.fire(member.id);
+      this.logger.info(`Contrato expirado: Staff ID ${member.id} liberado`);
+    }
+
+    return expiredStaff.length;
+  }
 }
 
-export const contractService = new ContractService();
+/**
+ * Factory function para criar instância com DI
+ */
+export function createContractService(
+  repos: IRepositoryContainer
+): ContractService {
+  return new ContractService(repos);
+}

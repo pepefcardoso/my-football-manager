@@ -1,10 +1,13 @@
 import { Logger } from "../lib/Logger";
-import { teamRepository } from "../repositories/TeamRepository";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class MarketingService {
   private logger: Logger;
+  private repos: IRepositoryContainer;
 
-  constructor() {
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
     this.logger = new Logger("MarketingService");
   }
 
@@ -23,7 +26,7 @@ export class MarketingService {
     );
 
     try {
-      const team = await teamRepository.findById(teamId);
+      const team = await this.repos.teams.findById(teamId);
       if (!team) {
         this.logger.warn(
           `Time ${teamId} não encontrado para atualização de marketing.`
@@ -75,7 +78,7 @@ export class MarketingService {
       );
 
       if (newSatisfaction !== currentSatisfaction) {
-        await teamRepository.update(teamId, {
+        await this.repos.teams.update(teamId, {
           fanSatisfaction: newSatisfaction,
         });
 
@@ -90,4 +93,10 @@ export class MarketingService {
   }
 }
 
-export const marketingService = new MarketingService();
+export function createMarketingService(
+  repos: IRepositoryContainer
+): MarketingService {
+  return new MarketingService(repos);
+}
+
+export const marketingService = new MarketingService(repositoryContainer);

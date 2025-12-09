@@ -1,13 +1,15 @@
-import { teamRepository } from "../repositories/TeamRepository";
-import { financialRepository } from "../repositories/FinancialRepository";
 import { FinancialCategory } from "../domain/enums";
 import { InfrastructureCosts } from "./config/ServiceConstants";
 import { Logger } from "../lib/Logger";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class InfrastructureService {
   private logger: Logger;
+  private repos: IRepositoryContainer;
 
-  constructor() {
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
     this.logger = new Logger("InfrastructureService");
   }
 
@@ -39,7 +41,7 @@ export class InfrastructureService {
     this.logger.info(`Iniciando expansão de estádio para o time ${teamId}...`);
 
     try {
-      const team = await teamRepository.findById(teamId);
+      const team = await this.repos.teams.findById(teamId);
       if (!team) {
         this.logger.warn(`Time ${teamId} não encontrado.`);
         return { success: false, message: "Clube não encontrado." };
@@ -60,12 +62,12 @@ export class InfrastructureService {
         (team.stadiumCapacity || 0) + InfrastructureCosts.SEAT_EXPANSION_BLOCK;
       const newBudget = (team.budget || 0) - cost;
 
-      await teamRepository.update(teamId, {
+      await this.repos.teams.update(teamId, {
         stadiumCapacity: newCapacity,
         budget: newBudget,
       });
 
-      await financialRepository.addRecord({
+      await this.repos.financial.addRecord({
         teamId,
         seasonId,
         date: new Date().toISOString().split("T")[0],
@@ -95,7 +97,7 @@ export class InfrastructureService {
     );
 
     try {
-      const team = await teamRepository.findById(teamId);
+      const team = await this.repos.teams.findById(teamId);
       if (!team) {
         this.logger.warn(`Time ${teamId} não encontrado.`);
         return { success: false, message: "Clube não encontrado." };
@@ -147,9 +149,9 @@ export class InfrastructureService {
         facilityName = "Academia de Base";
       }
 
-      await teamRepository.update(teamId, updateData);
+      await this.repos.teams.update(teamId, updateData);
 
-      await financialRepository.addRecord({
+      await this.repos.financial.addRecord({
         teamId,
         seasonId,
         date: new Date().toISOString().split("T")[0],
@@ -173,4 +175,12 @@ export class InfrastructureService {
   }
 }
 
-export const infrastructureService = new InfrastructureService();
+export function createInfrastructureService(
+  repos: IRepositoryContainer
+): InfrastructureService {
+  return new InfrastructureService(repos);
+}
+
+export const infrastructureService = new InfrastructureService(
+  repositoryContainer
+);

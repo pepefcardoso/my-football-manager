@@ -1,8 +1,3 @@
-import { matchRepository } from "../repositories/MatchRepository";
-import { playerRepository } from "../repositories/PlayerRepository";
-import { teamRepository } from "../repositories/TeamRepository";
-import { competitionRepository } from "../repositories/CompetitionRepository";
-import { financialRepository } from "../repositories/FinancialRepository";
 import type { Team } from "../domain/models";
 import { FinancialCategory } from "../domain/enums";
 import { MatchEngine } from "../engine/MatchEngine";
@@ -11,26 +6,30 @@ import { FinanceService } from "./FinanceService";
 import { marketingService } from "./MarketingService";
 import { Logger } from "../lib/Logger";
 import { CompetitionScheduler } from "./CompetitionScheduler";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class MatchService {
   private engines: Map<number, MatchEngine> = new Map();
   private logger: Logger;
+  private repos: IRepositoryContainer;
 
-  constructor() {
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
     this.logger = new Logger("MatchService");
   }
 
   async initializeMatch(matchId: number): Promise<MatchEngine | null> {
     this.logger.info(`Inicializando partida ${matchId}...`);
     try {
-      const match = await matchRepository.findById(matchId);
+      const match = await this.repos.matches.findById(matchId);
       if (!match) {
         this.logger.error(`Partida ${matchId} não encontrada.`);
         return null;
       }
 
-      const homeTeamData = await teamRepository.findById(match.homeTeamId!);
-      const awayTeamData = await teamRepository.findById(match.awayTeamId!);
+      const homeTeamData = await this.repos.teams.findById(match.homeTeamId!);
+      const awayTeamData = await this.repos.teams.findById(match.awayTeamId!);
 
       if (!homeTeamData || !awayTeamData) {
         this.logger.error("Times não encontrados para a partida.");
@@ -56,10 +55,10 @@ export class MatchService {
       const homeTeam = mapToDomainTeam(homeTeamData);
       const awayTeam = mapToDomainTeam(awayTeamData);
 
-      const allHomePlayers = await playerRepository.findByTeamId(
+      const allHomePlayers = await this.repos.players.findByTeamId(
         match.homeTeamId!
       );
-      const allAwayPlayers = await playerRepository.findByTeamId(
+      const allAwayPlayers = await this.repos.players.findByTeamId(
         match.awayTeamId!
       );
 
@@ -76,7 +75,7 @@ export class MatchService {
 
       let isKnockout = false;
       if (match.competitionId) {
-        const competitions = await competitionRepository.findAll();
+        const competitions = await this.repos.competitions.findAll();
         const competition = competitions.find(
           (c) => c.id === match.competitionId
         );
@@ -185,15 +184,15 @@ export class MatchService {
     result: MatchResult
   ): Promise<void> {
     try {
-      const match = await matchRepository.findById(matchId);
+      const match = await this.repos.matches.findById(matchId);
       if (!match) return;
 
-      const homeTeam = await teamRepository.findById(match.homeTeamId!);
+      const homeTeam = await this.repos.teams.findById(match.homeTeamId!);
       if (!homeTeam) return;
 
       let matchImportance = 1.0;
       if (match.competitionId) {
-        const competition = await competitionRepository.findAll();
+        const competition = await this.repos.competitions.findAll();
         const comp = competition.find((c) => c.id === match.competitionId);
         if (comp) {
           matchImportance = FinanceService.getMatchImportance(
@@ -212,7 +211,7 @@ export class MatchService {
           50
         );
 
-      await matchRepository.updateMatchResult(
+      await this.repos.matches.updateMatchResult(
         matchId,
         result.homeScore,
         result.awayScore,
@@ -233,9 +232,9 @@ export class MatchService {
           description: e.description,
         }));
 
-      await matchRepository.createMatchEvents(eventsToSave);
+      await this.repos.matches.createMatchEvents(eventsToSave);
 
-      await playerRepository.updateDailyStatsBatch(
+      await this.repos.players.updateDailyStatsBatch(
         result.playerUpdates.map((u) => ({
           id: u.playerId,
           energy: u.energy,
@@ -247,7 +246,7 @@ export class MatchService {
       );
 
       if (ticketRevenue > 0 && match.seasonId) {
-        await financialRepository.addRecord({
+        await this.repos.financial.addRecord({
           teamId: match.homeTeamId,
           seasonId: match.seasonId,
           date: match.date,
@@ -269,7 +268,7 @@ export class MatchService {
 
       if (ticketRevenue > 0) {
         const currentBudget = homeTeam.budget ?? 0;
-        await teamRepository.updateBudget(
+        await this.repos.teams.updateBudget(
           match.homeTeamId!,
           currentBudget + ticketRevenue
         );
@@ -287,7 +286,7 @@ export class MatchService {
       }
 
       const homeTeamRep = homeTeam.reputation || 0;
-      const awayTeam = await teamRepository.findById(match.awayTeamId!);
+      const awayTeam = await this.repos.teams.findById(match.awayTeamId!);
       const awayTeamRep = awayTeam?.reputation || 0;
 
       let homeResult: "win" | "draw" | "loss" = "draw";
@@ -321,25 +320,21 @@ export class MatchService {
 
   private async checkCupProgression(matchId: number): Promise<void> {
     try {
-      const match = await matchRepository.findById(matchId);
+      const match = await this.repos.matches.findById(matchId);
       if (!match || !match.competitionId || !match.seasonId || !match.round)
         return;
 
-      const competition = (await competitionRepository.findAll()).find(
+      const competition = (await this.repos.competitions.findAll()).find(
         (c) => c.id === match.competitionId
       );
 
       if (!competition || competition.type === "league") return;
 
-      const allMatchesInRound = await matchRepository.findByTeamAndSeason(
+      const allMatchesInRound = await this.repos.matches.findByTeamAndSeason(
         0, // Hack para buscar todas se a query suportar ou precisa refatorar repository
         match.seasonId
       );
-      // Nota: findByTeamAndSeason no repo atual busca por time OR time.
-      // Idealmente precisaríamos de um findByCompetitionRound.
-      // Assumindo que a lógica original funcionava, mantemos, mas adicionamos log.
 
-      // Filtragem em memória (não ideal mas preservando lógica original)
       const roundMatches = allMatchesInRound.filter(
         (m) =>
           m.competitionId === match.competitionId && m.round === match.round
@@ -375,7 +370,7 @@ export class MatchService {
         weather: "sunny",
       }));
 
-      await matchRepository.createMany(matchesToSave as any);
+      await this.repos.matches.createMany(matchesToSave as any);
       this.logger.info(
         `Próxima fase da ${competition.name} gerada: ${matchesToSave.length} partidas.`
       );
@@ -392,7 +387,7 @@ export class MatchService {
     homeScore: number,
     awayScore: number
   ): Promise<void> {
-    const homeStanding = await competitionRepository.getStandings(
+    const homeStanding = await this.repos.competitions.getStandings(
       competitionId,
       seasonId
     );
@@ -401,7 +396,7 @@ export class MatchService {
     const homeWin = homeScore > awayScore;
     const draw = homeScore === awayScore;
 
-    await competitionRepository.updateStanding(
+    await this.repos.competitions.updateStanding(
       competitionId,
       seasonId,
       homeTeamId,
@@ -419,7 +414,7 @@ export class MatchService {
     const awayData = homeStanding.find((s) => s.teamId === awayTeamId);
     const awayWin = awayScore > homeScore;
 
-    await competitionRepository.updateStanding(
+    await this.repos.competitions.updateStanding(
       competitionId,
       seasonId,
       awayTeamId,
@@ -452,7 +447,7 @@ export class MatchService {
     results: Array<{ matchId: number; result: MatchResult }>;
   }> {
     this.logger.info(`Simulando partidas do dia: ${date}`);
-    const matches = await matchRepository.findPendingMatchesByDate(date);
+    const matches = await this.repos.matches.findPendingMatchesByDate(date);
 
     const results: Array<{ matchId: number; result: MatchResult }> = [];
 
@@ -470,4 +465,8 @@ export class MatchService {
   }
 }
 
-export const matchService = new MatchService();
+export function createMatchService(repos: IRepositoryContainer): MatchService {
+  return new MatchService(repos);
+}
+
+export const matchService = new MatchService(repositoryContainer);

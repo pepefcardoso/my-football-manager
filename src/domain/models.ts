@@ -95,6 +95,9 @@ export interface Competition {
   type: "league" | "cup" | string;
   priority: number;
   config?: Record<string, any>;
+  window?: string | null;
+  startMonth?: number | null;
+  endMonth?: number | null;
 }
 
 export interface CompetitionStanding {
@@ -135,6 +138,7 @@ export interface Match {
   attendance: number | null;
   ticketRevenue: number | null;
   weather: WeatherCondition | string | null;
+  groupName?: string | null; // Adicionado para compatibilidade e uso em fases de grupo
 }
 
 export interface MatchEvent {

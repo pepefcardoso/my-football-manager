@@ -1,5 +1,5 @@
+import type { Match } from "../domain/models";
 import { RandomEngine } from "../engine/RandomEngine";
-import type { MatchSelect } from "../repositories/MatchRepository";
 
 export interface MatchPair {
   homeTeamId: number;
@@ -209,7 +209,7 @@ export class CompetitionScheduler {
    * @returns IDs dos times classificados ordenados para chaveamento
    */
   static getGroupStageQualifiers(
-    matches: MatchSelect[],
+    matches: Match[],
     groupStructure: Record<string, number[]>,
     qualifiersPerGroup: number = 2
   ): number[] {
@@ -248,7 +248,7 @@ export class CompetitionScheduler {
    * Calcula a classificação completa de todos os grupos
    */
   static calculateGroupStandings(
-    matches: MatchSelect[],
+    matches: Match[],
     groupStructure: Record<string, number[]>
   ): GroupStanding[] {
     const standings: GroupStanding[] = [];
@@ -321,7 +321,7 @@ export class CompetitionScheduler {
    * Assume jogo único. Se houve empate, simula um vencedor (pênaltis técnicos).
    */
   static generateNextRoundPairings(
-    completedMatches: MatchSelect[],
+    completedMatches: Match[],
     nextRoundNumber: number
   ): MatchPair[] {
     const winners: number[] = [];

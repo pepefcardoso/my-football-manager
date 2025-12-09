@@ -1,6 +1,12 @@
 import { eq, and, sql, or, desc } from "drizzle-orm";
-import { competitions, competitionStandings, matches } from "../db/schema";
+import {
+  competitions,
+  competitionStandings,
+  matches,
+  playerCompetitionStats,
+} from "../db/schema";
 import { db } from "../lib/db";
+import type { PlayerCompetitionStats } from "./IRepositories";
 
 export type CompetitionSelect = typeof competitions.$inferSelect;
 export type StandingSelect = typeof competitionStandings.$inferSelect;
@@ -94,6 +100,78 @@ export class CompetitionRepository {
       if (teamScore > oppScore) return "W";
       if (teamScore < oppScore) return "L";
       return "D";
+    });
+  }
+
+  async findPlayerStats(
+    playerId: number,
+    competitionId: number,
+    seasonId: number
+  ): Promise<PlayerCompetitionStats | undefined> {
+    const result = await db
+      .select()
+      .from(playerCompetitionStats)
+      .where(
+        and(
+          eq(playerCompetitionStats.playerId, playerId),
+          eq(playerCompetitionStats.competitionId, competitionId),
+          eq(playerCompetitionStats.seasonId, seasonId)
+        )
+      )
+      .limit(1);
+
+    return result[0] as PlayerCompetitionStats | undefined;
+  }
+
+  async createPlayerStats(
+    data: Partial<PlayerCompetitionStats>
+  ): Promise<void> {
+    await db.insert(playerCompetitionStats).values(data as any);
+  }
+
+  async updatePlayerStats(
+    id: number,
+    data: Partial<PlayerCompetitionStats>
+  ): Promise<void> {
+    await db
+      .update(playerCompetitionStats)
+      .set(data as any)
+      .where(eq(playerCompetitionStats.id, id));
+  }
+
+  async getTopScorers(
+    competitionId: number,
+    seasonId: number,
+    limit: number = 10
+  ): Promise<any[]> {
+    return await db.query.playerCompetitionStats.findMany({
+      where: and(
+        eq(playerCompetitionStats.competitionId, competitionId),
+        eq(playerCompetitionStats.seasonId, seasonId)
+      ),
+      orderBy: (stats, { desc }) => [desc(stats.goals), desc(stats.assists)],
+      limit: limit,
+      with: {
+        // Relações implícitas se configuradas no schema relations
+      },
+    });
+  }
+
+  async getTopGoalkeepers(
+    competitionId: number,
+    seasonId: number,
+    limit: number = 10
+  ): Promise<any[]> {
+    return await db.query.playerCompetitionStats.findMany({
+      where: and(
+        eq(playerCompetitionStats.competitionId, competitionId),
+        eq(playerCompetitionStats.seasonId, seasonId)
+      ),
+      orderBy: (stats, { desc }) => [
+        desc(stats.cleanSheets),
+        desc(stats.saves),
+      ],
+      limit: limit,
     });
   }
 }

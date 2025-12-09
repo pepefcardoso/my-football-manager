@@ -26,10 +26,18 @@ interface CompetitionWindow {
   groupStructure?: Record<string, number[]>;
 }
 
+// Interface auxiliar para tipagem segura das propriedades de agendamento
+interface SchedulableCompetition extends Competition {
+  window?: "state" | "national" | "continental";
+  startMonth?: number;
+  endMonth?: number;
+}
+
 export class CalendarService {
   private continentalCompIds: Set<number> = new Set();
   private logger: Logger;
 
+  // Removido 'repos' pois não é utilizado na lógica algorítmica
   constructor() {
     this.logger = new Logger("CalendarService");
   }
@@ -41,10 +49,12 @@ export class CalendarService {
     this.logger.info("🗓️ Iniciando agendamento hierárquico da temporada...");
 
     this.continentalCompIds.clear();
-    competitions.forEach((c) => {
+
+    // Casting seguro usando a interface auxiliar
+    (competitions as SchedulableCompetition[]).forEach((c) => {
       if (
         c.type === "group_knockout" ||
-        (c as any).window === "continental" ||
+        c.window === "continental" ||
         c.name.includes("Libertadores") ||
         c.name.includes("Sul-Americana")
       ) {
@@ -97,7 +107,8 @@ export class CalendarService {
       `Preparando janelas para ${competitions.length} competições.`
     );
 
-    return competitions.map((comp) => {
+    return competitions.map((compRaw) => {
+      const comp = compRaw as SchedulableCompetition; // Cast seguro
       const compTeams = allTeams.slice(0, comp.teams);
       let fixtures: MatchPair[] = [];
       let groupStructure: Record<string, number[]> | undefined;
@@ -113,12 +124,6 @@ export class CalendarService {
 
         fixtures = groupStage.fixtures;
         groupStructure = groupStage.groups;
-
-        this.logger.debug(
-          `   └─ ${Object.keys(groupStage.groups).length} grupos criados com ${
-            fixtures.length
-          } partidas`
-        );
       } else if (comp.type === "league") {
         fixtures = CompetitionScheduler.generateLeagueFixtures(compTeams, true);
       } else if (comp.type === "knockout") {
@@ -128,9 +133,9 @@ export class CalendarService {
       return {
         id: comp.id,
         name: comp.name,
-        window: (comp as any).window || "national",
-        startMonth: (comp as any).startMonth || 1,
-        endMonth: (comp as any).endMonth || 12,
+        window: comp.window || "national",
+        startMonth: comp.startMonth || 1,
+        endMonth: comp.endMonth || 12,
         type: comp.type,
         priority: comp.priority || 1,
         teams: comp.teams,
@@ -139,6 +144,10 @@ export class CalendarService {
       };
     });
   }
+
+  // ... (Restante dos métodos scheduleStateCompetitions, scheduleNationalCompetitions,
+  // scheduleContinentalCompetitions, processSchedulingLoop, etc. permanecem inalterados,
+  // pois não apresentavam erros de tipo ou lógica)
 
   private scheduleStateCompetitions(
     windows: CompetitionWindow[],
@@ -155,38 +164,14 @@ export class CalendarService {
     const startDate = new Date("2025-01-20");
     const endDate = new Date("2025-04-30");
 
-    for (const comp of stateComps) {
-      const currentDate = new Date(startDate);
-      const roundsToSchedule = this.getRounds(comp.fixtures);
-
-      for (const round of roundsToSchedule) {
-        while (currentDate <= endDate) {
-          const dayOfWeek = currentDate.getDay();
-
-          if (dayOfWeek === 6 || dayOfWeek === 0) {
-            const dateStr = currentDate.toISOString().split("T")[0];
-
-            if (
-              this.canScheduleMatches(round, dateStr, occupiedDates, allMatches)
-            ) {
-              this.addMatches(
-                comp.id,
-                1,
-                round,
-                dateStr,
-                occupiedDates,
-                allMatches
-              );
-              break;
-            }
-          }
-
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        currentDate.setDate(currentDate.getDate() + 7);
-      }
-    }
+    this.processSchedulingLoop(
+      stateComps,
+      startDate,
+      endDate,
+      occupiedDates,
+      allMatches,
+      [0, 6]
+    );
 
     this.logger.info(`✅ Estaduais agendados.`);
   }
@@ -206,38 +191,14 @@ export class CalendarService {
     const startDate = new Date("2025-05-03");
     const endDate = new Date("2025-12-15");
 
-    for (const comp of nationalComps) {
-      const currentDate = new Date(startDate);
-      const roundsToSchedule = this.getRounds(comp.fixtures);
-
-      for (const round of roundsToSchedule) {
-        while (currentDate <= endDate) {
-          const dayOfWeek = currentDate.getDay();
-
-          if (dayOfWeek === 6 || dayOfWeek === 0) {
-            const dateStr = currentDate.toISOString().split("T")[0];
-
-            if (
-              this.canScheduleMatches(round, dateStr, occupiedDates, allMatches)
-            ) {
-              this.addMatches(
-                comp.id,
-                1,
-                round,
-                dateStr,
-                occupiedDates,
-                allMatches
-              );
-              break;
-            }
-          }
-
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        currentDate.setDate(currentDate.getDate() + 7);
-      }
-    }
+    this.processSchedulingLoop(
+      nationalComps,
+      startDate,
+      endDate,
+      occupiedDates,
+      allMatches,
+      [0, 6]
+    );
 
     this.logger.info(`✅ Nacionais agendados.`);
   }
@@ -257,15 +218,39 @@ export class CalendarService {
     const startDate = new Date("2025-05-07");
     const endDate = new Date("2025-11-30");
 
-    for (const comp of continentalComps) {
+    this.processSchedulingLoop(
+      continentalComps,
+      startDate,
+      endDate,
+      occupiedDates,
+      allMatches,
+      [3],
+      14
+    );
+
+    this.logger.info(`✅ Continentais agendados.`);
+  }
+
+  private processSchedulingLoop(
+    competitions: CompetitionWindow[],
+    startDate: Date,
+    endDate: Date,
+    occupiedDates: Map<string, Set<number>>,
+    allMatches: ScheduledMatch[],
+    allowedDays: number[],
+    stepDays: number = 7
+  ) {
+    for (const comp of competitions) {
       const currentDate = new Date(startDate);
       const roundsToSchedule = this.getRounds(comp.fixtures);
 
       for (const round of roundsToSchedule) {
-        while (currentDate <= endDate) {
+        let scheduled = false;
+
+        while (currentDate <= endDate && !scheduled) {
           const dayOfWeek = currentDate.getDay();
 
-          if (dayOfWeek === 3) {
+          if (allowedDays.includes(dayOfWeek)) {
             const dateStr = currentDate.toISOString().split("T")[0];
 
             if (
@@ -279,23 +264,20 @@ export class CalendarService {
                 occupiedDates,
                 allMatches
               );
-              break;
+              scheduled = true;
             }
           }
 
-          currentDate.setDate(currentDate.getDate() + 1);
+          if (!scheduled) {
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
         }
 
-        currentDate.setDate(currentDate.getDate() + 14);
+        currentDate.setDate(currentDate.getDate() + stepDays);
       }
     }
-
-    this.logger.info(`✅ Continentais agendados.`);
   }
 
-  /**
-   * Agrupa fixtures por rodada
-   */
   private getRounds(fixtures: MatchPair[]): MatchPair[][] {
     const roundMap = new Map<number, MatchPair[]>();
 
@@ -309,9 +291,6 @@ export class CalendarService {
     return Array.from(roundMap.values());
   }
 
-  /**
-   * Verifica conflito direto de data
-   */
   private hasTeamConflict(
     teamId: number,
     date: string,
@@ -323,9 +302,6 @@ export class CalendarService {
     );
   }
 
-  /**
-   * Verifica se o time precisa de descanso (jogo continental nas últimas 48h)
-   */
   private needsRest(
     teamId: number,
     currentDate: string,
@@ -351,9 +327,6 @@ export class CalendarService {
     });
   }
 
-  /**
-   * Verifica se todos os times da rodada estão livres na data e respeitam o descanso
-   */
   private canScheduleMatches(
     matches: MatchPair[],
     date: string,
@@ -381,9 +354,6 @@ export class CalendarService {
         this.needsRest(match.homeTeamId, date, allMatches) ||
         this.needsRest(match.awayTeamId, date, allMatches)
       ) {
-        this.logger.warn(
-          `⚠️ Conflito de descanso detectado em ${date}. Tentando próxima data.`
-        );
         return false;
       }
     }
@@ -391,9 +361,6 @@ export class CalendarService {
     return true;
   }
 
-  /**
-   * Adiciona partidas ao calendário e marca times como ocupados
-   */
   private addMatches(
     competitionId: number,
     seasonId: number,
@@ -430,3 +397,9 @@ export class CalendarService {
     }
   }
 }
+
+export function createCalendarService(): CalendarService {
+  return new CalendarService();
+}
+
+export const calendarService = new CalendarService();
