@@ -68,7 +68,6 @@ export class ScoutingRepository {
    * Busca relatórios ativos (que ainda não chegaram a 100%) para simulação diária
    */
   async findActiveReports(): Promise<ScoutingReportSelect[]> {
-    // Filtrar por progress < 100 e data recente
     return await db.select().from(scoutingReports);
   }
 }

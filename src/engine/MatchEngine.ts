@@ -7,6 +7,7 @@ import type {
   TeamStrength,
 } from "../domain/types";
 import { GameBalance } from "./GameBalanceConfig";
+import { RandomEngine } from "./RandomEngine";
 import { TeamStrengthCalculator } from "./TeamStrengthCalculator";
 import type { IMatchState } from "./match/states/IMatchState";
 import { NotStartedState } from "./match/states/NotStartedState";
@@ -45,12 +46,15 @@ export class MatchEngine {
   };
 
   public readonly config: MatchConfig;
+  public readonly rng: RandomEngine;
   private homeStrength: TeamStrength;
   private awayStrength: TeamStrength;
   private weatherMultiplier: number = 1.0;
 
-  constructor(config: MatchConfig) {
+  constructor(config: MatchConfig, seed?: number) {
     this.config = config;
+    const matchSeed = seed || Date.now();
+    this.rng = new RandomEngine(matchSeed);
     this.currentState = new NotStartedState(this);
 
     this.homeStrength = TeamStrengthCalculator.calculate({

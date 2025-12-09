@@ -1,44 +1,64 @@
 export class RandomEngine {
-  private static seed: number = Date.now();
+  private static defaultInstance = new RandomEngine(Date.now());
 
-  static setSeed(seed: number) {
+  private seed: number;
+
+  constructor(seed: number) {
     this.seed = seed;
   }
 
-  private static random(): number {
+  public setSeed(seed: number) {
+    this.seed = seed;
+  }
+
+  private next(): number {
     this.seed = (this.seed * 9301 + 49297) % 233280;
     return this.seed / 233280;
   }
 
-  static getInt(min: number, max: number): number {
-    return Math.floor(this.random() * (max - min + 1)) + min;
+  public getInt(min: number, max: number): number {
+    return Math.floor(this.next() * (max - min + 1)) + min;
   }
 
-  static chance(percentage: number): boolean {
-    return this.random() * 100 < percentage;
+  public chance(percentage: number): boolean {
+    return this.next() * 100 < percentage;
   }
 
-  static getNormalDistribution(mean: number, stdDev: number): number {
-    let u = 0,
-      v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
-    const num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-    return Math.round(num * stdDev + mean);
-  }
-
-  static pickOne<T>(items: T[]): T {
+  public pickOne<T>(items: T[]): T | null {
+    if (items.length === 0) return null;
     return items[this.getInt(0, items.length - 1)];
   }
 
-  static pickWeighted<T>(items: T[], weights: number[]): T {
+  public pickWeighted<T>(items: T[], weights: number[]): T {
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-    let random = this.random() * totalWeight;
+    let randomVal = this.next() * totalWeight;
 
     for (let i = 0; i < items.length; i++) {
-      if (random < weights[i]) return items[i];
-      random -= weights[i];
+      if (randomVal < weights[i]) return items[i];
+      randomVal -= weights[i];
     }
     return items[0];
+  }
+
+  static setSeed(seed: number) {
+    this.defaultInstance.setSeed(seed);
+  }
+
+  static getInt(min: number, max: number): number {
+    return this.defaultInstance.getInt(min, max);
+  }
+
+  static chance(percentage: number): boolean {
+    return this.defaultInstance.chance(percentage);
+  }
+
+  static pickOne<T>(items: T[]): T {
+    const result = this.defaultInstance.pickOne(items);
+    if (result === null && items.length > 0) return items[0];
+    return result as T;
+  }
+
+  static pickWeighted<T>(items: T[], weights: number[]): T {
+    return this.defaultInstance.pickWeighted(items, weights);
   }
 }

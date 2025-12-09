@@ -1,4 +1,3 @@
-// src/engine/match/states/FinishedState.ts
 import { MatchEngine } from "../../MatchEngine";
 import { MatchState } from "../../../domain/enums";
 import type { IMatchState } from "./IMatchState";
@@ -12,7 +11,6 @@ const logger = new Logger("FinishedState");
  */
 export class FinishedState implements IMatchState {
   constructor(private readonly _context: MatchEngine) {
-    // Contexto mantido como readonly para prevenir modificações acidentais
   }
 
   getStateEnum(): MatchState {

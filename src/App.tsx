@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"; // Adicione useCallback
+import { useEffect, useState, useCallback } from "react";
 import { useGameStore } from "./store/useGameStore";
 import MainLayout from "./components/layout/MainLayout";
 import Sidebar from "./components/layout/Sidebar";

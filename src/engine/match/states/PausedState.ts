@@ -1,4 +1,3 @@
-// src/engine/match/states/PausedState.ts
 import { MatchEngine } from "../../MatchEngine";
 import { MatchState } from "../../../domain/enums";
 import { PlayingState } from "./PlayingState";

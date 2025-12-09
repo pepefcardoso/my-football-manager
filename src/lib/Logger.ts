@@ -1,5 +1,3 @@
-// src/lib/Logger.ts
-
 /**
  * Define a severidade do log.
  * Útil para filtrar o que deve ser exibido em produção vs desenvolvimento.

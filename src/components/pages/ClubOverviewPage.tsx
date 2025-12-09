@@ -3,7 +3,7 @@ import TrainingControl from "../features/squad/TrainingControl";
 import type { GameState, Team } from "../../domain/models";
 import StatCard from "../common/StatCard";
 import { Logger } from "../../lib/Logger";
-import { useGameStore } from "../../store/useGameStore"; // Para atualizar data global
+import { useGameStore } from "../../store/useGameStore";
 
 const logger = new Logger("ClubOverviewPage");
 

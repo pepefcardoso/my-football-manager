@@ -56,11 +56,13 @@ export class PlayingState implements IMatchState {
 
     const attackingTeamIsHome = this.calculatePossession();
 
-    if (RandomEngine.chance(GameBalance.MATCH.ATTACK_CHANCE_PER_MINUTE)) {
+    if (this.context.rng.chance(GameBalance.MATCH.ATTACK_CHANCE_PER_MINUTE)) {
       this.processAttackPhase(attackingTeamIsHome);
     }
 
-    if (RandomEngine.chance(GameBalance.MATCH.RANDOM_EVENT_CHANCE_PER_MINUTE)) {
+    if (
+      this.context.rng.chance(GameBalance.MATCH.RANDOM_EVENT_CHANCE_PER_MINUTE)
+    ) {
       this.processRandomEvent(attackingTeamIsHome);
     }
   }
@@ -98,10 +100,8 @@ export class PlayingState implements IMatchState {
     const total = homePower + awayPower;
     const homeChance = (homePower / total) * 100;
 
-    const isHome = RandomEngine.chance(homeChance);
-
+    const isHome = this.context.rng.chance(homeChance);
     this.context.updatePossession(isHome);
-
     return isHome;
   }
 
@@ -152,11 +152,11 @@ export class PlayingState implements IMatchState {
         isHome: attackingTeam.isHome,
       },
       { strength: defendingTeam.strength, players: defendingTeam.players },
-      this.context.getWeatherMultiplier()
+      this.context.getWeatherMultiplier(),
+      this.context.rng
     );
 
-    // Chance de Escanteio
-    if (RandomEngine.chance(GameBalance.MATCH.CORNER_CHANCE)) {
+    if (this.context.rng.chance(GameBalance.MATCH.CORNER_CHANCE)) {
       this.handleCorner(attackingTeam.data, attackingTeamIsHome);
       const cornerResult = simulator.simulateCornerKick();
       this.handleAttackOutcome(
@@ -168,7 +168,6 @@ export class PlayingState implements IMatchState {
       return;
     }
 
-    // Ataque Normal
     const result = simulator.simulate();
     this.handleAttackOutcome(
       result,
@@ -205,7 +204,7 @@ export class PlayingState implements IMatchState {
    * - offside: Registra impedimento
    */
   private handleAttackOutcome(
-    result: any, // AttackResult
+    result: any,
     attacker: { data: Team },
     defender: { data: Team },
     attackingTeamIsHome: boolean
@@ -213,7 +212,6 @@ export class PlayingState implements IMatchState {
     const shooter = result.shooter;
     const keeper = result.goalkeeper;
 
-    // Atualiza estatísticas de chute
     this.context.updateShots(
       attackingTeamIsHome,
       result.totalShots,
@@ -229,11 +227,9 @@ export class PlayingState implements IMatchState {
 
     switch (result.outcome) {
       case "goal": {
-        // Verifica VAR antes de confirmar o gol
         if (this.processVAR(attacker.data.id, shooter!)) {
           this.context.addScore(attackingTeamIsHome);
 
-          // Tenta gerar assistência
           const assist = this.getLastPassProvider(
             attackingTeamIsHome,
             shooter!
@@ -397,7 +393,10 @@ export class PlayingState implements IMatchState {
       ? this.context.config.homePlayers
       : this.context.config.awayPlayers;
 
-    const event = MatchEventGenerator.tryGenerateRandomEvent({ team, players });
+    const event = MatchEventGenerator.tryGenerateRandomEvent(
+      { team, players },
+      this.context.rng
+    );
 
     if (!event) return;
 

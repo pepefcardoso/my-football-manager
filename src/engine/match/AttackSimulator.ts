@@ -39,22 +39,14 @@ export interface AttackResult {
  *
  * Responsabilidade: Decidir o resultado de um ataque (gol, defesa, chute fora, etc).
  * Princípio: Open/Closed - pode ser estendido para diferentes tipos de ataque sem modificar.
- *
- * Uso:
- * ```ts
- * const simulator = new AttackSimulator(context);
- * const result = simulator.simulate();
- *
- * if (result.outcome === 'goal') {
- *   // Atualizar placar
- * }
- * ```
  */
 export class AttackSimulator {
   private context: AttackContext;
+  private rng: RandomEngine;
 
-  constructor(context: AttackContext) {
+  constructor(context: AttackContext, rng: RandomEngine) {
     this.context = context;
+    this.rng = rng;
   }
 
   /**
@@ -70,7 +62,6 @@ export class AttackSimulator {
       wasBlocked: false,
     };
 
-    // Verifica se vai gerar um chute
     const shotGenerated = this.shouldGenerateShot();
     if (!shotGenerated) {
       result.outcome = "miss";
@@ -79,14 +70,15 @@ export class AttackSimulator {
 
     result.totalShots = 1;
 
-    // Seleciona o chutador
     const shooter = this.selectShooter();
+    if (!shooter) {
+      result.outcome = "miss";
+      return result;
+    }
     result.shooter = shooter;
 
-    // Calcula qualidade do chute
     const shotQuality = this.calculateShotQuality(shooter);
 
-    // Verifica se o chute vai no gol
     const shotOnTarget = this.isShotOnTarget(shotQuality);
 
     if (!shotOnTarget) {
@@ -96,18 +88,15 @@ export class AttackSimulator {
 
     result.shotsOnTarget = 1;
 
-    // Seleciona o goleiro
     const goalkeeper = this.selectGoalkeeper();
     result.goalkeeper = goalkeeper;
 
-    // Verifica impedimento antes do gol
     if (this.checkOffside()) {
       result.outcome = "offside";
       result.wasOffside = true;
       return result;
     }
 
-    // Calcula chance de gol vs defesa
     const goalScored = this.resolveGoalAttempt(shooter, goalkeeper);
 
     if (goalScored) {
@@ -123,29 +112,28 @@ export class AttackSimulator {
    * Decide se o ataque vai gerar um chute
    */
   private shouldGenerateShot(): boolean {
-    return RandomEngine.chance(GameBalance.MATCH.SHOT_CHANCE_IN_ATTACK);
+    return this.rng.chance(GameBalance.MATCH.SHOT_CHANCE_IN_ATTACK);
   }
 
   /**
    * Seleciona o jogador que vai chutar (priorizando atacantes)
    */
-  private selectShooter(): Player {
+  private selectShooter(): Player | undefined {
     const { attackingPlayers } = this.context;
 
-    // Prioriza atacantes (70% de chance)
+    if (attackingPlayers.length === 0) return undefined;
+
     const forwards = attackingPlayers.filter((p) => p.position === "FW");
-    if (forwards.length > 0 && RandomEngine.chance(70)) {
-      return RandomEngine.pickOne(forwards);
+    if (forwards.length > 0 && this.rng.chance(70)) {
+      return this.rng.pickOne(forwards) || undefined;
     }
 
-    // Depois meias (50% de chance)
     const midfielders = attackingPlayers.filter((p) => p.position === "MF");
-    if (midfielders.length > 0 && RandomEngine.chance(50)) {
-      return RandomEngine.pickOne(midfielders);
+    if (midfielders.length > 0 && this.rng.chance(50)) {
+      return this.rng.pickOne(midfielders) || undefined;
     }
 
-    // Qualquer jogador em último caso
-    return RandomEngine.pickOne(attackingPlayers);
+    return this.rng.pickOne(attackingPlayers) || undefined;
   }
 
   /**
@@ -154,7 +142,6 @@ export class AttackSimulator {
   private calculateShotQuality(shooter: Player): number {
     const { shooting = 50, finishing = 50, overall = 50 } = shooter;
 
-    // Média ponderada: 40% shooting, 40% finishing, 20% overall
     const quality = shooting * 0.4 + finishing * 0.4 + overall * 0.2;
 
     return Math.round(quality);
@@ -166,12 +153,11 @@ export class AttackSimulator {
   private isShotOnTarget(shotQuality: number): boolean {
     const { weatherMultiplier } = this.context;
 
-    // Chance base * qualidade do chute * clima
     const baseAccuracy = GameBalance.MATCH.SHOT_ACCURACY_BASE;
     const accuracyChance =
       baseAccuracy * (shotQuality / 100) * weatherMultiplier * 100;
 
-    return RandomEngine.chance(accuracyChance);
+    return this.rng.chance(accuracyChance);
   }
 
   /**
@@ -186,7 +172,7 @@ export class AttackSimulator {
    * Verifica se há impedimento (15% de chance quando há gol)
    */
   private checkOffside(): boolean {
-    return RandomEngine.chance(GameBalance.MATCH.OFFSIDE_IN_GOAL_PROBABILITY);
+    return this.rng.chance(GameBalance.MATCH.OFFSIDE_IN_GOAL_PROBABILITY);
   }
 
   /**
@@ -197,18 +183,15 @@ export class AttackSimulator {
     const { attackingStrength, defendingStrength, weatherMultiplier } =
       this.context;
 
-    // Calcula força efetiva do ataque
     const shooterBonus = (shooter.shooting + shooter.finishing) / 200;
     const attackPower =
       attackingStrength.attack *
       attackingStrength.fitnessMultiplier *
       shooterBonus;
 
-    // Calcula força efetiva da defesa
     const defensePower =
       defendingStrength.defense * defendingStrength.fitnessMultiplier;
 
-    // Calcula chance de defesa do goleiro
     let saveChance = GameBalance.MATCH.SAVE_CHANCE_BASE;
 
     if (goalkeeper) {
@@ -217,16 +200,13 @@ export class AttackSimulator {
       saveChance = goalkeeperQuality * 100;
     }
 
-    // Chance final de gol = força do ataque vs defesa, ajustada pelo clima
     const totalStrength = attackPower + defensePower;
     const goalChance = (attackPower / totalStrength) * 100 * weatherMultiplier;
 
-    // Primeiro verifica se ultrapassa a defesa
-    const beatDefense = RandomEngine.chance(goalChance);
+    const beatDefense = this.rng.chance(goalChance);
     if (!beatDefense) return false;
 
-    // Depois verifica se o goleiro defende
-    const beatGoalkeeper = !RandomEngine.chance(saveChance);
+    const beatGoalkeeper = !this.rng.chance(saveChance);
 
     return beatGoalkeeper;
   }
@@ -243,16 +223,19 @@ export class AttackSimulator {
       wasBlocked: false,
     };
 
-    // Escanteios têm menor chance de gol (~10%)
     const cornerGoalChance = 10;
 
-    if (RandomEngine.chance(cornerGoalChance)) {
-      result.outcome = "goal";
-      result.shooter = this.selectShooter();
-      result.shotsOnTarget = 1;
+    if (this.rng.chance(cornerGoalChance)) {
+      const shooter = this.selectShooter();
+      if (shooter) {
+        result.outcome = "goal";
+        result.shooter = shooter;
+        result.shotsOnTarget = 1;
+      } else {
+        result.outcome = "miss";
+      }
     } else {
-      // 50% de chance de ser chute no gol (mas defendido)
-      if (RandomEngine.chance(50)) {
+      if (this.rng.chance(50)) {
         result.outcome = "save";
         result.shotsOnTarget = 1;
       } else {
@@ -279,18 +262,16 @@ export class AttackSimulator {
     const goalkeeper = this.selectGoalkeeper();
     result.goalkeeper = goalkeeper;
 
-    // Pênaltis têm alta chance de conversão (~75-85%)
     const shooterSkill = (shooter.finishing + shooter.shooting) / 200;
     const baseChance = 75;
     const conversionChance = baseChance + shooterSkill * 10;
 
-    const converted = RandomEngine.chance(conversionChance);
+    const converted = this.rng.chance(conversionChance);
 
     if (converted) {
       result.outcome = "goal";
     } else {
-      // 50/50 entre defesa ou chute fora
-      result.outcome = RandomEngine.chance(50) ? "save" : "miss";
+      result.outcome = this.rng.chance(50) ? "save" : "miss";
     }
 
     return result;
@@ -309,7 +290,8 @@ export class AttackSimulator {
       strength: TeamStrength;
       players: Player[];
     },
-    weather: number = 1.0
+    weather: number = 1.0,
+    rng: RandomEngine
   ): AttackSimulator {
     const context: AttackContext = {
       attackingStrength: attackingTeam.strength,
@@ -320,6 +302,6 @@ export class AttackSimulator {
       isHomeTeam: attackingTeam.isHome,
     };
 
-    return new AttackSimulator(context);
+    return new AttackSimulator(context, rng);
   }
 }
