@@ -1,14 +1,7 @@
 import { teamRepository } from "../repositories/TeamRepository";
 import { financialRepository } from "../repositories/FinancialRepository";
 import { FinancialCategory } from "../domain/enums";
-
-export const INFRASTRUCTURE_COSTS = {
-  SEAT_EXPANSION_BLOCK: 1000,
-  SEAT_COST_PER_UNIT: 500,
-  QUALITY_UPGRADE_BLOCK: 5,
-  QUALITY_COST_BASE: 200000,
-  MAINTENANCE_COST_PER_SEAT: 2,
-};
+import { InfrastructureCosts } from "./config/ServiceConstants";
 
 export class InfrastructureService {
   /**
@@ -19,8 +12,9 @@ export class InfrastructureService {
     stadiumQuality: number
   ): number {
     const seatMaintenance =
-      stadiumCapacity * INFRASTRUCTURE_COSTS.MAINTENANCE_COST_PER_SEAT;
-    const qualityUpkeep = stadiumQuality * 1000;
+      stadiumCapacity * InfrastructureCosts.MAINTENANCE_COST_PER_SEAT;
+    const qualityUpkeep =
+      stadiumQuality * InfrastructureCosts.MAINTENANCE_QUALITY_MULTIPLIER;
     return Math.round(seatMaintenance + qualityUpkeep);
   }
 
@@ -35,15 +29,15 @@ export class InfrastructureService {
     if (!team) return { success: false, message: "Clube não encontrado." };
 
     const cost =
-      INFRASTRUCTURE_COSTS.SEAT_EXPANSION_BLOCK *
-      INFRASTRUCTURE_COSTS.SEAT_COST_PER_UNIT;
+      InfrastructureCosts.SEAT_EXPANSION_BLOCK *
+      InfrastructureCosts.SEAT_COST_PER_UNIT;
 
     if ((team.budget || 0) < cost) {
       return { success: false, message: "Saldo insuficiente para expansão." };
     }
 
     const newCapacity =
-      (team.stadiumCapacity || 0) + INFRASTRUCTURE_COSTS.SEAT_EXPANSION_BLOCK;
+      (team.stadiumCapacity || 0) + InfrastructureCosts.SEAT_EXPANSION_BLOCK;
     const newBudget = (team.budget || 0) - cost;
 
     await teamRepository.update(teamId, {
@@ -58,7 +52,7 @@ export class InfrastructureService {
       type: "expense",
       category: FinancialCategory.INFRASTRUCTURE,
       amount: cost,
-      description: `Expansão do Estádio (+${INFRASTRUCTURE_COSTS.SEAT_EXPANSION_BLOCK} lugares)`,
+      description: `Expansão do Estádio (+${InfrastructureCosts.SEAT_EXPANSION_BLOCK} lugares)`,
     });
 
     return { success: true, message: "Expansão concluída com sucesso!" };
@@ -79,12 +73,12 @@ export class InfrastructureService {
         ? team.trainingCenterQuality
         : team.youthAcademyQuality;
 
-    if ((currentQuality || 0) >= 100) {
+    if ((currentQuality || 0) >= InfrastructureCosts.MAX_QUALITY) {
       return { success: false, message: "Instalação já está no nível máximo." };
     }
 
     const cost = Math.round(
-      INFRASTRUCTURE_COSTS.QUALITY_COST_BASE * (1 + (currentQuality || 0) / 50)
+      InfrastructureCosts.QUALITY_COST_BASE * (1 + (currentQuality || 0) / 50)
     );
 
     if ((team.budget || 0) < cost) {
@@ -92,8 +86,8 @@ export class InfrastructureService {
     }
 
     const newQuality = Math.min(
-      100,
-      (currentQuality || 0) + INFRASTRUCTURE_COSTS.QUALITY_UPGRADE_BLOCK
+      InfrastructureCosts.MAX_QUALITY,
+      (currentQuality || 0) + InfrastructureCosts.QUALITY_UPGRADE_BLOCK
     );
     const newBudget = (team.budget || 0) - cost;
 

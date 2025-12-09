@@ -7,6 +7,11 @@ import { competitionRepository } from "../repositories/CompetitionRepository";
 import { seasonRepository } from "../repositories/SeasonRepository";
 import { infrastructureService } from "./InfrastructureService";
 import { Logger } from "../lib/Logger";
+import {
+  FinancialThresholds,
+  PenaltyWeights,
+  MatchRevenueConfig,
+} from "./config/ServiceConstants";
 
 const logger = new Logger("FinanceService");
 
@@ -23,18 +28,23 @@ export class FinanceService {
     stadiumCapacity: number,
     fanSatisfaction: number,
     matchImportance: number = 1.0,
-    ticketPrice: number = 50
+    ticketPrice: number = MatchRevenueConfig.BASE_TICKET_PRICE
   ): { revenue: number; attendance: number } {
     const satisfactionMultiplier = Math.max(
-      0.3,
-      Math.min(1.0, fanSatisfaction / 100)
+      MatchRevenueConfig.MIN_SATISFACTION_MULTIPLIER,
+      Math.min(
+        MatchRevenueConfig.MAX_SATISFACTION_MULTIPLIER,
+        fanSatisfaction / 100
+      )
     );
 
     const baseAttendance = stadiumCapacity * satisfactionMultiplier;
-
     const expectedAttendance = baseAttendance * matchImportance;
 
-    const randomFactor = 0.95 + Math.random() * 0.1;
+    const randomFactor =
+      MatchRevenueConfig.ATTENDANCE_RANDOM_FACTOR_BASE +
+      Math.random() * MatchRevenueConfig.ATTENDANCE_RANDOM_VARIANCE;
+
     const actualAttendance = Math.round(
       Math.min(stadiumCapacity, expectedAttendance * randomFactor)
     );
@@ -75,10 +85,11 @@ export class FinanceService {
         throw new Error(`Time ${teamId} não encontrado`);
       }
 
-      const infraMaintenance = infrastructureService.calculateMonthlyMaintenance(
-        team.stadiumCapacity || 10000,
-        team.stadiumQuality || 50
-      );
+      const infraMaintenance =
+        infrastructureService.calculateMonthlyMaintenance(
+          team.stadiumCapacity || 10000,
+          team.stadiumQuality || 50
+        );
 
       if (infraMaintenance > 0) {
         await financialRepository.addRecord({
@@ -88,7 +99,7 @@ export class FinanceService {
           type: "expense",
           category: FinancialCategory.STADIUM_MAINTENANCE,
           amount: infraMaintenance,
-          description: `Manutenção de Estádio e Instalações`
+          description: `Manutenção de Estádio e Instalações`,
         });
       }
 
@@ -235,16 +246,19 @@ export class FinanceService {
       if (currentBudget < 0) {
         const debtAmount = Math.abs(currentBudget);
 
-        if (debtAmount > 5000000) {
+        if (debtAmount > FinancialThresholds.CRITICAL_DEBT) {
           severity = "critical";
-        } else if (debtAmount > 1000000) {
+        } else if (debtAmount > FinancialThresholds.WARNING_DEBT) {
           severity = "warning";
         } else {
           severity = "warning";
         }
 
         const players = await playerRepository.findByTeamId(teamId);
-        const moralPenalty = severity === "critical" ? -15 : -10;
+        const moralPenalty =
+          severity === "critical"
+            ? PenaltyWeights.MORAL_CRITICAL
+            : PenaltyWeights.MORAL_WARNING;
 
         const playerUpdates = players.map((p) => ({
           id: p.id,
@@ -267,7 +281,11 @@ export class FinanceService {
           "Transfer Ban ativado - Contratações bloqueadas até regularização financeira"
         );
 
-        const fanPenalty = severity === "critical" ? -15 : -10;
+        const fanPenalty =
+          severity === "critical"
+            ? PenaltyWeights.SATISFACTION_PENALTY_CRITICAL
+            : PenaltyWeights.SATISFACTION_PENALTY_WARNING;
+
         const newFanSatisfaction = Math.max(
           0,
           (team.fanSatisfaction ?? 50) + fanPenalty
@@ -296,7 +314,7 @@ export class FinanceService {
               const teamStanding = standings.find((s) => s.teamId === teamId);
 
               if (teamStanding && (teamStanding.points ?? 0) > 0) {
-                const pointsPenalty = 3;
+                const pointsPenalty = PenaltyWeights.POINTS_DEDUCTION;
 
                 await competitionRepository.updateStanding(
                   mainComp.id,
@@ -370,13 +388,15 @@ export class FinanceService {
     fine: number;
     description: string;
   } {
-    const fine = Math.round(Math.abs(debtAmount) * 0.05);
+    const fine = Math.round(
+      Math.abs(debtAmount) * PenaltyWeights.FINE_PERCENTAGE
+    );
 
     return {
       fine,
-      description: `Multa por má gestão financeira (5% da dívida: €${debtAmount.toLocaleString(
-        "pt-PT"
-      )})`,
+      description: `Multa por má gestão financeira (${
+        PenaltyWeights.FINE_PERCENTAGE * 100
+      }% da dívida: €${debtAmount.toLocaleString("pt-PT")})`,
     };
   }
 
