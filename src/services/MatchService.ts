@@ -3,19 +3,27 @@ import { FinancialCategory } from "../domain/enums";
 import { MatchEngine } from "../engine/MatchEngine";
 import type { MatchConfig, MatchResult } from "../domain/types";
 import { FinanceService } from "./FinanceService";
-import { marketingService } from "./MarketingService";
+import { MarketingService } from "./MarketingService";
 import { Logger } from "../lib/Logger";
 import { CompetitionScheduler } from "./CompetitionScheduler";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { repositoryContainer } from "../repositories/RepositoryContainer";
+import { StatsService } from "./StatsService";
 
 export class MatchService {
   private engines: Map<number, MatchEngine> = new Map();
   private logger: Logger;
   private repos: IRepositoryContainer;
+  private marketingService: MarketingService;
+  private statsService: StatsService;
 
-  constructor(repositories: IRepositoryContainer) {
+  constructor(
+    repositories: IRepositoryContainer,
+    marketingService: MarketingService,
+    statsService: StatsService
+  ) {
     this.repos = repositories;
+    this.marketingService = marketingService;
+    this.statsService = statsService;
     this.logger = new Logger("MatchService");
   }
 
@@ -283,6 +291,13 @@ export class MatchService {
           result.homeScore,
           result.awayScore
         );
+
+        await this.statsService.processMatchStats(
+          matchId,
+          match.competitionId,
+          match.seasonId,
+          result
+        );
       }
 
       const homeTeamRep = homeTeam.reputation || 0;
@@ -293,7 +308,7 @@ export class MatchService {
       if (result.homeScore > result.awayScore) homeResult = "win";
       else if (result.homeScore < result.awayScore) homeResult = "loss";
 
-      await marketingService.updateFanSatisfactionAfterMatch(
+      await this.marketingService.updateFanSatisfactionAfterMatch(
         match.homeTeamId!,
         homeResult,
         true,
@@ -304,7 +319,7 @@ export class MatchService {
       if (result.awayScore > result.homeScore) awayResult = "win";
       else if (result.awayScore < result.homeScore) awayResult = "loss";
 
-      await marketingService.updateFanSatisfactionAfterMatch(
+      await this.marketingService.updateFanSatisfactionAfterMatch(
         match.awayTeamId!,
         awayResult,
         false,
@@ -446,7 +461,7 @@ export class MatchService {
     matchesPlayed: number;
     results: Array<{ matchId: number; result: MatchResult }>;
   }> {
-    this.logger.info(`Simulando partidas do dia: ${date}`);
+    this.logger.info(`Simulando partida do dia: ${date}`);
     const matches = await this.repos.matches.findPendingMatchesByDate(date);
 
     const results: Array<{ matchId: number; result: MatchResult }> = [];
@@ -464,9 +479,3 @@ export class MatchService {
     };
   }
 }
-
-export function createMatchService(repos: IRepositoryContainer): MatchService {
-  return new MatchService(repos);
-}
-
-export const matchService = new MatchService(repositoryContainer);

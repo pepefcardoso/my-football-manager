@@ -1,7 +1,6 @@
 import { CalendarService } from "./CalendarService";
 import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export interface SeasonSummary {
   seasonYear: number;
@@ -15,9 +14,12 @@ export class SeasonService {
   private logger: Logger;
   private repos: IRepositoryContainer;
 
-  constructor(repositories: IRepositoryContainer) {
+  constructor(
+    repositories: IRepositoryContainer,
+    calendarService: CalendarService
+  ) {
     this.repos = repositories;
-    this.calendarService = new CalendarService(repositories);
+    this.calendarService = calendarService;
     this.logger = new Logger("SeasonService");
   }
 
@@ -161,11 +163,3 @@ export class SeasonService {
     }
   }
 }
-
-export function createSeasonService(
-  repos: IRepositoryContainer
-): SeasonService {
-  return new SeasonService(repos);
-}
-
-export const seasonService = new SeasonService(repositoryContainer);

@@ -1,23 +1,28 @@
 import { FinancialCategory } from "../domain/enums";
 import { ContractService } from "./ContractService";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { repositoryContainer } from "../repositories/RepositoryContainer";
-import { infrastructureService } from "./InfrastructureService"; // TODO REFACTOR
 import { Logger } from "../lib/Logger";
 import {
   FinancialThresholds,
   PenaltyWeights,
   MatchRevenueConfig,
 } from "./config/ServiceConstants";
+import type { InfrastructureService } from "./InfrastructureService";
 
 export class FinanceService {
   private logger: Logger;
   private repos: IRepositoryContainer;
   private contractService: ContractService;
+  private infraService: InfrastructureService;
 
-  constructor(repositories: IRepositoryContainer) {
+  constructor(
+    repositories: IRepositoryContainer,
+    contractService: ContractService,
+    infraService: InfrastructureService
+  ) {
     this.repos = repositories;
-    this.contractService = new ContractService(repositories);
+    this.contractService = contractService;
+    this.infraService = infraService;
     this.logger = new Logger("FinanceService");
   }
 
@@ -96,11 +101,10 @@ export class FinanceService {
         throw new Error(`Time ${teamId} não encontrado`);
       }
 
-      const infraMaintenance =
-        infrastructureService.calculateMonthlyMaintenance(
-          team.stadiumCapacity || 10000,
-          team.stadiumQuality || 50
-        );
+      const infraMaintenance = this.infraService.calculateMonthlyMaintenance(
+        team.stadiumCapacity || 10000,
+        team.stadiumQuality || 50
+      );
 
       if (infraMaintenance > 0) {
         await this.repos.financial.addRecord({
@@ -417,14 +421,3 @@ export class FinanceService {
     return await this.repos.financial.findByTeamAndSeason(teamId, seasonId);
   }
 }
-
-/**
- * Factory e Exportação da Instância Global (Singleton)
- */
-export function createFinanceService(
-  repos: IRepositoryContainer
-): FinanceService {
-  return new FinanceService(repos);
-}
-
-export const financeService = new FinanceService(repositoryContainer);
