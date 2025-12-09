@@ -1,5 +1,5 @@
 import { MatchEventType, MatchState } from "../domain/enums";
-import type { Player } from "../domain/models";
+import type { Player, Team } from "../domain/models";
 import type {
   MatchConfig,
   MatchEventData,
@@ -9,12 +9,17 @@ import type {
 import { GameBalance } from "./GameBalanceConfig";
 import { RandomEngine } from "./RandomEngine";
 import { TeamStrengthCalculator } from "./TeamStrengthCalculator";
+import { MatchNarrator, type NarratorContext } from "./match/MatchNarrator";
+import { MatchEventGenerator } from "./match/MatchEventGenerator";
+import { AttackSimulator, type AttackResult } from "./match/AttackSimulator";
 
 export class MatchEngine {
   private currentMinute: number = 0;
   private state: MatchState = MatchState.NOT_STARTED;
   private homeScore: number = 0;
   private awayScore: number = 0;
+
+  // Histórico de eventos e estatísticas
   private events: MatchEventData[] = [];
   private stats = {
     homePossession: 0,
@@ -29,6 +34,7 @@ export class MatchEngine {
     awayFouls: 0,
   };
 
+  // Configurações e Estado
   private config: MatchConfig;
   private homeStrength: TeamStrength;
   private awayStrength: TeamStrength;
@@ -38,14 +44,32 @@ export class MatchEngine {
   constructor(config: MatchConfig, isKnockout: boolean = false) {
     this.config = config;
     this.isKnockout = isKnockout;
-    this.homeStrength = TeamStrengthCalculator.calculate(
-      config.homePlayers,
-      config.homeTacticalBonus || 0
-    );
-    this.awayStrength = TeamStrengthCalculator.calculate(
-      config.awayPlayers,
-      config.awayTacticalBonus || 0
-    );
+
+    // Inicialização de forças
+    this.homeStrength = TeamStrengthCalculator.calculate({
+      id: config.homeTeam.id.toString(),
+      tacticalBonus: config.homeTacticalBonus || 0,
+      players: config.homePlayers.map(
+        (p) =>
+          ({
+            ...p,
+            id: p.id.toString(),
+          } as any)
+      ),
+    } as any);
+
+    this.awayStrength = TeamStrengthCalculator.calculate({
+      id: config.awayTeam.id.toString(),
+      tacticalBonus: config.awayTacticalBonus || 0,
+      players: config.awayPlayers.map(
+        (p) =>
+          ({
+            ...p,
+            id: p.id.toString(),
+          } as any)
+      ),
+    } as any);
+
     this.applyWeatherEffects(config.weather || "sunny");
   }
 
@@ -57,33 +81,30 @@ export class MatchEngine {
     this.weatherMultiplier = penalty || 1.0;
   }
 
+  // --- Controles de Estado ---
+
   public start(): void {
     if (this.state !== MatchState.NOT_STARTED) return;
     this.state = MatchState.PLAYING;
-    this.events.push({
-      minute: 0,
-      type: MatchEventType.SHOT,
-      teamId: this.config.homeTeam.id,
-      playerId: null,
-      description: "⚽ A partida começou!",
-    });
+
+    // Narrativa de início delegada
+    const description = MatchNarrator.narrateKickOff(
+      this.config.homeTeam,
+      this.config.awayTeam
+    );
+    this.addEvent(0, MatchEventType.SHOT, null, null, description);
   }
 
   public pause(): void {
-    if (this.state === MatchState.PLAYING) {
-      this.state = MatchState.PAUSED;
-    }
+    if (this.state === MatchState.PLAYING) this.state = MatchState.PAUSED;
   }
 
   public resume(): void {
-    if (this.state === MatchState.PAUSED) {
-      this.state = MatchState.PLAYING;
-    }
+    if (this.state === MatchState.PAUSED) this.state = MatchState.PLAYING;
   }
 
-  /**
-   * Simula a partida inteira do início ao fim de uma vez
-   */
+  // --- Loop de Simulação ---
+
   public simulateToCompletion(): void {
     this.start();
     while (this.currentMinute < 90) {
@@ -99,406 +120,308 @@ export class MatchEngine {
 
     this.currentMinute++;
 
-    const homeStrengthTotal =
-      this.homeStrength.overall * GameBalance.MATCH.HOME_ADVANTAGE +
-      this.homeStrength.moralBonus;
-    const awayStrengthTotal =
-      this.awayStrength.overall + this.awayStrength.moralBonus;
-    const totalStrength = homeStrengthTotal + awayStrengthTotal;
+    // 1. Cálculo de Posse de Bola
+    const isHomeAttacking = this.calculatePossession();
 
-    const homePossessionChance = (homeStrengthTotal / totalStrength) * 100;
-    const isHomeAttacking = RandomEngine.chance(homePossessionChance);
-
-    if (isHomeAttacking) {
-      this.stats.homePossession++;
-    } else {
-      this.stats.awayPossession++;
-    }
-
+    // 2. Tentar Gerar Ataque
     if (RandomEngine.chance(GameBalance.MATCH.ATTACK_CHANCE_PER_MINUTE)) {
-      this.processAttack(isHomeAttacking);
+      this.processAttackPhase(isHomeAttacking);
     }
 
+    // 3. Tentar Gerar Evento Aleatório
     if (RandomEngine.chance(GameBalance.MATCH.RANDOM_EVENT_CHANCE_PER_MINUTE)) {
       this.processRandomEvent(isHomeAttacking);
     }
 
-    if (this.currentMinute === 90) {
-      this.events.push({
-        minute: 90,
-        type: MatchEventType.FINISHED,
-        teamId: null,
-        playerId: null,
-        description: `⏱️ FIM DO TEMPO REGULAMENTAR! ${this.config.homeTeam.shortName} ${this.homeScore} x ${this.awayScore} ${this.config.awayTeam.shortName}`,
-      });
-    }
-
-    if (this.currentMinute === 120) {
-      this.events.push({
-        minute: 120,
-        type: MatchEventType.FINISHED,
-        teamId: null,
-        playerId: null,
-        description: `⏱️ FIM DA PRORROGAÇÃO! ${this.config.homeTeam.shortName} ${this.homeScore} x ${this.awayScore} ${this.config.awayTeam.shortName}`,
-      });
-    }
+    // 4. Checagem de fim de tempo
+    this.checkTimeEvents();
   }
 
-  /**
-   * Simula 30 minutos de prorrogação (minutos 91-120)
-   */
-  private simulateExtraTime(): { homeGoals: number; awayGoals: number } {
-    this.events.push({
-      minute: 90,
-      type: MatchEventType.SHOT,
-      teamId: null,
-      playerId: null,
-      description: "⏰ PRORROGAÇÃO! A partida vai para os 30 minutos extras.",
-    });
+  // --- Processamento de Lógica ---
 
-    const goalsBeforeHome = this.homeScore;
-    const goalsBeforeAway = this.awayScore;
+  private calculatePossession(): boolean {
+    const homePower =
+      this.homeStrength.overall * GameBalance.MATCH.HOME_ADVANTAGE +
+      this.homeStrength.moralBonus;
+    const awayPower = this.awayStrength.overall + this.awayStrength.moralBonus;
 
-    const originalHomeStrength = { ...this.homeStrength };
-    const originalAwayStrength = { ...this.awayStrength };
+    const total = homePower + awayPower;
+    const homeChance = (homePower / total) * 100;
 
-    this.homeStrength.fitnessMultiplier *= 0.9;
-    this.awayStrength.fitnessMultiplier *= 0.9;
+    const isHome = RandomEngine.chance(homeChance);
 
-    for (let minute = 91; minute <= 120; minute++) {
-      this.simulateMinute();
-    }
+    if (isHome) this.stats.homePossession++;
+    else this.stats.awayPossession++;
 
-    this.homeStrength = originalHomeStrength;
-    this.awayStrength = originalAwayStrength;
-
-    const homeGoals = this.homeScore - goalsBeforeHome;
-    const awayGoals = this.awayScore - goalsBeforeAway;
-
-    return { homeGoals, awayGoals };
+    return isHome;
   }
 
-  /**
-   * Simula disputa de pênaltis com 5 cobranças por time (ou mais se necessário)
-   */
-  private simulatePenaltyShootout(): "home" | "away" {
-    this.events.push({
-      minute: 120,
-      type: MatchEventType.PENALTY_SHOOTOUT,
-      teamId: null,
-      playerId: null,
-      description: "🥅 DISPUTA DE PÊNALTIS! A decisão será nos pênaltis.",
-    });
+  private processAttackPhase(isHome: boolean): void {
+    const attackingTeam = isHome
+      ? {
+          strength: this.homeStrength,
+          players: this.config.homePlayers,
+          isHome: true,
+          data: this.config.homeTeam,
+        }
+      : {
+          strength: this.awayStrength,
+          players: this.config.awayPlayers,
+          isHome: false,
+          data: this.config.awayTeam,
+        };
 
-    let homePenalties = 0;
-    let awayPenalties = 0;
+    const defendingTeam = isHome
+      ? {
+          strength: this.awayStrength,
+          players: this.config.awayPlayers,
+          data: this.config.awayTeam,
+        }
+      : {
+          strength: this.homeStrength,
+          players: this.config.homePlayers,
+          data: this.config.homeTeam,
+        };
 
-    const homeTeam = this.config.homeTeam;
-    const awayTeam = this.config.awayTeam;
-
-    const homePlayers = this.config.homePlayers.filter(
-      (p) => p.position !== "GK"
+    const simulator = AttackSimulator.fromTeams(
+      {
+        strength: attackingTeam.strength,
+        players: attackingTeam.players,
+        isHome: attackingTeam.isHome,
+      },
+      { strength: defendingTeam.strength, players: defendingTeam.players },
+      this.weatherMultiplier
     );
-    const awayPlayers = this.config.awayPlayers.filter(
-      (p) => p.position !== "GK"
-    );
 
-    const homeBaseChance =
-      70 + Math.min(10, (homeTeam.reputation - awayTeam.reputation) / 500);
-    const awayBaseChance =
-      70 + Math.min(10, (awayTeam.reputation - homeTeam.reputation) / 500);
-
-    for (let round = 1; round <= 5; round++) {
-      const homeShooter =
-        homePlayers[Math.min(round - 1, homePlayers.length - 1)];
-      const homeConverts = RandomEngine.chance(
-        homeBaseChance + homeShooter.finishing / 10
+    if (RandomEngine.chance(GameBalance.MATCH.CORNER_CHANCE)) {
+      this.handleCorner(attackingTeam.data, isHome);
+      const cornerResult = simulator.simulateCornerKick();
+      this.handleAttackOutcome(
+        cornerResult,
+        attackingTeam,
+        defendingTeam,
+        isHome
       );
+      return;
+    }
 
-      if (homeConverts) {
-        homePenalties++;
-        this.events.push({
-          minute: 120,
-          type: MatchEventType.GOAL,
-          teamId: homeTeam.id,
-          playerId: homeShooter.id,
-          description: `✅ ${homeShooter.firstName} ${homeShooter.lastName} (${homeTeam.shortName}) converte! ${homePenalties}-${awayPenalties}`,
-        });
-      } else {
-        this.events.push({
-          minute: 120,
-          type: MatchEventType.SHOT,
-          teamId: homeTeam.id,
-          playerId: homeShooter.id,
-          description: `❌ ${homeShooter.firstName} ${homeShooter.lastName} (${homeTeam.shortName}) desperdiça! ${homePenalties}-${awayPenalties}`,
-        });
+    const result = simulator.simulate();
+    this.handleAttackOutcome(result, attackingTeam, defendingTeam, isHome);
+  }
+
+  private handleAttackOutcome(
+    result: AttackResult,
+    attacker: { data: Team },
+    defender: { data: Team },
+    isHome: boolean
+  ): void {
+    const shooter = result.shooter;
+    const keeper = result.goalkeeper;
+
+    if (result.totalShots > 0) {
+      if (isHome) this.stats.homeShots++;
+      else this.stats.awayShots++;
+    }
+    if (result.shotsOnTarget > 0) {
+      if (isHome) this.stats.homeShotsOnTarget++;
+      else this.stats.awayShotsOnTarget++;
+    }
+
+    const narrateContext: NarratorContext = {
+      player: shooter,
+      team: attacker.data,
+      opponent: defender.data,
+      additionalInfo: { outcome: result.outcome },
+    };
+
+    switch (result.outcome) {
+      case "goal": {
+        // Correção no-case-declarations: Bloco {}
+        if (this.processVAR(isHome, attacker.data.id, shooter!)) {
+          if (isHome) this.homeScore++;
+          else this.awayScore++;
+
+          const assist = this.getLastPassProvider(isHome, shooter!);
+          if (assist) {
+            const assistDesc = MatchNarrator.getEventDescription(
+              MatchEventType.ASSIST,
+              { player: assist }
+            );
+            this.addEvent(
+              this.currentMinute,
+              MatchEventType.ASSIST,
+              attacker.data.id,
+              assist.id,
+              assistDesc
+            );
+          }
+
+          const goalDesc = MatchNarrator.getEventDescription(
+            MatchEventType.GOAL,
+            narrateContext
+          );
+          this.addEvent(
+            this.currentMinute,
+            MatchEventType.GOAL,
+            attacker.data.id,
+            shooter!.id,
+            goalDesc
+          );
+        }
+        break;
       }
 
-      const awayShooter =
-        awayPlayers[Math.min(round - 1, awayPlayers.length - 1)];
-      const awayConverts = RandomEngine.chance(
-        awayBaseChance + awayShooter.finishing / 10
-      );
-
-      if (awayConverts) {
-        awayPenalties++;
-        this.events.push({
-          minute: 120,
-          type: MatchEventType.GOAL,
-          teamId: awayTeam.id,
-          playerId: awayShooter.id,
-          description: `✅ ${awayShooter.firstName} ${awayShooter.lastName} (${awayTeam.shortName}) converte! ${homePenalties}-${awayPenalties}`,
-        });
-      } else {
-        this.events.push({
-          minute: 120,
-          type: MatchEventType.SHOT,
-          teamId: awayTeam.id,
-          playerId: awayShooter.id,
-          description: `❌ ${awayShooter.firstName} ${awayShooter.lastName} (${awayTeam.shortName}) desperdiça! ${homePenalties}-${awayPenalties}`,
-        });
+      case "save": {
+        const saveDesc = MatchNarrator.getEventDescription(
+          MatchEventType.SAVE,
+          { player: keeper }
+        );
+        this.addEvent(
+          this.currentMinute,
+          MatchEventType.SAVE,
+          defender.data.id,
+          keeper ? keeper.id : null,
+          saveDesc
+        );
+        break;
       }
 
-      const remainingRounds = 5 - round;
-      if (Math.abs(homePenalties - awayPenalties) > remainingRounds) {
+      case "miss":
+      case "blocked": {
+        const missDesc = MatchNarrator.getEventDescription(
+          MatchEventType.SHOT,
+          narrateContext
+        );
+        this.addEvent(
+          this.currentMinute,
+          MatchEventType.SHOT,
+          attacker.data.id,
+          shooter!.id,
+          missDesc
+        );
+        break;
+      }
+
+      case "offside": {
+        const offsideDesc = MatchNarrator.getEventDescription(
+          MatchEventType.OFFSIDE,
+          narrateContext
+        );
+        this.addEvent(
+          this.currentMinute,
+          MatchEventType.OFFSIDE,
+          attacker.data.id,
+          shooter!.id,
+          offsideDesc
+        );
         break;
       }
     }
-
-    let suddenDeathRound = 1;
-
-    while (homePenalties === awayPenalties) {
-      const homeConverts = RandomEngine.chance(homeBaseChance);
-      const awayConverts = RandomEngine.chance(awayBaseChance);
-
-      if (homeConverts) homePenalties++;
-      if (awayConverts) awayPenalties++;
-
-      this.events.push({
-        minute: 120,
-        type: MatchEventType.PENALTY_SHOOTOUT,
-        teamId: null,
-        playerId: null,
-        description: `⚡ Morte Súbita ${suddenDeathRound}: ${homePenalties}-${awayPenalties}`,
-      });
-
-      suddenDeathRound++;
-
-      if (suddenDeathRound > 10) break;
-    }
-
-    const winner = homePenalties > awayPenalties ? "home" : "away";
-    const winnerTeam = winner === "home" ? homeTeam : awayTeam;
-
-    this.events.push({
-      minute: 120,
-      type: MatchEventType.PENALTY_SHOOTOUT,
-      teamId: winnerTeam.id,
-      playerId: null,
-      description: `🏆 ${winnerTeam.shortName} VENCE NOS PÊNALTIS! ${homePenalties}-${awayPenalties}`,
-    });
-
-    if (winner === "home") {
-      this.homeScore++;
-    } else {
-      this.awayScore++;
-    }
-
-    return winner;
   }
 
-  private processAttack(isHome: boolean): void {
-    const attackingTeam = isHome ? this.config.homeTeam : this.config.awayTeam;
-    const defendingTeam = isHome ? this.config.awayTeam : this.config.homeTeam;
-    const attackingPlayers = isHome
-      ? this.config.homePlayers
-      : this.config.awayPlayers;
-    const defendingPlayers = isHome
-      ? this.config.awayPlayers
-      : this.config.homePlayers;
-
-    const attackStrength = isHome
-      ? this.homeStrength.attack * this.homeStrength.fitnessMultiplier
-      : this.awayStrength.attack * this.awayStrength.fitnessMultiplier;
-
-    const defenseStrength = isHome
-      ? this.awayStrength.defense * this.awayStrength.fitnessMultiplier
-      : this.homeStrength.defense * this.homeStrength.fitnessMultiplier;
-
-    if (RandomEngine.chance(GameBalance.MATCH.SHOT_CHANCE_IN_ATTACK)) {
-      if (isHome) this.stats.homeShots++;
-      else this.stats.awayShots++;
-
-      const shooter = this.selectScorer(attackingPlayers);
-      const shotQuality = (shooter.shooting + shooter.finishing) / 2;
-
-      if (
-        RandomEngine.chance(
-          (shotQuality / 100) * (GameBalance.MATCH.SHOT_ACCURACY_BASE * 100)
-        )
-      ) {
-        if (isHome) this.stats.homeShotsOnTarget++;
-        else this.stats.awayShotsOnTarget++;
-
-        const goalkeeper = defendingPlayers.find((p) => p.position === "GK");
-        const saveChance = goalkeeper
-          ? ((goalkeeper.defending + goalkeeper.overall) / 200) * 100
-          : GameBalance.MATCH.SAVE_CHANCE_BASE;
-
-        const goalChance =
-          (attackStrength / (attackStrength + defenseStrength)) *
-          100 *
-          this.weatherMultiplier;
-
-        if (
-          RandomEngine.chance(goalChance) &&
-          !RandomEngine.chance(saveChance)
-        ) {
-          this.handleGoalScored(isHome, attackingTeam.id, shooter);
-        } else {
-          if (isHome) this.stats.awayShotsOnTarget++;
-          else this.stats.homeShotsOnTarget++;
-
-          this.events.push({
-            minute: this.currentMinute,
-            type: MatchEventType.SAVE,
-            teamId: defendingTeam.id,
-            playerId: goalkeeper ? goalkeeper.id : null,
-            description: `🧤 Grande defesa de ${
-              goalkeeper?.firstName || "o goleiro"
-            }!`,
-          });
-        }
-      } else {
-        this.events.push({
-          minute: this.currentMinute,
-          type: MatchEventType.SHOT,
-          teamId: attackingTeam.id,
-          playerId: shooter.id,
-          description: `📉 ${shooter.firstName} chuta para fora.`,
-        });
-      }
-    }
-
-    if (RandomEngine.chance(GameBalance.MATCH.CORNER_CHANCE)) {
-      if (isHome) this.stats.homeCorners++;
-      else this.stats.awayCorners++;
-
-      this.events.push({
-        minute: this.currentMinute,
-        type: MatchEventType.CORNER,
-        teamId: attackingTeam.id,
-        playerId: null,
-        description: `🚩 Escanteio para o ${attackingTeam.shortName}.`,
-      });
-    }
+  private handleCorner(team: Team, isHome: boolean): void {
+    if (isHome) this.stats.homeCorners++;
+    else this.stats.awayCorners++;
+    const desc = MatchNarrator.getEventDescription(MatchEventType.CORNER, {
+      team,
+    });
+    this.addEvent(
+      this.currentMinute,
+      MatchEventType.CORNER,
+      team.id,
+      null,
+      desc
+    );
   }
 
-  private handleGoalScored(isHome: boolean, teamId: number, shooter: Player) {
-    if (RandomEngine.chance(GameBalance.MATCH.VAR_CHECK_PROBABILITY)) {
-      this.events.push({
-        minute: this.currentMinute,
-        type: MatchEventType.VAR_CHECK,
-        teamId: null,
-        playerId: null,
-        description:
-          "🖥️ VAR em ação! Analisando possível irregularidade no gol...",
-      });
+  private processVAR(
+    isHome: boolean,
+    teamId: number,
+    shooter: Player
+  ): boolean {
+    if (!RandomEngine.chance(GameBalance.MATCH.VAR_CHECK_PROBABILITY))
+      return true;
 
-      if (RandomEngine.chance(GameBalance.MATCH.VAR_OVERTURN_PROBABILITY)) {
-        this.events.push({
-          minute: this.currentMinute,
-          type: MatchEventType.OFFSIDE,
-          teamId: teamId,
-          playerId: shooter.id,
-          description: `❌ GOL ANULADO! O VAR identificou impedimento de ${shooter.firstName}.`,
-        });
-        return;
-      } else {
-        this.events.push({
-          minute: this.currentMinute,
-          type: MatchEventType.VAR_CHECK,
-          teamId: teamId,
-          playerId: null,
-          description: "✅ Gol confirmado após revisão.",
-        });
-      }
+    this.addEvent(
+      this.currentMinute,
+      MatchEventType.VAR_CHECK,
+      null,
+      null,
+      MatchNarrator.getEventDescription(MatchEventType.VAR_CHECK)
+    );
+
+    if (RandomEngine.chance(GameBalance.MATCH.VAR_OVERTURN_PROBABILITY)) {
+      this.addEvent(
+        this.currentMinute,
+        MatchEventType.OFFSIDE,
+        teamId,
+        shooter.id,
+        MatchNarrator.getEventDescription(MatchEventType.VAR_CHECK, {
+          additionalInfo: { result: "overturned" },
+        })
+      );
+      return false;
     }
 
-    if (isHome) this.homeScore++;
-    else this.awayScore++;
-
-    const assistProvider = this.getLastPassProvider(isHome, shooter);
-
-    if (assistProvider) {
-      this.events.push({
-        minute: this.currentMinute,
-        type: MatchEventType.ASSIST,
-        teamId: teamId,
-        playerId: assistProvider.id,
-        description: `🎯 Passe perfeito de ${assistProvider.firstName} para o gol!`,
-      });
-    }
-
-    this.events.push({
-      minute: this.currentMinute,
-      type: MatchEventType.GOAL,
-      teamId: teamId,
-      playerId: shooter.id,
-      description: `⚽ GOOOL! ${shooter.firstName} ${shooter.lastName} marca!`,
-    });
+    this.addEvent(
+      this.currentMinute,
+      MatchEventType.VAR_CHECK,
+      teamId,
+      null,
+      MatchNarrator.getEventDescription(MatchEventType.VAR_CHECK, {
+        additionalInfo: { result: "confirmed" },
+      })
+    );
+    return true;
   }
 
   private processRandomEvent(isHome: boolean): void {
     const team = isHome ? this.config.homeTeam : this.config.awayTeam;
     const players = isHome ? this.config.homePlayers : this.config.awayPlayers;
 
-    const eventType = RandomEngine.pickOne(["foul", "yellow", "injury"]);
+    const event = MatchEventGenerator.tryGenerateRandomEvent({ team, players });
 
-    if (eventType === "foul") {
+    if (!event) return;
+
+    if (event.type === MatchEventType.FOUL) {
       if (isHome) this.stats.homeFouls++;
       else this.stats.awayFouls++;
-
-      const player = RandomEngine.pickOne(players);
-      this.events.push({
-        minute: this.currentMinute,
-        type: MatchEventType.FOUL,
-        teamId: team.id,
-        playerId: player.id,
-        description: `🟨 Falta cometida por ${player.firstName} ${player.lastName}.`,
-      });
-    } else if (eventType === "yellow") {
-      const player = RandomEngine.pickOne(players);
-      this.events.push({
-        minute: this.currentMinute,
-        type: MatchEventType.YELLOW_CARD,
-        teamId: team.id,
-        playerId: player.id,
-        description: `🟨 Cartão amarelo para ${player.firstName} ${player.lastName}!`,
-      });
-    } else if (eventType === "injury") {
-      const player = RandomEngine.pickOne(players);
-      this.events.push({
-        minute: this.currentMinute,
-        type: MatchEventType.INJURY,
-        teamId: team.id,
-        playerId: player.id,
-        description: `🩹 ${player.firstName} ${player.lastName} sente uma lesão e precisa de atendimento.`,
-      });
     }
+
+    const player = players.find((p) => p.id === event.playerId);
+    const description = MatchNarrator.getEventDescription(event.type, {
+      player,
+      team,
+    });
+
+    this.addEvent(
+      this.currentMinute,
+      event.type,
+      team.id,
+      event.playerId,
+      description
+    );
   }
 
-  private selectScorer(players: Player[]): Player {
-    const forwards = players.filter((p) => p.position === "FW");
-    const midfielders = players.filter((p) => p.position === "MF");
+  private addEvent(
+    minute: number,
+    type: MatchEventType,
+    teamId: number | null,
+    playerId: number | null,
+    description: string
+  ) {
+    this.events.push({ minute, type, teamId, playerId, description });
+  }
 
-    if (forwards.length > 0 && RandomEngine.chance(70)) {
-      return RandomEngine.pickOne(forwards);
+  private checkTimeEvents() {
+    if (this.currentMinute === 90) {
+      const desc = MatchNarrator.getEventDescription(MatchEventType.FINISHED, {
+        team: this.config.homeTeam,
+        opponent: this.config.awayTeam,
+        score: { home: this.homeScore, away: this.awayScore },
+      });
+      this.addEvent(90, MatchEventType.FINISHED, null, null, desc);
     }
-    if (midfielders.length > 0 && RandomEngine.chance(50)) {
-      return RandomEngine.pickOne(midfielders);
-    }
-    return RandomEngine.pickOne(players);
   }
 
   public getMatchResult(): MatchResult {
@@ -508,7 +431,6 @@ export class MatchEngine {
       this.homeScore === this.awayScore
     ) {
       this.simulateExtraTime();
-
       if (this.homeScore === this.awayScore) {
         this.simulatePenaltyShootout();
       }
@@ -516,83 +438,155 @@ export class MatchEngine {
 
     if (this.state !== MatchState.FINISHED) {
       this.state = MatchState.FINISHED;
-      const finalMinute = this.currentMinute >= 90 ? 120 : 90;
-      this.events.push({
-        minute: finalMinute,
-        type: MatchEventType.FINISHED,
-        teamId: this.config.homeTeam.id,
-        playerId: null,
-        description: `🏁 FIM DE JOGO! ${this.config.homeTeam.shortName} ${this.homeScore} x ${this.awayScore} ${this.config.awayTeam.shortName}`,
-      });
     }
 
-    const homeRep = this.config.homeTeam.reputation || 5000;
-    const awayRep = this.config.awayTeam.reputation || 5000;
+    return this.compileFinalResult();
+  }
 
-    const homeWon = this.homeScore > this.awayScore;
-    const awayWon = this.awayScore > this.homeScore;
+  private simulateExtraTime(): void {
+    this.addEvent(
+      90,
+      MatchEventType.SHOT,
+      null,
+      null,
+      MatchNarrator.narrateExtraTime()
+    );
 
-    const playerUpdates: MatchResult["playerUpdates"] = [];
+    this.homeStrength.fitnessMultiplier *= 0.9;
+    this.awayStrength.fitnessMultiplier *= 0.9;
 
-    const processPlayers = (
+    for (let m = 91; m <= 120; m++) {
+      this.simulateMinute();
+    }
+  }
+
+  private simulatePenaltyShootout(): "home" | "away" {
+    this.addEvent(
+      120,
+      MatchEventType.PENALTY_SHOOTOUT,
+      null,
+      null,
+      MatchNarrator.getEventDescription(MatchEventType.PENALTY_SHOOTOUT)
+    );
+
+    let homePenalties = 0;
+    let awayPenalties = 0;
+
+    const homeSim = AttackSimulator.fromTeams(
+      {
+        strength: this.homeStrength,
+        players: this.config.homePlayers,
+        isHome: true,
+      },
+      { strength: this.awayStrength, players: this.config.awayPlayers }
+    );
+    const awaySim = AttackSimulator.fromTeams(
+      {
+        strength: this.awayStrength,
+        players: this.config.awayPlayers,
+        isHome: false,
+      },
+      { strength: this.homeStrength, players: this.config.homePlayers }
+    );
+
+    const shoot = (
+      simulator: AttackSimulator,
+      team: Team,
       players: Player[],
-      won: boolean,
-      draw: boolean,
-      opponentRep: number,
-      teamRep: number
+      currentScore: { h: number; a: number }
     ) => {
-      for (const player of players) {
-        let moralChange = 0;
+      const shooter = RandomEngine.pickOne(
+        players.filter((p) => p.position !== "GK")
+      );
+      const result = simulator.simulatePenalty(shooter);
 
-        if (won) {
-          const repDiff = opponentRep - teamRep;
-          moralChange = 5 + Math.max(0, Math.min(15, repDiff / 500));
-        } else if (!won && !draw) {
-          const repDiff = teamRep - opponentRep;
-          moralChange = -5 - Math.max(0, Math.min(15, repDiff / 500));
-        } else {
-          moralChange = opponentRep > teamRep ? 2 : -2;
-        }
+      const converted = result.outcome === "goal";
+      const desc = MatchNarrator.getEventDescription(MatchEventType.PENALTY, {
+        player: shooter,
+        team,
+        additionalInfo: { converted },
+      });
 
-        const newMoral = Math.max(0, Math.min(100, player.moral + moralChange));
-        const energyLoss =
-          this.currentMinute > 90
-            ? RandomEngine.getInt(20, 35)
-            : RandomEngine.getInt(10, 20);
-        const newEnergy = Math.max(0, player.energy - energyLoss);
+      const _updatedScore = ` (${currentScore.h}-${currentScore.a})`;
 
-        const goals = this.events.filter(
-          (e) => e.type === MatchEventType.GOAL && e.playerId === player.id
-        ).length;
+      this.addEvent(
+        120,
+        MatchEventType.GOAL,
+        team.id,
+        shooter.id,
+        converted ? desc + " ✅" : desc + " ❌"
+      );
 
-        let rating = 6.0;
-        if (won) rating += 0.5;
-        rating += goals * 1.5;
-        if (newMoral < 40) rating -= 0.5;
-
-        rating += Math.random() * 2 - 1;
-        rating = Math.max(3, Math.min(10, Number(rating.toFixed(1))));
-
-        playerUpdates.push({
-          playerId: player.id,
-          energy: newEnergy,
-          moral: Math.round(newMoral),
-          isInjured: false,
-          rating: rating,
-          goals: goals,
-          assists: 0,
-        });
-      }
+      return converted;
     };
 
-    const isDraw = this.homeScore === this.awayScore;
+    // Série regular de 5 cobranças
+    for (let i = 0; i < 5; i++) {
+      const homeGoal = shoot(
+        homeSim,
+        this.config.homeTeam,
+        this.config.homePlayers,
+        { h: homePenalties, a: awayPenalties }
+      );
+      if (homeGoal) homePenalties++;
 
-    processPlayers(this.config.homePlayers, homeWon, isDraw, awayRep, homeRep);
-    processPlayers(this.config.awayPlayers, awayWon, isDraw, homeRep, awayRep);
+      const awayGoal = shoot(
+        awaySim,
+        this.config.awayTeam,
+        this.config.awayPlayers,
+        { h: homePenalties, a: awayPenalties }
+      );
+      if (awayGoal) awayPenalties++;
+
+      // Checagem se alguém já ganhou matematicamente pode ser add aqui
+    }
+
+    // Morte súbita se empate
+    let round = 6;
+    while (homePenalties === awayPenalties && round < 20) {
+      const homeGoal = shoot(
+        homeSim,
+        this.config.homeTeam,
+        this.config.homePlayers,
+        { h: homePenalties, a: awayPenalties }
+      );
+      if (homeGoal) homePenalties++;
+
+      const awayGoal = shoot(
+        awaySim,
+        this.config.awayTeam,
+        this.config.awayPlayers,
+        { h: homePenalties, a: awayPenalties }
+      );
+      if (awayGoal) awayPenalties++;
+
+      round++;
+    }
+
+    return homePenalties > awayPenalties ? "home" : "away";
+  }
+
+  private getLastPassProvider(isHome: boolean, shooter: Player): Player | null {
+    const players = isHome ? this.config.homePlayers : this.config.awayPlayers;
+    if (!RandomEngine.chance(70)) return null;
+
+    const candidates = players.filter(
+      (p) => p.id !== shooter.id && !p.isInjured
+    );
+    if (candidates.length === 0) return null;
+
+    const midfielders = candidates.filter((p) => p.position === "MF");
+    if (midfielders.length > 0 && RandomEngine.chance(60)) {
+      return RandomEngine.pickOne(midfielders);
+    }
+    return RandomEngine.pickOne(candidates);
+  }
+
+  private compileFinalResult(): MatchResult {
+    const playerUpdates = this.calculatePlayerUpdates();
 
     const totalPossession =
       this.stats.homePossession + this.stats.awayPossession;
-
     const finalHomePossession =
       totalPossession > 0
         ? Math.round((this.stats.homePossession / totalPossession) * 100)
@@ -611,38 +605,69 @@ export class MatchEngine {
     };
   }
 
-  private getLastPassProvider(isHome: boolean, shooter: Player): Player | null {
-    const players = isHome ? this.config.homePlayers : this.config.awayPlayers;
+  private calculatePlayerUpdates(): MatchResult["playerUpdates"] {
+    const updates: MatchResult["playerUpdates"] = [];
 
-    if (!RandomEngine.chance(70)) return null;
+    // Agora usando as variáveis que antes estavam ociosas
+    const process = (
+      players: Player[],
+      won: boolean,
+      draw: boolean,
+      opponentRep: number,
+      teamRep: number
+    ) => {
+      for (const player of players) {
+        let moralChange = 0;
 
-    const candidates = players.filter(
-      (p) => p.id !== shooter.id && !p.isInjured
-    );
+        // Lógica de cálculo de moral
+        if (won) {
+          const repDiff = opponentRep - teamRep;
+          moralChange = 5 + Math.max(0, Math.min(15, repDiff / 500));
+        } else if (!won && !draw) {
+          const repDiff = teamRep - opponentRep;
+          moralChange = -5 - Math.max(0, Math.min(15, repDiff / 500));
+        } else {
+          // Empate: favorece quem tem menos reputação
+          moralChange = opponentRep > teamRep ? 2 : -2;
+        }
 
-    if (candidates.length === 0) return null;
+        const newMoral = Math.max(0, Math.min(100, player.moral + moralChange));
 
-    const midfielders = candidates.filter((p) => p.position === "MF");
-    if (midfielders.length > 0 && RandomEngine.chance(60)) {
-      return RandomEngine.pickOne(midfielders);
-    }
+        updates.push({
+          playerId: player.id,
+          energy: Math.max(0, player.energy - 15),
+          moral: Math.round(newMoral),
+          isInjured: false,
+          rating: won ? 7.0 : draw ? 6.5 : 6.0,
+          goals: this.events.filter(
+            (e) => e.type === MatchEventType.GOAL && e.playerId === player.id
+          ).length,
+          assists: 0,
+        });
+      }
+    };
 
-    return RandomEngine.pickOne(candidates);
+    const homeRep = this.config.homeTeam.reputation || 5000;
+    const awayRep = this.config.awayTeam.reputation || 5000;
+    const homeWon = this.homeScore > this.awayScore;
+    const draw = this.homeScore === this.awayScore;
+
+    process(this.config.homePlayers, homeWon, draw, awayRep, homeRep);
+    process(this.config.awayPlayers, !homeWon, draw, homeRep, awayRep);
+
+    return updates;
   }
 
-  public getCurrentMinute(): number {
+  public getCurrentMinute() {
     return this.currentMinute;
   }
-
-  public getState(): MatchState {
+  public getState() {
     return this.state;
   }
-
-  public getCurrentScore(): { home: number; away: number } {
+  public getCurrentScore() {
     return { home: this.homeScore, away: this.awayScore };
   }
-
-  public getEvents(): MatchEventData[] {
+  public getEvents() {
     return this.events;
   }
 }
