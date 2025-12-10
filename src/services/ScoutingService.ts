@@ -1,7 +1,8 @@
 import { RandomEngine } from "../engine/RandomEngine";
 import type { Player } from "../domain/models";
-import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { BaseService } from "./BaseService";
+import type { ServiceResult } from "./types/ServiceResults";
 
 export interface MaskedAttribute {
   value: number | string;
@@ -24,128 +25,133 @@ const STAFF_IMPACT_CONFIG = {
   REDUCTION_RATE: 0.1,
 } as const;
 
-export class ScoutingService {
-  private readonly logger: Logger;
-  private readonly repos: IRepositoryContainer;
-
+export class ScoutingService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
-    this.logger = new Logger("ScoutingService");
+    super(repositories, "ScoutingService");
   }
 
   async getScoutedPlayer(
     playerId: number,
     viewerTeamId: number
-  ): Promise<ScoutedPlayerView | null> {
-    try {
-      const player = await this.repos.players.findById(playerId);
-      if (!player) {
-        this.logger.warn(`Jogador ${playerId} não encontrado para scouting.`);
-        return null;
+  ): Promise<ServiceResult<ScoutedPlayerView | null>> {
+    return this.execute(
+      "getScoutedPlayer",
+      { playerId, viewerTeamId },
+      async ({ playerId, viewerTeamId }) => {
+        const player = await this.repos.players.findById(playerId);
+        if (!player) {
+          this.logger.warn(`Jogador ${playerId} não encontrado para scouting.`);
+          return null;
+        }
+
+        if (player.teamId === viewerTeamId) {
+          return this.createFullVisibilityView(player);
+        }
+
+        const report = await this.repos.scouting.findByPlayerAndTeam(
+          playerId,
+          viewerTeamId
+        );
+        const progress = report ? report.progress || 0 : 0;
+
+        return this.createMaskedView(
+          player,
+          progress,
+          report ? report.date : null
+        );
       }
-
-      if (player.teamId === viewerTeamId) {
-        return this.createFullVisibilityView(player);
-      }
-
-      const report = await this.repos.scouting.findByPlayerAndTeam(
-        playerId,
-        viewerTeamId
-      );
-      const progress = report ? report.progress || 0 : 0;
-
-      return this.createMaskedView(
-        player,
-        progress,
-        report ? report.date : null
-      );
-    } catch (error) {
-      this.logger.error("Erro ao processar getScoutedPlayer", error);
-      throw error;
-    }
+    );
   }
 
-  async getScoutingList(teamId: number) {
-    this.logger.debug(`Buscando lista de observação para o time ${teamId}`);
-    return await this.repos.scouting.findByTeam(teamId);
+  async getScoutingList(teamId: number): Promise<ServiceResult<any[]>> {
+    return this.execute("getScoutingList", teamId, async (teamId) => {
+      this.logger.debug(`Buscando lista de observação para o time ${teamId}`);
+      return await this.repos.scouting.findByTeam(teamId);
+    });
   }
 
   async assignScoutToPlayer(
     scoutId: number,
     playerId: number
-  ): Promise<boolean> {
-    this.logger.info(`Atribuindo olheiro ${scoutId} ao jogador ${playerId}...`);
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "assignScoutToPlayer",
+      { scoutId, playerId },
+      async ({ scoutId, playerId }) => {
+        this.logger.info(
+          `Atribuindo olheiro ${scoutId} ao jogador ${playerId}...`
+        );
 
-    try {
-      const scout = await this.repos.staff.findById(scoutId);
-      if (!scout || !scout.teamId) {
-        this.logger.warn("Olheiro inválido ou sem time.");
-        return false;
-      }
+        const scout = await this.repos.staff.findById(scoutId);
+        if (!scout || !scout.teamId) {
+          throw new Error("Olheiro inválido ou sem time associado.");
+        }
 
-      const player = await this.repos.players.findById(playerId);
-      if (!player) {
-        this.logger.warn("Jogador alvo não encontrado.");
-        return false;
-      }
+        const player = await this.repos.players.findById(playerId);
+        if (!player) {
+          throw new Error("Jogador alvo não encontrado.");
+        }
 
-      const date = new Date().toISOString().split("T")[0];
-
-      await this.repos.scouting.upsert({
-        teamId: scout.teamId,
-        playerId: playerId,
-        scoutId: scoutId,
-        date: date,
-        progress: 0,
-        notes: "Observação iniciada",
-      });
-
-      this.logger.info("Olheiro atribuído com sucesso.");
-      return true;
-    } catch (error) {
-      this.logger.error("Erro ao atribuir olheiro:", error);
-      return false;
-    }
-  }
-
-  async processDailyScouting(currentDate: string): Promise<void> {
-    this.logger.info(`Processando scouting diário para ${currentDate}`);
-
-    try {
-      const activeReports = await this.repos.scouting.findActiveReports();
-      let updatesCount = 0;
-
-      for (const report of activeReports) {
-        if (!report.scoutId || (report.progress || 0) >= 100) continue;
-
-        const scout = await this.repos.staff.findById(report.scoutId);
-        if (!scout) continue;
-
-        const dailyProgress =
-          Math.round(scout.overall / 10) + RandomEngine.getInt(1, 5);
+        const date = new Date().toISOString().split("T")[0];
 
         await this.repos.scouting.upsert({
-          ...report,
-          date: currentDate,
-          progress: dailyProgress,
+          teamId: scout.teamId,
+          playerId: playerId,
+          scoutId: scoutId,
+          date: date,
+          progress: 0,
+          notes: "Observação iniciada",
         });
-        updatesCount++;
-      }
 
-      this.logger.info(
-        `Scouting diário finalizado. ${updatesCount} relatórios atualizados.`
-      );
-    } catch (error) {
-      this.logger.error("Erro no processamento diário de scouting", error);
-    }
+        this.logger.info("Olheiro atribuído com sucesso.");
+      }
+    );
   }
 
-  async calculateScoutingAccuracy(teamId: number): Promise<number> {
-    this.logger.debug(
-      `Calculando precisão de scouting para o time ${teamId}...`
-    );
+  async processDailyScouting(
+    currentDate: string
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "processDailyScouting",
+      currentDate,
+      async (currentDate) => {
+        this.logger.info(`Processando scouting diário para ${currentDate}`);
 
-    try {
+        const activeReports = await this.repos.scouting.findActiveReports();
+        let updatesCount = 0;
+
+        for (const report of activeReports) {
+          if (!report.scoutId || (report.progress || 0) >= 100) continue;
+
+          const scout = await this.repos.staff.findById(report.scoutId);
+          if (!scout) continue;
+
+          const dailyProgress =
+            Math.round(scout.overall / 10) + RandomEngine.getInt(1, 5);
+
+          await this.repos.scouting.upsert({
+            ...report,
+            date: currentDate,
+            progress: dailyProgress,
+          });
+          updatesCount++;
+        }
+
+        this.logger.info(
+          `Scouting diário finalizado. ${updatesCount} relatórios atualizados.`
+        );
+      }
+    );
+  }
+
+  async calculateScoutingAccuracy(
+    teamId: number
+  ): Promise<ServiceResult<number>> {
+    return this.execute("calculateScoutingAccuracy", teamId, async (teamId) => {
+      this.logger.debug(
+        `Calculando precisão de scouting para o time ${teamId}...`
+      );
+
       const allStaff = await this.repos.staff.findByTeamId(teamId);
       const scouts = allStaff.filter((s) => s.role === "scout");
 
@@ -157,13 +163,7 @@ export class ScoutingService {
       const reduction = bestScout * STAFF_IMPACT_CONFIG.REDUCTION_RATE;
 
       return Math.max(0, STAFF_IMPACT_CONFIG.BASE_UNCERTAINTY - reduction);
-    } catch (error) {
-      this.logger.error(
-        `Erro ao calcular precisão de scouting para time ${teamId}:`,
-        error
-      );
-      return STAFF_IMPACT_CONFIG.BASE_UNCERTAINTY;
-    }
+    });
   }
 
   private createFullVisibilityView(player: Player): ScoutedPlayerView {

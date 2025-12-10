@@ -1,8 +1,9 @@
 import { StaffRole } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
 import type { Staff } from "../domain/models";
-import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { BaseService } from "./BaseService";
+import type { ServiceResult } from "./types/ServiceResults";
 
 const STAFF_IMPACT_CONFIG = {
   MEDICAL: {
@@ -26,23 +27,20 @@ const STAFF_IMPACT_CONFIG = {
   },
 } as const;
 
-export class StaffService {
-  private readonly logger: Logger;
-  private readonly repos: IRepositoryContainer;
-
+export class StaffService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
-    this.logger = new Logger("StaffService");
+    super(repositories, "StaffService");
   }
 
-  async getStaffImpact(teamId: number): Promise<TeamStaffImpact> {
-    this.logger.debug(
-      `Calculando impacto da equipe técnica para o time ${teamId}...`
-    );
+  async getStaffImpact(
+    teamId: number
+  ): Promise<ServiceResult<TeamStaffImpact>> {
+    return this.execute("getStaffImpact", teamId, async (teamId) => {
+      this.logger.debug(
+        `Calculando impacto da equipe técnica para o time ${teamId}...`
+      );
 
-    try {
       const allStaff = await this.repos.staff.findByTeamId(teamId);
-
       const categorized = this.categorizeStaff(allStaff);
 
       const impact: TeamStaffImpact = {
@@ -62,15 +60,59 @@ export class StaffService {
       this.logger.debug("Bônus calculados:", impact);
 
       return impact;
-    } catch (error) {
-      this.logger.error(
-        `Erro ao calcular impacto do staff para time ${teamId}:`,
-        error
-      );
-
-      return this.getDefaultImpact();
-    }
+    });
   }
+
+  async getStaffByTeam(teamId: number): Promise<ServiceResult<Staff[]>> {
+    return this.execute("getStaffByTeam", teamId, async (teamId) => {
+      this.logger.debug(`Buscando staff do time ${teamId}...`);
+      return await this.repos.staff.findByTeamId(teamId);
+    });
+  }
+
+  async getFreeAgents(): Promise<ServiceResult<Staff[]>> {
+    return this.execute("getFreeAgents", null, async () => {
+      this.logger.debug(`Buscando staff sem contrato...`);
+      return await this.repos.staff.findFreeAgents();
+    });
+  }
+
+  async hireStaff(
+    teamId: number,
+    staffId: number,
+    salary: number,
+    contractEnd: string
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "hireStaff",
+      { teamId, staffId, salary, contractEnd },
+      async ({ teamId, staffId, salary, contractEnd }) => {
+        this.logger.info(
+          `Contratando staff ${staffId} para o time ${teamId}...`
+        );
+
+        await this.repos.staff.update(staffId, {
+          teamId,
+          salary,
+          contractEnd,
+        });
+
+        this.logger.info(`Staff ${staffId} contratado com sucesso.`);
+      }
+    );
+  }
+
+  async fireStaff(staffId: number): Promise<ServiceResult<void>> {
+    return this.executeVoid("fireStaff", staffId, async (staffId) => {
+      this.logger.info(`Demitindo staff ${staffId}...`);
+
+      await this.repos.staff.fire(staffId);
+
+      this.logger.info(`Staff ${staffId} demitido com sucesso.`);
+    });
+  }
+
+  // Métodos privados de cálculo (Lógica Pura)
 
   private categorizeStaff(allStaff: Staff[]): {
     medical: Staff[];
@@ -96,7 +138,6 @@ export class StaffService {
     }
 
     const maxOverall = Math.max(...medics.map((m) => m.overall));
-
     const reduction =
       (maxOverall * STAFF_IMPACT_CONFIG.MEDICAL.MAX_REDUCTION) / 100;
 
@@ -143,7 +184,6 @@ export class StaffService {
     }
 
     const bestScout = Math.max(...scouts.map((s) => s.overall));
-
     const reduction = bestScout * STAFF_IMPACT_CONFIG.SCOUTING.REDUCTION_RATE;
 
     return Math.max(
@@ -158,73 +198,5 @@ export class StaffService {
     const bestScout = Math.max(...scouts.map((s) => s.overall));
 
     return Math.round(bestScout * STAFF_IMPACT_CONFIG.YOUTH.CONVERSION_RATE);
-  }
-
-  private getDefaultImpact(): TeamStaffImpact {
-    return {
-      injuryRecoveryMultiplier: 1.0,
-      energyRecoveryBonus: 0,
-      tacticalAnalysisBonus: 0,
-      scoutingAccuracy: STAFF_IMPACT_CONFIG.SCOUTING.BASE_UNCERTAINTY,
-      youthDevelopmentRate: 0,
-    };
-  }
-
-  async getStaffByTeam(teamId: number) {
-    this.logger.debug(`Buscando staff do time ${teamId}...`);
-
-    try {
-      return await this.repos.staff.findByTeamId(teamId);
-    } catch (error) {
-      this.logger.error(`Erro ao buscar staff do time ${teamId}:`, error);
-      return [];
-    }
-  }
-
-  async getFreeAgents() {
-    this.logger.debug(`Buscando staff sem contrato...`);
-
-    try {
-      return await this.repos.staff.findFreeAgents();
-    } catch (error) {
-      this.logger.error("Erro ao buscar staff sem contrato:", error);
-      return [];
-    }
-  }
-
-  async hireStaff(
-    teamId: number,
-    staffId: number,
-    salary: number,
-    contractEnd: string
-  ): Promise<boolean> {
-    this.logger.info(`Contratando staff ${staffId} para o time ${teamId}...`);
-
-    try {
-      await this.repos.staff.update(staffId, {
-        teamId,
-        salary,
-        contractEnd,
-      });
-
-      this.logger.info(`Staff ${staffId} contratado com sucesso.`);
-      return true;
-    } catch (error) {
-      this.logger.error(`Erro ao contratar staff ${staffId}:`, error);
-      return false;
-    }
-  }
-
-  async fireStaff(staffId: number): Promise<boolean> {
-    this.logger.info(`Demitindo staff ${staffId}...`);
-
-    try {
-      await this.repos.staff.fire(staffId);
-      this.logger.info(`Staff ${staffId} demitido com sucesso.`);
-      return true;
-    } catch (error) {
-      this.logger.error(`Erro ao demitir staff ${staffId}:`, error);
-      return false;
-    }
   }
 }

@@ -1,8 +1,10 @@
+import { BaseService } from "./BaseService";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
+import type { ServiceResult } from "./types/ServiceResults";
 import { CompetitionScheduler, type MatchPair } from "./CompetitionScheduler";
 import type { Competition } from "../domain/models";
-import { Logger } from "../lib/Logger";
 
-interface ScheduledMatch {
+export interface ScheduledMatch {
   competitionId: number;
   seasonId: number;
   homeTeamId: number;
@@ -32,78 +34,74 @@ interface SchedulableCompetition extends Competition {
   endMonth?: number;
 }
 
-export class CalendarService {
-  private continentalCompIds: Set<number> = new Set();
-  private readonly logger: Logger;
+export interface ScheduleSeasonInput {
+  competitions: Competition[];
+  allTeams: number[];
+}
 
-  constructor() {
-    this.logger = new Logger("CalendarService");
+export class CalendarService extends BaseService {
+  private continentalCompIds: Set<number> = new Set();
+
+  constructor(repositories: IRepositoryContainer) {
+    super(repositories, "CalendarService");
   }
 
   async scheduleSeason(
     competitions: Competition[],
     allTeams: number[]
-  ): Promise<ScheduledMatch[]> {
-    this.logger.info("🗓️ Iniciando agendamento hierárquico da temporada...");
+  ): Promise<ServiceResult<ScheduledMatch[]>> {
+    return this.execute(
+      "scheduleSeason",
+      { competitions, allTeams },
+      async ({ competitions, allTeams }) => {
+        this.continentalCompIds.clear();
 
-    this.continentalCompIds.clear();
+        (competitions as SchedulableCompetition[]).forEach((c) => {
+          if (
+            c.type === "group_knockout" ||
+            c.window === "continental" ||
+            c.name.includes("Libertadores") ||
+            c.name.includes("Sul-Americana")
+          ) {
+            this.continentalCompIds.add(c.id);
+          }
+        });
 
-    (competitions as SchedulableCompetition[]).forEach((c) => {
-      if (
-        c.type === "group_knockout" ||
-        c.window === "continental" ||
-        c.name.includes("Libertadores") ||
-        c.name.includes("Sul-Americana")
-      ) {
-        this.continentalCompIds.add(c.id);
+        const allMatchesToSave: ScheduledMatch[] = [];
+        const occupiedDates = new Map<string, Set<number>>();
+
+        const competitionWindows = this.prepareCompetitionWindows(
+          competitions,
+          allTeams
+        );
+
+        this.scheduleStateCompetitions(
+          competitionWindows,
+          occupiedDates,
+          allMatchesToSave
+        );
+
+        this.scheduleNationalCompetitions(
+          competitionWindows,
+          occupiedDates,
+          allMatchesToSave
+        );
+
+        this.scheduleContinentalCompetitions(
+          competitionWindows,
+          occupiedDates,
+          allMatchesToSave
+        );
+
+        return allMatchesToSave;
       }
-    });
-
-    const allMatchesToSave: ScheduledMatch[] = [];
-    const occupiedDates = new Map<string, Set<number>>();
-
-    try {
-      const competitionWindows = this.prepareCompetitionWindows(
-        competitions,
-        allTeams
-      );
-
-      this.scheduleStateCompetitions(
-        competitionWindows,
-        occupiedDates,
-        allMatchesToSave
-      );
-
-      this.scheduleNationalCompetitions(
-        competitionWindows,
-        occupiedDates,
-        allMatchesToSave
-      );
-
-      this.scheduleContinentalCompetitions(
-        competitionWindows,
-        occupiedDates,
-        allMatchesToSave
-      );
-
-      this.logger.info(
-        `✅ Agendamento concluído: ${allMatchesToSave.length} partidas geradas.`
-      );
-      return allMatchesToSave;
-    } catch (error) {
-      this.logger.error("Erro crítico ao agendar temporada:", error);
-      throw error;
-    }
+    );
   }
 
   private prepareCompetitionWindows(
     competitions: Competition[],
     allTeams: number[]
   ): CompetitionWindow[] {
-    this.logger.debug(
-      `Preparando janelas para ${competitions.length} competições.`
-    );
-
     return competitions.map((compRaw) => {
       const comp = compRaw as SchedulableCompetition;
       const compTeams = allTeams.slice(0, comp.teams);
@@ -111,8 +109,6 @@ export class CalendarService {
       let groupStructure: Record<string, number[]> | undefined;
 
       if (comp.type === "group_knockout") {
-        this.logger.info(`📊 Gerando fase de grupos para ${comp.name}`);
-
         const groupStage = CompetitionScheduler.generateGroupStageFixtures(
           compTeams,
           4,
@@ -150,10 +146,6 @@ export class CalendarService {
     const stateComps = windows.filter((w) => w.window === "state");
     if (stateComps.length === 0) return;
 
-    this.logger.info(
-      `📅 Agendando ${stateComps.length} competição(ões) estadual(is)...`
-    );
-
     const startDate = new Date("2025-01-20");
     const endDate = new Date("2025-04-30");
 
@@ -165,8 +157,6 @@ export class CalendarService {
       allMatches,
       [0, 6]
     );
-
-    this.logger.info(`✅ Estaduais agendados.`);
   }
 
   private scheduleNationalCompetitions(
@@ -176,10 +166,6 @@ export class CalendarService {
   ): void {
     const nationalComps = windows.filter((w) => w.window === "national");
     if (nationalComps.length === 0) return;
-
-    this.logger.info(
-      `📅 Agendando ${nationalComps.length} competição(ões) nacional(is)...`
-    );
 
     const startDate = new Date("2025-05-03");
     const endDate = new Date("2025-12-15");
@@ -192,8 +178,6 @@ export class CalendarService {
       allMatches,
       [0, 6]
     );
-
-    this.logger.info(`✅ Nacionais agendados.`);
   }
 
   private scheduleContinentalCompetitions(
@@ -203,10 +187,6 @@ export class CalendarService {
   ): void {
     const continentalComps = windows.filter((w) => w.window === "continental");
     if (continentalComps.length === 0) return;
-
-    this.logger.info(
-      `📅 Agendando ${continentalComps.length} competição(ões) continental(is)...`
-    );
 
     const startDate = new Date("2025-05-07");
     const endDate = new Date("2025-11-30");
@@ -220,8 +200,6 @@ export class CalendarService {
       [3],
       14
     );
-
-    this.logger.info(`✅ Continentais agendados.`);
   }
 
   private processSchedulingLoop(

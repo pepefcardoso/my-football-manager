@@ -1,6 +1,5 @@
 import { FinancialCategory } from "../domain/enums";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { Logger } from "../lib/Logger";
 import {
   FinancialThresholds,
   PenaltyWeights,
@@ -9,14 +8,40 @@ import {
 import { playerContracts } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import { db } from "../lib/db";
+import { BaseService } from "./BaseService";
+import type { ServiceResult } from "./types/ServiceResults";
+import { Result } from "./types/ServiceResults";
 
-export class FinanceService {
-  private readonly logger: Logger;
-  private readonly repos: IRepositoryContainer;
+export interface ProcessExpensesInput {
+  teamId: number;
+  currentDate: string;
+  seasonId: number;
+}
 
+export interface ProcessExpensesResult {
+  totalExpense: number;
+  newBudget: number;
+  playerWages: number;
+  staffWages: number;
+  message: string;
+}
+
+export interface FinancialHealthResult {
+  isHealthy: boolean;
+  currentBudget: number;
+  hasTransferBan: boolean;
+  penaltiesApplied: string[];
+  severity: "none" | "warning" | "critical";
+}
+
+export interface TransferPermissionResult {
+  allowed: boolean;
+  reason?: string;
+}
+
+export class FinanceService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
-    this.logger = new Logger("FinanceService");
+    super(repositories, "FinanceService");
   }
 
   static calculateMatchDayRevenue(
@@ -53,123 +78,102 @@ export class FinanceService {
   }
 
   async processMonthlyExpenses(
-    teamId: number,
-    currentDate: string,
-    seasonId: number
-  ): Promise<{
-    success: boolean;
-    totalExpense: number;
-    newBudget: number;
-    playerWages: number;
-    staffWages: number;
-    message: string;
-  }> {
-    this.logger.info(
-      `Processando despesas mensais para time ${teamId} em ${currentDate}`
-    );
+    input: ProcessExpensesInput
+  ): Promise<ServiceResult<ProcessExpensesResult>> {
+    return this.execute(
+      "processMonthlyExpenses",
+      input,
+      async ({ teamId, currentDate, seasonId }) => {
+        const team = await this.repos.teams.findById(teamId);
+        if (!team) {
+          throw new Error(`Time ${teamId} não encontrado`);
+        }
 
-    try {
-      const team = await this.repos.teams.findById(teamId);
-      if (!team) {
-        throw new Error(`Time ${teamId} não encontrado`);
-      }
+        const activeContracts = await db
+          .select()
+          .from(playerContracts)
+          .where(
+            and(
+              eq(playerContracts.teamId, teamId),
+              eq(playerContracts.status, "active")
+            )
+          );
 
-      const activeContracts = await db
-        .select()
-        .from(playerContracts)
-        .where(
-          and(
-            eq(playerContracts.teamId, teamId),
-            eq(playerContracts.status, "active")
-          )
+        const playerWages = Math.round(
+          activeContracts.reduce(
+            (sum, contract) => sum + (contract.wage || 0),
+            0
+          ) / 12
         );
 
-      const playerWages = Math.round(
-        activeContracts.reduce(
-          (sum, contract) => sum + (contract.wage || 0),
-          0
-        ) / 12
-      );
+        const allStaff = await this.repos.staff.findByTeamId(teamId);
+        const staffWages = Math.round(
+          allStaff.reduce((sum, s) => sum + (s.salary || 0), 0) / 12
+        );
 
-      const allStaff = await this.repos.staff.findByTeamId(teamId);
-      const staffWages = Math.round(
-        allStaff.reduce((sum, s) => sum + (s.salary || 0), 0) / 12
-      );
+        const infraMaintenance = this.calculateMonthlyMaintenance(
+          team.stadiumCapacity || 10000,
+          team.stadiumQuality || 50
+        );
 
-      const infraMaintenance = this.calculateMonthlyMaintenance(
-        team.stadiumCapacity || 10000,
-        team.stadiumQuality || 50
-      );
+        if (infraMaintenance > 0) {
+          await this.repos.financial.addRecord({
+            teamId,
+            seasonId,
+            date: currentDate,
+            type: "expense",
+            category: FinancialCategory.STADIUM_MAINTENANCE,
+            amount: infraMaintenance,
+            description: `Manutenção de Estádio e Instalações`,
+          });
+        }
 
-      if (infraMaintenance > 0) {
-        await this.repos.financial.addRecord({
-          teamId,
-          seasonId,
-          date: currentDate,
-          type: "expense",
-          category: FinancialCategory.STADIUM_MAINTENANCE,
-          amount: infraMaintenance,
-          description: `Manutenção de Estádio e Instalações`,
-        });
+        const currentBudget = team.budget ?? 0;
+        const totalExpense = playerWages + staffWages + infraMaintenance;
+        const newBudget = currentBudget - totalExpense;
+
+        await this.repos.teams.updateBudget(teamId, newBudget);
+
+        if (playerWages > 0) {
+          await this.repos.financial.addRecord({
+            teamId,
+            seasonId,
+            date: currentDate,
+            type: "expense",
+            category: FinancialCategory.SALARY,
+            amount: playerWages,
+            description: `Folha Salarial Mensal - ${activeContracts.length} jogadores`,
+          });
+        }
+
+        if (staffWages > 0) {
+          await this.repos.financial.addRecord({
+            teamId,
+            seasonId,
+            date: currentDate,
+            type: "expense",
+            category: FinancialCategory.STAFF_SALARY,
+            amount: staffWages,
+            description: `Folha Salarial Mensal - ${allStaff.length} profissionais`,
+          });
+        }
+
+        const budgetStatus = newBudget < 0 ? "NEGATIVO ⚠️" : "positivo";
+        const message = `Despesas mensais processadas: €${totalExpense.toLocaleString(
+          "pt-PT"
+        )} | Orçamento: €${newBudget.toLocaleString(
+          "pt-PT"
+        )} (${budgetStatus})`;
+
+        return {
+          totalExpense,
+          newBudget,
+          playerWages,
+          staffWages,
+          message,
+        };
       }
-
-      const currentBudget = team.budget ?? 0;
-      const totalExpense = playerWages + staffWages + infraMaintenance;
-
-      const newBudget = currentBudget - totalExpense;
-
-      await this.repos.teams.updateBudget(teamId, newBudget);
-
-      if (playerWages > 0) {
-        await this.repos.financial.addRecord({
-          teamId,
-          seasonId,
-          date: currentDate,
-          type: "expense",
-          category: FinancialCategory.SALARY,
-          amount: playerWages,
-          description: `Folha Salarial Mensal - ${activeContracts.length} jogadores`,
-        });
-      }
-
-      if (staffWages > 0) {
-        await this.repos.financial.addRecord({
-          teamId,
-          seasonId,
-          date: currentDate,
-          type: "expense",
-          category: FinancialCategory.STAFF_SALARY,
-          amount: staffWages,
-          description: `Folha Salarial Mensal - ${allStaff.length} profissionais`,
-        });
-      }
-
-      const budgetStatus = newBudget < 0 ? "NEGATIVO ⚠️" : "positivo";
-      const message = `Despesas mensais processadas: €${totalExpense.toLocaleString(
-        "pt-PT"
-      )} | Orçamento: €${newBudget.toLocaleString("pt-PT")} (${budgetStatus})`;
-
-      this.logger.info(message);
-
-      return {
-        success: true,
-        totalExpense,
-        newBudget,
-        playerWages,
-        staffWages,
-        message,
-      };
-    } catch (error) {
-      this.logger.error("Erro ao processar despesas mensais:", error);
-      return {
-        success: false,
-        totalExpense: 0,
-        newBudget: 0,
-        playerWages: 0,
-        staffWages: 0,
-        message: `Erro ao processar despesas: ${error}`,
-      };
-    }
+    );
   }
 
   private calculateMonthlyMaintenance(
@@ -178,11 +182,7 @@ export class FinanceService {
   ): number {
     const seatMaintenance = stadiumCapacity * 2;
     const qualityUpkeep = stadiumQuality * 1000;
-
-    const total = Math.round(seatMaintenance + qualityUpkeep);
-    this.logger.debug(`Custo de manutenção calculado: €${total}`);
-
-    return total;
+    return Math.round(seatMaintenance + qualityUpkeep);
   }
 
   static isPayDay(currentDate: string): boolean {
@@ -224,14 +224,10 @@ export class FinanceService {
       : map[category] || "Transação Diversa";
   }
 
-  async checkFinancialHealth(teamId: number): Promise<{
-    isHealthy: boolean;
-    currentBudget: number;
-    hasTransferBan: boolean;
-    penaltiesApplied: string[];
-    severity: "none" | "warning" | "critical";
-  }> {
-    try {
+  async checkFinancialHealth(
+    teamId: number
+  ): Promise<ServiceResult<FinancialHealthResult>> {
+    return this.execute("checkFinancialHealth", teamId, async (teamId) => {
       const team = await this.repos.teams.findById(teamId);
       if (!team) {
         throw new Error(`Time ${teamId} não encontrado`);
@@ -334,11 +330,6 @@ export class FinanceService {
             }
           }
         }
-
-        this.logger.info(`CRISE FINANCEIRA - ${team.name}`);
-        this.logger.info(`Dívida: €${debtAmount.toLocaleString("pt-PT")}`);
-        this.logger.info(`Severidade: ${severity.toUpperCase()}`);
-        penaltiesApplied.forEach((p) => this.logger.info(`   • ${p}`));
       }
 
       return {
@@ -348,28 +339,35 @@ export class FinanceService {
         penaltiesApplied,
         severity,
       };
-    } catch (error) {
-      this.logger.error("Erro ao verificar saúde financeira:", error);
-      throw error;
-    }
+    });
   }
 
-  async canMakeTransfers(teamId: number): Promise<{
-    allowed: boolean;
-    reason?: string;
-  }> {
-    const health = await this.checkFinancialHealth(teamId);
+  async canMakeTransfers(
+    teamId: number
+  ): Promise<ServiceResult<TransferPermissionResult>> {
+    return this.execute("canMakeTransfers", teamId, async (teamId) => {
+      const healthResult = await this.checkFinancialHealth(teamId);
 
-    if (health.hasTransferBan) {
-      return {
-        allowed: false,
-        reason: `Transfer Ban ativo. Orçamento atual: €${health.currentBudget.toLocaleString(
-          "pt-PT"
-        )}. Regularize as finanças do clube para desbloquear contratações.`,
-      };
-    }
+      if (!Result.isSuccess(healthResult)) {
+        return {
+          allowed: false,
+          reason: "Erro ao verificar saúde financeira",
+        };
+      }
 
-    return { allowed: true };
+      const health = healthResult.data;
+
+      if (health.hasTransferBan) {
+        return {
+          allowed: false,
+          reason: `Transfer Ban ativo. Orçamento atual: €${health.currentBudget.toLocaleString(
+            "pt-PT"
+          )}. Regularize as finanças do clube para desbloquear contratações.`,
+        };
+      }
+
+      return { allowed: true };
+    });
   }
 
   static calculateFinancialPenaltyFine(debtAmount: number): {
@@ -389,6 +387,6 @@ export class FinanceService {
   }
 
   async getFinancialRecords(teamId: number, seasonId: number) {
-    return await this.repos.financial.findByTeamAndSeason(teamId, seasonId);
+    return this.repos.financial.findByTeamAndSeason(teamId, seasonId);
   }
 }

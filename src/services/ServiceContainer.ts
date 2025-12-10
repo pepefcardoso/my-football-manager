@@ -39,13 +39,9 @@ export class ServiceContainer implements IServiceContainer {
     this.stats = new StatsService(repos);
     this.dailySimulation = new DailySimulationService(repos);
 
-    this.finance = new FinanceService(
-      repos,
-      this.contract,
-      this.infrastructure
-    );
-    this.season = new SeasonService(repos, this.calendar);
-    this.match = new MatchService(repos, this.marketing, this.stats);
+    this.finance = new FinanceService(repos);
+    this.season = new SeasonService(repos);
+    this.match = new MatchService(repos);
   }
 }
 

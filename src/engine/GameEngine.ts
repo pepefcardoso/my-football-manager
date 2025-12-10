@@ -1,9 +1,8 @@
 import type { GameState, Match, Player } from "../domain/models";
 import type { MatchResult, GameEvent } from "../domain/types";
 import { FinanceService } from "../services/FinanceService";
-import { contractService } from "../services/ContractService";
+import { serviceContainer } from "../services/ServiceContainer";
 import { Logger } from "../lib/Logger";
-import { matchService } from "../services/MatchService";
 
 const logger = new Logger("GameEngine");
 
@@ -79,14 +78,19 @@ export class GameEngine {
       const dateStr = this.getCurrentDate();
 
       try {
-        await contractService.processDailyWages(teamId, dateStr, seasonId);
+        await serviceContainer.contract.processDailyWages(
+          teamId,
+          dateStr,
+          seasonId
+        );
 
         if (FinanceService.isPayDay(dateStr)) {
-          const expenseResult = await FinanceService.processMonthlyExpenses(
-            teamId,
-            dateStr,
-            seasonId
-          );
+          const expenseResult =
+            await serviceContainer.finance.processMonthlyExpenses(
+              teamId,
+              dateStr,
+              seasonId
+            );
 
           if (expenseResult.success) {
             updates.financialChanges.push({
@@ -98,12 +102,13 @@ export class GameEngine {
           }
         }
 
-        const simulationResults = await matchService.simulateMatchesOfDate(
-          dateStr
-        );
+        const simulationResults =
+          await serviceContainer.match.simulateMatchesOfDate(dateStr);
 
         if (simulationResults.matchesPlayed > 0) {
-          updates.matchResults = simulationResults.results.map((r) => r.result);
+          updates.matchResults = simulationResults.results.map(
+            (r: { result: MatchResult }) => r.result
+          );
           // Aqui você pode converter os resultados para o formato de Match se necessário para a UI
           // updates.matchesPlayed = ...
 

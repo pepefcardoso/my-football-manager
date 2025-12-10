@@ -2,229 +2,301 @@ import type { Team } from "../domain/models";
 import { FinancialCategory } from "../domain/enums";
 import { MatchEngine } from "../engine/MatchEngine";
 import type { MatchConfig, MatchResult } from "../domain/types";
-import { Logger } from "../lib/Logger";
 import { CompetitionScheduler } from "./CompetitionScheduler";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { BaseService } from "./BaseService";
+import { Result } from "./types/ServiceResults";
+import type { ServiceResult } from "./types/ServiceResults";
 
-export class MatchService {
+export class MatchService extends BaseService {
   private engines: Map<number, MatchEngine> = new Map();
-  private readonly logger: Logger;
-  private readonly repos: IRepositoryContainer;
 
   constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
-    this.logger = new Logger("MatchService");
+    super(repositories, "MatchService");
   }
 
-  async initializeMatch(matchId: number): Promise<MatchEngine | null> {
-    this.logger.info(`Inicializando partida ${matchId}...`);
-    try {
-      const match = await this.repos.matches.findById(matchId);
-      if (!match) {
-        this.logger.error(`Partida ${matchId} não encontrada.`);
-        return null;
+  /**
+   * Inicializa o motor de jogo para uma partida específica.
+   * Carrega times, jogadores e configurações necessárias.
+   */
+  async initializeMatch(matchId: number): Promise<ServiceResult<void>> {
+    return this.executeVoid("initializeMatch", matchId, async (id) => {
+      await this.ensureEngineInitialized(id);
+    });
+  }
+
+  /**
+   * Inicia a partida (start).
+   */
+  async startMatch(matchId: number): Promise<ServiceResult<void>> {
+    return this.executeVoid("startMatch", matchId, async (id) => {
+      const engine = this.engines.get(id);
+      if (!engine) {
+        throw new Error(`Partida ${id} não inicializada.`);
+      }
+      engine.start();
+    });
+  }
+
+  /**
+   * Pausa a partida.
+   */
+  async pauseMatch(matchId: number): Promise<ServiceResult<void>> {
+    return this.executeVoid("pauseMatch", matchId, async (id) => {
+      const engine = this.engines.get(id);
+      if (!engine) {
+        throw new Error(`Partida ${id} não inicializada.`);
+      }
+      engine.pause();
+    });
+  }
+
+  /**
+   * Retoma a partida (resume).
+   */
+  async resumeMatch(matchId: number): Promise<ServiceResult<void>> {
+    return this.executeVoid("resumeMatch", matchId, async (id) => {
+      const engine = this.engines.get(id);
+      if (!engine) {
+        throw new Error(`Partida ${id} não inicializada.`);
+      }
+      engine.resume();
+    });
+  }
+
+  /**
+   * Simula um minuto da partida.
+   */
+  async simulateMinute(matchId: number): Promise<
+    ServiceResult<{
+      currentMinute: number;
+      score: { home: number; away: number };
+      newEvents: any[];
+    }>
+  > {
+    return this.execute("simulateMinute", matchId, async (id) => {
+      const engine = this.engines.get(id);
+      if (!engine) {
+        throw new Error(`Partida ${id} não inicializada.`);
       }
 
-      const homeTeamData = await this.repos.teams.findById(match.homeTeamId!);
-      const awayTeamData = await this.repos.teams.findById(match.awayTeamId!);
+      const eventsBefore = engine.getEvents().length;
+      engine.simulateMinute();
 
-      if (!homeTeamData || !awayTeamData) {
-        this.logger.error("Times não encontrados para a partida.");
-        return null;
-      }
+      const allEvents = engine.getEvents();
+      const newEvents = allEvents.slice(eventsBefore);
 
-      const mapToDomainTeam = (dbTeam: typeof homeTeamData): Team => ({
-        ...dbTeam,
-        primaryColor: dbTeam.primaryColor ?? "#000000",
-        secondaryColor: dbTeam.secondaryColor ?? "#ffffff",
-        reputation: dbTeam.reputation ?? 0,
-        budget: dbTeam.budget ?? 0,
-        stadiumCapacity: dbTeam.stadiumCapacity ?? 10000,
-        stadiumQuality: dbTeam.stadiumQuality ?? 50,
-        trainingCenterQuality: dbTeam.trainingCenterQuality ?? 50,
-        youthAcademyQuality: dbTeam.youthAcademyQuality ?? 50,
-        fanSatisfaction: dbTeam.fanSatisfaction ?? 50,
-        fanBase: dbTeam.fanBase ?? 10000,
-        isHuman: dbTeam.isHuman ?? false,
-      });
-
-      const homeTeam = mapToDomainTeam(homeTeamData);
-      const awayTeam = mapToDomainTeam(awayTeamData);
-
-      const allHomePlayers = await this.repos.players.findByTeamId(
-        match.homeTeamId!
-      );
-      const allAwayPlayers = await this.repos.players.findByTeamId(
-        match.awayTeamId!
-      );
-
-      const homePlayers = allHomePlayers.filter((p) => !p.isInjured);
-      const awayPlayers = allAwayPlayers.filter((p) => !p.isInjured);
-
-      const config: MatchConfig = {
-        homeTeam,
-        awayTeam,
-        homePlayers,
-        awayPlayers,
-        weather: match.weather as any,
-      };
-
-      let isKnockout = false;
-      if (match.competitionId) {
-        const competitions = await this.repos.competitions.findAll();
-        const competition = competitions.find(
-          (c) => c.id === match.competitionId
+      if (newEvents.length > 0) {
+        this.logger.debug(
+          `Eventos no minuto ${engine.getCurrentMinute()}:`,
+          newEvents
         );
+      }
 
-        if (
-          competition &&
-          (competition.type === "knockout" ||
-            competition.type === "group_knockout")
-        ) {
-          isKnockout = true;
+      return {
+        currentMinute: engine.getCurrentMinute(),
+        score: engine.getCurrentScore(),
+        newEvents,
+      };
+    });
+  }
+
+  /**
+   * Simula a partida completa instantaneamente.
+   */
+  async simulateFullMatch(
+    matchId: number
+  ): Promise<ServiceResult<MatchResult>> {
+    return this.execute("simulateFullMatch", matchId, async (id) => {
+      const engine = await this.ensureEngineInitialized(id);
+
+      engine.simulateToCompletion();
+
+      const result = engine.getMatchResult();
+      await this.saveMatchResult(id, result);
+
+      this.engines.delete(id);
+
+      this.logger.info(
+        `Simulação completa finalizada para partida ${id}. Placar: ${result.homeScore}-${result.awayScore}`
+      );
+
+      return result;
+    });
+  }
+
+  /**
+   * Obtém o estado atual da partida (para UI).
+   */
+  async getMatchState(matchId: number): Promise<ServiceResult<any>> {
+    return this.execute("getMatchState", matchId, async (id) => {
+      const engine = this.engines.get(id);
+      if (!engine) {
+        throw new Error(`Partida ${id} não está carregada em memória.`);
+      }
+
+      return {
+        state: engine.getState(),
+        currentMinute: engine.getCurrentMinute(),
+        score: engine.getCurrentScore(),
+        events: engine.getEvents(),
+      };
+    });
+  }
+
+  /**
+   * Simula todas as partidas pendentes de uma data específica.
+   */
+  async simulateMatchesOfDate(date: string): Promise<
+    ServiceResult<{
+      matchesPlayed: number;
+      results: Array<{ matchId: number; result: MatchResult }>;
+    }>
+  > {
+    return this.execute("simulateMatchesOfDate", date, async (dateStr) => {
+      const matches = await this.repos.matches.findPendingMatchesByDate(
+        dateStr
+      );
+
+      const results: Array<{ matchId: number; result: MatchResult }> = [];
+
+      for (const match of matches) {
+        const resultWrapper = await this.simulateFullMatch(match.id);
+        if (Result.isSuccess(resultWrapper)) {
+          results.push({ matchId: match.id, result: resultWrapper.data });
         }
       }
 
-      const engine = new MatchEngine(config, isKnockout);
-      this.engines.set(matchId, engine);
-
-      this.logger.info(`Partida ${matchId} inicializada com sucesso.`);
-      return engine;
-    } catch (error) {
-      this.logger.error("Erro ao inicializar partida:", error);
-      return null;
-    }
+      return {
+        matchesPlayed: results.length,
+        results,
+      };
+    });
   }
 
-  startMatch(matchId: number): boolean {
-    const engine = this.engines.get(matchId);
-    if (!engine) {
-      this.logger.warn(`Tentativa de iniciar partida ${matchId} sem engine.`);
-      return false;
-    }
+  /**
+   * Recupera ou inicializa a engine de uma partida.
+   */
+  private async ensureEngineInitialized(matchId: number): Promise<MatchEngine> {
+    let engine = this.engines.get(matchId);
+    if (engine) return engine;
 
-    engine.start();
-    this.logger.info(`Partida ${matchId} iniciada.`);
-    return true;
-  }
-
-  pauseMatch(matchId: number): boolean {
-    const engine = this.engines.get(matchId);
-    if (!engine) return false;
-
-    engine.pause();
-    return true;
-  }
-
-  resumeMatch(matchId: number): boolean {
-    const engine = this.engines.get(matchId);
-    if (!engine) return false;
-
-    engine.resume();
-    return true;
-  }
-
-  simulateMinute(matchId: number): {
-    currentMinute: number;
-    score: { home: number; away: number };
-    newEvents: any[];
-  } | null {
-    const engine = this.engines.get(matchId);
-    if (!engine) return null;
-
-    const eventsBefore = engine.getEvents().length;
-    engine.simulateMinute();
-
-    const allEvents = engine.getEvents();
-    const newEvents = allEvents.slice(eventsBefore);
-
-    if (newEvents.length > 0) {
-      this.logger.debug(
-        `Eventos no minuto ${engine.getCurrentMinute()}:`,
-        newEvents
-      );
+    const match = await this.repos.matches.findById(matchId);
+    if (!match) {
+      throw new Error(`Partida ${matchId} não encontrada no banco de dados.`);
     }
 
-    return {
-      currentMinute: engine.getCurrentMinute(),
-      score: engine.getCurrentScore(),
-      newEvents,
-    };
-  }
+    const homeTeamData = await this.repos.teams.findById(match.homeTeamId!);
+    const awayTeamData = await this.repos.teams.findById(match.awayTeamId!);
 
-  async simulateFullMatch(matchId: number): Promise<MatchResult | null> {
-    this.logger.info(`Simulando partida completa: ${matchId}`);
-
-    const engine = this.engines.get(matchId);
-    if (!engine) {
-      const initialized = await this.initializeMatch(matchId);
-      if (!initialized) return null;
-      return this.simulateFullMatch(matchId);
+    if (!homeTeamData || !awayTeamData) {
+      throw new Error("Times não encontrados para a partida.");
     }
 
-    engine.simulateToCompletion();
+    const mapToDomainTeam = (dbTeam: typeof homeTeamData): Team => ({
+      ...dbTeam,
+      primaryColor: dbTeam.primaryColor ?? "#000000",
+      secondaryColor: dbTeam.secondaryColor ?? "#ffffff",
+      reputation: dbTeam.reputation ?? 0,
+      budget: dbTeam.budget ?? 0,
+      stadiumCapacity: dbTeam.stadiumCapacity ?? 10000,
+      stadiumQuality: dbTeam.stadiumQuality ?? 50,
+      trainingCenterQuality: dbTeam.trainingCenterQuality ?? 50,
+      youthAcademyQuality: dbTeam.youthAcademyQuality ?? 50,
+      fanSatisfaction: dbTeam.fanSatisfaction ?? 50,
+      fanBase: dbTeam.fanBase ?? 10000,
+      isHuman: dbTeam.isHuman ?? false,
+    });
 
-    const result = engine.getMatchResult();
-    await this.saveMatchResult(matchId, result);
+    const homeTeam = mapToDomainTeam(homeTeamData);
+    const awayTeam = mapToDomainTeam(awayTeamData);
 
-    this.engines.delete(matchId);
-    this.logger.info(
-      `Simulação completa finalizada para partida ${matchId}. Placar: ${result.homeScore}-${result.awayScore}`
+    const allHomePlayers = await this.repos.players.findByTeamId(
+      match.homeTeamId!
+    );
+    const allAwayPlayers = await this.repos.players.findByTeamId(
+      match.awayTeamId!
     );
 
-    return result;
+    const homePlayers = allHomePlayers.filter((p) => !p.isInjured);
+    const awayPlayers = allAwayPlayers.filter((p) => !p.isInjured);
+
+    const config: MatchConfig = {
+      homeTeam,
+      awayTeam,
+      homePlayers,
+      awayPlayers,
+      weather: (match.weather as any) || "sunny",
+    };
+
+    let isKnockout = false;
+    if (match.competitionId) {
+      const competitions = await this.repos.competitions.findAll();
+      const competition = competitions.find(
+        (c) => c.id === match.competitionId
+      );
+
+      if (
+        competition &&
+        (competition.type === "knockout" ||
+          competition.type === "group_knockout")
+      ) {
+        isKnockout = true;
+      }
+    }
+
+    engine = new MatchEngine(config, isKnockout);
+    this.engines.set(matchId, engine);
+    this.logger.info(`Engine inicializada para partida ${matchId}.`);
+
+    return engine;
   }
 
   private async saveMatchResult(
     matchId: number,
     result: MatchResult
   ): Promise<void> {
-    try {
-      const match = await this.repos.matches.findById(matchId);
-      if (!match) return;
+    const match = await this.repos.matches.findById(matchId);
+    if (!match) return;
 
-      const homeTeam = await this.repos.teams.findById(match.homeTeamId!);
-      if (!homeTeam) return;
+    const homeTeam = await this.repos.teams.findById(match.homeTeamId!);
+    if (!homeTeam) return;
 
-      const { ticketRevenue, attendance } = await this.calculateMatchRevenue(
-        match,
-        homeTeam
-      );
+    const { ticketRevenue, attendance } = await this.calculateMatchRevenue(
+      match,
+      homeTeam
+    );
 
-      await this.repos.matches.updateMatchResult(
-        matchId,
+    await this.repos.matches.updateMatchResult(
+      matchId,
+      result.homeScore,
+      result.awayScore,
+      attendance,
+      ticketRevenue
+    );
+
+    await this.saveMatchEvents(matchId, result);
+    await this.updatePlayerConditions(result);
+    await this.processMatchFinancials(
+      match,
+      homeTeam,
+      ticketRevenue,
+      attendance
+    );
+
+    if (match.competitionId && match.seasonId) {
+      await this.updateStandings(
+        match.competitionId,
+        match.seasonId,
+        match.homeTeamId!,
+        match.awayTeamId!,
         result.homeScore,
-        result.awayScore,
-        attendance,
-        ticketRevenue
+        result.awayScore
       );
-
-      await this.saveMatchEvents(matchId, result);
-      await this.updatePlayerConditions(result);
-      await this.processMatchFinancials(
-        match,
-        homeTeam,
-        ticketRevenue,
-        attendance
-      );
-
-      if (match.competitionId && match.seasonId) {
-        await this.updateStandings(
-          match.competitionId,
-          match.seasonId,
-          match.homeTeamId!,
-          match.awayTeamId!,
-          result.homeScore,
-          result.awayScore
-        );
-      }
-
-      await this.updateFanSatisfaction(match, result);
-      await this.checkCupProgression(matchId);
-    } catch (error) {
-      this.logger.error("❌ Erro ao salvar resultado da partida:", error);
-      throw error;
     }
+
+    await this.updateFanSatisfaction(match, result);
+    await this.checkCupProgression(matchId);
   }
 
   private async calculateMatchRevenue(
@@ -318,12 +390,6 @@ export class MatchService {
           "pt-PT"
         )} torcedores presentes`,
       });
-
-      this.logger.info(
-        `💰 Receita de bilheteria registrada: €${ticketRevenue.toLocaleString(
-          "pt-PT"
-        )} (${attendance} torcedores)`
-      );
 
       const currentBudget = homeTeam.budget ?? 0;
       await this.repos.teams.updateBudget(
@@ -525,39 +591,5 @@ export class MatchService {
         points: (awayData?.points || 0) + (awayWin ? 3 : draw ? 1 : 0),
       }
     );
-  }
-
-  getMatchState(matchId: number) {
-    const engine = this.engines.get(matchId);
-    if (!engine) return null;
-
-    return {
-      state: engine.getState(),
-      currentMinute: engine.getCurrentMinute(),
-      score: engine.getCurrentScore(),
-      events: engine.getEvents(),
-    };
-  }
-
-  async simulateMatchesOfDate(date: string): Promise<{
-    matchesPlayed: number;
-    results: Array<{ matchId: number; result: MatchResult }>;
-  }> {
-    this.logger.info(`Simulando partidas do dia: ${date}`);
-    const matches = await this.repos.matches.findPendingMatchesByDate(date);
-
-    const results: Array<{ matchId: number; result: MatchResult }> = [];
-
-    for (const match of matches) {
-      const result = await this.simulateFullMatch(match.id);
-      if (result) {
-        results.push({ matchId: match.id, result });
-      }
-    }
-
-    return {
-      matchesPlayed: results.length,
-      results,
-    };
   }
 }

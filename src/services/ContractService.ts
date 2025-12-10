@@ -1,8 +1,10 @@
-import { FinancialCategory } from "../domain/enums";
-import { db } from "../lib/db";
-import { playerContracts } from "../db/schema";
 import { eq, and } from "drizzle-orm";
-import { Logger } from "../lib/Logger";
+import { playerContracts } from "../db/schema";
+import { db } from "../lib/db";
+import { FinancialCategory } from "../domain/enums";
+import { BaseService } from "./BaseService";
+import { Result } from "./types/ServiceResults";
+import type { ServiceResult } from "./types/ServiceResults";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 
 export interface WageBillDetails {
@@ -18,19 +20,27 @@ export interface ContractExpirationResult {
   staffReleased: number;
 }
 
-export class ContractService {
-  private readonly logger: Logger;
-  private readonly repos: IRepositoryContainer;
+export interface ProcessDailyWagesInput {
+  teamId: number;
+  currentDate: string;
+  seasonId: number;
+}
 
+export interface RenewContractInput {
+  playerId: number;
+  newWage: number;
+  newEndDate: string;
+}
+
+export class ContractService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
-    this.logger = new Logger("ContractService");
+    super(repositories, "ContractService");
   }
 
-  async calculateMonthlyWageBill(teamId: number): Promise<WageBillDetails> {
-    this.logger.debug(`Calculando folha salarial para o time ${teamId}`);
-
-    try {
+  async calculateMonthlyWageBill(
+    teamId: number
+  ): Promise<ServiceResult<WageBillDetails>> {
+    return this.execute("calculateMonthlyWageBill", teamId, async (teamId) => {
       const [playerWages, staffWages] = await Promise.all([
         this.calculatePlayerWages(teamId),
         this.calculateStaffWages(teamId),
@@ -43,111 +53,99 @@ export class ContractService {
         playerCount: playerWages.count,
         staffCount: staffWages.count,
       };
-    } catch (error) {
-      this.logger.error("Erro ao calcular folha salarial:", error);
-      throw error;
-    }
+    });
   }
 
   async checkExpiringContracts(
     currentDate: string
-  ): Promise<ContractExpirationResult> {
-    this.logger.info(`Verificando contratos expirando em ${currentDate}`);
-
-    try {
+  ): Promise<ServiceResult<ContractExpirationResult>> {
+    return this.execute("checkExpiringContracts", currentDate, async (date) => {
       const [playersReleased, staffReleased] = await Promise.all([
-        this.processExpiringPlayerContracts(currentDate),
-        this.processExpiringStaffContracts(currentDate),
+        this.processExpiringPlayerContracts(date),
+        this.processExpiringStaffContracts(date),
       ]);
 
       return { playersReleased, staffReleased };
-    } catch (error) {
-      this.logger.error("Erro ao verificar contratos expirando:", error);
-      return { playersReleased: 0, staffReleased: 0 };
-    }
+    });
   }
 
   async processDailyWages(
-    teamId: number,
-    currentDate: string,
-    seasonId: number
-  ): Promise<void> {
-    this.logger.debug(`Processando salários diários para time ${teamId}`);
+    input: ProcessDailyWagesInput
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "processDailyWages",
+      input,
+      async ({ teamId, currentDate, seasonId }) => {
+        const wageBillResult = await this.calculateMonthlyWageBill(teamId);
 
-    try {
-      const wageBill = await this.calculateMonthlyWageBill(teamId);
+        if (Result.isFailure(wageBillResult)) {
+          throw new Error(wageBillResult.error.message);
+        }
 
-      const dailyPlayerWages = Math.round(wageBill.playerWages / 30);
-      const dailyStaffWages = Math.round(wageBill.staffWages / 30);
+        const wageBill = wageBillResult.data;
+        const dailyPlayerWages = Math.round(wageBill.playerWages / 30);
+        const dailyStaffWages = Math.round(wageBill.staffWages / 30);
 
-      if (dailyPlayerWages > 0) {
-        await this.repos.financial.addRecord({
-          teamId,
-          seasonId,
-          date: currentDate,
-          type: "expense",
-          category: FinancialCategory.SALARY,
-          amount: dailyPlayerWages,
-          description: "Salários Diários - Jogadores",
-        });
+        if (dailyPlayerWages > 0) {
+          await this.repos.financial.addRecord({
+            teamId,
+            seasonId,
+            date: currentDate,
+            type: "expense",
+            category: FinancialCategory.SALARY,
+            amount: dailyPlayerWages,
+            description: "Salários Diários - Jogadores",
+          });
+        }
+
+        if (dailyStaffWages > 0) {
+          await this.repos.financial.addRecord({
+            teamId,
+            seasonId,
+            date: currentDate,
+            type: "expense",
+            category: FinancialCategory.STAFF_SALARY,
+            amount: dailyStaffWages,
+            description: "Salários Diários - Staff",
+          });
+        }
       }
-
-      if (dailyStaffWages > 0) {
-        await this.repos.financial.addRecord({
-          teamId,
-          seasonId,
-          date: currentDate,
-          type: "expense",
-          category: FinancialCategory.STAFF_SALARY,
-          amount: dailyStaffWages,
-          description: "Salários Diários - Staff",
-        });
-      }
-    } catch (error) {
-      this.logger.error("Erro ao processar salários diários:", error);
-    }
+    );
   }
 
   async renewPlayerContract(
-    playerId: number,
-    newWage: number,
-    newEndDate: string
-  ): Promise<void> {
-    this.logger.info(`Tentativa de renovação: Jogador ${playerId}`);
-
-    try {
-      const currentContract = await db
-        .select()
-        .from(playerContracts)
-        .where(
-          and(
-            eq(playerContracts.playerId, playerId),
-            eq(playerContracts.status, "active")
+    input: RenewContractInput
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "renewPlayerContract",
+      input,
+      async ({ playerId, newWage, newEndDate }) => {
+        const currentContract = await db
+          .select()
+          .from(playerContracts)
+          .where(
+            and(
+              eq(playerContracts.playerId, playerId),
+              eq(playerContracts.status, "active")
+            )
           )
-        )
-        .limit(1);
+          .limit(1);
 
-      if (currentContract.length === 0) {
-        throw new Error(
-          `Nenhum contrato ativo encontrado para jogador ${playerId}`
-        );
+        if (currentContract.length === 0) {
+          throw new Error(
+            `Nenhum contrato ativo encontrado para jogador ${playerId}`
+          );
+        }
+
+        await db
+          .update(playerContracts)
+          .set({
+            wage: newWage,
+            endDate: newEndDate,
+          })
+          .where(eq(playerContracts.id, currentContract[0].id));
       }
-
-      await db
-        .update(playerContracts)
-        .set({
-          wage: newWage,
-          endDate: newEndDate,
-        })
-        .where(eq(playerContracts.id, currentContract[0].id));
-
-      this.logger.info(
-        `Contrato renovado: Jogador ${playerId} - €${newWage.toLocaleString()}/ano até ${newEndDate}`
-      );
-    } catch (error) {
-      this.logger.error("Erro ao renovar contrato:", error);
-      throw error;
-    }
+    );
   }
 
   private async calculatePlayerWages(teamId: number): Promise<{
@@ -212,10 +210,6 @@ export class ContractService {
         .where(eq(playerContracts.id, contract.id));
 
       await this.repos.players.update(contract.playerId, { teamId: null });
-
-      this.logger.info(
-        `Contrato expirado: Jogador ID ${contract.playerId} liberado`
-      );
     }
 
     return expiringContracts.length;
@@ -229,7 +223,6 @@ export class ContractService {
 
     for (const member of expiredStaff) {
       await this.repos.staff.fire(member.id);
-      this.logger.info(`Contrato expirado: Staff ID ${member.id} liberado`);
     }
 
     return expiredStaff.length;

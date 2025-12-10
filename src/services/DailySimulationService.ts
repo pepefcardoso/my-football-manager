@@ -1,11 +1,12 @@
+import { BaseService } from "./BaseService";
+import type { ServiceResult } from "./types/ServiceResults";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { RandomEngine } from "../engine/RandomEngine";
 import { GameEngine } from "../engine/GameEngine";
 import { AttributeCalculator } from "../engine/AttributeCalculator";
 import type { Player } from "../domain/models";
 import { TrainingFocus, Position } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
-import { Logger } from "../lib/Logger";
-import type { IRepositoryContainer } from "../repositories/IRepositories";
 
 export interface PlayerTrainingUpdate {
   id: number;
@@ -29,72 +30,77 @@ export interface TeamTrainingResult {
   logs: string[];
 }
 
-export class DailySimulationService {
+export interface ProcessTeamDailyLoopInput {
+  teamId: number;
+  trainingFocus: TrainingFocus;
+  staffImpact: TeamStaffImpact;
+}
+
+export class DailySimulationService extends BaseService {
   private gameEngine: GameEngine;
-  private readonly logger: Logger;
-  private readonly repos: IRepositoryContainer;
 
   constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
+    super(repositories, "DailySimulationService");
     this.gameEngine = new GameEngine();
-    this.logger = new Logger("DailySimulationService");
   }
 
   async processTeamDailyLoop(
     teamId: number,
     trainingFocus: TrainingFocus,
     staffImpact: TeamStaffImpact
-  ): Promise<TeamTrainingResult> {
-    this.logger.info(
-      `🏋️ Iniciando treino diário para time ${teamId}. Foco: ${trainingFocus.toUpperCase()}`
-    );
-    this.logger.debug("Impacto do Staff aplicado:", staffImpact);
+  ): Promise<ServiceResult<TeamTrainingResult>> {
+    return this.execute(
+      "processTeamDailyLoop",
+      { teamId, trainingFocus, staffImpact },
+      async ({ teamId, trainingFocus, staffImpact }) => {
+        this.logger.info(
+          `🏋️ Iniciando treino diário para time ${teamId}. Foco: ${trainingFocus.toUpperCase()}`
+        );
+        this.logger.debug("Impacto do Staff aplicado:", staffImpact);
 
-    const logs: string[] = [];
-    const playerUpdates: PlayerTrainingUpdate[] = [];
+        const logs: string[] = [];
+        const playerUpdates: PlayerTrainingUpdate[] = [];
 
-    logs.push(`Treino do dia: ${this.translateFocus(trainingFocus)}`);
+        logs.push(`Treino do dia: ${this.translateFocus(trainingFocus)}`);
 
-    try {
-      const players = await this.repos.players.findByTeamId(teamId);
-      this.logger.info(`Processando ${players.length} jogadores...`);
+        const players = await this.repos.players.findByTeamId(teamId);
+        this.logger.info(`Processando ${players.length} jogadores...`);
 
-      for (const player of players) {
-        if (player.isInjured) {
-          const update = await this.processInjuredPlayer(player);
-          playerUpdates.push(update);
+        for (const player of players) {
+          if (player.isInjured) {
+            const update = await this.processInjuredPlayer(player);
+            playerUpdates.push(update);
 
-          if (update.injuryDays === 0 && player.injuryDaysRemaining > 0) {
-            const msg = `🚑 ${player.firstName} ${player.lastName} recuperou-se da lesão.`;
-            logs.push(msg);
-            this.logger.info(
-              `[Recuperação] Jogador ${player.id} está recuperado.`
-            );
+            if (update.injuryDays === 0 && player.injuryDaysRemaining > 0) {
+              const msg = `🚑 ${player.firstName} ${player.lastName} recuperou-se da lesão.`;
+              logs.push(msg);
+              this.logger.info(
+                `[Recuperação] Jogador ${player.id} está recuperado.`
+              );
+            }
+            continue;
           }
-          continue;
+
+          const update = await this.processHealthyPlayer(
+            player,
+            trainingFocus,
+            staffImpact,
+            logs
+          );
+          playerUpdates.push(update);
         }
 
-        const update = await this.processHealthyPlayer(
-          player,
-          trainingFocus,
-          staffImpact,
-          logs
+        if (playerUpdates.length > 0) {
+          await this.repos.players.updateDailyStatsBatch(playerUpdates);
+        }
+
+        this.logger.info(
+          `Treino finalizado. ${playerUpdates.length} jogadores processados e atualizados.`
         );
-        playerUpdates.push(update);
-      }
 
-      if (playerUpdates.length > 0) {
-        await this.repos.players.updateDailyStatsBatch(playerUpdates);
+        return { playerUpdates, logs };
       }
-
-      this.logger.info(
-        `Treino finalizado. ${playerUpdates.length} jogadores processados e atualizados.`
-      );
-      return { playerUpdates, logs };
-    } catch (error) {
-      this.logger.error("❌ Erro crítico no loop de treino diário:", error);
-      return { playerUpdates: [], logs: ["Erro interno ao processar treino."] };
-    }
+    );
   }
 
   private async processInjuredPlayer(

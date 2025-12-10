@@ -1,15 +1,15 @@
 import type { MatchResult } from "../domain/types";
 import { MatchEventType } from "../domain/enums";
-import { Logger } from "../lib/Logger";
-import type { IRepositoryContainer } from "../repositories/IRepositories";
+import type {
+  IRepositoryContainer,
+  PlayerCompetitionStats,
+} from "../repositories/IRepositories";
+import { BaseService } from "./BaseService";
+import type { ServiceResult } from "./types/ServiceResults";
 
-export class StatsService {
-  private readonly logger: Logger;
-  private readonly repos: IRepositoryContainer;
-
+export class StatsService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
-    this.logger = new Logger("StatsService");
+    super(repositories, "StatsService");
   }
 
   async processMatchStats(
@@ -17,38 +17,87 @@ export class StatsService {
     competitionId: number,
     seasonId: number,
     result: MatchResult
-  ): Promise<void> {
-    this.logger.info(
-      `Processando estatísticas da partida ${matchId} (Comp: ${competitionId})...`
-    );
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "processMatchStats",
+      { matchId, competitionId, seasonId, result },
+      async ({ matchId, competitionId, seasonId, result }) => {
+        const match = await this.repos.matches.findById(matchId);
 
-    try {
-      const match = await this.repos.matches.findById(matchId);
-      if (!match) {
-        this.logger.warn(
-          `Partida ${matchId} não encontrada. Estatísticas ignoradas.`
-        );
-        return;
+        if (!match) {
+          this.logger.warn(
+            `Partida ${matchId} não encontrada. Estatísticas ignoradas.`
+          );
+          return;
+        }
+
+        await this.updatePlayerStats(competitionId, seasonId, result, match);
       }
-
-      await this.updatePlayerStats(competitionId, seasonId, result, match);
-      this.logger.info(
-        `Estatísticas atualizadas com sucesso para a partida ${matchId}.`
-      );
-    } catch (error) {
-      this.logger.error(
-        `Erro ao processar estatísticas da partida ${matchId}:`,
-        error
-      );
-    }
+    );
   }
+
+  async getTopGoalkeepers(
+    competitionId: number,
+    seasonId: number,
+    limit: number = 10
+  ): Promise<ServiceResult<any[]>> {
+    return this.execute(
+      "getTopGoalkeepers",
+      { competitionId, seasonId, limit },
+      async ({ competitionId, seasonId, limit }) => {
+        return await this.repos.competitions.getTopGoalkeepers(
+          competitionId,
+          seasonId,
+          limit
+        );
+      }
+    );
+  }
+
+  async getTopScorers(
+    competitionId: number,
+    seasonId: number,
+    limit: number = 10
+  ): Promise<ServiceResult<any[]>> {
+    return this.execute(
+      "getTopScorers",
+      { competitionId, seasonId, limit },
+      async ({ competitionId, seasonId, limit }) => {
+        return await this.repos.competitions.getTopScorers(
+          competitionId,
+          seasonId,
+          limit
+        );
+      }
+    );
+  }
+
+  async getPlayerStats(
+    playerId: number,
+    competitionId: number,
+    seasonId: number
+  ): Promise<ServiceResult<PlayerCompetitionStats | undefined>> {
+    return this.execute(
+      "getPlayerStats",
+      { playerId, competitionId, seasonId },
+      async ({ playerId, competitionId, seasonId }) => {
+        return await this.repos.competitions.findPlayerStats(
+          playerId,
+          competitionId,
+          seasonId
+        );
+      }
+    );
+  }
+
+  // Métodos privados (Lógica de Negócio Interna)
 
   private async updatePlayerStats(
     competitionId: number,
     seasonId: number,
     result: MatchResult,
     match: any
-  ) {
+  ): Promise<void> {
     const events = result.events;
     this.logger.debug(
       `Analisando ${events.length} eventos para estatísticas individuais...`
@@ -65,6 +114,7 @@ export class StatsService {
       }
     >();
 
+    // Agrega estatísticas baseadas nos eventos
     events.forEach((event) => {
       if (!event.playerId) return;
 
@@ -85,6 +135,7 @@ export class StatsService {
       statsMap.set(event.playerId, current);
     });
 
+    // Identifica todos os jogadores envolvidos (via updates ou eventos)
     const allPlayerIds = new Set([
       ...result.playerUpdates.map((u) => u.playerId),
       ...Array.from(statsMap.keys()),
@@ -107,6 +158,7 @@ export class StatsService {
       let cleanSheet = 0;
       let goalsConceded = 0;
 
+      // Lógica específica para goleiros
       if (player.position === "GK") {
         const isHomeTeam = player.teamId === match.homeTeamId;
         const goalsAgainst = isHomeTeam ? result.awayScore : result.homeScore;
@@ -158,69 +210,5 @@ export class StatsService {
     this.logger.debug(
       `Estatísticas individuais atualizadas para ${updatedCount} jogadores.`
     );
-  }
-
-  async getTopGoalkeepers(
-    competitionId: number,
-    seasonId: number,
-    limit: number = 10
-  ) {
-    this.logger.debug(
-      `Buscando top ${limit} goleiros (Comp: ${competitionId})`
-    );
-    try {
-      return await this.repos.competitions.getTopGoalkeepers(
-        competitionId,
-        seasonId,
-        limit
-      );
-    } catch (error) {
-      this.logger.error("Erro ao buscar top goleiros:", error);
-      return [];
-    }
-  }
-
-  async getTopScorers(
-    competitionId: number,
-    seasonId: number,
-    limit: number = 10
-  ) {
-    this.logger.debug(
-      `Buscando top ${limit} artilheiros (Comp: ${competitionId})`
-    );
-    try {
-      return await this.repos.competitions.getTopScorers(
-        competitionId,
-        seasonId,
-        limit
-      );
-    } catch (error) {
-      this.logger.error("Erro ao buscar top artilheiros:", error);
-      return [];
-    }
-  }
-
-  async getPlayerStats(
-    playerId: number,
-    competitionId: number,
-    seasonId: number
-  ) {
-    this.logger.debug(
-      `Buscando estatísticas do jogador ${playerId} na competição ${competitionId}...`
-    );
-
-    try {
-      return await this.repos.competitions.findPlayerStats(
-        playerId,
-        competitionId,
-        seasonId
-      );
-    } catch (error) {
-      this.logger.error(
-        `Erro ao buscar estatísticas do jogador ${playerId}:`,
-        error
-      );
-      return null;
-    }
   }
 }

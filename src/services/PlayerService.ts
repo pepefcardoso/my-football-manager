@@ -1,161 +1,118 @@
 import { AttributeCalculator } from "../engine/AttributeCalculator";
 import { Position } from "../domain/enums";
-import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { BaseService } from "./BaseService";
+import type { ServiceResult } from "./types/ServiceResults";
+import type { Player } from "../domain/models";
 
-export class PlayerService {
-  private readonly logger: Logger;
-  private readonly repos: IRepositoryContainer;
+export interface UpdatePlayerConditionInput {
+  playerId: number;
+  energy?: number;
+  fitness?: number;
+  moral?: number;
+}
 
+export interface InjurePlayerInput {
+  playerId: number;
+  injuryType: string;
+  daysRemaining: number;
+}
+
+export class PlayerService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
-    this.logger = new Logger("PlayerService");
+    super(repositories, "PlayerService");
   }
 
-  async updatePlayerOverall(playerId: number): Promise<void> {
-    try {
-      const player = await this.repos.players.findById(playerId);
+  async updatePlayerOverall(playerId: number): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "updatePlayerOverall",
+      playerId,
+      async (playerId) => {
+        const player = await this.repos.players.findById(playerId);
 
-      if (!player) {
-        this.logger.warn(
-          `Tentativa de atualizar overall de jogador inexistente: ${playerId}`
-        );
-        return;
-      }
-
-      const newOverall = AttributeCalculator.calculateOverall(
-        player.position as Position,
-        {
-          finishing: player.finishing || 0,
-          passing: player.passing || 0,
-          dribbling: player.dribbling || 0,
-          defending: player.defending || 0,
-          physical: player.physical || 0,
-          pace: player.pace || 0,
-          shooting: player.shooting || 0,
+        if (!player) {
+          throw new Error(
+            `Tentativa de atualizar overall de jogador inexistente: ${playerId}`
+          );
         }
-      );
 
-      if (newOverall !== player.overall) {
-        await this.repos.players.update(playerId, { overall: newOverall });
-        this.logger.info(
-          `Overall atualizado: ${player.firstName} ${player.lastName} (${player.position}) ${player.overall} ➡️ ${newOverall}`
+        const newOverall = AttributeCalculator.calculateOverall(
+          player.position as Position,
+          {
+            finishing: player.finishing || 0,
+            passing: player.passing || 0,
+            dribbling: player.dribbling || 0,
+            defending: player.defending || 0,
+            physical: player.physical || 0,
+            pace: player.pace || 0,
+            shooting: player.shooting || 0,
+          }
         );
-      } else {
-        this.logger.debug(
-          `Overall mantido para ${player.firstName} ${player.lastName}: ${newOverall}`
-        );
+
+        if (newOverall !== player.overall) {
+          await this.repos.players.update(playerId, { overall: newOverall });
+          this.logger.info(
+            `Overall atualizado: ${player.firstName} ${player.lastName} (${player.position}) ${player.overall} ➡️ ${newOverall}`
+          );
+        }
       }
-    } catch (error) {
-      this.logger.error(
-        `Erro ao atualizar overall do jogador ${playerId}:`,
-        error
-      );
-    }
+    );
   }
 
-  async getPlayerWithContract(playerId: number) {
-    this.logger.debug(`Buscando jogador ${playerId} e contrato ativo...`);
-
-    try {
-      const result = await this.repos.players.findById(playerId);
-
-      if (!result) {
-        this.logger.warn(`Jogador ${playerId} não encontrado.`);
-      }
-
-      return result;
-    } catch (error) {
-      this.logger.error(
-        `Erro ao buscar jogador com contrato (${playerId}):`,
-        error
-      );
-      throw error;
-    }
+  async getPlayerWithContract(
+    playerId: number
+  ): Promise<ServiceResult<Player | undefined>> {
+    return this.execute("getPlayerWithContract", playerId, async (playerId) => {
+      return await this.repos.players.findById(playerId);
+    });
   }
 
-  async getPlayersByTeam(teamId: number) {
-    this.logger.debug(`Buscando jogadores do time ${teamId}...`);
-
-    try {
+  async getPlayersByTeam(teamId: number): Promise<ServiceResult<Player[]>> {
+    return this.execute("getPlayersByTeam", teamId, async (teamId) => {
       return await this.repos.players.findByTeamId(teamId);
-    } catch (error) {
-      this.logger.error(`Erro ao buscar jogadores do time ${teamId}:`, error);
-      return [];
-    }
+    });
   }
 
-  async getYouthPlayers(teamId: number) {
-    this.logger.debug(`Buscando jogadores da base do time ${teamId}...`);
-
-    try {
+  async getYouthPlayers(teamId: number): Promise<ServiceResult<Player[]>> {
+    return this.execute("getYouthPlayers", teamId, async (teamId) => {
       return await this.repos.players.findYouthAcademy(teamId);
-    } catch (error) {
-      this.logger.error(
-        `Erro ao buscar jogadores da base do time ${teamId}:`,
-        error
-      );
-      return [];
-    }
+    });
   }
 
-  async getFreeAgents() {
-    this.logger.debug(`Buscando jogadores sem contrato...`);
-
-    try {
+  async getFreeAgents(): Promise<ServiceResult<Player[]>> {
+    return this.execute("getFreeAgents", null, async () => {
       return await this.repos.players.findFreeAgents();
-    } catch (error) {
-      this.logger.error("Erro ao buscar jogadores sem contrato:", error);
-      return [];
-    }
+    });
   }
 
   async updatePlayerCondition(
-    playerId: number,
-    updates: {
-      energy?: number;
-      fitness?: number;
-      moral?: number;
-    }
-  ): Promise<void> {
-    this.logger.debug(`Atualizando condição do jogador ${playerId}...`);
+    input: UpdatePlayerConditionInput
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "updatePlayerCondition",
+      input,
+      async ({ playerId, ...updates }) => {
+        const player = await this.repos.players.findById(playerId);
+        if (!player) {
+          throw new Error(`Jogador ${playerId} não encontrado.`);
+        }
 
-    try {
-      const player = await this.repos.players.findById(playerId);
-      if (!player) {
-        this.logger.warn(`Jogador ${playerId} não encontrado.`);
-        return;
+        await this.repos.players.update(playerId, updates);
       }
-
-      await this.repos.players.update(playerId, updates);
-      this.logger.debug(`Condição atualizada para jogador ${playerId}`);
-    } catch (error) {
-      this.logger.error(
-        `Erro ao atualizar condição do jogador ${playerId}:`,
-        error
-      );
-    }
+    );
   }
 
-  async injurePlayer(
-    playerId: number,
-    injuryType: string,
-    daysRemaining: number
-  ): Promise<void> {
-    this.logger.info(
-      `Aplicando lesão ao jogador ${playerId}: ${injuryType} (${daysRemaining} dias)`
+  async injurePlayer(input: InjurePlayerInput): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "injurePlayer",
+      input,
+      async ({ playerId, injuryType, daysRemaining }) => {
+        await this.repos.players.update(playerId, {
+          isInjured: true,
+          injuryType,
+          injuryDaysRemaining: daysRemaining,
+        });
+      }
     );
-
-    try {
-      await this.repos.players.update(playerId, {
-        isInjured: true,
-        injuryType,
-        injuryDaysRemaining: daysRemaining,
-      });
-
-      this.logger.info(`Lesão aplicada com sucesso ao jogador ${playerId}`);
-    } catch (error) {
-      this.logger.error(`Erro ao lesionar jogador ${playerId}:`, error);
-    }
   }
 }
