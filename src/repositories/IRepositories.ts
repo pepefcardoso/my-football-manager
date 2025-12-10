@@ -8,6 +8,7 @@ import type {
   ScoutingReport,
   FinancialRecord,
 } from "../domain/models";
+import type { ClubInterestInsert } from "./ClubInterestRepository";
 
 export interface PlayerCompetitionStats {
   id: number;
@@ -74,6 +75,14 @@ export interface IStaffRepository {
   create(data: Partial<Staff>): Promise<number>;
   update(id: number, data: Partial<Staff>): Promise<void>;
   fire(id: number): Promise<void>;
+}
+
+export interface IClubInterestRepository {
+  upsert(data: ClubInterestInsert): Promise<void>;
+  findByPlayerId(playerId: number): Promise<any[]>;
+  findByTeamId(teamId: number): Promise<any[]>;
+  remove(teamId: number, playerId: number): Promise<void>;
+  deleteOlderThan(dateThreshold: string): Promise<number>;
 }
 
 export interface IMatchRepository {
@@ -206,6 +215,7 @@ export interface IRepositoryContainer {
   scouting: IScoutingRepository;
   transfers: ITransferRepository;
   transferProposals: ITransferProposalRepository;
+  clubInterests: IClubInterestRepository;
 }
 
 export type ServiceFactory<T> = (deps: IRepositoryContainer) => T;
