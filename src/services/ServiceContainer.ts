@@ -81,7 +81,7 @@ export class ServiceContainer implements IServiceContainer {
     this.staff = new StaffService(repos);
     this.dailySimulation = new DailySimulationService(repos);
     this.season = new SeasonService(repos);
-    this.finance = new FinanceService(repos);
+    this.finance = new FinanceService(repos, this.eventBus);
     this.promotionRelegation = new PromotionRelegationService(repos);
     this.seasonTransition = new SeasonTransitionManager(
       repos,

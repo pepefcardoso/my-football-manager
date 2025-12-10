@@ -20,6 +20,14 @@ export class ScoutingService extends BaseService {
     super(repositories, "ScoutingService");
   }
 
+  /**
+   * Retorna a visão que um time tem de um jogador específico.
+   * Os atributos podem estar mascarados (faixa de valores) dependendo do nível de conhecimento (progress).
+   * Se o jogador pertence ao time observador, os atributos são exatos (100% progress).
+   * * @param playerId - O ID do jogador a ser visualizado.
+   * @param viewerTeamId - O ID do time que está visualizando.
+   * @returns Objeto ScoutedPlayerView com atributos mascarados ou null se jogador não existir.
+   */
   async getScoutedPlayer(
     playerId: number,
     viewerTeamId: number
@@ -52,6 +60,11 @@ export class ScoutingService extends BaseService {
     );
   }
 
+  /**
+   * Retorna a lista de todos os relatórios de observação ativos de um time.
+   * * @param teamId - O ID do time.
+   * @returns Lista de relatórios de scouting.
+   */
   async getScoutingList(teamId: number): Promise<ServiceResult<any[]>> {
     return this.execute("getScoutingList", teamId, async (teamId) => {
       this.logger.debug(`Buscando lista de observação para o time ${teamId}`);
@@ -59,6 +72,14 @@ export class ScoutingService extends BaseService {
     });
   }
 
+  /**
+   * Designa um olheiro para observar um jogador específico.
+   * Cria um novo relatório ou atualiza um existente iniciando a observação.
+   * * @param scoutId - O ID do olheiro (Staff).
+   * @param playerId - O ID do jogador alvo.
+   * @returns ServiceResult void.
+   * @throws Error se olheiro ou jogador não forem encontrados.
+   */
   async assignScoutToPlayer(
     scoutId: number,
     playerId: number
@@ -97,6 +118,12 @@ export class ScoutingService extends BaseService {
     );
   }
 
+  /**
+   * Processa a evolução diária dos relatórios de scouting.
+   * Aumenta a porcentagem de conhecimento sobre os jogadores observados baseados na habilidade do olheiro.
+   * * @param currentDate - Data atual da simulação.
+   * @returns ServiceResult void.
+   */
   async processDailyScouting(
     currentDate: string
   ): Promise<ServiceResult<void>> {
@@ -133,6 +160,12 @@ export class ScoutingService extends BaseService {
     );
   }
 
+  /**
+   * Calcula a precisão geral do departamento de scouting de um time.
+   * Baseado na média e qualidade dos olheiros contratados.
+   * * @param teamId - O ID do time.
+   * @returns Um valor de incerteza (quanto menor, melhor).
+   */
   async calculateScoutingAccuracy(
     teamId: number
   ): Promise<ServiceResult<number>> {

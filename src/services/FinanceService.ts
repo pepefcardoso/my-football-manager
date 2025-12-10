@@ -10,6 +10,7 @@ import {
   FinancialReportFactory,
   type MonthlyFinancialSummary,
 } from "./factories/ReportFactory";
+import { GameEventBus } from "./events/GameEventBus";
 
 export interface ProcessExpensesInput {
   teamId: number;
@@ -42,12 +43,20 @@ export class FinanceService extends BaseService {
   private healthChecker: FinancialHealthChecker;
   private wageCalculator: WageCalculator;
 
-  constructor(repositories: IRepositoryContainer) {
+  constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
     super(repositories, "FinanceService");
-    this.healthChecker = new FinancialHealthChecker(repositories);
+    this.healthChecker = new FinancialHealthChecker(repositories, eventBus);
     this.wageCalculator = new WageCalculator(repositories);
   }
 
+  /**
+   * Calcula a receita estimada para um dia de jogo.
+   * Utiliza a estratégia de receita apropriada.
+   * * @param stadiumCapacity - Capacidade total do estádio.
+   * @param fanSatisfaction - Percentual de satisfação da torcida (0-100).
+   * @param ticketPrice - Preço do ingresso.
+   * @returns Objeto contendo receita total e público pagante.
+   */
   static calculateMatchDayRevenue(
     stadiumCapacity: number,
     fanSatisfaction: number,
@@ -69,11 +78,23 @@ export class FinanceService extends BaseService {
     };
   }
 
+  /**
+   * Verifica se a data atual corresponde ao dia de pagamento (dia 1 do mês).
+   * * @param currentDate - Data atual no formato string.
+   * @returns True se for dia de pagamento.
+   */
   static isPayDay(currentDate: string): boolean {
     const date = new Date(currentDate);
     return date.getDate() === 1;
   }
 
+  /**
+   * Calcula o multiplicador de importância da partida para fins de receita.
+   * * @param competitionTier - Nível da competição (1, 2, etc).
+   * @param round - Rodada atual.
+   * @param isKnockout - Se é mata-mata.
+   * @returns Multiplicador de importância.
+   */
   static getMatchImportance(
     competitionTier: number,
     round?: number,
@@ -86,6 +107,12 @@ export class FinanceService extends BaseService {
     return Math.min(2.0, importance);
   }
 
+  /**
+   * Gera uma descrição legível para uma transação financeira.
+   * * @param category - Categoria da transação.
+   * @param detail - Detalhe opcional.
+   * @returns String formatada.
+   */
   static getTransactionDescription(
     category: FinancialCategory,
     detail?: string
@@ -108,6 +135,11 @@ export class FinanceService extends BaseService {
       : map[category] || "Transação Diversa";
   }
 
+  /**
+   * Calcula o valor da multa com base na dívida atual.
+   * * @param debtAmount - Valor da dívida.
+   * @returns Objeto com valor da multa e descrição.
+   */
   static calculateFinancialPenaltyFine(debtAmount: number): {
     fine: number;
     description: string;
@@ -124,6 +156,13 @@ export class FinanceService extends BaseService {
     };
   }
 
+  /**
+   * Processa todas as despesas fixas mensais do time (salários, manutenção).
+   * Atualiza o orçamento e gera registros financeiros.
+   * * @param input - Dados necessários (teamId, currentDate, seasonId).
+   * @returns Resultado contendo totais gastos e novo orçamento.
+   * @throws Error se o time não for encontrado.
+   */
   async processMonthlyExpenses(
     input: ProcessExpensesInput
   ): Promise<ServiceResult<ProcessExpensesResult>> {
@@ -205,22 +244,47 @@ export class FinanceService extends BaseService {
     );
   }
 
+  /**
+   * Verifica a saúde financeira do clube.
+   * Detecta se o time está endividado e aplica penalidades (Transfer Ban) se necessário.
+   * * @param teamId - O ID do time.
+   * @returns Status de saúde financeira e penalidades ativas.
+   */
   async checkFinancialHealth(
     teamId: number
   ): Promise<ServiceResult<FinancialHealthResult>> {
     return this.healthChecker.checkFinancialHealth(teamId);
   }
 
+  /**
+   * Verifica se o time tem permissão para realizar transferências.
+   * Baseado na existência de Transfer Bans ativos.
+   * * @param teamId - O ID do time.
+   * @returns Objeto indicando se é permitido e o motivo (se negado).
+   */
   async canMakeTransfers(
     teamId: number
   ): Promise<ServiceResult<TransferPermissionResult>> {
     return this.healthChecker.canMakeTransfers(teamId);
   }
 
+  /**
+   * Busca o histórico de transações financeiras de um time na temporada.
+   * * @param teamId - O ID do time.
+   * @param seasonId - O ID da temporada.
+   * @returns Lista de registros financeiros.
+   */
   async getFinancialRecords(teamId: number, seasonId: number) {
     return this.repos.financial.findByTeamAndSeason(teamId, seasonId);
   }
 
+  /**
+   * Gera um relatório mensal consolidado das finanças.
+   * Agrupa receitas e despesas por mês e categoria.
+   * * @param teamId - O ID do time.
+   * @param seasonId - O ID da temporada.
+   * @returns Resumo financeiro mensal.
+   */
   async getMonthlyReport(
     teamId: number,
     seasonId: number

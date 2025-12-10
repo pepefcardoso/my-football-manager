@@ -17,6 +17,14 @@ export class SeasonService extends BaseService {
     super(repositories, "SeasonService");
   }
 
+  /**
+   * Inicia uma nova temporada no jogo.
+   * Cria o registro da temporada, gera o calendário de partidas para todas as competições
+   * e inicializa as tabelas de classificação.
+   * * @param year - O ano da temporada (ex: 2025).
+   * @returns ServiceResult void em caso de sucesso.
+   * @throws Error se houver falha no agendamento do calendário.
+   */
   async startNewSeason(year: number): Promise<ServiceResult<void>> {
     return this.executeVoid("startNewSeason", year, async (year) => {
       this.logger.info(
@@ -89,12 +97,22 @@ export class SeasonService extends BaseService {
     });
   }
 
+  /**
+   * Obtém a temporada atualmente ativa no jogo.
+   * * @returns O objeto da temporada (SeasonSelect) ou undefined se nenhuma estiver ativa.
+   */
   async getCurrentSeason(): Promise<ServiceResult<SeasonSelect | undefined>> {
     return this.execute("getCurrentSeason", null, async () => {
       return await this.repos.seasons.findActiveSeason();
     });
   }
 
+  /**
+   * Retorna o nome do campeão de uma competição específica na temporada.
+   * * @param seasonId - ID da temporada.
+   * @param competitionId - ID da competição.
+   * @returns Nome do time campeão ou null se não definido.
+   */
   async getSeasonChampion(
     seasonId: number,
     competitionId: number
@@ -117,6 +135,13 @@ export class SeasonService extends BaseService {
     );
   }
 
+  /**
+   * Lista os artilheiros de uma competição na temporada.
+   * * @param seasonId - ID da temporada.
+   * @param competitionId - ID da competição.
+   * @param limit - Número máximo de jogadores a retornar (padrão: 10).
+   * @returns Array de estatísticas de jogadores.
+   */
   async getTopScorers(
     seasonId: number,
     competitionId: number,
@@ -135,6 +160,13 @@ export class SeasonService extends BaseService {
     );
   }
 
+  /**
+   * Retorna os times na zona de rebaixamento de uma competição.
+   * * @param seasonId - ID da temporada.
+   * @param competitionId - ID da competição.
+   * @param zoneSize - Quantidade de times rebaixados (padrão: 4).
+   * @returns Array com as classificações dos times na zona de rebaixamento.
+   */
   async getRelegationZone(
     seasonId: number,
     competitionId: number,

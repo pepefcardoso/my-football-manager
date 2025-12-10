@@ -3,6 +3,7 @@ import type { MatchResult, GameEvent } from "../domain/types";
 import { FinanceService } from "../services/FinanceService";
 import { serviceContainer } from "../services/ServiceContainer";
 import { Logger } from "../lib/Logger";
+import { Result } from "../services/types/ServiceResults";
 
 const logger = new Logger("GameEngine");
 
@@ -78,26 +79,26 @@ export class GameEngine {
       const dateStr = this.getCurrentDate();
 
       try {
-        await serviceContainer.contract.processDailyWages(
+        await serviceContainer.contract.processDailyWages({
           teamId,
-          dateStr,
-          seasonId
-        );
+          currentDate: dateStr,
+          seasonId,
+        });
 
         if (FinanceService.isPayDay(dateStr)) {
           const expenseResult =
-            await serviceContainer.finance.processMonthlyExpenses(
+            await serviceContainer.finance.processMonthlyExpenses({
               teamId,
-              dateStr,
-              seasonId
-            );
+              currentDate: dateStr,
+              seasonId,
+            });
 
-          if (expenseResult.success) {
+          if (Result.isSuccess(expenseResult)) {
             updates.financialChanges.push({
               type: "expense",
-              amount: expenseResult.totalExpense,
+              amount: expenseResult.data.totalExpense,
               category: "monthly_wages",
-              description: expenseResult.message,
+              description: expenseResult.data.message,
             });
           }
         }
@@ -105,16 +106,18 @@ export class GameEngine {
         const simulationResults =
           await serviceContainer.match.simulateMatchesOfDate(dateStr);
 
-        if (simulationResults.matchesPlayed > 0) {
-          updates.matchResults = simulationResults.results.map(
-            (r: { result: MatchResult }) => r.result
-          );
-          // Aqui você pode converter os resultados para o formato de Match se necessário para a UI
-          // updates.matchesPlayed = ...
+        if (Result.isSuccess(simulationResults)) {
+          const simData = simulationResults.data;
 
-          logger.info(
-            `${simulationResults.matchesPlayed} partidas simuladas neste dia.`
-          );
+          if (simData.matchesPlayed > 0) {
+            updates.matchResults = simData.results.map(
+              (r: { result: MatchResult }) => r.result
+            );
+
+            logger.info(
+              `${simData.matchesPlayed} partidas simuladas neste dia.`
+            );
+          }
         }
 
         // TODO: Treinamento e Recuperação Diária de Jogadores

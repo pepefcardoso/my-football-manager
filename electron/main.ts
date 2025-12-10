@@ -13,6 +13,8 @@ import { db } from "../src/lib/db";
 import { Logger } from "../src/lib/Logger";
 import { serviceContainer } from "../src/services/ServiceContainer";
 import { FinanceService } from "../src/services/FinanceService";
+import { Result } from "../src/services/types/ServiceResults";
+import { TrainingFocus } from "../src/domain/enums";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = new Logger("electron-main");
@@ -96,11 +98,13 @@ function registerIpcHandlers() {
         const activeSeason = await seasonRepository.findActiveSeason();
 
         if (activeSeason) {
-          const summary = await serviceContainer.season.processEndOfSeason(
-            activeSeason.id
-          );
+          const summaryResult =
+            await serviceContainer.seasonTransition.processEndOfSeason(
+              activeSeason.id
+            );
 
-          if (summary) {
+          if (Result.isSuccess(summaryResult)) {
+            const summary = summaryResult.data;
             logs.push(`🏆 TEMPORADA ${summary.seasonYear} ENCERRADA!`);
             logs.push(`🥇 Campeão Nacional: ${summary.championName}`);
             logs.push(`📅 Temporada ${summary.seasonYear + 1} iniciada.`);
@@ -128,51 +132,52 @@ function registerIpcHandlers() {
         const allTeams = await teamRepository.findAll();
 
         for (const team of allTeams) {
-          const result = await serviceContainer.finance.processMonthlyExpenses(
-            team.id,
-            nextDate,
-            state.currentSeasonId
-          );
+          const result = await serviceContainer.finance.processMonthlyExpenses({
+            teamId: team.id,
+            currentDate: nextDate,
+            seasonId: state.currentSeasonId,
+          });
 
-          if (result.success) {
+          if (Result.isSuccess(result)) {
+            const data = result.data;
             logs.push(
               `💸 ${
                 team.name
-              }: Despesas mensais €${result.totalExpense.toLocaleString(
-                "pt-PT"
-              )}`
+              }: Despesas mensais €${data.totalExpense.toLocaleString("pt-PT")}`
             );
             logs.push(
-              `   └─ Jogadores: €${result.playerWages.toLocaleString(
+              `   └─ Jogadores: €${data.playerWages.toLocaleString(
                 "pt-PT"
-              )} | Staff: €${result.staffWages.toLocaleString("pt-PT")}`
+              )} | Staff: €${data.staffWages.toLocaleString("pt-PT")}`
             );
 
-            const health = await serviceContainer.finance.checkFinancialHealth(
-              team.id
-            );
+            const healthResult =
+              await serviceContainer.finance.checkFinancialHealth(team.id);
 
-            if (!health.isHealthy) {
-              logs.push(`⚠️ ${team.name}: CRISE FINANCEIRA DETECTADA`);
-              logs.push(
-                `   └─ Orçamento: €${health.currentBudget.toLocaleString(
-                  "pt-PT"
-                )} (${health.severity.toUpperCase()})`
-              );
+            if (Result.isSuccess(healthResult)) {
+              const health = healthResult.data;
+              if (!health.isHealthy) {
+                logs.push(`⚠️ ${team.name}: CRISE FINANCEIRA DETECTADA`);
+                logs.push(
+                  `   └─ Orçamento: €${health.currentBudget.toLocaleString(
+                    "pt-PT"
+                  )} (${health.severity.toUpperCase()})`
+                );
 
-              health.penaltiesApplied.forEach((penalty) => {
-                logs.push(`   └─ ⚠️ ${penalty}`);
-              });
+                health.penaltiesApplied.forEach((penalty: string) => {
+                  logs.push(`   └─ ⚠️ ${penalty}`);
+                });
 
-              if (health.severity === "critical") {
-                logs.push(`   └─ 🚨 ATENÇÃO: Situação financeira CRÍTICA!`);
+                if (health.severity === "critical") {
+                  logs.push(`   └─ 🚨 ATENÇÃO: Situação financeira CRÍTICA!`);
+                }
+              } else {
+                logs.push(
+                  `   └─ Orçamento: €${data.newBudget.toLocaleString(
+                    "pt-PT"
+                  )} ✅`
+                );
               }
-            } else {
-              logs.push(
-                `   └─ Orçamento: €${result.newBudget.toLocaleString(
-                  "pt-PT"
-                )} ✅`
-              );
             }
           } else {
             logs.push(`❌ ${team.name}: Erro ao processar despesas`);
@@ -181,73 +186,93 @@ function registerIpcHandlers() {
       }
 
       if (state.playerTeamId && !FinanceService.isPayDay(nextDate)) {
-        const health = await serviceContainer.finance.checkFinancialHealth(
-          state.playerTeamId
-        );
-
-        if (!health.isHealthy) {
-          logs.push(`⚠️ Alerta: Seu clube ainda está com orçamento negativo`);
-          logs.push(
-            `   └─ Saldo: €${health.currentBudget.toLocaleString("pt-PT")}`
+        const healthResult =
+          await serviceContainer.finance.checkFinancialHealth(
+            state.playerTeamId
           );
 
-          if (health.hasTransferBan) {
-            logs.push(`   └─ 🚫 Transfer Ban ativo - Contratações bloqueadas`);
+        if (Result.isSuccess(healthResult)) {
+          const health = healthResult.data;
+          if (!health.isHealthy) {
+            logs.push(`⚠️ Alerta: Seu clube ainda está com orçamento negativo`);
+            logs.push(
+              `   └─ Saldo: €${health.currentBudget.toLocaleString("pt-PT")}`
+            );
+
+            if (health.hasTransferBan) {
+              logs.push(
+                `   └─ 🚫 Transfer Ban ativo - Contratações bloqueadas`
+              );
+            }
           }
         }
       }
 
       if (state.playerTeamId) {
-        const players = await playerRepository.findByTeamId(state.playerTeamId);
-        const staffImpact = await serviceContainer.staff.getStaffImpact(
+        const staffImpactResult = await serviceContainer.staff.getStaffImpact(
           state.playerTeamId
         );
 
-        const focus = state.trainingFocus || "technical";
+        if (Result.isSuccess(staffImpactResult)) {
+          const focus =
+            (state.trainingFocus as TrainingFocus) || TrainingFocus.TECHNICAL;
 
-        const simResult = serviceContainer.dailySimulation.processTeamDailyLoop(
-          players,
-          focus as any,
-          staffImpact
-        );
+          const simResult =
+            await serviceContainer.dailySimulation.processTeamDailyLoop(
+              state.playerTeamId,
+              focus,
+              staffImpactResult.data
+            );
 
-        logs.push(...(await simResult).logs);
+          if (Result.isSuccess(simResult)) {
+            logs.push(...simResult.data.logs);
+          }
+        }
       }
 
       if (state.currentSeasonId) {
-        const expirations =
+        const expirationsResult =
           await serviceContainer.contract.checkExpiringContracts(nextDate);
 
-        if (expirations.playersReleased > 0) {
-          logs.push(
-            `📋 ${expirations.playersReleased} jogador(es) liberado(s) por término de contrato`
-          );
-        }
+        if (Result.isSuccess(expirationsResult)) {
+          const expirations = expirationsResult.data;
+          if (expirations.playersReleased > 0) {
+            logs.push(
+              `📋 ${expirations.playersReleased} jogador(es) liberado(s) por término de contrato`
+            );
+          }
 
-        if (expirations.staffReleased > 0) {
-          logs.push(
-            `📋 ${expirations.staffReleased} membro(s) do staff liberado(s) por término de contrato`
-          );
+          if (expirations.staffReleased > 0) {
+            logs.push(
+              `📋 ${expirations.staffReleased} membro(s) do staff liberado(s) por término de contrato`
+            );
+          }
         }
       }
 
       if (state.currentSeasonId) {
-        const matchResults = await serviceContainer.match.simulateMatchesOfDate(
-          nextDate
-        );
+        const matchResultsWrapper =
+          await serviceContainer.match.simulateMatchesOfDate(nextDate);
 
-        if (matchResults.matchesPlayed > 0) {
-          logs.push(`⚽ ${matchResults.matchesPlayed} partida(s) simulada(s)`);
+        if (Result.isSuccess(matchResultsWrapper)) {
+          const matchData = matchResultsWrapper.data;
+          if (matchData.matchesPlayed > 0) {
+            logs.push(`⚽ ${matchData.matchesPlayed} partida(s) simulada(s)`);
 
-          for (const { matchId, result } of matchResults.results) {
-            const match = await matchRepository.findById(matchId);
-            if (match) {
-              const homeTeam = await teamRepository.findById(match.homeTeamId!);
-              const awayTeam = await teamRepository.findById(match.awayTeamId!);
+            for (const { matchId, result } of matchData.results) {
+              const match = await matchRepository.findById(matchId);
+              if (match) {
+                const homeTeam = await teamRepository.findById(
+                  match.homeTeamId!
+                );
+                const awayTeam = await teamRepository.findById(
+                  match.awayTeamId!
+                );
 
-              logs.push(
-                `   └─ ${homeTeam?.shortName} ${result.homeScore} x ${result.awayScore} ${awayTeam?.shortName}`
-              );
+                logs.push(
+                  `   └─ ${homeTeam?.shortName} ${result.homeScore} x ${result.awayScore} ${awayTeam?.shortName}`
+                );
+              }
             }
           }
         }
@@ -305,7 +330,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle("check-financial-health", async (_, teamId: number) => {
     try {
-      return await serviceContainer.finance.checkFinancialHealth(teamId);
+      const result = await serviceContainer.finance.checkFinancialHealth(
+        teamId
+      );
+      return Result.unwrapOr(result, null);
     } catch (error) {
       logger.error(
         `IPC Error [check-financial-health] teamId=${teamId}:`,
@@ -317,7 +345,11 @@ function registerIpcHandlers() {
 
   ipcMain.handle("can-make-transfers", async (_, teamId: number) => {
     try {
-      return await serviceContainer.finance.canMakeTransfers(teamId);
+      const result = await serviceContainer.finance.canMakeTransfers(teamId);
+      return Result.unwrapOr(result, {
+        allowed: false,
+        reason: "Erro desconhecido",
+      });
     } catch (error) {
       logger.error(`IPC Error [can-make-transfers] teamId=${teamId}:`, error);
       return { allowed: false, reason: "Erro ao verificar permissões" };
@@ -326,7 +358,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle("get-wage-bill", async (_, teamId: number) => {
     try {
-      return await serviceContainer.contract.calculateMonthlyWageBill(teamId);
+      const result = await serviceContainer.contract.calculateMonthlyWageBill(
+        teamId
+      );
+      return Result.unwrapOr(result, null);
     } catch (error) {
       logger.error(`IPC Error [get-wage-bill] teamId=${teamId}:`, error);
       return null;
@@ -335,10 +370,11 @@ function registerIpcHandlers() {
 
   ipcMain.handle("start-match", async (_, matchId: number) => {
     try {
-      const engine = await serviceContainer.match.initializeMatch(matchId);
-      if (!engine) return false;
+      const initResult = await serviceContainer.match.initializeMatch(matchId);
+      if (Result.isFailure(initResult)) return false;
 
-      return serviceContainer.match.startMatch(matchId);
+      const startResult = await serviceContainer.match.startMatch(matchId);
+      return Result.isSuccess(startResult);
     } catch (error) {
       logger.error(`IPC Error [start-match] matchId=${matchId}:`, error);
       return false;
@@ -347,7 +383,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle("pause-match", async (_, matchId: number) => {
     try {
-      return serviceContainer.match.pauseMatch(matchId);
+      const result = await serviceContainer.match.pauseMatch(matchId);
+      return Result.isSuccess(result);
     } catch (error) {
       logger.error(`IPC Error [pause-match] matchId=${matchId}:`, error);
       return false;
@@ -356,7 +393,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle("resume-match", async (_, matchId: number) => {
     try {
-      return serviceContainer.match.resumeMatch(matchId);
+      const result = await serviceContainer.match.resumeMatch(matchId);
+      return Result.isSuccess(result);
     } catch (error) {
       logger.error(`IPC Error [resume-match] matchId=${matchId}:`, error);
       return false;
@@ -365,7 +403,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle("simulate-match-minute", async (_, matchId: number) => {
     try {
-      return serviceContainer.match.simulateMinute(matchId);
+      const result = await serviceContainer.match.simulateMinute(matchId);
+      return Result.unwrapOr(result, null);
     } catch (error) {
       logger.error(
         `IPC Error [simulate-match-minute] matchId=${matchId}:`,
@@ -377,7 +416,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle("simulate-full-match", async (_, matchId: number) => {
     try {
-      return await serviceContainer.match.simulateFullMatch(matchId);
+      const result = await serviceContainer.match.simulateFullMatch(matchId);
+      return Result.unwrapOr(result, null);
     } catch (error) {
       logger.error(
         `IPC Error [simulate-full-match] matchId=${matchId}:`,
@@ -389,7 +429,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle("get-match-state", async (_, matchId: number) => {
     try {
-      return serviceContainer.match.getMatchState(matchId);
+      const result = await serviceContainer.match.getMatchState(matchId);
+      return Result.unwrapOr(result, null);
     } catch (error) {
       logger.error(`IPC Error [get-match-state] matchId=${matchId}:`, error);
       return null;
@@ -398,7 +439,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle("simulate-matches-of-date", async (_, date: string) => {
     try {
-      return await serviceContainer.match.simulateMatchesOfDate(date);
+      const result = await serviceContainer.match.simulateMatchesOfDate(date);
+      return Result.unwrapOr(result, { matchesPlayed: 0, results: [] });
     } catch (error) {
       logger.error(`IPC Error [simulate-matches-of-date] date=${date}:`, error);
       return { matchesPlayed: 0, results: [] };
@@ -425,7 +467,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle("get-financial-health", async (_, teamId: number) => {
     try {
-      return await serviceContainer.finance.checkFinancialHealth(teamId);
+      const result = await serviceContainer.finance.checkFinancialHealth(
+        teamId
+      );
+      return Result.unwrapOr(result, null);
     } catch (error) {
       logger.error(`IPC Error [get-financial-health] teamId=${teamId}:`, error);
       return null;
@@ -435,40 +480,48 @@ function registerIpcHandlers() {
   ipcMain.handle(
     "upgrade-infrastructure",
     async (_event, type, teamId, seasonId) => {
+      let result;
       if (type === "expand_stadium") {
-        return await serviceContainer.infrastructure.expandStadium(
+        result = await serviceContainer.infrastructure.expandStadium(
           teamId,
           seasonId
         );
-      }
-      if (type === "upgrade_stadium") {
-        return await serviceContainer.infrastructure.upgradeFacility(
+      } else if (type === "upgrade_stadium") {
+        result = await serviceContainer.infrastructure.upgradeFacility(
           teamId,
           seasonId,
           "stadium"
         );
-      }
-      if (type === "upgrade_training") {
-        return await serviceContainer.infrastructure.upgradeFacility(
+      } else if (type === "upgrade_training") {
+        result = await serviceContainer.infrastructure.upgradeFacility(
           teamId,
           seasonId,
           "training"
         );
-      }
-      if (type === "upgrade_youth") {
-        return await serviceContainer.infrastructure.upgradeFacility(
+      } else if (type === "upgrade_youth") {
+        result = await serviceContainer.infrastructure.upgradeFacility(
           teamId,
           seasonId,
           "youth"
         );
+      } else {
+        return { success: false, message: "Tipo de operação inválido" };
       }
-      return { success: false, message: "Tipo de operação inválido" };
+
+      if (Result.isSuccess(result)) {
+        return { success: true, message: "Upgrade realizado com sucesso!" };
+      }
+      return { success: false, message: result.error.message };
     }
   );
 
   ipcMain.handle("get-scouted-player", async (_, { playerId, teamId }) => {
     try {
-      return await serviceContainer.scouting.getScoutedPlayer(playerId, teamId);
+      const result = await serviceContainer.scouting.getScoutedPlayer(
+        playerId,
+        teamId
+      );
+      return Result.unwrapOr(result, null);
     } catch (error) {
       logger.error(
         `IPC Error [get-scouted-player] playerId=${playerId} teamId=${teamId}:`,
@@ -482,10 +535,11 @@ function registerIpcHandlers() {
     "assign-scout",
     async (_, { scoutId, playerId }: { scoutId: number; playerId: number }) => {
       try {
-        return await serviceContainer.scouting.assignScoutToPlayer(
+        const result = await serviceContainer.scouting.assignScoutToPlayer(
           scoutId,
           playerId
         );
+        return Result.isSuccess(result);
       } catch (error) {
         logger.error(
           `IPC Error [assign-scout] scoutId=${scoutId} playerId=${playerId}:`,
@@ -498,7 +552,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle("get-scouting-list", async (_, teamId: number) => {
     try {
-      return await serviceContainer.scouting.getScoutingList(teamId);
+      const result = await serviceContainer.scouting.getScoutingList(teamId);
+      return Result.unwrapOr(result, []);
     } catch (error) {
       logger.error(`IPC Error [get-scouting-list] teamId=${teamId}:`, error);
       return [];
@@ -511,6 +566,21 @@ function registerIpcHandlers() {
       competitionId,
       seasonId
     );
+  });
+
+  ipcMain.handle("getTopScorers", async (_, competitionId, seasonId) => {
+    return await competitionRepository.getTopScorers(competitionId, seasonId);
+  });
+
+  ipcMain.handle("getTopGoalkeepers", async (_, competitionId, seasonId) => {
+    return await competitionRepository.getTopGoalkeepers(
+      competitionId,
+      seasonId
+    );
+  });
+
+  ipcMain.handle("getStandings", async (_, competitionId, seasonId) => {
+    return await competitionRepository.getStandings(competitionId, seasonId);
   });
 }
 
