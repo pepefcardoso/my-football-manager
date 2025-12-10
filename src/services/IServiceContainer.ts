@@ -21,6 +21,7 @@ import type { MatchFinancialsProcessor } from "./match/MatchFinancialsProcessor"
 import type { MatchResultProcessor } from "./match/MatchResultProcessor";
 import type { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
 import type { IUnitOfWork } from "../repositories/IUnitOfWork";
+import type { TransferWindowManager } from "./transfer/TransferWindowManager";
 
 export interface IServiceContainer {
   unitOfWork: IUnitOfWork;
@@ -46,4 +47,5 @@ export interface IServiceContainer {
   seasonTransition: SeasonTransitionManager;
   staff: StaffService;
   stats: StatsService;
+  transferWindow: TransferWindowManager;
 }

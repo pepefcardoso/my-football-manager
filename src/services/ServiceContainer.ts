@@ -31,6 +31,7 @@ import { MatchFanSatisfactionProcessor } from "./match/MatchFanSatisfactionProce
 import { MatchFinancialsProcessor } from "./match/MatchFinancialsProcessor";
 import { MatchResultProcessor } from "./match/MatchResultProcessor";
 import { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
+import { TransferWindowManager } from "./transfer/TransferWindowManager";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: UnitOfWork;
@@ -57,6 +58,7 @@ export class ServiceContainer implements IServiceContainer {
   public readonly seasonTransition: SeasonTransitionManager;
   public readonly staff: StaffService;
   public readonly stats: StatsService;
+  public readonly transferWindow: TransferWindowManager;
 
   constructor(repos: IRepositoryContainer) {
     this.unitOfWork = new UnitOfWork();
@@ -88,6 +90,7 @@ export class ServiceContainer implements IServiceContainer {
       this.promotionRelegation,
       this.season
     );
+    this.transferWindow = new TransferWindowManager(repos);
     this.setupSubscriptions();
   }
 
