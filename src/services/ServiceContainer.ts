@@ -1,5 +1,12 @@
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { repositoryContainer } from "../repositories/RepositoryContainer";
+import { GameEventBus } from "./events/GameEventBus";
+import {
+  GameEventType,
+  type MatchFinishedPayload,
+  type FinancialCrisisPayload,
+  type ContractExpiredPayload,
+} from "./events/GameEventTypes";
 import { CalendarService } from "./CalendarService";
 import { ContractService } from "./ContractService";
 import { DailySimulationService } from "./DailySimulationService";
@@ -25,6 +32,7 @@ import { MatchResultProcessor } from "./match/MatchResultProcessor";
 import { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
 
 export class ServiceContainer implements IServiceContainer {
+  public readonly eventBus: GameEventBus;
   public readonly calendar: CalendarService;
   public readonly contract: ContractService;
   public readonly dailySimulation: DailySimulationService;
@@ -49,34 +57,78 @@ export class ServiceContainer implements IServiceContainer {
   public readonly stats: StatsService;
 
   constructor(repos: IRepositoryContainer) {
+    this.eventBus = new GameEventBus();
+    this.wageCalculator = new WageCalculator(repos);
+    this.financialPenalty = new FinancialPenaltyService(repos);
+    this.matchRevenue = new MatchRevenueCalculator(repos);
+    this.matchResult = new MatchResultProcessor(repos);
+    this.matchFinancials = new MatchFinancialsProcessor(repos);
+    this.matchFanSatisfaction = new MatchFanSatisfactionProcessor(repos);
+    this.cupProgression = new CupProgressionManager(repos);
+    this.stats = new StatsService(repos);
+    this.contract = new ContractService(repos, this.eventBus);
+    this.financialHealth = new FinancialHealthChecker(repos, this.eventBus);
+    this.match = new MatchService(repos, this.eventBus);
     this.calendar = new CalendarService(repos);
-    this.contract = new ContractService(repos);
     this.infrastructure = new InfrastructureService(repos);
     this.marketing = new MarketingService(repos);
     this.player = new PlayerService(repos);
     this.scouting = new ScoutingService(repos);
     this.staff = new StaffService(repos);
-    this.stats = new StatsService(repos);
     this.dailySimulation = new DailySimulationService(repos);
     this.season = new SeasonService(repos);
+    this.finance = new FinanceService(repos);
     this.promotionRelegation = new PromotionRelegationService(repos);
     this.seasonTransition = new SeasonTransitionManager(
       repos,
       this.promotionRelegation,
       this.season
     );
-    this.match = new MatchService(repos);
+    this.setupSubscriptions();
+  }
 
-    this.financialPenalty = new FinancialPenaltyService(repos);
-    this.wageCalculator = new WageCalculator(repos);
-    this.financialHealth = new FinancialHealthChecker(repos);
-    this.finance = new FinanceService(repos);
+  private setupSubscriptions() {
+    this.eventBus.subscribe(
+      GameEventType.MATCH_FINISHED,
+      async (payload: MatchFinishedPayload) => {
+        if (payload.competitionId && payload.seasonId) {
+          await this.matchResult.updateStandings(
+            payload.competitionId,
+            payload.seasonId,
+            payload.homeTeamId,
+            payload.awayTeamId,
+            payload.homeScore,
+            payload.awayScore
+          );
+        }
 
-    this.cupProgression = new CupProgressionManager(repos);
-    this.matchFanSatisfaction = new MatchFanSatisfactionProcessor(repos);
-    this.matchFinancials = new MatchFinancialsProcessor(repos);
-    this.matchResult = new MatchResultProcessor(repos);
-    this.matchRevenue = new MatchRevenueCalculator(repos);
+        await this.matchFanSatisfaction.updateSatisfactionForMatch(
+          payload.matchId,
+          payload.homeScore,
+          payload.awayScore
+        );
+
+        await this.cupProgression.checkAndProgressCup(payload.matchId);
+      }
+    );
+
+    this.eventBus.subscribe(
+      GameEventType.FINANCIAL_CRISIS,
+      async (payload: FinancialCrisisPayload) => {
+        await this.financialPenalty.applyPenalties(
+          payload.teamId,
+          payload.severity,
+          payload.fanSatisfaction
+        );
+      }
+    );
+
+    this.eventBus.subscribe(
+      GameEventType.CONTRACT_EXPIRED,
+      async (payload: ContractExpiredPayload) => {
+        console.log(`Contrato expirado para jogador ${payload.playerId}`);
+      }
+    );
   }
 }
 

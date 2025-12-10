@@ -6,6 +6,8 @@ import { BaseService } from "./BaseService";
 import { Result } from "./types/ServiceResults";
 import type { ServiceResult } from "./types/ServiceResults";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
+import { GameEventBus } from "./events/GameEventBus";
+import { GameEventType } from "./events/GameEventTypes";
 
 export interface WageBillDetails {
   playerWages: number;
@@ -33,8 +35,11 @@ export interface RenewContractInput {
 }
 
 export class ContractService extends BaseService {
-  constructor(repositories: IRepositoryContainer) {
+  private eventBus: GameEventBus;
+
+  constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
     super(repositories, "ContractService");
+    this.eventBus = eventBus;
   }
 
   async calculateMonthlyWageBill(
@@ -77,10 +82,8 @@ export class ContractService extends BaseService {
       input,
       async ({ teamId, currentDate, seasonId }) => {
         const wageBillResult = await this.calculateMonthlyWageBill(teamId);
-
-        if (Result.isFailure(wageBillResult)) {
+        if (Result.isFailure(wageBillResult))
           throw new Error(wageBillResult.error.message);
-        }
 
         const wageBill = wageBillResult.data;
         const dailyPlayerWages = Math.round(wageBill.playerWages / 30);
@@ -97,7 +100,6 @@ export class ContractService extends BaseService {
             description: "Salários Diários - Jogadores",
           });
         }
-
         if (dailyStaffWages > 0) {
           await this.repos.financial.addRecord({
             teamId,
@@ -131,27 +133,22 @@ export class ContractService extends BaseService {
           )
           .limit(1);
 
-        if (currentContract.length === 0) {
+        if (currentContract.length === 0)
           throw new Error(
             `Nenhum contrato ativo encontrado para jogador ${playerId}`
           );
-        }
 
         await db
           .update(playerContracts)
-          .set({
-            wage: newWage,
-            endDate: newEndDate,
-          })
+          .set({ wage: newWage, endDate: newEndDate })
           .where(eq(playerContracts.id, currentContract[0].id));
       }
     );
   }
 
-  private async calculatePlayerWages(teamId: number): Promise<{
-    monthly: number;
-    count: number;
-  }> {
+  private async calculatePlayerWages(
+    teamId: number
+  ): Promise<{ monthly: number; count: number }> {
     const activeContracts = await db
       .select()
       .from(playerContracts)
@@ -166,24 +163,20 @@ export class ContractService extends BaseService {
       (sum, contract) => sum + (contract.wage || 0),
       0
     );
-
     return {
       monthly: Math.round(annualTotal / 12),
       count: activeContracts.length,
     };
   }
 
-  private async calculateStaffWages(teamId: number): Promise<{
-    monthly: number;
-    count: number;
-  }> {
+  private async calculateStaffWages(
+    teamId: number
+  ): Promise<{ monthly: number; count: number }> {
     const staffMembers = await this.repos.staff.findByTeamId(teamId);
-
     const annualTotal = staffMembers.reduce(
       (sum, member) => sum + (member.salary || 0),
       0
     );
-
     return {
       monthly: Math.round(annualTotal / 12),
       count: staffMembers.length,
@@ -208,8 +201,13 @@ export class ContractService extends BaseService {
         .update(playerContracts)
         .set({ status: "expired" })
         .where(eq(playerContracts.id, contract.id));
-
       await this.repos.players.update(contract.playerId, { teamId: null });
+
+      await this.eventBus.publish(GameEventType.CONTRACT_EXPIRED, {
+        playerId: contract.playerId,
+        teamId: contract.teamId,
+        date: currentDate,
+      });
     }
 
     return expiringContracts.length;
@@ -219,12 +217,11 @@ export class ContractService extends BaseService {
     currentDate: string
   ): Promise<number> {
     const allStaff = await this.repos.staff.findFreeAgents();
-    const expiredStaff = allStaff.filter((s) => s.contractEnd === currentDate);
 
+    const expiredStaff = allStaff.filter((s) => s.contractEnd === currentDate);
     for (const member of expiredStaff) {
       await this.repos.staff.fire(member.id);
     }
-
     return expiredStaff.length;
   }
 }
