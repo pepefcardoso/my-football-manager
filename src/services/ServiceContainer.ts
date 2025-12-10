@@ -1,5 +1,6 @@
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { repositoryContainer } from "../repositories/RepositoryContainer";
+import { UnitOfWork } from "../repositories/UnitOfWork";
 import { GameEventBus } from "./events/GameEventBus";
 import {
   GameEventType,
@@ -32,6 +33,7 @@ import { MatchResultProcessor } from "./match/MatchResultProcessor";
 import { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
 
 export class ServiceContainer implements IServiceContainer {
+  public readonly unitOfWork: UnitOfWork;
   public readonly eventBus: GameEventBus;
   public readonly calendar: CalendarService;
   public readonly contract: ContractService;
@@ -57,7 +59,9 @@ export class ServiceContainer implements IServiceContainer {
   public readonly stats: StatsService;
 
   constructor(repos: IRepositoryContainer) {
+    this.unitOfWork = new UnitOfWork();
     this.eventBus = new GameEventBus();
+
     this.wageCalculator = new WageCalculator(repos);
     this.financialPenalty = new FinancialPenaltyService(repos);
     this.matchRevenue = new MatchRevenueCalculator(repos);

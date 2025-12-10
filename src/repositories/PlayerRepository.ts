@@ -1,11 +1,11 @@
 import { eq, and } from "drizzle-orm";
 import { players } from "../db/schema";
-import { db } from "../lib/db";
+import { BaseRepository } from "./BaseRepository";
 import type { Player } from "../domain/models";
 
-export class PlayerRepository {
+export class PlayerRepository extends BaseRepository {
   async findById(id: number): Promise<Player | undefined> {
-    const result = await db.query.players.findFirst({
+    const result = await this.db.query.players.findFirst({
       where: eq(players.id, id),
       with: {
         contracts: {
@@ -28,7 +28,7 @@ export class PlayerRepository {
   }
 
   async findByTeamId(teamId: number): Promise<Player[]> {
-    const result = await db.query.players.findMany({
+    const result = await this.db.query.players.findMany({
       where: eq(players.teamId, teamId),
       with: {
         contracts: {
@@ -50,7 +50,7 @@ export class PlayerRepository {
   }
 
   async findFreeAgents(): Promise<Player[]> {
-    const result = await db.query.players.findMany({
+    const result = await this.db.query.players.findMany({
       where: eq(players.teamId, null as any),
       with: {
         contracts: {
@@ -72,7 +72,7 @@ export class PlayerRepository {
   }
 
   async findYouthAcademy(teamId: number): Promise<Player[]> {
-    const result = await db.query.players.findMany({
+    const result = await this.db.query.players.findMany({
       where: and(eq(players.teamId, teamId), eq(players.isYouth, true)),
       with: {
         contracts: {
@@ -94,7 +94,7 @@ export class PlayerRepository {
   }
 
   async create(player: any): Promise<number> {
-    const result = await db
+    const result = await this.db
       .insert(players)
       .values(player)
       .returning({ id: players.id });
@@ -102,20 +102,18 @@ export class PlayerRepository {
   }
 
   async update(id: number, data: any): Promise<void> {
-    await db.update(players).set(data).where(eq(players.id, id));
+    await this.db.update(players).set(data).where(eq(players.id, id));
   }
 
   async updateConditionBatch(
     updates: { id: number; energy: number; fitness: number }[]
   ): Promise<void> {
-    db.transaction((tx) => {
-      for (const update of updates) {
-        tx.update(players)
-          .set({ energy: update.energy, fitness: update.fitness })
-          .where(eq(players.id, update.id))
-          .run();
-      }
-    });
+    for (const update of updates) {
+      await this.db
+        .update(players)
+        .set({ energy: update.energy, fitness: update.fitness })
+        .where(eq(players.id, update.id));
+    }
   }
 
   async updateDailyStatsBatch(
@@ -129,22 +127,20 @@ export class PlayerRepository {
       isInjured?: boolean;
     }[]
   ): Promise<void> {
-    db.transaction((tx) => {
-      for (const u of updates) {
-        const updateData: any = {
-          energy: u.energy,
-          fitness: u.fitness,
-          moral: u.moral,
-        };
+    for (const u of updates) {
+      const updateData: any = {
+        energy: u.energy,
+        fitness: u.fitness,
+        moral: u.moral,
+      };
 
-        if (u.overall !== undefined) updateData.overall = u.overall;
-        if (u.injuryDays !== undefined)
-          updateData.injuryDaysRemaining = u.injuryDays;
-        if (u.isInjured !== undefined) updateData.isInjured = u.isInjured;
+      if (u.overall !== undefined) updateData.overall = u.overall;
+      if (u.injuryDays !== undefined)
+        updateData.injuryDaysRemaining = u.injuryDays;
+      if (u.isInjured !== undefined) updateData.isInjured = u.isInjured;
 
-        tx.update(players).set(updateData).where(eq(players.id, u.id)).run();
-      }
-    });
+      await this.db.update(players).set(updateData).where(eq(players.id, u.id));
+    }
   }
 }
 

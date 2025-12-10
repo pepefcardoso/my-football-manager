@@ -1,11 +1,11 @@
 import { eq, and, desc } from "drizzle-orm";
 import { scoutingReports } from "../db/schema";
-import { db } from "../lib/db";
+import { BaseRepository } from "./BaseRepository";
 
 export type ScoutingReportInsert = typeof scoutingReports.$inferInsert;
 export type ScoutingReportSelect = typeof scoutingReports.$inferSelect;
 
-export class ScoutingRepository {
+export class ScoutingRepository extends BaseRepository {
   /**
    * Encontra um relatório específico de um jogador para um time
    */
@@ -13,7 +13,7 @@ export class ScoutingRepository {
     playerId: number,
     teamId: number
   ): Promise<ScoutingReportSelect | undefined> {
-    const result = await db
+    const result = await this.db
       .select()
       .from(scoutingReports)
       .where(
@@ -29,7 +29,7 @@ export class ScoutingRepository {
    * Lista todos os relatórios de um time (Lista de Observação)
    */
   async findByTeam(teamId: number) {
-    return await db.query.scoutingReports.findMany({
+    return await this.db.query.scoutingReports.findMany({
       where: eq(scoutingReports.teamId, teamId),
       with: {
         player: true,
@@ -49,7 +49,7 @@ export class ScoutingRepository {
     );
 
     if (existing) {
-      await db
+      await this.db
         .update(scoutingReports)
         .set({
           ...data,
@@ -60,7 +60,7 @@ export class ScoutingRepository {
         })
         .where(eq(scoutingReports.id, existing.id));
     } else {
-      await db.insert(scoutingReports).values(data);
+      await this.db.insert(scoutingReports).values(data);
     }
   }
 
@@ -68,7 +68,7 @@ export class ScoutingRepository {
    * Busca relatórios ativos (que ainda não chegaram a 100%) para simulação diária
    */
   async findActiveReports(): Promise<ScoutingReportSelect[]> {
-    return await db.select().from(scoutingReports);
+    return await this.db.select().from(scoutingReports);
   }
 }
 

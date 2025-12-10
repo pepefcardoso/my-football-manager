@@ -1,16 +1,16 @@
 import { eq, and } from "drizzle-orm";
 import { financialRecords } from "../db/schema";
-import { db } from "../lib/db";
+import { BaseRepository } from "./BaseRepository";
 
 export type FinancialRecordInsert = typeof financialRecords.$inferInsert;
 
-export class FinancialRepository {
+export class FinancialRepository extends BaseRepository {
   async addRecord(record: FinancialRecordInsert): Promise<void> {
-    await db.insert(financialRecords).values(record);
+    await this.db.insert(financialRecords).values(record);
   }
 
   async findByTeamAndSeason(teamId: number, seasonId: number) {
-    return await db
+    return await this.db
       .select()
       .from(financialRecords)
       .where(

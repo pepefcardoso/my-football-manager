@@ -1,16 +1,16 @@
 import { eq, desc } from "drizzle-orm";
 import { transfers } from "../db/schema";
-import { db } from "../lib/db";
+import { BaseRepository } from "./BaseRepository";
 
 export type TransferInsert = typeof transfers.$inferInsert;
 
-export class TransferRepository {
+export class TransferRepository extends BaseRepository {
   async create(data: TransferInsert): Promise<void> {
-    await db.insert(transfers).values(data);
+    await this.db.insert(transfers).values(data);
   }
 
   async findRecent(limit: number = 10) {
-    return await db.query.transfers.findMany({
+    return await this.db.query.transfers.findMany({
       orderBy: [desc(transfers.date)],
       limit: limit,
       with: {
@@ -22,7 +22,7 @@ export class TransferRepository {
   }
 
   async findByPlayerId(playerId: number) {
-    return await db
+    return await this.db
       .select()
       .from(transfers)
       .where(eq(transfers.playerId, playerId))

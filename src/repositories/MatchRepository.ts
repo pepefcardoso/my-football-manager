@@ -1,14 +1,17 @@
 import { eq, and, or, asc, gte, lte } from "drizzle-orm";
 import { matches, matchEvents } from "../db/schema";
-import { db } from "../lib/db";
+import { BaseRepository } from "./BaseRepository";
 
 export type MatchSelect = typeof matches.$inferSelect;
 export type MatchInsert = typeof matches.$inferInsert;
 export type MatchEventInsert = typeof matchEvents.$inferInsert;
 
-export class MatchRepository {
+export class MatchRepository extends BaseRepository {
   async findById(id: number): Promise<MatchSelect | undefined> {
-    const result = await db.select().from(matches).where(eq(matches.id, id));
+    const result = await this.db
+      .select()
+      .from(matches)
+      .where(eq(matches.id, id));
     return result[0];
   }
 
@@ -16,7 +19,7 @@ export class MatchRepository {
     teamId: number,
     seasonId: number
   ): Promise<MatchSelect[]> {
-    return await db
+    return await this.db
       .select()
       .from(matches)
       .where(
@@ -32,7 +35,7 @@ export class MatchRepository {
     startDate: string,
     endDate: string
   ): Promise<MatchSelect[]> {
-    return await db
+    return await this.db
       .select()
       .from(matches)
       .where(and(gte(matches.date, startDate), lte(matches.date, endDate)))
@@ -40,7 +43,7 @@ export class MatchRepository {
   }
 
   async findPendingMatchesByDate(date: string): Promise<MatchSelect[]> {
-    return await db
+    return await this.db
       .select()
       .from(matches)
       .where(and(eq(matches.isPlayed, false), eq(matches.date, date)));
@@ -53,7 +56,7 @@ export class MatchRepository {
     attendance: number,
     ticketRevenue: number
   ): Promise<void> {
-    await db
+    await this.db
       .update(matches)
       .set({
         homeScore,
@@ -67,13 +70,13 @@ export class MatchRepository {
 
   async createMatchEvents(events: MatchEventInsert[]): Promise<void> {
     if (events.length > 0) {
-      await db.insert(matchEvents).values(events);
+      await this.db.insert(matchEvents).values(events);
     }
   }
 
   async createMany(matchesData: MatchInsert[]): Promise<void> {
     if (matchesData.length === 0) return;
-    await db.insert(matches).values(matchesData);
+    await this.db.insert(matches).values(matchesData);
   }
 }
 

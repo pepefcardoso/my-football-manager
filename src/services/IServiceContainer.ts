@@ -20,8 +20,10 @@ import type { MatchFanSatisfactionProcessor } from "./match/MatchFanSatisfaction
 import type { MatchFinancialsProcessor } from "./match/MatchFinancialsProcessor";
 import type { MatchResultProcessor } from "./match/MatchResultProcessor";
 import type { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
+import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 
 export interface IServiceContainer {
+  unitOfWork: IUnitOfWork;
   calendar: CalendarService;
   contract: ContractService;
   dailySimulation: DailySimulationService;

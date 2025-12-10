@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { seasons } from "../db/schema";
-import { db } from "../lib/db";
+import { BaseRepository } from "./BaseRepository";
 
 export type SeasonSelect = typeof seasons.$inferSelect;
 
-export class SeasonRepository {
+export class SeasonRepository extends BaseRepository {
   async findActiveSeason(): Promise<SeasonSelect | undefined> {
-    const result = await db
+    const result = await this.db
       .select()
       .from(seasons)
       .where(eq(seasons.isActive, true));
@@ -18,12 +18,12 @@ export class SeasonRepository {
     startDate: string,
     endDate: string
   ): Promise<SeasonSelect> {
-    await db
+    await this.db
       .update(seasons)
       .set({ isActive: false })
       .where(eq(seasons.isActive, true));
 
-    const result = await db
+    const result = await this.db
       .insert(seasons)
       .values({ year, startDate, endDate, isActive: true })
       .returning();

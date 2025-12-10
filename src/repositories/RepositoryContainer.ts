@@ -1,16 +1,60 @@
-import { playerRepository } from "../repositories/PlayerRepository";
-import { teamRepository } from "../repositories/TeamRepository";
-import { staffRepository } from "../repositories/StaffRepository";
-import { matchRepository } from "../repositories/MatchRepository";
-import { competitionRepository } from "../repositories/CompetitionRepository";
-import { seasonRepository } from "../repositories/SeasonRepository";
-import { financialRepository } from "../repositories/FinancialRepository";
-import { scoutingRepository } from "../repositories/ScoutingRepository";
-import { transferRepository } from "../repositories/TransferRepository";
+import { type DbInstance, type DbTransaction } from "../lib/db";
+import {
+  PlayerRepository,
+  playerRepository,
+} from "../repositories/PlayerRepository";
+import { TeamRepository, teamRepository } from "../repositories/TeamRepository";
+import {
+  StaffRepository,
+  staffRepository,
+} from "../repositories/StaffRepository";
+import {
+  MatchRepository,
+  matchRepository,
+} from "../repositories/MatchRepository";
+import {
+  CompetitionRepository,
+  competitionRepository,
+} from "../repositories/CompetitionRepository";
+import {
+  SeasonRepository,
+  seasonRepository,
+} from "../repositories/SeasonRepository";
+import {
+  FinancialRepository,
+  financialRepository,
+} from "../repositories/FinancialRepository";
+import {
+  ScoutingRepository,
+  scoutingRepository,
+} from "../repositories/ScoutingRepository";
+import {
+  TransferRepository,
+  transferRepository,
+} from "../repositories/TransferRepository";
 import type { IRepositoryContainer } from "./IRepositories";
 
 /**
- * Container de produção com implementações reais
+ * Container que permite instanciar repositórios com um contexto específico (transação)
+ */
+export class RepositoryFactory {
+  static create(context: DbInstance | DbTransaction): IRepositoryContainer {
+    return {
+      players: new PlayerRepository(context),
+      teams: new TeamRepository(context),
+      staff: new StaffRepository(context),
+      matches: new MatchRepository(context),
+      competitions: new CompetitionRepository(context),
+      seasons: new SeasonRepository(context),
+      financial: new FinancialRepository(context),
+      scouting: new ScoutingRepository(context),
+      transfers: new TransferRepository(context),
+    };
+  }
+}
+
+/**
+ * Container de produção com implementações singleton (contexto global)
  */
 class ProductionRepositoryContainer implements IRepositoryContainer {
   public readonly players = playerRepository;
@@ -24,15 +68,9 @@ class ProductionRepositoryContainer implements IRepositoryContainer {
   public readonly transfers = transferRepository;
 }
 
-/**
- * Singleton global do container
- */
 export const repositoryContainer: IRepositoryContainer =
   new ProductionRepositoryContainer();
 
-/**
- * Factory para criar containers customizados (útil para testes)
- */
 export function createRepositoryContainer(
   overrides?: Partial<IRepositoryContainer>
 ): IRepositoryContainer {

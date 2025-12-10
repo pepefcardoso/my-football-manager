@@ -5,26 +5,26 @@ import {
   matches,
   playerCompetitionStats,
 } from "../db/schema";
-import { db } from "../lib/db";
+import { BaseRepository } from "./BaseRepository";
 import type { PlayerCompetitionStats } from "./IRepositories";
 
 export type CompetitionSelect = typeof competitions.$inferSelect;
 export type StandingSelect = typeof competitionStandings.$inferSelect;
 
-export class CompetitionRepository {
+export class CompetitionRepository extends BaseRepository {
   async findAll(): Promise<CompetitionSelect[]> {
-    return await db.select().from(competitions);
+    return await this.db.select().from(competitions);
   }
 
   async findByCountry(country: string): Promise<CompetitionSelect[]> {
-    return await db
+    return await this.db
       .select()
       .from(competitions)
       .where(eq(competitions.country, country));
   }
 
   async getStandings(competitionId: number, seasonId: number) {
-    return await db.query.competitionStandings.findMany({
+    return await this.db.query.competitionStandings.findMany({
       where: and(
         eq(competitionStandings.competitionId, competitionId),
         eq(competitionStandings.seasonId, seasonId)
@@ -47,7 +47,7 @@ export class CompetitionRepository {
     teamId: number,
     data: Partial<StandingSelect>
   ): Promise<void> {
-    const existing = await db
+    const existing = await this.db
       .select()
       .from(competitionStandings)
       .where(
@@ -59,14 +59,14 @@ export class CompetitionRepository {
       );
 
     if (existing.length === 0) {
-      await db.insert(competitionStandings).values({
+      await this.db.insert(competitionStandings).values({
         competitionId,
         seasonId,
         teamId,
         ...data,
       } as any);
     } else {
-      await db
+      await this.db
         .update(competitionStandings)
         .set(data)
         .where(eq(competitionStandings.id, existing[0].id));
@@ -78,7 +78,7 @@ export class CompetitionRepository {
     competitionId: number,
     seasonId: number
   ): Promise<("W" | "D" | "L")[]> {
-    const lastMatches = await db
+    const lastMatches = await this.db
       .select()
       .from(matches)
       .where(
@@ -108,7 +108,7 @@ export class CompetitionRepository {
     competitionId: number,
     seasonId: number
   ): Promise<PlayerCompetitionStats | undefined> {
-    const result = await db
+    const result = await this.db
       .select()
       .from(playerCompetitionStats)
       .where(
@@ -126,14 +126,14 @@ export class CompetitionRepository {
   async createPlayerStats(
     data: Partial<PlayerCompetitionStats>
   ): Promise<void> {
-    await db.insert(playerCompetitionStats).values(data as any);
+    await this.db.insert(playerCompetitionStats).values(data as any);
   }
 
   async updatePlayerStats(
     id: number,
     data: Partial<PlayerCompetitionStats>
   ): Promise<void> {
-    await db
+    await this.db
       .update(playerCompetitionStats)
       .set(data as any)
       .where(eq(playerCompetitionStats.id, id));
@@ -144,7 +144,7 @@ export class CompetitionRepository {
     seasonId: number,
     limit: number = 10
   ): Promise<any[]> {
-    return await db.query.playerCompetitionStats.findMany({
+    return await this.db.query.playerCompetitionStats.findMany({
       where: and(
         eq(playerCompetitionStats.competitionId, competitionId),
         eq(playerCompetitionStats.seasonId, seasonId)
@@ -162,7 +162,7 @@ export class CompetitionRepository {
     seasonId: number,
     limit: number = 10
   ): Promise<any[]> {
-    return await db.query.playerCompetitionStats.findMany({
+    return await this.db.query.playerCompetitionStats.findMany({
       where: and(
         eq(playerCompetitionStats.competitionId, competitionId),
         eq(playerCompetitionStats.seasonId, seasonId)

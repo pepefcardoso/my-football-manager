@@ -1,9 +1,17 @@
 import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import {
+  drizzle,
+  type BetterSQLite3Database,
+} from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Logger } from "./Logger";
+
+export type DbInstance = BetterSQLite3Database<typeof schema>;
+export type DbTransaction = Parameters<
+  Parameters<DbInstance["transaction"]>[0]
+>[0];
 
 let dbPath: string;
 const logger = new Logger("Database");
