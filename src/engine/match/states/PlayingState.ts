@@ -1,30 +1,18 @@
-import { MatchEngine } from "../../MatchEngine";
 import { MatchState, MatchEventType } from "../../../domain/enums";
 import { RandomEngine } from "../../RandomEngine";
 import { GameBalance } from "../../GameBalanceConfig";
 import type { Team, Player } from "../../../domain/models";
 import { MatchNarrator, type NarratorContext } from "../MatchNarrator";
-import { PausedState } from "./PausedState";
 import type { IMatchState } from "./IMatchState";
-import { FinishedState } from "./FinishedState";
+import type { IMatchEngineContext } from "../IMatchEngineContext";
 import { AttackSimulator } from "../AttackSimulator";
 import { MatchEventGenerator } from "../MatchEventGenerator";
 import { Logger } from "../../../lib/Logger";
 
 const logger = new Logger("PlayingState");
 
-/**
- * Estado principal da partida onde toda a simulação acontece.
- * Responsabilidade: Orquestrar a lógica de cada minuto de jogo.
- *
- * Fluxo de um minuto:
- * 1. Verifica se chegou ao fim (90min)
- * 2. Calcula posse de bola
- * 3. Tenta gerar ataque (usando AttackSimulator)
- * 4. Tenta gerar eventos aleatórios (cartões, lesões)
- */
 export class PlayingState implements IMatchState {
-  constructor(private context: MatchEngine) {}
+  constructor(private context: IMatchEngineContext) {}
 
   getStateEnum(): MatchState {
     return MatchState.PLAYING;
@@ -35,7 +23,7 @@ export class PlayingState implements IMatchState {
   }
 
   pause(): void {
-    this.context.setState(new PausedState(this.context));
+    this.context.transitionToPaused();
   }
 
   resume(): void {
@@ -66,9 +54,6 @@ export class PlayingState implements IMatchState {
     }
   }
 
-  /**
-   * Finaliza a partida e transiciona para FinishedState
-   */
   private finishMatch(): void {
     const context = this.context;
     const desc = MatchNarrator.getEventDescription(MatchEventType.FINISHED, {
@@ -78,15 +63,10 @@ export class PlayingState implements IMatchState {
     });
 
     context.addEvent(90, MatchEventType.FINISHED, null, null, desc);
-    context.setState(new FinishedState(context));
+
+    context.transitionToFinished();
   }
 
-  /**
-   * Calcula qual time tem a posse de bola neste minuto.
-   * Baseado em força overall + bônus de moral + vantagem de casa.
-   *
-   * @returns true se o time da casa ataca, false se o visitante ataca
-   */
   private calculatePossession(): boolean {
     const homeStrength = this.context.getHomeStrength();
     const awayStrength = this.context.getAwayStrength();
@@ -104,17 +84,6 @@ export class PlayingState implements IMatchState {
     return isHome;
   }
 
-  /**
-   * Processa uma fase de ataque usando o AttackSimulator.
-   *
-   * Fluxo:
-   * 1. Define times atacante/defensor
-   * 2. Verifica chance de escanteio
-   * 3. Simula o ataque (usando AttackSimulator)
-   * 4. Processa o resultado (gol, defesa, chute fora, etc)
-   *
-   * @param attackingTeamIsHome - Define qual time está atacando
-   */
   private processAttackPhase(attackingTeamIsHome: boolean): void {
     const config = this.context.config;
 
@@ -176,9 +145,6 @@ export class PlayingState implements IMatchState {
     );
   }
 
-  /**
-   * Registra evento de escanteio
-   */
   private handleCorner(team: Team, isHome: boolean): void {
     this.context.updateCorners(isHome);
     const desc = MatchNarrator.getEventDescription(MatchEventType.CORNER, {
@@ -193,15 +159,6 @@ export class PlayingState implements IMatchState {
     );
   }
 
-  /**
-   * Processa o resultado de um ataque e gera os eventos apropriados.
-   *
-   * Possíveis resultados:
-   * - goal: Verifica VAR, registra gol e assistência
-   * - save: Registra defesa do goleiro
-   * - miss/blocked: Registra chute para fora
-   * - offside: Registra impedimento
-   */
   private handleAttackOutcome(
     result: any,
     attacker: { data: Team },
@@ -315,13 +272,6 @@ export class PlayingState implements IMatchState {
     }
   }
 
-  /**
-   * Simula revisão do VAR em possíveis gols.
-   *
-   * @param teamId - ID do time que marcou o gol
-   * @param shooter - Jogador que finalizou
-   * @returns true se o gol é válido, false se foi anulado
-   */
   private processVAR(teamId: number, shooter: Player): boolean {
     if (!RandomEngine.chance(GameBalance.MATCH.VAR_CHECK_PROBABILITY))
       return true;
@@ -359,10 +309,6 @@ export class PlayingState implements IMatchState {
     return true;
   }
 
-  /**
-   * Determina quem deu a assistência (70% de chance de haver assistência).
-   * Prioriza meio-campistas (60% de chance se disponíveis).
-   */
   private getLastPassProvider(
     attackingTeamIsHome: boolean,
     shooter: Player
@@ -385,10 +331,6 @@ export class PlayingState implements IMatchState {
     return RandomEngine.pickOne(candidates);
   }
 
-  /**
-   * Processa eventos aleatórios (faltas, cartões, lesões).
-   * Usa o MatchEventGenerator para determinar tipo e jogador afetado.
-   */
   private processRandomEvent(attackingTeamIsHome: boolean): void {
     const team = attackingTeamIsHome
       ? this.context.config.homeTeam

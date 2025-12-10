@@ -1,17 +1,13 @@
-import { MatchEngine } from "../../MatchEngine";
 import { MatchState } from "../../../domain/enums";
 import type { IMatchState } from "./IMatchState";
+import type { IMatchEngineContext } from "../IMatchEngineContext";
 import { Logger } from "../../../lib/Logger";
 
 const logger = new Logger("FinishedState");
 
-/**
- * Estado final da partida.
- * Responsabilidade: Bloquear qualquer ação após o término.
- */
 export class FinishedState implements IMatchState {
-  constructor(private readonly _context: MatchEngine) {
-  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  constructor(private readonly _context: IMatchEngineContext) {}
 
   getStateEnum(): MatchState {
     return MatchState.FINISHED;

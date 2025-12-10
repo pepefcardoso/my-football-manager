@@ -2,7 +2,7 @@ import { BaseService } from "./BaseService";
 import type { ServiceResult } from "./types/ServiceResults";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { RandomEngine } from "../engine/RandomEngine";
-import { GameEngine } from "../engine/GameEngine";
+import { InjuryEngine } from "../engine/InjuryEngine";
 import { AttributeCalculator } from "../engine/AttributeCalculator";
 import type { Player } from "../domain/models";
 import { TrainingFocus, Position } from "../domain/enums";
@@ -37,11 +37,8 @@ export interface ProcessTeamDailyLoopInput {
 }
 
 export class DailySimulationService extends BaseService {
-  private gameEngine: GameEngine;
-
   constructor(repositories: IRepositoryContainer) {
     super(repositories, "DailySimulationService");
-    this.gameEngine = new GameEngine();
   }
 
   async processTeamDailyLoop(
@@ -219,7 +216,7 @@ export class DailySimulationService extends BaseService {
     const isInjured = RandomEngine.chance(mitigatedRisk);
 
     if (isInjured) {
-      const injuryDays = this.gameEngine.generateInjuryDuration(
+      const injuryDays = InjuryEngine.generateInjuryDuration(
         "light",
         staffImpact.injuryRecoveryMultiplier
       );

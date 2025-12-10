@@ -87,7 +87,7 @@ export interface MatchConfig {
   homePlayers: Player[];
   awayPlayers: Player[];
   weather?: "sunny" | "rainy" | "cloudy" | "windy";
-  homeTacticalBonus?: number; 
+  homeTacticalBonus?: number;
   awayTacticalBonus?: number;
 }
 
@@ -269,4 +269,31 @@ export interface PlayerAttributes {
   dribbling: number;
   pace: number;
   shooting: number;
+}
+
+export interface ProcessExpensesInput {
+  teamId: number;
+  currentDate: string;
+  seasonId: number;
+}
+
+export interface ProcessExpensesResult {
+  totalExpense: number;
+  newBudget: number;
+  playerWages: number;
+  staffWages: number;
+  message: string;
+}
+
+export interface FinancialHealthResult {
+  isHealthy: boolean;
+  currentBudget: number;
+  hasTransferBan: boolean;
+  penaltiesApplied: string[];
+  severity: "none" | "warning" | "critical";
+}
+
+export interface TransferPermissionResult {
+  allowed: boolean;
+  reason?: string;
 }

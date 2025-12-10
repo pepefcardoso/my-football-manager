@@ -12,27 +12,18 @@ import { TeamStrengthCalculator } from "./TeamStrengthCalculator";
 import { DomainToEngineAdapter } from "./adapters/DomainToEngineAdapter";
 import type { IMatchState } from "./match/states/IMatchState";
 import { NotStartedState } from "./match/states/NotStartedState";
+import { PlayingState } from "./match/states/PlayingState";
+import { PausedState } from "./match/states/PausedState";
+import { FinishedState } from "./match/states/FinishedState";
+import type { IMatchEngineContext } from "./match/IMatchEngineContext";
 
-/**
- * MatchEngine - Contexto do State Pattern
- *
- * Responsabilidade Principal:
- * - Manter o estado atual da partida (delegando comportamento para classes State)
- * - Fornecer API pública para controle (start, pause, resume, simulate)
- * - Armazenar dados da partida (placar, eventos, estatísticas)
- * - Fornecer métodos de acesso e mutação para os Estados
- *
- * Design Pattern: State Pattern
- * - currentState: Referência para o estado atual (IMatchState)
- * - setState(): Permite que estados transicionem entre si
- * - Métodos públicos delegam para this.currentState.metodo()
- */
-export class MatchEngine {
+export class MatchEngine implements IMatchEngineContext {
   private currentState: IMatchState;
   private currentMinute: number = 0;
   private homeScore: number = 0;
   private awayScore: number = 0;
   private events: MatchEventData[] = [];
+
   private stats = {
     homePossession: 0,
     awayPossession: 0,
@@ -56,6 +47,7 @@ export class MatchEngine {
     this.config = config;
     const matchSeed = seed || Date.now();
     this.rng = new RandomEngine(matchSeed);
+
     this.currentState = new NotStartedState(this);
 
     this.homeStrength = TeamStrengthCalculator.calculate({
@@ -86,90 +78,73 @@ export class MatchEngine {
   }
 
   // ============================================
-  // API PÚBLICA - CONTROLES (Delegam para State)
+  // TRANSIÇÕES DE ESTADO (Resolvendo Ciclos)
   // ============================================
 
-  /**
-   * Inicia a partida (Válido apenas em NOT_STARTED)
-   */
+  public transitionToPlaying(): void {
+    this.setState(new PlayingState(this));
+  }
+
+  public transitionToPaused(): void {
+    this.setState(new PausedState(this));
+  }
+
+  public transitionToFinished(): void {
+    this.setState(new FinishedState(this));
+  }
+
+  public setState(newState: IMatchState): void {
+    this.currentState = newState;
+  }
+
+  // ============================================
+  // API PÚBLICA DE CONTROLE
+  // ============================================
+
   public start(): void {
     this.currentState.start();
   }
 
-  /**
-   * Pausa a simulação (Válido apenas em PLAYING)
-   */
   public pause(): void {
     this.currentState.pause();
   }
 
-  /**
-   * Retoma a simulação (Válido apenas em PAUSED)
-   */
   public resume(): void {
     this.currentState.resume();
   }
 
-  /**
-   * Simula um minuto de jogo
-   * O comportamento depende do estado atual:
-   * - NOT_STARTED: Avisa que precisa chamar start() primeiro
-   * - PLAYING: Executa lógica de simulação completa
-   * - PAUSED: Não faz nada
-   * - FINISHED: Avisa que o jogo acabou
-   */
   public simulateMinute(): void {
     this.currentState.simulateMinute();
   }
 
-  /**
-   * Simula a partida completa do início ao fim
-   */
   public simulateToCompletion(): void {
-    this.start();
+    if (this.currentState.getStateEnum() === MatchState.NOT_STARTED) {
+      this.start();
+    }
+
     while (this.currentState.getStateEnum() !== MatchState.FINISHED) {
       this.simulateMinute();
     }
   }
 
   // ============================================
-  // MÉTODOS DE ESTADO (Usados pelas classes State)
+  // MÉTODOS DE DADOS E MUTAÇÃO (Interface)
   // ============================================
 
-  /**
-   * Permite que estados transicionem para outros estados.
-   * Chamado internamente por NotStartedState, PlayingState, etc.
-   */
-  public setState(newState: IMatchState): void {
-    this.currentState = newState;
-  }
-
-  /**
-   * Incrementa o minuto atual da partida
-   */
   public incrementMinute(): void {
     this.currentMinute++;
   }
 
-  /**
-   * Adiciona um gol ao placar
-   */
   public addScore(isHome: boolean): void {
     if (isHome) this.homeScore++;
     else this.awayScore++;
   }
 
-  /**
-   * Atualiza contadores de posse de bola
-   */
   public updatePossession(isHome: boolean): void {
     if (isHome) this.stats.homePossession++;
     else this.stats.awayPossession++;
   }
 
-  /**
-   * Atualiza estatísticas de chutes
-   */
   public updateShots(isHome: boolean, total: number, onTarget: number): void {
     if (isHome) {
       this.stats.homeShots += total;
@@ -180,25 +155,16 @@ export class MatchEngine {
     }
   }
 
-  /**
-   * Atualiza contador de escanteios
-   */
   public updateCorners(isHome: boolean): void {
     if (isHome) this.stats.homeCorners++;
     else this.stats.awayCorners++;
   }
 
-  /**
-   * Atualiza contador de faltas
-   */
   public updateFouls(isHome: boolean): void {
     if (isHome) this.stats.homeFouls++;
     else this.stats.awayFouls++;
   }
 
-  /**
-   * Adiciona um evento ao histórico da partida
-   */
   public addEvent(
     minute: number,
     type: MatchEventType,
@@ -209,17 +175,10 @@ export class MatchEngine {
     this.events.push({ minute, type, teamId, playerId, description });
   }
 
-  // ============================================
-  // GETTERS (Acessados pelos States e UI)
-  // ============================================
-
   public getCurrentMinute(): number {
     return this.currentMinute;
   }
 
-  /**
-   * Retorna o enum do estado atual (para UI e lógica externa)
-   */
   public getState(): MatchState {
     return this.currentState.getStateEnum();
   }
@@ -245,21 +204,14 @@ export class MatchEngine {
   }
 
   // ============================================
-  // FINALIZAÇÃO E RESULTADO
+  // FINALIZAÇÃO
   // ============================================
 
-  /**
-   * Retorna o resultado final da partida.
-   * Compila todos os dados (placar, eventos, estatísticas, updates de jogadores)
-   */
   public getMatchResult(): MatchResult {
     if (this.currentState.getStateEnum() !== MatchState.FINISHED) {
-      console.warn(
-        "Warning: getMatchResult() called before match finished. Forcing completion."
-      );
+      console.warn("Warning: getMatchResult() called before match finished.");
       this.simulateToCompletion();
     }
-
     return this.compileFinalResult();
   }
 
@@ -285,10 +237,6 @@ export class MatchEngine {
     };
   }
 
-  /**
-   * Calcula as atualizações de atributos dos jogadores após a partida
-   * (moral, energia, rating, gols, assistências)
-   */
   private calculatePlayerUpdates(): MatchResult["playerUpdates"] {
     const updates: MatchResult["playerUpdates"] = [];
     const homeRep = this.config.homeTeam.reputation || 5000;
@@ -325,7 +273,9 @@ export class MatchEngine {
           goals: this.events.filter(
             (e) => e.type === MatchEventType.GOAL && e.playerId === player.id
           ).length,
-          assists: 0,
+          assists: this.events.filter(
+            (e) => e.type === MatchEventType.ASSIST && e.playerId === player.id
+          ).length,
         });
       }
     };

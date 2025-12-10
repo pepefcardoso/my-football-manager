@@ -1,17 +1,12 @@
-import { MatchEngine } from "../../MatchEngine";
 import { MatchState } from "../../../domain/enums";
-import { PlayingState } from "./PlayingState";
 import type { IMatchState } from "./IMatchState";
+import type { IMatchEngineContext } from "../IMatchEngineContext";
 import { Logger } from "../../../lib/Logger";
 
 const logger = new Logger("PausedState");
 
-/**
- * Estado de pausa da partida.
- * Responsabilidade: Congelar a simulação e permitir retomada.
- */
 export class PausedState implements IMatchState {
-  constructor(private context: MatchEngine) {}
+  constructor(private context: IMatchEngineContext) {}
 
   getStateEnum(): MatchState {
     return MatchState.PAUSED;
@@ -26,7 +21,7 @@ export class PausedState implements IMatchState {
   }
 
   resume(): void {
-    this.context.setState(new PlayingState(this.context));
+    this.context.transitionToPlaying();
   }
 
   simulateMinute(): void {

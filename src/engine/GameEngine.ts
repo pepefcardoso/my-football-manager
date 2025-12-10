@@ -4,21 +4,24 @@ import { FinanceService } from "../services/FinanceService";
 import { serviceContainer } from "../services/ServiceContainer";
 import { Logger } from "../lib/Logger";
 import { Result } from "../services/types/ServiceResults";
+import { TimeEngine } from "./TimeEngine";
 
 const logger = new Logger("GameEngine");
 
 export class GameEngine {
-  private currentDate: Date;
+  private timeEngine: TimeEngine;
   private gameState: GameState | null = null;
 
   constructor(initialDate?: string) {
-    this.currentDate = initialDate
-      ? new Date(initialDate)
-      : new Date("2025-01-01");
+    this.timeEngine = new TimeEngine(initialDate || "2025-01-01");
   }
 
   setGameState(state: GameState) {
     this.gameState = state;
+
+    if (state.currentDate) {
+      this.timeEngine = new TimeEngine(state.currentDate);
+    }
   }
 
   getGameState(): GameState | null {
@@ -26,22 +29,19 @@ export class GameEngine {
   }
 
   getCurrentDate(): string {
-    return this.currentDate.toISOString().split("T")[0];
+    return this.timeEngine.getDateString();
   }
 
   advanceDay(): string {
-    this.currentDate.setDate(this.currentDate.getDate() + 1);
-    return this.getCurrentDate();
+    return this.timeEngine.advanceDay();
   }
 
   advanceDays(days: number): string {
-    for (let i = 0; i < days; i++) {
-      this.advanceDay();
-    }
-    return this.getCurrentDate();
+    return this.timeEngine.addDays(days);
   }
 
   getWeekday(): string {
+    const date = new Date(this.getCurrentDate());
     const days = [
       "Domingo",
       "Segunda",
@@ -51,11 +51,12 @@ export class GameEngine {
       "Sexta",
       "Sábado",
     ];
-    return days[this.currentDate.getDay()];
+    return days[date.getDay()];
   }
 
   isMatchDay(): boolean {
-    const day = this.currentDate.getDay();
+    const date = new Date(this.getCurrentDate());
+    const day = date.getDay();
     return day === 3 || day === 6;
   }
 

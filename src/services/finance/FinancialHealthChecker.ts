@@ -1,13 +1,13 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import { FinancialThresholds } from "../config/ServiceConstants";
-import type {
-  FinancialHealthResult,
-  TransferPermissionResult,
-} from "../FinanceService";
 import { Result, type ServiceResult } from "../types/ServiceResults";
 import { GameEventBus } from "../events/GameEventBus";
 import { GameEventType } from "../events/GameEventTypes";
+import type {
+  FinancialHealthResult,
+  TransferPermissionResult,
+} from "../../domain/types";
 
 export class FinancialHealthChecker extends BaseService {
   private eventBus: GameEventBus;
