@@ -1,33 +1,43 @@
 import type { Team } from "../domain/models";
-import { FinancialCategory } from "../domain/enums";
 import { MatchEngine } from "../engine/MatchEngine";
 import type { MatchConfig, MatchResult } from "../domain/types";
-import { CompetitionScheduler } from "./CompetitionScheduler";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import { Result } from "./types/ServiceResults";
 import type { ServiceResult } from "./types/ServiceResults";
 
+import { MatchResultProcessor } from "./match/MatchResultProcessor";
+import { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
+import { MatchFinancialsProcessor } from "./match/MatchFinancialsProcessor";
+import { MatchFanSatisfactionProcessor } from "./match/MatchFanSatisfactionProcessor";
+import { CupProgressionManager } from "./match/CupProgressionManager";
+
 export class MatchService extends BaseService {
   private engines: Map<number, MatchEngine> = new Map();
 
+  private resultProcessor: MatchResultProcessor;
+  private revenueCalculator: MatchRevenueCalculator;
+  private financialsProcessor: MatchFinancialsProcessor;
+  private fanSatisfactionProcessor: MatchFanSatisfactionProcessor;
+  private cupManager: CupProgressionManager;
+
   constructor(repositories: IRepositoryContainer) {
     super(repositories, "MatchService");
+    this.resultProcessor = new MatchResultProcessor(repositories);
+    this.revenueCalculator = new MatchRevenueCalculator(repositories);
+    this.financialsProcessor = new MatchFinancialsProcessor(repositories);
+    this.fanSatisfactionProcessor = new MatchFanSatisfactionProcessor(
+      repositories
+    );
+    this.cupManager = new CupProgressionManager(repositories);
   }
 
-  /**
-   * Inicializa o motor de jogo para uma partida específica.
-   * Carrega times, jogadores e configurações necessárias.
-   */
   async initializeMatch(matchId: number): Promise<ServiceResult<void>> {
     return this.executeVoid("initializeMatch", matchId, async (id) => {
       await this.ensureEngineInitialized(id);
     });
   }
 
-  /**
-   * Inicia a partida (start).
-   */
   async startMatch(matchId: number): Promise<ServiceResult<void>> {
     return this.executeVoid("startMatch", matchId, async (id) => {
       const engine = this.engines.get(id);
@@ -38,9 +48,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Pausa a partida.
-   */
   async pauseMatch(matchId: number): Promise<ServiceResult<void>> {
     return this.executeVoid("pauseMatch", matchId, async (id) => {
       const engine = this.engines.get(id);
@@ -51,9 +58,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Retoma a partida (resume).
-   */
   async resumeMatch(matchId: number): Promise<ServiceResult<void>> {
     return this.executeVoid("resumeMatch", matchId, async (id) => {
       const engine = this.engines.get(id);
@@ -64,9 +68,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Simula um minuto da partida.
-   */
   async simulateMinute(matchId: number): Promise<
     ServiceResult<{
       currentMinute: number;
@@ -101,9 +102,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Simula a partida completa instantaneamente.
-   */
   async simulateFullMatch(
     matchId: number
   ): Promise<ServiceResult<MatchResult>> {
@@ -125,9 +123,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Obtém o estado atual da partida (para UI).
-   */
   async getMatchState(matchId: number): Promise<ServiceResult<any>> {
     return this.execute("getMatchState", matchId, async (id) => {
       const engine = this.engines.get(id);
@@ -144,9 +139,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Simula todas as partidas pendentes de uma data específica.
-   */
   async simulateMatchesOfDate(date: string): Promise<
     ServiceResult<{
       matchesPlayed: number;
@@ -174,9 +166,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Recupera ou inicializa a engine de uma partida.
-   */
   private async ensureEngineInitialized(matchId: number): Promise<MatchEngine> {
     let engine = this.engines.get(matchId);
     if (engine) return engine;
@@ -262,22 +251,26 @@ export class MatchService extends BaseService {
     const homeTeam = await this.repos.teams.findById(match.homeTeamId!);
     if (!homeTeam) return;
 
-    const { ticketRevenue, attendance } = await this.calculateMatchRevenue(
-      match,
-      homeTeam
-    );
-
-    await this.repos.matches.updateMatchResult(
+    const revenueResult = await this.revenueCalculator.calculateRevenue({
       matchId,
-      result.homeScore,
-      result.awayScore,
-      attendance,
-      ticketRevenue
+      homeTeam,
+      competitionId: match.competitionId,
+      round: match.round,
+    });
+
+    const { ticketRevenue, attendance } = Result.unwrapOr(revenueResult, {
+      ticketRevenue: 0,
+      attendance: 0,
+    });
+
+    await this.resultProcessor.processResult(
+      matchId,
+      result,
+      ticketRevenue,
+      attendance
     );
 
-    await this.saveMatchEvents(matchId, result);
-    await this.updatePlayerConditions(result);
-    await this.processMatchFinancials(
+    await this.financialsProcessor.processFinancials(
       match,
       homeTeam,
       ticketRevenue,
@@ -285,7 +278,7 @@ export class MatchService extends BaseService {
     );
 
     if (match.competitionId && match.seasonId) {
-      await this.updateStandings(
+      await this.resultProcessor.updateStandings(
         match.competitionId,
         match.seasonId,
         match.homeTeamId!,
@@ -295,301 +288,12 @@ export class MatchService extends BaseService {
       );
     }
 
-    await this.updateFanSatisfaction(match, result);
-    await this.checkCupProgression(matchId);
-  }
-
-  private async calculateMatchRevenue(
-    match: any,
-    homeTeam: any
-  ): Promise<{ ticketRevenue: number; attendance: number }> {
-    let matchImportance = 1.0;
-
-    if (match.competitionId) {
-      const competitions = await this.repos.competitions.findAll();
-      const comp = competitions.find((c) => c.id === match.competitionId);
-
-      if (comp) {
-        if (comp.tier === 1) matchImportance *= 1.2;
-        if (comp.type === "knockout") matchImportance *= 1.3;
-        if (match.round && match.round > 30) matchImportance *= 1.2;
-        matchImportance = Math.min(2.0, matchImportance);
-      }
-    }
-
-    const satisfactionMultiplier = Math.max(
-      0.3,
-      Math.min(1.0, (homeTeam.fanSatisfaction ?? 50) / 100)
+    await this.fanSatisfactionProcessor.updateSatisfactionForMatch(
+      matchId,
+      result.homeScore,
+      result.awayScore
     );
 
-    const baseAttendance =
-      (homeTeam.stadiumCapacity ?? 10000) * satisfactionMultiplier;
-    const expectedAttendance = baseAttendance * matchImportance;
-    const randomFactor = 0.95 + Math.random() * 0.1;
-
-    const attendance = Math.round(
-      Math.min(
-        homeTeam.stadiumCapacity ?? 10000,
-        expectedAttendance * randomFactor
-      )
-    );
-
-    const ticketRevenue = Math.round(attendance * 50);
-
-    return { ticketRevenue, attendance };
-  }
-
-  private async saveMatchEvents(
-    matchId: number,
-    result: MatchResult
-  ): Promise<void> {
-    const eventsToSave = result.events
-      .filter((e) =>
-        ["goal", "yellow_card", "red_card", "injury"].includes(e.type)
-      )
-      .map((e) => ({
-        matchId,
-        minute: e.minute,
-        type: e.type,
-        teamId: e.teamId,
-        playerId: e.playerId || null,
-        description: e.description,
-      }));
-
-    await this.repos.matches.createMatchEvents(eventsToSave);
-  }
-
-  private async updatePlayerConditions(result: MatchResult): Promise<void> {
-    await this.repos.players.updateDailyStatsBatch(
-      result.playerUpdates.map((u) => ({
-        id: u.playerId,
-        energy: u.energy,
-        fitness: Math.max(0, 100 - (100 - u.energy)),
-        moral: u.moral,
-        isInjured: u.isInjured,
-        injuryDays: u.injuryDays,
-      }))
-    );
-  }
-
-  private async processMatchFinancials(
-    match: any,
-    homeTeam: any,
-    ticketRevenue: number,
-    attendance: number
-  ): Promise<void> {
-    if (ticketRevenue > 0 && match.seasonId) {
-      await this.repos.financial.addRecord({
-        teamId: match.homeTeamId,
-        seasonId: match.seasonId,
-        date: match.date,
-        type: "income",
-        category: FinancialCategory.TICKET_SALES,
-        amount: ticketRevenue,
-        description: `Receita de Bilheteira - ${attendance.toLocaleString(
-          "pt-PT"
-        )} torcedores presentes`,
-      });
-
-      const currentBudget = homeTeam.budget ?? 0;
-      await this.repos.teams.updateBudget(
-        match.homeTeamId!,
-        currentBudget + ticketRevenue
-      );
-    }
-  }
-
-  private async updateFanSatisfaction(
-    match: any,
-    result: MatchResult
-  ): Promise<void> {
-    const homeTeam = await this.repos.teams.findById(match.homeTeamId!);
-    const awayTeam = await this.repos.teams.findById(match.awayTeamId!);
-
-    if (!homeTeam || !awayTeam) return;
-
-    const homeTeamRep = homeTeam.reputation || 0;
-    const awayTeamRep = awayTeam.reputation || 0;
-
-    let homeResult: "win" | "draw" | "loss" = "draw";
-    if (result.homeScore > result.awayScore) homeResult = "win";
-    else if (result.homeScore < result.awayScore) homeResult = "loss";
-
-    await this.updateTeamSatisfaction(
-      match.homeTeamId!,
-      homeResult,
-      true,
-      awayTeamRep,
-      homeTeamRep,
-      homeTeam.fanSatisfaction ?? 50
-    );
-
-    let awayResult: "win" | "draw" | "loss" = "draw";
-    if (result.awayScore > result.homeScore) awayResult = "win";
-    else if (result.awayScore < result.homeScore) awayResult = "loss";
-
-    await this.updateTeamSatisfaction(
-      match.awayTeamId!,
-      awayResult,
-      false,
-      homeTeamRep,
-      awayTeamRep,
-      awayTeam.fanSatisfaction ?? 50
-    );
-  }
-
-  private async updateTeamSatisfaction(
-    teamId: number,
-    result: "win" | "draw" | "loss",
-    isHomeGame: boolean,
-    opponentReputation: number,
-    teamReputation: number,
-    currentSatisfaction: number
-  ): Promise<void> {
-    const reputationDiff = opponentReputation - teamReputation;
-    let change = 0;
-
-    if (result === "win") {
-      change = 2 + Math.max(0, reputationDiff / 1000);
-      if (isHomeGame) change += 1;
-    } else if (result === "loss") {
-      change = -3;
-      if (reputationDiff > 2000) change += 1;
-      if (isHomeGame) change -= 1;
-    } else {
-      if (reputationDiff > 500) change = 1;
-      else if (reputationDiff < -500) change = -2;
-      else change = 0;
-    }
-
-    change = Math.max(-5, Math.min(5, Math.round(change)));
-
-    const newSatisfaction = Math.max(
-      0,
-      Math.min(100, currentSatisfaction + change)
-    );
-
-    if (newSatisfaction !== currentSatisfaction) {
-      await this.repos.teams.update(teamId, {
-        fanSatisfaction: newSatisfaction,
-      });
-
-      const symbol = change > 0 ? "+" : "";
-      this.logger.info(
-        `Satisfação da torcida atualizada: ${currentSatisfaction}% ➡️ ${newSatisfaction}% (${symbol}${change})`
-      );
-    }
-  }
-
-  private async checkCupProgression(matchId: number): Promise<void> {
-    try {
-      const match = await this.repos.matches.findById(matchId);
-      if (!match || !match.competitionId || !match.seasonId || !match.round)
-        return;
-
-      const competition = (await this.repos.competitions.findAll()).find(
-        (c) => c.id === match.competitionId
-      );
-
-      if (!competition || competition.type === "league") return;
-
-      const allMatchesInRound = await this.repos.matches.findByTeamAndSeason(
-        0,
-        match.seasonId
-      );
-
-      const roundMatches = allMatchesInRound.filter(
-        (m) =>
-          m.competitionId === match.competitionId && m.round === match.round
-      );
-
-      const pending = roundMatches.some((m) => !m.isPlayed);
-      if (pending) return;
-
-      const nextRound = match.round + 1;
-
-      if (roundMatches.length === 1) {
-        this.logger.info(`🏆 Competição ${competition.name} encerrada!`);
-        return;
-      }
-
-      const nextFixtures = CompetitionScheduler.generateNextRoundPairings(
-        roundMatches,
-        nextRound
-      );
-
-      const lastMatchDate = new Date(match.date);
-      lastMatchDate.setDate(lastMatchDate.getDate() + 14);
-      const nextDateStr = lastMatchDate.toISOString().split("T")[0];
-
-      const matchesToSave = nextFixtures.map((f) => ({
-        competitionId: competition.id,
-        seasonId: match.seasonId,
-        homeTeamId: f.homeTeamId,
-        awayTeamId: f.awayTeamId,
-        date: nextDateStr,
-        round: nextRound,
-        isPlayed: false,
-        weather: "sunny",
-      }));
-
-      await this.repos.matches.createMany(matchesToSave as any);
-      this.logger.info(
-        `Próxima fase da ${competition.name} gerada: ${matchesToSave.length} partidas.`
-      );
-    } catch (error) {
-      this.logger.error("Erro ao processar progressão de copa:", error);
-    }
-  }
-
-  private async updateStandings(
-    competitionId: number,
-    seasonId: number,
-    homeTeamId: number,
-    awayTeamId: number,
-    homeScore: number,
-    awayScore: number
-  ): Promise<void> {
-    const homeStanding = await this.repos.competitions.getStandings(
-      competitionId,
-      seasonId
-    );
-    const homeData = homeStanding.find((s) => s.teamId === homeTeamId);
-
-    const homeWin = homeScore > awayScore;
-    const draw = homeScore === awayScore;
-
-    await this.repos.competitions.updateStanding(
-      competitionId,
-      seasonId,
-      homeTeamId,
-      {
-        played: (homeData?.played || 0) + 1,
-        wins: (homeData?.wins || 0) + (homeWin ? 1 : 0),
-        draws: (homeData?.draws || 0) + (draw ? 1 : 0),
-        losses: (homeData?.losses || 0) + (!homeWin && !draw ? 1 : 0),
-        goalsFor: (homeData?.goalsFor || 0) + homeScore,
-        goalsAgainst: (homeData?.goalsAgainst || 0) + awayScore,
-        points: (homeData?.points || 0) + (homeWin ? 3 : draw ? 1 : 0),
-      }
-    );
-
-    const awayData = homeStanding.find((s) => s.teamId === awayTeamId);
-    const awayWin = awayScore > homeScore;
-
-    await this.repos.competitions.updateStanding(
-      competitionId,
-      seasonId,
-      awayTeamId,
-      {
-        played: (awayData?.played || 0) + 1,
-        wins: (awayData?.wins || 0) + (awayWin ? 1 : 0),
-        draws: (awayData?.draws || 0) + (draw ? 1 : 0),
-        losses: (awayData?.losses || 0) + (!awayWin && !draw ? 1 : 0),
-        goalsFor: (awayData?.goalsFor || 0) + awayScore,
-        goalsAgainst: (awayData?.goalsAgainst || 0) + homeScore,
-        points: (awayData?.points || 0) + (awayWin ? 3 : draw ? 1 : 0),
-      }
-    );
+    await this.cupManager.checkAndProgressCup(matchId);
   }
 }
