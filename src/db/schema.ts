@@ -1,4 +1,10 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  index,
+} from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
 export const teams = sqliteTable("teams", {
@@ -21,7 +27,60 @@ export const teams = sqliteTable("teams", {
   headCoachId: integer("head_coach_id"),
   footballDirectorId: integer("football_director_id"),
   executiveDirectorId: integer("executive_director_id"),
+  transferBudget: real("transfer_budget").default(0).notNull(),
+  transferStrategy: text("transfer_strategy").default("balanced").notNull(),
 });
+
+export const transferProposals = sqliteTable(
+  "transfer_proposals",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    playerId: integer("player_id")
+      .references(() => players.id)
+      .notNull(),
+    fromTeamId: integer("from_team_id")
+      .references(() => teams.id)
+      .notNull(),
+    toTeamId: integer("to_team_id").references(() => teams.id),
+    type: text("type").notNull(),
+    status: text("status").default("pending").notNull(),
+    fee: real("fee").default(0).notNull(),
+    wageOffer: real("wage_offer").default(0).notNull(),
+    contractLength: integer("contract_length").default(1),
+    createdAt: text("created_at").notNull(),
+    responseDeadline: text("response_deadline").notNull(),
+    counterOfferFee: real("counter_offer_fee"),
+    rejectionReason: text("rejection_reason"),
+  },
+  (table) => ({
+    fromTeamIdx: index("idx_proposals_from_team").on(table.fromTeamId),
+    toTeamIdx: index("idx_proposals_to_team").on(table.toTeamId),
+    statusIdx: index("idx_proposals_status").on(table.status),
+  })
+);
+
+export const clubInterests = sqliteTable(
+  "club_interests",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: integer("team_id")
+      .references(() => teams.id)
+      .notNull(),
+    playerId: integer("player_id")
+      .references(() => players.id)
+      .notNull(),
+
+    interestLevel: text("interest_level").default("observing").notNull(), // Enum: InterestLevel
+    priority: integer("priority").default(0).notNull(), // 0-100 para ordenação de IA
+
+    maxFeeWillingToPay: real("max_fee_willing_to_pay"), // Limite interno da IA
+    dateAdded: text("date_added").notNull(),
+  },
+  (table) => ({
+    teamInterestIdx: index("idx_interests_team").on(table.teamId),
+    playerInterestIdx: index("idx_interests_player").on(table.playerId),
+  })
+);
 
 export const players = sqliteTable("players", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -98,7 +157,10 @@ export const competitions = sqliteTable("competitions", {
   type: text("type").notNull().default("league"),
   priority: integer("priority").default(1).notNull(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  config: text("config", { mode: "json" }).$type<Record<string, any>>().notNull().default({}),
+  config: text("config", { mode: "json" })
+    .$type<Record<string, any>>()
+    .notNull()
+    .default({}),
   teams: integer("teams").default(20).notNull(),
   prize: real("prize").default(0).notNull(),
   reputation: integer("reputation").default(0).notNull(),
@@ -231,6 +293,11 @@ export const teamsRelations = relations(teams, ({ many, one }) => ({
     fields: [teams.headCoachId],
     references: [staff.id],
   }),
+  sentProposals: many(transferProposals, { relationName: "proposalsSent" }),
+  receivedProposals: many(transferProposals, {
+    relationName: "proposalsReceived",
+  }),
+  interests: many(clubInterests),
 }));
 
 export const playersRelations = relations(players, ({ one, many }) => ({
@@ -240,6 +307,8 @@ export const playersRelations = relations(players, ({ one, many }) => ({
     fields: [players.id],
     references: [playerContracts.playerId],
   }),
+  transferProposals: many(transferProposals),
+  interestedClubs: many(clubInterests),
 }));
 
 export const playerContractsRelations = relations(
@@ -329,6 +398,37 @@ export const competitionStandingsRelations = relations(
     }),
   })
 );
+
+export const transferProposalsRelations = relations(
+  transferProposals,
+  ({ one }) => ({
+    player: one(players, {
+      fields: [transferProposals.playerId],
+      references: [players.id],
+    }),
+    fromTeam: one(teams, {
+      fields: [transferProposals.fromTeamId],
+      references: [teams.id],
+      relationName: "proposalsSent",
+    }),
+    toTeam: one(teams, {
+      fields: [transferProposals.toTeamId],
+      references: [teams.id],
+      relationName: "proposalsReceived",
+    }),
+  })
+);
+
+export const clubInterestsRelations = relations(clubInterests, ({ one }) => ({
+  team: one(teams, {
+    fields: [clubInterests.teamId],
+    references: [teams.id],
+  }),
+  player: one(players, {
+    fields: [clubInterests.playerId],
+    references: [players.id],
+  }),
+}));
 
 export const playerCompetitionStatsRelations = relations(
   playerCompetitionStats,

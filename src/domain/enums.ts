@@ -80,3 +80,28 @@ export enum MatchState {
   PAUSED = "paused",
   FINISHED = "finished",
 }
+
+export enum TransferStatus {
+  PENDING = "pending",
+  NEGOTIATING = "negotiating",
+  ACCEPTED = "accepted",
+  REJECTED = "rejected",
+  COMPLETED = "completed",
+  CANCELLED = "cancelled",
+  WITHDRAWN = "withdrawn",
+}
+
+export enum TransferStrategy {
+  AGGRESSIVE = "aggressive",
+  BALANCED = "balanced",
+  YOUTH_FOCUSED = "youth_focused",
+  SELLING_CLUB = "selling_club",
+  REBUILDING = "rebuilding",
+}
+
+export enum InterestLevel {
+  OBSERVING = "observing",
+  INTERESTED = "interested",
+  HIGH_PRIORITY = "high_priority",
+  CRITICAL = "critical",
+}

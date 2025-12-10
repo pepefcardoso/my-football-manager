@@ -1,8 +1,11 @@
 import type {
   FinancialCategory,
+  InterestLevel,
   MatchEventType,
   Position,
   StaffRole,
+  TransferStatus,
+  TransferStrategy,
   TransferType,
   WeatherCondition,
 } from "./enums";
@@ -81,6 +84,8 @@ export interface Team {
   headCoachId: number | null;
   footballDirectorId: number | null;
   executiveDirectorId: number | null;
+  transferBudget: number;
+  transferStrategy: TransferStrategy | string;
 }
 
 export interface Competition {
@@ -194,4 +199,30 @@ export interface GameState {
   playerTeamId: number | null;
   simulationSpeed: number;
   trainingFocus: string | null;
+}
+
+export interface TransferProposal {
+  id: number;
+  playerId: number;
+  fromTeamId: number;
+  toTeamId: number | null;
+  type: "transfer" | "loan" | string;
+  status: TransferStatus | string;
+  fee: number;
+  wageOffer: number;
+  contractLength: number;
+  createdAt: string;
+  responseDeadline: string;
+  counterOfferFee: number | null;
+  rejectionReason: string | null;
+}
+
+export interface ClubInterest {
+  id: number;
+  teamId: number;
+  playerId: number;
+  interestLevel: InterestLevel | string;
+  priority: number;
+  maxFeeWillingToPay: number | null;
+  dateAdded: string;
 }

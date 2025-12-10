@@ -13,8 +13,7 @@ dist-electron
 dist-ssr
 *.local
 data/
-*.sqlite
-*.sqlite-*
+database.sqlite
 .turbo/
 .cache/
 coverage/
