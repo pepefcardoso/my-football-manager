@@ -179,6 +179,22 @@ export interface ITransferRepository {
   findByPlayerId(playerId: number): Promise<any[]>;
 }
 
+export interface ITransferProposalRepository {
+  create(data: any): Promise<number>;
+  findById(id: number): Promise<any>;
+  update(id: number, data: any): Promise<void>;
+  delete(id: number): Promise<void>;
+  findSentByTeam(teamId: number): Promise<any[]>;
+  findReceivedByTeam(teamId: number): Promise<any[]>;
+  findActiveProposal(
+    playerId: number,
+    fromTeamId: number,
+    toTeamId: number
+  ): Promise<any>;
+  findActiveByPlayer(playerId: number): Promise<any[]>;
+  expireProposals(currentDate: string): Promise<number>;
+}
+
 export interface IRepositoryContainer {
   players: IPlayerRepository;
   teams: ITeamRepository;
@@ -189,6 +205,7 @@ export interface IRepositoryContainer {
   financial: IFinancialRepository;
   scouting: IScoutingRepository;
   transfers: ITransferRepository;
+  transferProposals: ITransferProposalRepository;
 }
 
 export type ServiceFactory<T> = (deps: IRepositoryContainer) => T;

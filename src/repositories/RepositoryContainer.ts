@@ -33,6 +33,7 @@ import {
   transferRepository,
 } from "../repositories/TransferRepository";
 import type { IRepositoryContainer } from "./IRepositories";
+import { transferProposalRepository, TransferProposalRepository } from "./TransferProposalRepository";
 
 /**
  * Container que permite instanciar repositórios com um contexto específico (transação)
@@ -49,6 +50,7 @@ export class RepositoryFactory {
       financial: new FinancialRepository(context),
       scouting: new ScoutingRepository(context),
       transfers: new TransferRepository(context),
+      transferProposals: new TransferProposalRepository(context),
     };
   }
 }
@@ -66,6 +68,7 @@ class ProductionRepositoryContainer implements IRepositoryContainer {
   public readonly financial = financialRepository;
   public readonly scouting = scoutingRepository;
   public readonly transfers = transferRepository;
+  public readonly transferProposals = transferProposalRepository;
 }
 
 export const repositoryContainer: IRepositoryContainer =
