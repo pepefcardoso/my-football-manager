@@ -6,12 +6,12 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "rebuild": "electron-rebuild -f -w better-sqlite3",
-    "seed": "npm rebuild better-sqlite3 && tsx src/db/seed.ts && npm run rebuild",
-    "db:push": "npm rebuild better-sqlite3 && drizzle-kit push && npm run rebuild",
-    "postinstall": "electron-rebuild -f -w better-sqlite3"
+    "deps:validate": "depcruise src",
+    "deps:graph": "depcruise src --include-only \"^src/services\" --output-type archi > dependency-graph.html",
+    "deps:services": "tsx scripts/generate-service-map.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
@@ -28,6 +28,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.22",
+    "dependency-cruiser": "^16.2.0",
     "drizzle-kit": "^0.31.8",
     "electron": "^39.2.4",
     "electron-builder": "^26.0.12",
