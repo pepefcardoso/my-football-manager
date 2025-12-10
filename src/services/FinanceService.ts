@@ -5,6 +5,7 @@ import { BaseService } from "./BaseService";
 import type { ServiceResult } from "./types/ServiceResults";
 import { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
 import { WageCalculator } from "./finance/WageCalculator";
+import { RevenueStrategyFactory } from "./strategies/revenue/RevenueStrategyFactory";
 
 export interface ProcessExpensesInput {
   teamId: number;
@@ -43,36 +44,30 @@ export class FinanceService extends BaseService {
     this.wageCalculator = new WageCalculator(repositories);
   }
 
+  /**
+   * Calcula a receita estimada de uma partida.
+   * Refatorado para usar o Strategy Pattern (LeagueRevenueStrategy como padrão).
+   * * Nota: O parâmetro matchImportance é mantido para compatibilidade,
+   * mas a estratégia calcula sua própria importância baseada no contexto.
+   */
   static calculateMatchDayRevenue(
     stadiumCapacity: number,
     fanSatisfaction: number,
-    matchImportance: number = 1.0,
     ticketPrice: number = MatchRevenueConfig.BASE_TICKET_PRICE
   ): { revenue: number; attendance: number } {
-    const satisfactionMultiplier = Math.max(
-      MatchRevenueConfig.MIN_SATISFACTION_MULTIPLIER,
-      Math.min(
-        MatchRevenueConfig.MAX_SATISFACTION_MULTIPLIER,
-        fanSatisfaction / 100
-      )
-    );
+    const strategy = RevenueStrategyFactory.getStrategy();
 
-    const baseAttendance = stadiumCapacity * satisfactionMultiplier;
-    const expectedAttendance = baseAttendance * matchImportance;
-
-    const randomFactor =
-      MatchRevenueConfig.ATTENDANCE_RANDOM_FACTOR_BASE +
-      Math.random() * MatchRevenueConfig.ATTENDANCE_RANDOM_VARIANCE;
-
-    const actualAttendance = Math.round(
-      Math.min(stadiumCapacity, expectedAttendance * randomFactor)
-    );
-
-    const revenue = Math.round(actualAttendance * ticketPrice);
+    const result = strategy.calculateRevenue({
+      stadiumCapacity,
+      fanSatisfaction,
+      ticketPrice,
+      competitionTier: 1,
+      round: 15,
+    });
 
     return {
-      revenue,
-      attendance: actualAttendance,
+      revenue: result.ticketRevenue,
+      attendance: result.attendance,
     };
   }
 

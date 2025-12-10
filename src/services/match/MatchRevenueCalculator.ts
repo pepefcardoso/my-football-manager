@@ -2,6 +2,7 @@ import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { ServiceResult } from "../types/ServiceResults";
 import { MatchRevenueConfig } from "../config/ServiceConstants";
+import { RevenueStrategyFactory } from "../strategies/revenue/RevenueStrategyFactory";
 
 export interface RevenueCalculationInput {
   matchId: number;
@@ -27,54 +28,34 @@ export class MatchRevenueCalculator extends BaseService {
       "calculateRevenue",
       input,
       async ({ homeTeam, competitionId, round }) => {
-        let matchImportance: number = MatchRevenueConfig.IMPORTANCE.BASE;
+        let competition = undefined;
 
         if (competitionId) {
-          const competitions = await this.repos.competitions.findAll();
-          const comp = competitions.find((c) => c.id === competitionId);
-
-          if (comp) {
-            if (comp.tier === 1)
-              matchImportance *= MatchRevenueConfig.IMPORTANCE.TIER_1_BONUS;
-            if (comp.type === "knockout")
-              matchImportance *= MatchRevenueConfig.IMPORTANCE.KNOCKOUT_BONUS;
-            if (round && round > 30)
-              matchImportance *= MatchRevenueConfig.IMPORTANCE.LATE_ROUND_BONUS;
-
-            matchImportance = Math.min(
-              MatchRevenueConfig.IMPORTANCE.MAX_MULTIPLIER,
-              matchImportance
-            );
-          }
+          const allCompetitions = await this.repos.competitions.findAll();
+          competition = allCompetitions.find((c) => c.id === competitionId);
         }
 
-        const satisfactionMultiplier = Math.max(
-          MatchRevenueConfig.MIN_SATISFACTION_MULTIPLIER,
-          Math.min(
-            MatchRevenueConfig.MAX_SATISFACTION_MULTIPLIER,
-            (homeTeam.fanSatisfaction ?? 50) / 100
-          )
+        const strategy = RevenueStrategyFactory.getStrategy(competition);
+
+        const result = strategy.calculateRevenue({
+          stadiumCapacity: homeTeam.stadiumCapacity ?? 10000,
+          fanSatisfaction: homeTeam.fanSatisfaction ?? 50,
+          ticketPrice: MatchRevenueConfig.BASE_TICKET_PRICE,
+          competitionTier: competition?.tier ?? 1,
+          round: round || undefined,
+        });
+
+        this.logger.debug(
+          `Receita calculada (Importância: ${result.matchImportance.toFixed(
+            2
+          )}):`,
+          result
         );
 
-        const baseAttendance =
-          (homeTeam.stadiumCapacity ?? 10000) * satisfactionMultiplier;
-        const expectedAttendance = baseAttendance * matchImportance;
-        const randomFactor =
-          MatchRevenueConfig.ATTENDANCE_RANDOM_FACTOR_BASE +
-          Math.random() * MatchRevenueConfig.ATTENDANCE_RANDOM_VARIANCE;
-
-        const attendance = Math.round(
-          Math.min(
-            homeTeam.stadiumCapacity ?? 10000,
-            expectedAttendance * randomFactor
-          )
-        );
-
-        const ticketRevenue = Math.round(
-          attendance * MatchRevenueConfig.BASE_TICKET_PRICE
-        );
-
-        return { ticketRevenue, attendance };
+        return {
+          ticketRevenue: result.ticketRevenue,
+          attendance: result.attendance,
+        };
       }
     );
   }
