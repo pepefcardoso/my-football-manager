@@ -2,20 +2,16 @@ import { FinancialCategory } from "../domain/enums";
 import { InfrastructureCosts } from "./config/ServiceConstants";
 import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class InfrastructureService {
-  private logger: Logger;
-  private repos: IRepositoryContainer;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
   constructor(repositories: IRepositoryContainer) {
     this.repos = repositories;
     this.logger = new Logger("InfrastructureService");
   }
 
-  /**
-   * Calcula o custo de manutenção mensal do estádio e CT
-   */
   calculateMonthlyMaintenance(
     stadiumCapacity: number,
     stadiumQuality: number
@@ -31,9 +27,6 @@ export class InfrastructureService {
     return total;
   }
 
-  /**
-   * Realiza a expansão da capacidade do estádio
-   */
   async expandStadium(
     teamId: number,
     seasonId: number
@@ -172,5 +165,78 @@ export class InfrastructureService {
       this.logger.error(`Erro ao realizar upgrade de ${type}:`, error);
       return { success: false, message: "Erro interno ao processar melhoria." };
     }
+  }
+
+  async getInfrastructureStatus(teamId: number): Promise<{
+    stadium: { capacity: number; quality: number; maintenanceCost: number };
+    trainingCenter: { quality: number };
+    youthAcademy: { quality: number };
+    totalMonthlyCost: number;
+  } | null> {
+    try {
+      const team = await this.repos.teams.findById(teamId);
+      if (!team) {
+        this.logger.warn(`Time ${teamId} não encontrado.`);
+        return null;
+      }
+
+      const maintenanceCost = this.calculateMonthlyMaintenance(
+        team.stadiumCapacity || 10000,
+        team.stadiumQuality || 50
+      );
+
+      return {
+        stadium: {
+          capacity: team.stadiumCapacity || 10000,
+          quality: team.stadiumQuality || 50,
+          maintenanceCost,
+        },
+        trainingCenter: {
+          quality: team.trainingCenterQuality || 50,
+        },
+        youthAcademy: {
+          quality: team.youthAcademyQuality || 50,
+        },
+        totalMonthlyCost: maintenanceCost,
+      };
+    } catch (error) {
+      this.logger.error("Erro ao buscar status de infraestrutura:", error);
+      return null;
+    }
+  }
+
+  async getUpgradeCost(
+    teamId: number,
+    type: "stadium" | "training" | "youth"
+  ): Promise<number | null> {
+    try {
+      const team = await this.repos.teams.findById(teamId);
+      if (!team) return null;
+
+      const currentQuality =
+        type === "stadium"
+          ? team.stadiumQuality
+          : type === "training"
+          ? team.trainingCenterQuality
+          : team.youthAcademyQuality;
+
+      if ((currentQuality || 0) >= InfrastructureCosts.MAX_QUALITY) {
+        return null;
+      }
+
+      return Math.round(
+        InfrastructureCosts.QUALITY_COST_BASE * (1 + (currentQuality || 0) / 50)
+      );
+    } catch (error) {
+      this.logger.error("Erro ao calcular custo de upgrade:", error);
+      return null;
+    }
+  }
+
+  async getExpansionCost(): Promise<number> {
+    return (
+      InfrastructureCosts.SEAT_EXPANSION_BLOCK *
+      InfrastructureCosts.SEAT_COST_PER_UNIT
+    );
   }
 }

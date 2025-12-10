@@ -10,22 +10,14 @@ export interface SeasonSummary {
 }
 
 export class SeasonService {
-  private calendarService: CalendarService;
-  private logger: Logger;
-  private repos: IRepositoryContainer;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
-  constructor(
-    repositories: IRepositoryContainer,
-    calendarService: CalendarService
-  ) {
+  constructor(repositories: IRepositoryContainer) {
     this.repos = repositories;
-    this.calendarService = calendarService;
     this.logger = new Logger("SeasonService");
   }
 
-  /**
-   * Inicia uma nova temporada, gerando calendário para todas as competições.
-   */
   async startNewSeason(year: number): Promise<boolean> {
     this.logger.info(`🔄 Iniciando procedimentos para a temporada ${year}...`);
 
@@ -61,7 +53,8 @@ export class SeasonService {
         `Gerando calendário para ${competitions.length} competições e ${teamIds.length} times...`
       );
 
-      const scheduledMatches = await this.calendarService.scheduleSeason(
+      const calendarService = new CalendarService();
+      const scheduledMatches = await calendarService.scheduleSeason(
         competitions,
         teamIds
       );
@@ -82,6 +75,8 @@ export class SeasonService {
       );
       await this.repos.matches.createMany(matchesToSave);
 
+      await this.initializeStandings(newSeason.id, competitions, allTeams);
+
       this.logger.info(
         `✅ Temporada ${year} iniciada com sucesso! ${matchesToSave.length} partidas agendadas.`
       );
@@ -93,6 +88,39 @@ export class SeasonService {
       );
       return false;
     }
+  }
+
+  private async initializeStandings(
+    seasonId: number,
+    competitions: any[],
+    teams: any[]
+  ): Promise<void> {
+    this.logger.debug(`Inicializando tabelas de classificação...`);
+
+    for (const competition of competitions) {
+      if (competition.type === "league") {
+        const participatingTeams = teams.slice(0, competition.teams);
+
+        for (const team of participatingTeams) {
+          await this.repos.competitions.updateStanding(
+            competition.id,
+            seasonId,
+            team.id,
+            {
+              played: 0,
+              wins: 0,
+              draws: 0,
+              losses: 0,
+              goalsFor: 0,
+              goalsAgainst: 0,
+              points: 0,
+            }
+          );
+        }
+      }
+    }
+
+    this.logger.debug(`Tabelas inicializadas com sucesso.`);
   }
 
   async processEndOfSeason(
@@ -160,6 +188,66 @@ export class SeasonService {
     } catch (error) {
       this.logger.error("Erro ao processar fim de temporada:", error);
       return null;
+    }
+  }
+
+  async getCurrentSeason() {
+    return await this.repos.seasons.findActiveSeason();
+  }
+
+  async getSeasonChampion(
+    seasonId: number,
+    competitionId: number
+  ): Promise<string | null> {
+    try {
+      const standings = await this.repos.competitions.getStandings(
+        competitionId,
+        seasonId
+      );
+
+      if (standings.length > 0 && standings[0].team) {
+        return standings[0].team.name;
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.error("Erro ao buscar campeão da temporada:", error);
+      return null;
+    }
+  }
+
+  async getTopScorers(
+    seasonId: number,
+    competitionId: number,
+    limit: number = 10
+  ) {
+    try {
+      return await this.repos.competitions.getTopScorers(
+        competitionId,
+        seasonId,
+        limit
+      );
+    } catch (error) {
+      this.logger.error("Erro ao buscar artilheiros:", error);
+      return [];
+    }
+  }
+
+  async getRelegationZone(
+    seasonId: number,
+    competitionId: number,
+    zoneSize: number = 4
+  ) {
+    try {
+      const standings = await this.repos.competitions.getStandings(
+        competitionId,
+        seasonId
+      );
+
+      return standings.slice(-zoneSize);
+    } catch (error) {
+      this.logger.error("Erro ao buscar zona de rebaixamento:", error);
+      return [];
     }
   }
 }

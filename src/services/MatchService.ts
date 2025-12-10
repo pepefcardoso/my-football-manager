@@ -2,28 +2,17 @@ import type { Team } from "../domain/models";
 import { FinancialCategory } from "../domain/enums";
 import { MatchEngine } from "../engine/MatchEngine";
 import type { MatchConfig, MatchResult } from "../domain/types";
-import { FinanceService } from "./FinanceService";
-import { MarketingService } from "./MarketingService";
 import { Logger } from "../lib/Logger";
 import { CompetitionScheduler } from "./CompetitionScheduler";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { StatsService } from "./StatsService";
 
 export class MatchService {
   private engines: Map<number, MatchEngine> = new Map();
-  private logger: Logger;
-  private repos: IRepositoryContainer;
-  private marketingService: MarketingService;
-  private statsService: StatsService;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
-  constructor(
-    repositories: IRepositoryContainer,
-    marketingService: MarketingService,
-    statsService: StatsService
-  ) {
+  constructor(repositories: IRepositoryContainer) {
     this.repos = repositories;
-    this.marketingService = marketingService;
-    this.statsService = statsService;
     this.logger = new Logger("MatchService");
   }
 
@@ -44,7 +33,6 @@ export class MatchService {
         return null;
       }
 
-      // TODO: extrair para um adapter
       const mapToDomainTeam = (dbTeam: typeof homeTeamData): Team => ({
         ...dbTeam,
         primaryColor: dbTeam.primaryColor ?? "#000000",
@@ -198,26 +186,10 @@ export class MatchService {
       const homeTeam = await this.repos.teams.findById(match.homeTeamId!);
       if (!homeTeam) return;
 
-      let matchImportance = 1.0;
-      if (match.competitionId) {
-        const competition = await this.repos.competitions.findAll();
-        const comp = competition.find((c) => c.id === match.competitionId);
-        if (comp) {
-          matchImportance = FinanceService.getMatchImportance(
-            comp.tier || 3,
-            match.round ?? undefined,
-            comp.type === "knockout"
-          );
-        }
-      }
-
-      const { revenue: ticketRevenue, attendance } =
-        FinanceService.calculateMatchDayRevenue(
-          homeTeam.stadiumCapacity ?? 10000,
-          homeTeam.fanSatisfaction ?? 50,
-          matchImportance,
-          50
-        );
+      const { ticketRevenue, attendance } = await this.calculateMatchRevenue(
+        match,
+        homeTeam
+      );
 
       await this.repos.matches.updateMatchResult(
         matchId,
@@ -227,60 +199,14 @@ export class MatchService {
         ticketRevenue
       );
 
-      const eventsToSave = result.events
-        .filter((e) =>
-          ["goal", "yellow_card", "red_card", "injury"].includes(e.type)
-        )
-        .map((e) => ({
-          matchId,
-          minute: e.minute,
-          type: e.type,
-          teamId: e.teamId,
-          playerId: e.playerId || null,
-          description: e.description,
-        }));
-
-      await this.repos.matches.createMatchEvents(eventsToSave);
-
-      await this.repos.players.updateDailyStatsBatch(
-        result.playerUpdates.map((u) => ({
-          id: u.playerId,
-          energy: u.energy,
-          fitness: Math.max(0, 100 - (100 - u.energy)),
-          moral: u.moral,
-          isInjured: u.isInjured,
-          injuryDays: u.injuryDays,
-        }))
+      await this.saveMatchEvents(matchId, result);
+      await this.updatePlayerConditions(result);
+      await this.processMatchFinancials(
+        match,
+        homeTeam,
+        ticketRevenue,
+        attendance
       );
-
-      if (ticketRevenue > 0 && match.seasonId) {
-        await this.repos.financial.addRecord({
-          teamId: match.homeTeamId,
-          seasonId: match.seasonId,
-          date: match.date,
-          type: "income",
-          category: FinancialCategory.TICKET_SALES,
-          amount: ticketRevenue,
-          description: FinanceService.getTransactionDescription(
-            FinancialCategory.TICKET_SALES,
-            `${attendance.toLocaleString("pt-PT")} torcedores presentes`
-          ),
-        });
-
-        this.logger.info(
-          `💰 Receita de bilheteria registrada: €${ticketRevenue.toLocaleString(
-            "pt-PT"
-          )} (${attendance} torcedores)`
-        );
-      }
-
-      if (ticketRevenue > 0) {
-        const currentBudget = homeTeam.budget ?? 0;
-        await this.repos.teams.updateBudget(
-          match.homeTeamId!,
-          currentBudget + ticketRevenue
-        );
-      }
 
       if (match.competitionId && match.seasonId) {
         await this.updateStandings(
@@ -291,45 +217,201 @@ export class MatchService {
           result.homeScore,
           result.awayScore
         );
-
-        await this.statsService.processMatchStats(
-          matchId,
-          match.competitionId,
-          match.seasonId,
-          result
-        );
       }
 
-      const homeTeamRep = homeTeam.reputation || 0;
-      const awayTeam = await this.repos.teams.findById(match.awayTeamId!);
-      const awayTeamRep = awayTeam?.reputation || 0;
-
-      let homeResult: "win" | "draw" | "loss" = "draw";
-      if (result.homeScore > result.awayScore) homeResult = "win";
-      else if (result.homeScore < result.awayScore) homeResult = "loss";
-
-      await this.marketingService.updateFanSatisfactionAfterMatch(
-        match.homeTeamId!,
-        homeResult,
-        true,
-        awayTeamRep
-      );
-
-      let awayResult: "win" | "draw" | "loss" = "draw";
-      if (result.awayScore > result.homeScore) awayResult = "win";
-      else if (result.awayScore < result.homeScore) awayResult = "loss";
-
-      await this.marketingService.updateFanSatisfactionAfterMatch(
-        match.awayTeamId!,
-        awayResult,
-        false,
-        homeTeamRep
-      );
-
+      await this.updateFanSatisfaction(match, result);
       await this.checkCupProgression(matchId);
     } catch (error) {
       this.logger.error("❌ Erro ao salvar resultado da partida:", error);
       throw error;
+    }
+  }
+
+  private async calculateMatchRevenue(
+    match: any,
+    homeTeam: any
+  ): Promise<{ ticketRevenue: number; attendance: number }> {
+    let matchImportance = 1.0;
+
+    if (match.competitionId) {
+      const competitions = await this.repos.competitions.findAll();
+      const comp = competitions.find((c) => c.id === match.competitionId);
+
+      if (comp) {
+        if (comp.tier === 1) matchImportance *= 1.2;
+        if (comp.type === "knockout") matchImportance *= 1.3;
+        if (match.round && match.round > 30) matchImportance *= 1.2;
+        matchImportance = Math.min(2.0, matchImportance);
+      }
+    }
+
+    const satisfactionMultiplier = Math.max(
+      0.3,
+      Math.min(1.0, (homeTeam.fanSatisfaction ?? 50) / 100)
+    );
+
+    const baseAttendance =
+      (homeTeam.stadiumCapacity ?? 10000) * satisfactionMultiplier;
+    const expectedAttendance = baseAttendance * matchImportance;
+    const randomFactor = 0.95 + Math.random() * 0.1;
+
+    const attendance = Math.round(
+      Math.min(
+        homeTeam.stadiumCapacity ?? 10000,
+        expectedAttendance * randomFactor
+      )
+    );
+
+    const ticketRevenue = Math.round(attendance * 50);
+
+    return { ticketRevenue, attendance };
+  }
+
+  private async saveMatchEvents(
+    matchId: number,
+    result: MatchResult
+  ): Promise<void> {
+    const eventsToSave = result.events
+      .filter((e) =>
+        ["goal", "yellow_card", "red_card", "injury"].includes(e.type)
+      )
+      .map((e) => ({
+        matchId,
+        minute: e.minute,
+        type: e.type,
+        teamId: e.teamId,
+        playerId: e.playerId || null,
+        description: e.description,
+      }));
+
+    await this.repos.matches.createMatchEvents(eventsToSave);
+  }
+
+  private async updatePlayerConditions(result: MatchResult): Promise<void> {
+    await this.repos.players.updateDailyStatsBatch(
+      result.playerUpdates.map((u) => ({
+        id: u.playerId,
+        energy: u.energy,
+        fitness: Math.max(0, 100 - (100 - u.energy)),
+        moral: u.moral,
+        isInjured: u.isInjured,
+        injuryDays: u.injuryDays,
+      }))
+    );
+  }
+
+  private async processMatchFinancials(
+    match: any,
+    homeTeam: any,
+    ticketRevenue: number,
+    attendance: number
+  ): Promise<void> {
+    if (ticketRevenue > 0 && match.seasonId) {
+      await this.repos.financial.addRecord({
+        teamId: match.homeTeamId,
+        seasonId: match.seasonId,
+        date: match.date,
+        type: "income",
+        category: FinancialCategory.TICKET_SALES,
+        amount: ticketRevenue,
+        description: `Receita de Bilheteira - ${attendance.toLocaleString(
+          "pt-PT"
+        )} torcedores presentes`,
+      });
+
+      this.logger.info(
+        `💰 Receita de bilheteria registrada: €${ticketRevenue.toLocaleString(
+          "pt-PT"
+        )} (${attendance} torcedores)`
+      );
+
+      const currentBudget = homeTeam.budget ?? 0;
+      await this.repos.teams.updateBudget(
+        match.homeTeamId!,
+        currentBudget + ticketRevenue
+      );
+    }
+  }
+
+  private async updateFanSatisfaction(
+    match: any,
+    result: MatchResult
+  ): Promise<void> {
+    const homeTeam = await this.repos.teams.findById(match.homeTeamId!);
+    const awayTeam = await this.repos.teams.findById(match.awayTeamId!);
+
+    if (!homeTeam || !awayTeam) return;
+
+    const homeTeamRep = homeTeam.reputation || 0;
+    const awayTeamRep = awayTeam.reputation || 0;
+
+    let homeResult: "win" | "draw" | "loss" = "draw";
+    if (result.homeScore > result.awayScore) homeResult = "win";
+    else if (result.homeScore < result.awayScore) homeResult = "loss";
+
+    await this.updateTeamSatisfaction(
+      match.homeTeamId!,
+      homeResult,
+      true,
+      awayTeamRep,
+      homeTeamRep,
+      homeTeam.fanSatisfaction ?? 50
+    );
+
+    let awayResult: "win" | "draw" | "loss" = "draw";
+    if (result.awayScore > result.homeScore) awayResult = "win";
+    else if (result.awayScore < result.homeScore) awayResult = "loss";
+
+    await this.updateTeamSatisfaction(
+      match.awayTeamId!,
+      awayResult,
+      false,
+      homeTeamRep,
+      awayTeamRep,
+      awayTeam.fanSatisfaction ?? 50
+    );
+  }
+
+  private async updateTeamSatisfaction(
+    teamId: number,
+    result: "win" | "draw" | "loss",
+    isHomeGame: boolean,
+    opponentReputation: number,
+    teamReputation: number,
+    currentSatisfaction: number
+  ): Promise<void> {
+    const reputationDiff = opponentReputation - teamReputation;
+    let change = 0;
+
+    if (result === "win") {
+      change = 2 + Math.max(0, reputationDiff / 1000);
+      if (isHomeGame) change += 1;
+    } else if (result === "loss") {
+      change = -3;
+      if (reputationDiff > 2000) change += 1;
+      if (isHomeGame) change -= 1;
+    } else {
+      if (reputationDiff > 500) change = 1;
+      else if (reputationDiff < -500) change = -2;
+      else change = 0;
+    }
+
+    change = Math.max(-5, Math.min(5, Math.round(change)));
+
+    const newSatisfaction = Math.max(
+      0,
+      Math.min(100, currentSatisfaction + change)
+    );
+
+    if (newSatisfaction !== currentSatisfaction) {
+      await this.repos.teams.update(teamId, {
+        fanSatisfaction: newSatisfaction,
+      });
+
+      const symbol = change > 0 ? "+" : "";
+      this.logger.info(
+        `Satisfação da torcida atualizada: ${currentSatisfaction}% ➡️ ${newSatisfaction}% (${symbol}${change})`
+      );
     }
   }
 
@@ -346,7 +428,7 @@ export class MatchService {
       if (!competition || competition.type === "league") return;
 
       const allMatchesInRound = await this.repos.matches.findByTeamAndSeason(
-        0, // Hack para buscar todas se a query suportar ou precisa refatorar repository
+        0,
         match.seasonId
       );
 
@@ -461,7 +543,7 @@ export class MatchService {
     matchesPlayed: number;
     results: Array<{ matchId: number; result: MatchResult }>;
   }> {
-    this.logger.info(`Simulando partida do dia: ${date}`);
+    this.logger.info(`Simulando partidas do dia: ${date}`);
     const matches = await this.repos.matches.findPendingMatchesByDate(date);
 
     const results: Array<{ matchId: number; result: MatchResult }> = [];

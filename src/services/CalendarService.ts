@@ -34,7 +34,7 @@ interface SchedulableCompetition extends Competition {
 
 export class CalendarService {
   private continentalCompIds: Set<number> = new Set();
-  private logger: Logger;
+  private readonly logger: Logger;
 
   constructor() {
     this.logger = new Logger("CalendarService");
@@ -390,9 +390,3 @@ export class CalendarService {
     }
   }
 }
-
-export function createCalendarService(): CalendarService {
-  return new CalendarService();
-}
-
-export const calendarService = new CalendarService();

@@ -1,5 +1,4 @@
 import { FinancialCategory } from "../domain/enums";
-import { ContractService } from "./ContractService";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { Logger } from "../lib/Logger";
 import {
@@ -7,33 +6,19 @@ import {
   PenaltyWeights,
   MatchRevenueConfig,
 } from "./config/ServiceConstants";
-import type { InfrastructureService } from "./InfrastructureService";
+import { playerContracts } from "../db/schema";
+import { eq, and } from "drizzle-orm";
+import { db } from "../lib/db";
 
 export class FinanceService {
-  private logger: Logger;
-  private repos: IRepositoryContainer;
-  private contractService: ContractService;
-  private infraService: InfrastructureService;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
-  constructor(
-    repositories: IRepositoryContainer,
-    contractService: ContractService,
-    infraService: InfrastructureService
-  ) {
+  constructor(repositories: IRepositoryContainer) {
     this.repos = repositories;
-    this.contractService = contractService;
-    this.infraService = infraService;
     this.logger = new Logger("FinanceService");
   }
 
-  /**
-   * Calcula a receita de bilheteria de uma partida com base em múltiplos fatores
-   * @param stadiumCapacity Capacidade total do estádio
-   * @param fanSatisfaction Satisfação da torcida (0-100)
-   * @param matchImportance Importância da partida (0.5 = amistoso, 1.0 = campeonato, 1.5 = final)
-   * @param ticketPrice Preço base do ingresso (valor padrão: €50)
-   * @returns Objeto com receita total e público presente
-   */
   static calculateMatchDayRevenue(
     stadiumCapacity: number,
     fanSatisfaction: number,
@@ -67,14 +52,6 @@ export class FinanceService {
     };
   }
 
-  /**
-   * Processa as despesas mensais de salários de um time
-   * Debita do orçamento e cria registros financeiros
-   * @param teamId ID do time
-   * @param currentDate Data no formato YYYY-MM-DD
-   * @param seasonId ID da temporada atual
-   * @returns Objeto com detalhes da transação
-   */
   async processMonthlyExpenses(
     teamId: number,
     currentDate: string,
@@ -92,16 +69,34 @@ export class FinanceService {
     );
 
     try {
-      const wageBill = await this.contractService.calculateMonthlyWageBill(
-        teamId
-      );
-
       const team = await this.repos.teams.findById(teamId);
       if (!team) {
         throw new Error(`Time ${teamId} não encontrado`);
       }
 
-      const infraMaintenance = this.infraService.calculateMonthlyMaintenance(
+      const activeContracts = await db
+        .select()
+        .from(playerContracts)
+        .where(
+          and(
+            eq(playerContracts.teamId, teamId),
+            eq(playerContracts.status, "active")
+          )
+        );
+
+      const playerWages = Math.round(
+        activeContracts.reduce(
+          (sum, contract) => sum + (contract.wage || 0),
+          0
+        ) / 12
+      );
+
+      const allStaff = await this.repos.staff.findByTeamId(teamId);
+      const staffWages = Math.round(
+        allStaff.reduce((sum, s) => sum + (s.salary || 0), 0) / 12
+      );
+
+      const infraMaintenance = this.calculateMonthlyMaintenance(
         team.stadiumCapacity || 10000,
         team.stadiumQuality || 50
       );
@@ -119,33 +114,33 @@ export class FinanceService {
       }
 
       const currentBudget = team.budget ?? 0;
-      const totalExpense = wageBill.total + infraMaintenance;
+      const totalExpense = playerWages + staffWages + infraMaintenance;
 
       const newBudget = currentBudget - totalExpense;
 
       await this.repos.teams.updateBudget(teamId, newBudget);
 
-      if (wageBill.playerWages > 0) {
+      if (playerWages > 0) {
         await this.repos.financial.addRecord({
           teamId,
           seasonId,
           date: currentDate,
           type: "expense",
           category: FinancialCategory.SALARY,
-          amount: wageBill.playerWages,
-          description: `Folha Salarial Mensal - ${wageBill.playerCount} jogadores`,
+          amount: playerWages,
+          description: `Folha Salarial Mensal - ${activeContracts.length} jogadores`,
         });
       }
 
-      if (wageBill.staffWages > 0) {
+      if (staffWages > 0) {
         await this.repos.financial.addRecord({
           teamId,
           seasonId,
           date: currentDate,
           type: "expense",
           category: FinancialCategory.STAFF_SALARY,
-          amount: wageBill.staffWages,
-          description: `Folha Salarial Mensal - ${wageBill.staffCount} profissionais`,
+          amount: staffWages,
+          description: `Folha Salarial Mensal - ${allStaff.length} profissionais`,
         });
       }
 
@@ -160,8 +155,8 @@ export class FinanceService {
         success: true,
         totalExpense,
         newBudget,
-        playerWages: wageBill.playerWages,
-        staffWages: wageBill.staffWages,
+        playerWages,
+        staffWages,
         message,
       };
     } catch (error) {
@@ -177,23 +172,24 @@ export class FinanceService {
     }
   }
 
-  /**
-   * Verifica se é o dia de pagamento mensal (dia 1 de cada mês)
-   * @param currentDate Data no formato YYYY-MM-DD
-   * @returns true se for dia de pagamento
-   */
+  private calculateMonthlyMaintenance(
+    stadiumCapacity: number,
+    stadiumQuality: number
+  ): number {
+    const seatMaintenance = stadiumCapacity * 2;
+    const qualityUpkeep = stadiumQuality * 1000;
+
+    const total = Math.round(seatMaintenance + qualityUpkeep);
+    this.logger.debug(`Custo de manutenção calculado: €${total}`);
+
+    return total;
+  }
+
   static isPayDay(currentDate: string): boolean {
     const date = new Date(currentDate);
     return date.getDate() === 1;
   }
 
-  /**
-   * Determina a importância de uma partida baseada na competição
-   * @param competitionTier Tier da competição (1 = elite, 2 = segunda divisão, etc)
-   * @param round Rodada da competição
-   * @param isKnockout Se é fase eliminatória
-   * @returns Multiplicador de importância (0.5 a 2.0)
-   */
   static getMatchImportance(
     competitionTier: number,
     round?: number,
@@ -206,9 +202,6 @@ export class FinanceService {
     return Math.min(2.0, importance);
   }
 
-  /**
-   * Gera descrição formatada para registros financeiros
-   */
   static getTransactionDescription(
     category: FinancialCategory,
     detail?: string
@@ -231,11 +224,6 @@ export class FinanceService {
       : map[category] || "Transação Diversa";
   }
 
-  /**
-   * Verifica a saúde financeira de um time e aplica penalidades se necessário
-   * @param teamId ID do time
-   * @returns Objeto com status financeiro e penalidades aplicadas
-   */
   async checkFinancialHealth(teamId: number): Promise<{
     isHealthy: boolean;
     currentBudget: number;
@@ -366,11 +354,6 @@ export class FinanceService {
     }
   }
 
-  /**
-   * Verifica se um time tem permissão para fazer transferências
-   * @param teamId ID do time
-   * @returns true se pode contratar, false se está sob transfer ban
-   */
   async canMakeTransfers(teamId: number): Promise<{
     allowed: boolean;
     reason?: string;
@@ -389,12 +372,6 @@ export class FinanceService {
     return { allowed: true };
   }
 
-  /**
-   * Calcula multa por má gestão financeira
-   * @param teamId ID do time
-   * @param debtAmount Valor da dívida
-   * @returns Valor da multa a ser aplicada
-   */
   static calculateFinancialPenaltyFine(debtAmount: number): {
     fine: number;
     description: string;
@@ -411,12 +388,6 @@ export class FinanceService {
     };
   }
 
-  /**
-   * Obtém os registros financeiros de um time em uma temporada específica
-   * @param teamId ID do time
-   * @param seasonId ID da temporada
-   * @returns Lista de registros financeiros
-   */
   async getFinancialRecords(teamId: number, seasonId: number) {
     return await this.repos.financial.findByTeamAndSeason(teamId, seasonId);
   }

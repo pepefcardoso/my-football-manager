@@ -2,20 +2,16 @@ import { AttributeCalculator } from "../engine/AttributeCalculator";
 import { Position } from "../domain/enums";
 import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class PlayerService {
-  private logger: Logger;
-  private repos: IRepositoryContainer;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
   constructor(repositories: IRepositoryContainer) {
     this.repos = repositories;
     this.logger = new Logger("PlayerService");
   }
 
-  /**
-   * Recalcula e atualiza o Overall do jogador com base nos atributos atuais
-   */
   async updatePlayerOverall(playerId: number): Promise<void> {
     try {
       const player = await this.repos.players.findById(playerId);
@@ -75,6 +71,91 @@ export class PlayerService {
         error
       );
       throw error;
+    }
+  }
+
+  async getPlayersByTeam(teamId: number) {
+    this.logger.debug(`Buscando jogadores do time ${teamId}...`);
+
+    try {
+      return await this.repos.players.findByTeamId(teamId);
+    } catch (error) {
+      this.logger.error(`Erro ao buscar jogadores do time ${teamId}:`, error);
+      return [];
+    }
+  }
+
+  async getYouthPlayers(teamId: number) {
+    this.logger.debug(`Buscando jogadores da base do time ${teamId}...`);
+
+    try {
+      return await this.repos.players.findYouthAcademy(teamId);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar jogadores da base do time ${teamId}:`,
+        error
+      );
+      return [];
+    }
+  }
+
+  async getFreeAgents() {
+    this.logger.debug(`Buscando jogadores sem contrato...`);
+
+    try {
+      return await this.repos.players.findFreeAgents();
+    } catch (error) {
+      this.logger.error("Erro ao buscar jogadores sem contrato:", error);
+      return [];
+    }
+  }
+
+  async updatePlayerCondition(
+    playerId: number,
+    updates: {
+      energy?: number;
+      fitness?: number;
+      moral?: number;
+    }
+  ): Promise<void> {
+    this.logger.debug(`Atualizando condição do jogador ${playerId}...`);
+
+    try {
+      const player = await this.repos.players.findById(playerId);
+      if (!player) {
+        this.logger.warn(`Jogador ${playerId} não encontrado.`);
+        return;
+      }
+
+      await this.repos.players.update(playerId, updates);
+      this.logger.debug(`Condição atualizada para jogador ${playerId}`);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao atualizar condição do jogador ${playerId}:`,
+        error
+      );
+    }
+  }
+
+  async injurePlayer(
+    playerId: number,
+    injuryType: string,
+    daysRemaining: number
+  ): Promise<void> {
+    this.logger.info(
+      `Aplicando lesão ao jogador ${playerId}: ${injuryType} (${daysRemaining} dias)`
+    );
+
+    try {
+      await this.repos.players.update(playerId, {
+        isInjured: true,
+        injuryType,
+        injuryDaysRemaining: daysRemaining,
+      });
+
+      this.logger.info(`Lesão aplicada com sucesso ao jogador ${playerId}`);
+    } catch (error) {
+      this.logger.error(`Erro ao lesionar jogador ${playerId}:`, error);
     }
   }
 }

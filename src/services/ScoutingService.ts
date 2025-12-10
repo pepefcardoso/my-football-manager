@@ -2,7 +2,6 @@ import { RandomEngine } from "../engine/RandomEngine";
 import type { Player } from "../domain/models";
 import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export interface MaskedAttribute {
   value: number | string;
@@ -20,18 +19,20 @@ export interface ScoutedPlayerView extends Player {
   };
 }
 
+const STAFF_IMPACT_CONFIG = {
+  BASE_UNCERTAINTY: 15,
+  REDUCTION_RATE: 0.1,
+} as const;
+
 export class ScoutingService {
-  private logger: Logger;
-  private repos: IRepositoryContainer;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
   constructor(repositories: IRepositoryContainer) {
     this.repos = repositories;
     this.logger = new Logger("ScoutingService");
   }
 
-  /**
-   * Aplica o Fog of War a um jogador baseado no time que o visualiza
-   */
   async getScoutedPlayer(
     playerId: number,
     viewerTeamId: number
@@ -64,17 +65,11 @@ export class ScoutingService {
     }
   }
 
-  /**
-   * Lista todos os jogadores observados por um time
-   */
   async getScoutingList(teamId: number) {
     this.logger.debug(`Buscando lista de observação para o time ${teamId}`);
     return await this.repos.scouting.findByTeam(teamId);
   }
 
-  /**
-   * Atribui um olheiro para observar um jogador
-   */
   async assignScoutToPlayer(
     scoutId: number,
     playerId: number
@@ -113,11 +108,9 @@ export class ScoutingService {
     }
   }
 
-  /**
-   * Processa a evolução diária dos olheiros
-   */
-  async processDailyScouting(currentDate: string) {
+  async processDailyScouting(currentDate: string): Promise<void> {
     this.logger.info(`Processando scouting diário para ${currentDate}`);
+
     try {
       const activeReports = await this.repos.scouting.findActiveReports();
       let updatesCount = 0;
@@ -138,11 +131,38 @@ export class ScoutingService {
         });
         updatesCount++;
       }
+
       this.logger.info(
         `Scouting diário finalizado. ${updatesCount} relatórios atualizados.`
       );
     } catch (error) {
       this.logger.error("Erro no processamento diário de scouting", error);
+    }
+  }
+
+  async calculateScoutingAccuracy(teamId: number): Promise<number> {
+    this.logger.debug(
+      `Calculando precisão de scouting para o time ${teamId}...`
+    );
+
+    try {
+      const allStaff = await this.repos.staff.findByTeamId(teamId);
+      const scouts = allStaff.filter((s) => s.role === "scout");
+
+      if (scouts.length === 0) {
+        return STAFF_IMPACT_CONFIG.BASE_UNCERTAINTY;
+      }
+
+      const bestScout = Math.max(...scouts.map((s) => s.overall));
+      const reduction = bestScout * STAFF_IMPACT_CONFIG.REDUCTION_RATE;
+
+      return Math.max(0, STAFF_IMPACT_CONFIG.BASE_UNCERTAINTY - reduction);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao calcular precisão de scouting para time ${teamId}:`,
+        error
+      );
+      return STAFF_IMPACT_CONFIG.BASE_UNCERTAINTY;
     }
   }
 

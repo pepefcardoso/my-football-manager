@@ -4,9 +4,6 @@ import type { Staff } from "../domain/models";
 import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 
-/**
- * Configuração de pesos para cálculo de impacto
- */
 const STAFF_IMPACT_CONFIG = {
   MEDICAL: {
     BASE_MULTIPLIER: 1.0,
@@ -38,9 +35,6 @@ export class StaffService {
     this.logger = new Logger("StaffService");
   }
 
-  /**
-   * Calcula o impacto agregado de todo o staff do time
-   */
   async getStaffImpact(teamId: number): Promise<TeamStaffImpact> {
     this.logger.debug(
       `Calculando impacto da equipe técnica para o time ${teamId}...`
@@ -78,9 +72,6 @@ export class StaffService {
     }
   }
 
-  /**
-   * Organiza staff por categoria funcional
-   */
   private categorizeStaff(allStaff: Staff[]): {
     medical: Staff[];
     fitness: Staff[];
@@ -99,12 +90,6 @@ export class StaffService {
     };
   }
 
-  /**
-   * Impacto médico: Reduz tempo de recuperação de lesões
-   * Quanto maior o overall, mais rápida a recuperação
-   *
-   * @returns Multiplicador de tempo (1.0 = normal, 0.6 = 40% mais rápido)
-   */
   private calculateMedicalImpact(medics: Staff[]): number {
     if (medics.length === 0) {
       return STAFF_IMPACT_CONFIG.MEDICAL.BASE_MULTIPLIER;
@@ -120,11 +105,6 @@ export class StaffService {
     );
   }
 
-  /**
-   * Impacto de condicionamento físico: Bônus de energia/recuperação
-   *
-   * @returns Bônus de energia (0-10+)
-   */
   private calculateFitnessImpact(coaches: Staff[]): number {
     if (coaches.length === 0) return 0;
 
@@ -134,12 +114,6 @@ export class StaffService {
     return Math.round(avgOverall * STAFF_IMPACT_CONFIG.FITNESS.CONVERSION_RATE);
   }
 
-  /**
-   * Impacto de treinadores: Bônus tático e de desenvolvimento
-   * Head Coach tem peso maior que assistentes
-   *
-   * @returns Bônus tático (0-20+)
-   */
   private calculateCoachingImpact(coaches: Staff[]): number {
     if (coaches.length === 0) return 0;
 
@@ -163,12 +137,6 @@ export class StaffService {
     );
   }
 
-  /**
-   * Impacto de olheiros: Precisão nas estimativas de atributos
-   * Quanto melhor o scout, menor a margem de erro
-   *
-   * @returns Margem de incerteza (0-15, menor é melhor)
-   */
   private calculateScoutingImpact(scouts: Staff[]): number {
     if (scouts.length === 0) {
       return STAFF_IMPACT_CONFIG.SCOUTING.BASE_UNCERTAINTY;
@@ -184,11 +152,6 @@ export class StaffService {
     );
   }
 
-  /**
-   * Impacto no desenvolvimento de jovens
-   *
-   * @returns Taxa de desenvolvimento (0-10+)
-   */
   private calculateYouthDevelopmentImpact(scouts: Staff[]): number {
     if (scouts.length === 0) return 0;
 
@@ -197,9 +160,6 @@ export class StaffService {
     return Math.round(bestScout * STAFF_IMPACT_CONFIG.YOUTH.CONVERSION_RATE);
   }
 
-  /**
-   * Retorna impacto padrão quando não há staff ou ocorre erro
-   */
   private getDefaultImpact(): TeamStaffImpact {
     return {
       injuryRecoveryMultiplier: 1.0,
@@ -208,5 +168,63 @@ export class StaffService {
       scoutingAccuracy: STAFF_IMPACT_CONFIG.SCOUTING.BASE_UNCERTAINTY,
       youthDevelopmentRate: 0,
     };
+  }
+
+  async getStaffByTeam(teamId: number) {
+    this.logger.debug(`Buscando staff do time ${teamId}...`);
+
+    try {
+      return await this.repos.staff.findByTeamId(teamId);
+    } catch (error) {
+      this.logger.error(`Erro ao buscar staff do time ${teamId}:`, error);
+      return [];
+    }
+  }
+
+  async getFreeAgents() {
+    this.logger.debug(`Buscando staff sem contrato...`);
+
+    try {
+      return await this.repos.staff.findFreeAgents();
+    } catch (error) {
+      this.logger.error("Erro ao buscar staff sem contrato:", error);
+      return [];
+    }
+  }
+
+  async hireStaff(
+    teamId: number,
+    staffId: number,
+    salary: number,
+    contractEnd: string
+  ): Promise<boolean> {
+    this.logger.info(`Contratando staff ${staffId} para o time ${teamId}...`);
+
+    try {
+      await this.repos.staff.update(staffId, {
+        teamId,
+        salary,
+        contractEnd,
+      });
+
+      this.logger.info(`Staff ${staffId} contratado com sucesso.`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Erro ao contratar staff ${staffId}:`, error);
+      return false;
+    }
+  }
+
+  async fireStaff(staffId: number): Promise<boolean> {
+    this.logger.info(`Demitindo staff ${staffId}...`);
+
+    try {
+      await this.repos.staff.fire(staffId);
+      this.logger.info(`Staff ${staffId} demitido com sucesso.`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Erro ao demitir staff ${staffId}:`, error);
+      return false;
+    }
   }
 }

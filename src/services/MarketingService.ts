@@ -1,19 +1,15 @@
 import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class MarketingService {
-  private logger: Logger;
-  private repos: IRepositoryContainer;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
   constructor(repositories: IRepositoryContainer) {
     this.repos = repositories;
     this.logger = new Logger("MarketingService");
   }
 
-  /**
-   * Atualiza a satisfação da torcida após uma partida
-   */
   async updateFanSatisfactionAfterMatch(
     teamId: number,
     result: "win" | "draw" | "loss",
@@ -89,6 +85,92 @@ export class MarketingService {
       }
     } catch (error) {
       this.logger.error("Erro ao atualizar satisfação da torcida:", error);
+    }
+  }
+
+  async updateFanSatisfaction(
+    teamId: number,
+    change: number,
+    reason: string
+  ): Promise<void> {
+    this.logger.debug(
+      `Aplicando mudança manual de satisfação: ${change} (${reason})`
+    );
+
+    try {
+      const team = await this.repos.teams.findById(teamId);
+      if (!team) {
+        this.logger.warn(`Time ${teamId} não encontrado.`);
+        return;
+      }
+
+      const currentSatisfaction = team.fanSatisfaction || 50;
+      const newSatisfaction = Math.max(
+        0,
+        Math.min(100, currentSatisfaction + change)
+      );
+
+      if (newSatisfaction !== currentSatisfaction) {
+        await this.repos.teams.update(teamId, {
+          fanSatisfaction: newSatisfaction,
+        });
+
+        const symbol = change > 0 ? "+" : "";
+        this.logger.info(
+          `Satisfação atualizada (${reason}): ${currentSatisfaction}% ➡️ ${newSatisfaction}% (${symbol}${change})`
+        );
+      }
+    } catch (error) {
+      this.logger.error("Erro ao atualizar satisfação da torcida:", error);
+    }
+  }
+
+  async getFanSatisfaction(teamId: number): Promise<number> {
+    try {
+      const team = await this.repos.teams.findById(teamId);
+      return team?.fanSatisfaction || 50;
+    } catch (error) {
+      this.logger.error("Erro ao buscar satisfação da torcida:", error);
+      return 50;
+    }
+  }
+
+  async calculateTicketPriceImpact(
+    teamId: number,
+    proposedPrice: number
+  ): Promise<{
+    impact: number;
+    message: string;
+  }> {
+    try {
+      const team = await this.repos.teams.findById(teamId);
+      if (!team) {
+        return { impact: 0, message: "Time não encontrado" };
+      }
+
+      const fairPrice = 50;
+      const reputationTolerance = (team.reputation || 0) / 1000;
+      const adjustedFairPrice = fairPrice + reputationTolerance * 5;
+
+      if (proposedPrice > adjustedFairPrice * 1.5) {
+        return {
+          impact: -2,
+          message: "Preço muito alto - torcida insatisfeita",
+        };
+      } else if (proposedPrice < adjustedFairPrice * 0.5) {
+        return {
+          impact: 1,
+          message: "Preço popular - torcida satisfeita",
+        };
+      }
+
+      return {
+        impact: 0,
+        message: "Preço equilibrado",
+      };
+    } catch (error) {
+      this.logger.error("Erro ao calcular impacto do preço:", error);
+      return { impact: 0, message: "Erro ao calcular" };
     }
   }
 }

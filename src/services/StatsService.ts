@@ -2,20 +2,16 @@ import type { MatchResult } from "../domain/types";
 import { MatchEventType } from "../domain/enums";
 import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { repositoryContainer } from "../repositories/RepositoryContainer";
 
 export class StatsService {
-  private logger: Logger;
-  private repos: IRepositoryContainer;
+  private readonly logger: Logger;
+  private readonly repos: IRepositoryContainer;
 
   constructor(repositories: IRepositoryContainer) {
     this.repos = repositories;
     this.logger = new Logger("StatsService");
   }
 
-  /**
-   * Atualiza tabela e estatísticas de jogadores após uma partida
-   */
   async processMatchStats(
     matchId: number,
     competitionId: number,
@@ -184,9 +180,6 @@ export class StatsService {
     }
   }
 
-  /**
-   * Retorna os artilheiros de uma competição
-   */
   async getTopScorers(
     competitionId: number,
     seasonId: number,
@@ -204,6 +197,30 @@ export class StatsService {
     } catch (error) {
       this.logger.error("Erro ao buscar top artilheiros:", error);
       return [];
+    }
+  }
+
+  async getPlayerStats(
+    playerId: number,
+    competitionId: number,
+    seasonId: number
+  ) {
+    this.logger.debug(
+      `Buscando estatísticas do jogador ${playerId} na competição ${competitionId}...`
+    );
+
+    try {
+      return await this.repos.competitions.findPlayerStats(
+        playerId,
+        competitionId,
+        seasonId
+      );
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar estatísticas do jogador ${playerId}:`,
+        error
+      );
+      return null;
     }
   }
 }
