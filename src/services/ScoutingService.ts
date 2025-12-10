@@ -1,29 +1,19 @@
 import { RandomEngine } from "../engine/RandomEngine";
-import type { Player } from "../domain/models";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import type { ServiceResult } from "./types/ServiceResults";
-
-export interface MaskedAttribute {
-  value: number | string;
-  isExact: boolean;
-  min?: number;
-  max?: number;
-}
-
-export interface ScoutedPlayerView extends Player {
-  visibleAttributes: Record<string, MaskedAttribute>;
-  scoutingStatus: {
-    isObserved: boolean;
-    progress: number;
-    lastUpdate: string;
-  };
-}
+import {
+  ScoutingReportFactory,
+  type ScoutedPlayerView,
+  type MaskedAttribute,
+} from "./factories/ReportFactory";
 
 const STAFF_IMPACT_CONFIG = {
   BASE_UNCERTAINTY: 15,
   REDUCTION_RATE: 0.1,
 } as const;
+
+export type { ScoutedPlayerView, MaskedAttribute };
 
 export class ScoutingService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -44,20 +34,19 @@ export class ScoutingService extends BaseService {
           return null;
         }
 
-        if (player.teamId === viewerTeamId) {
-          return this.createFullVisibilityView(player);
-        }
-
         const report = await this.repos.scouting.findByPlayerAndTeam(
           playerId,
           viewerTeamId
         );
-        const progress = report ? report.progress || 0 : 0;
 
-        return this.createMaskedView(
+        const progress = report ? report.progress || 0 : 0;
+        const lastUpdate = report ? report.date : null;
+
+        return ScoutingReportFactory.createView(
           player,
           progress,
-          report ? report.date : null
+          lastUpdate,
+          viewerTeamId
         );
       }
     );
@@ -164,83 +153,5 @@ export class ScoutingService extends BaseService {
 
       return Math.max(0, STAFF_IMPACT_CONFIG.BASE_UNCERTAINTY - reduction);
     });
-  }
-
-  private createFullVisibilityView(player: Player): ScoutedPlayerView {
-    const attrs = this.extractAttributes(player);
-    const visibleAttrs: Record<string, MaskedAttribute> = {};
-
-    for (const [key, val] of Object.entries(attrs)) {
-      visibleAttrs[key] = { value: val, isExact: true, min: val, max: val };
-    }
-
-    return {
-      ...player,
-      visibleAttributes: visibleAttrs,
-      scoutingStatus: { isObserved: true, progress: 100, lastUpdate: "Hoje" },
-    };
-  }
-
-  private createMaskedView(
-    player: Player,
-    progress: number,
-    lastDate: string | null
-  ): ScoutedPlayerView {
-    const attrs = this.extractAttributes(player);
-    const visibleAttrs: Record<string, MaskedAttribute> = {};
-
-    for (const [key, val] of Object.entries(attrs)) {
-      visibleAttrs[key] = this.maskValue(val, progress);
-    }
-
-    return {
-      ...player,
-      visibleAttributes: visibleAttrs,
-      scoutingStatus: {
-        isObserved: progress > 0,
-        progress: progress,
-        lastUpdate: lastDate || "Nunca",
-      },
-    };
-  }
-
-  private maskValue(realValue: number, progress: number): MaskedAttribute {
-    if (progress >= 100) {
-      return {
-        value: realValue,
-        isExact: true,
-        min: realValue,
-        max: realValue,
-      };
-    }
-
-    const uncertainty = Math.max(1, Math.round(10 - progress / 10));
-
-    const noise = RandomEngine.getInt(-1, 1);
-    const estimatedCenter = Math.max(1, Math.min(99, realValue + noise));
-
-    const min = Math.max(1, estimatedCenter - uncertainty);
-    const max = Math.min(99, estimatedCenter + uncertainty);
-
-    return {
-      value: `${min}-${max}`,
-      isExact: false,
-      min,
-      max,
-    };
-  }
-
-  private extractAttributes(player: Player): Record<string, number> {
-    return {
-      finishing: player.finishing,
-      passing: player.passing,
-      dribbling: player.dribbling,
-      defending: player.defending,
-      physical: player.physical,
-      pace: player.pace,
-      shooting: player.shooting,
-      overall: player.overall,
-      potential: player.potential,
-    };
   }
 }

@@ -6,6 +6,10 @@ import type { ServiceResult } from "./types/ServiceResults";
 import { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
 import { WageCalculator } from "./finance/WageCalculator";
 import { RevenueStrategyFactory } from "./strategies/revenue/RevenueStrategyFactory";
+import {
+  FinancialReportFactory,
+  type MonthlyFinancialSummary,
+} from "./factories/ReportFactory";
 
 export interface ProcessExpensesInput {
   teamId: number;
@@ -44,12 +48,6 @@ export class FinanceService extends BaseService {
     this.wageCalculator = new WageCalculator(repositories);
   }
 
-  /**
-   * Calcula a receita estimada de uma partida.
-   * Refatorado para usar o Strategy Pattern (LeagueRevenueStrategy como padrão).
-   * * Nota: O parâmetro matchImportance é mantido para compatibilidade,
-   * mas a estratégia calcula sua própria importância baseada no contexto.
-   */
   static calculateMatchDayRevenue(
     stadiumCapacity: number,
     fanSatisfaction: number,
@@ -221,6 +219,19 @@ export class FinanceService extends BaseService {
 
   async getFinancialRecords(teamId: number, seasonId: number) {
     return this.repos.financial.findByTeamAndSeason(teamId, seasonId);
+  }
+
+  async getMonthlyReport(
+    teamId: number,
+    seasonId: number
+  ): Promise<ServiceResult<MonthlyFinancialSummary[]>> {
+    return this.execute("getMonthlyReport", { teamId, seasonId }, async () => {
+      const records = await this.repos.financial.findByTeamAndSeason(
+        teamId,
+        seasonId
+      );
+      return FinancialReportFactory.createMonthlyReport(records);
+    });
   }
 
   private calculateMonthlyMaintenance(
