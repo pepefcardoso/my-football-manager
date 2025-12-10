@@ -10,6 +10,7 @@ import { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
 import { MatchFinancialsProcessor } from "./match/MatchFinancialsProcessor";
 import { GameEventBus } from "./events/GameEventBus";
 import { GameEventType } from "./events/GameEventTypes";
+import { MatchDataValidator } from "./validators/MatchDataValidator";
 
 export class MatchService extends BaseService {
   private engines: Map<number, MatchEngine> = new Map();
@@ -29,12 +30,22 @@ export class MatchService extends BaseService {
   }
 
   async initializeMatch(matchId: number): Promise<ServiceResult<void>> {
+    const validation = MatchDataValidator.validateMatchIds(matchId);
+    if (!validation.isValid) {
+      return Result.validation(validation.errors!.join(", "));
+    }
+
     return this.executeVoid("initializeMatch", matchId, async (id) => {
       await this.ensureEngineInitialized(id);
     });
   }
 
   async startMatch(matchId: number): Promise<ServiceResult<void>> {
+    const validation = MatchDataValidator.validateMatchIds(matchId);
+    if (!validation.isValid) {
+      return Result.validation(validation.errors!.join(", "));
+    }
+
     return this.executeVoid("startMatch", matchId, async (id) => {
       const engine = this.engines.get(id);
       if (!engine) throw new Error(`Partida ${id} não inicializada.`);
@@ -43,6 +54,11 @@ export class MatchService extends BaseService {
   }
 
   async pauseMatch(matchId: number): Promise<ServiceResult<void>> {
+    const validation = MatchDataValidator.validateMatchIds(matchId);
+    if (!validation.isValid) {
+      return Result.validation(validation.errors!.join(", "));
+    }
+
     return this.executeVoid("pauseMatch", matchId, async (id) => {
       const engine = this.engines.get(id);
       if (!engine) throw new Error(`Partida ${id} não inicializada.`);
@@ -51,6 +67,11 @@ export class MatchService extends BaseService {
   }
 
   async resumeMatch(matchId: number): Promise<ServiceResult<void>> {
+    const validation = MatchDataValidator.validateMatchIds(matchId);
+    if (!validation.isValid) {
+      return Result.validation(validation.errors!.join(", "));
+    }
+
     return this.executeVoid("resumeMatch", matchId, async (id) => {
       const engine = this.engines.get(id);
       if (!engine) throw new Error(`Partida ${id} não inicializada.`);
@@ -65,6 +86,11 @@ export class MatchService extends BaseService {
       newEvents: any[];
     }>
   > {
+    const validation = MatchDataValidator.validateMatchIds(matchId);
+    if (!validation.isValid) {
+      return Result.validation(validation.errors!.join(", "));
+    }
+
     return this.execute("simulateMinute", matchId, async (id) => {
       const engine = this.engines.get(id);
       if (!engine) throw new Error(`Partida ${id} não inicializada.`);
@@ -85,6 +111,11 @@ export class MatchService extends BaseService {
   async simulateFullMatch(
     matchId: number
   ): Promise<ServiceResult<MatchResult>> {
+    const validation = MatchDataValidator.validateMatchIds(matchId);
+    if (!validation.isValid) {
+      return Result.validation(validation.errors!.join(", "));
+    }
+
     return this.execute("simulateFullMatch", matchId, async (id) => {
       const engine = await this.ensureEngineInitialized(id);
       engine.simulateToCompletion();
@@ -98,6 +129,11 @@ export class MatchService extends BaseService {
   }
 
   async getMatchState(matchId: number): Promise<ServiceResult<any>> {
+    const validation = MatchDataValidator.validateMatchIds(matchId);
+    if (!validation.isValid) {
+      return Result.validation(validation.errors!.join(", "));
+    }
+
     return this.execute("getMatchState", matchId, async (id) => {
       const engine = this.engines.get(id);
       if (!engine)

@@ -8,6 +8,7 @@ import type { ServiceResult } from "./types/ServiceResults";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { GameEventBus } from "./events/GameEventBus";
 import { GameEventType } from "./events/GameEventTypes";
+import { FinancialOperationValidator } from "./validators/FinancialOperationValidator";
 
 export interface WageBillDetails {
   playerWages: number;
@@ -118,6 +119,11 @@ export class ContractService extends BaseService {
   async renewPlayerContract(
     input: RenewContractInput
   ): Promise<ServiceResult<void>> {
+    const validation = FinancialOperationValidator.validateWage(input.newWage);
+    if (!validation.isValid) {
+      return Result.validation(validation.errors!.join(", "));
+    }
+
     return this.executeVoid(
       "renewPlayerContract",
       input,

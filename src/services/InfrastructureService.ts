@@ -4,6 +4,7 @@ import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import { Result } from "./types/ServiceResults";
 import type { ServiceResult } from "./types/ServiceResults";
+import { FinancialOperationValidator } from "./validators/FinancialOperationValidator";
 
 export interface InfrastructureStatus {
   stadium: {
@@ -59,10 +60,12 @@ export class InfrastructureService extends BaseService {
           InfrastructureCosts.SEAT_EXPANSION_BLOCK *
           InfrastructureCosts.SEAT_COST_PER_UNIT;
 
-        if ((team.budget || 0) < cost) {
-          return Result.businessRule(
-            `Saldo insuficiente para expansão. Necessário: €${cost}, Atual: €${team.budget}`
-          ) as any;
+        const validation = FinancialOperationValidator.validateBudget(
+          team.budget || 0,
+          cost
+        );
+        if (!validation.isValid) {
+          return Result.businessRule(validation.errors!.join(", ")) as any;
         }
 
         const newCapacity =
@@ -124,10 +127,12 @@ export class InfrastructureService extends BaseService {
             (1 + (currentQuality || 0) / 50)
         );
 
-        if ((team.budget || 0) < cost) {
-          return Result.businessRule(
-            `Saldo insuficiente para melhoria. Necessário: €${cost}`
-          ) as any;
+        const validation = FinancialOperationValidator.validateBudget(
+          team.budget || 0,
+          cost
+        );
+        if (!validation.isValid) {
+          return Result.businessRule(validation.errors!.join(", ")) as any;
         }
 
         const newQuality = Math.min(
