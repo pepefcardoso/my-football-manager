@@ -49,7 +49,11 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
 
   const runSimulationStep = useCallback(
     async (matchId: number) => {
-      const update = await window.electronAPI.simulateMatchMinute(matchId);
+      let update = await window.electronAPI.simulateMatchMinute(matchId);
+
+      if (update && "data" in update && "success" in update) {
+        update = (update as any).data;
+      }
 
       if (!update) {
         clearSimulationInterval();
@@ -59,7 +63,8 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
       setSimulation((prev) => {
         if (!prev) return null;
 
-        const newEvents = [...prev.events, ...update.newEvents];
+        const newEventsList = update.newEvents || [];
+        const newEvents = [...prev.events, ...newEventsList];
 
         if (update.currentMinute >= 90) {
           clearSimulationInterval();
@@ -215,9 +220,13 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
     );
 
     try {
-      const result = await window.electronAPI.simulateFullMatch(
+      let result = await window.electronAPI.simulateFullMatch(
         simulation.matchId
       );
+
+      if (result && "data" in result && "success" in result) {
+        result = (result as any).data;
+      }
 
       if (result) {
         setSimulation((prev) =>
