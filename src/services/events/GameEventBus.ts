@@ -4,6 +4,8 @@ import {
   type MatchFinishedPayload,
   type ContractExpiredPayload,
   type FinancialCrisisPayload,
+  type TransferCompletedPayload, // Importar novo
+  type ProposalReceivedPayload, // Importar novo
 } from "./GameEventTypes";
 
 type EventHandler<T> = (payload: T) => Promise<void> | void;
@@ -28,6 +30,15 @@ export class GameEventBus {
     eventType: GameEventType.FINANCIAL_CRISIS,
     handler: EventHandler<FinancialCrisisPayload>
   ): void;
+  public subscribe(
+    eventType: GameEventType.TRANSFER_COMPLETED,
+    handler: EventHandler<TransferCompletedPayload>
+  ): void;
+  public subscribe(
+    eventType: GameEventType.PROPOSAL_RECEIVED,
+    handler: EventHandler<ProposalReceivedPayload>
+  ): void;
+
   public subscribe<T>(
     eventType: GameEventType,
     handler: EventHandler<T>
@@ -65,6 +76,15 @@ export class GameEventBus {
     eventType: GameEventType.FINANCIAL_CRISIS,
     payload: FinancialCrisisPayload
   ): Promise<void>;
+  public async publish(
+    eventType: GameEventType.TRANSFER_COMPLETED,
+    payload: TransferCompletedPayload
+  ): Promise<void>;
+  public async publish(
+    eventType: GameEventType.PROPOSAL_RECEIVED,
+    payload: ProposalReceivedPayload
+  ): Promise<void>;
+
   public async publish<T>(eventType: GameEventType, payload: T): Promise<void> {
     const handlers = this.handlers.get(eventType);
 

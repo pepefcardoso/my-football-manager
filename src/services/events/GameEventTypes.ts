@@ -2,6 +2,8 @@ export enum GameEventType {
   MATCH_FINISHED = "MATCH_FINISHED",
   CONTRACT_EXPIRED = "CONTRACT_EXPIRED",
   FINANCIAL_CRISIS = "FINANCIAL_CRISIS",
+  TRANSFER_COMPLETED = "TRANSFER_COMPLETED",
+  PROPOSAL_RECEIVED = "PROPOSAL_RECEIVED",
 }
 
 export interface MatchFinishedPayload {
@@ -28,4 +30,20 @@ export interface FinancialCrisisPayload {
   currentBudget: number;
   severity: "warning" | "critical";
   fanSatisfaction: number;
+}
+
+export interface TransferCompletedPayload {
+  playerId: number;
+  fromTeamId: number;
+  toTeamId: number;
+  fee: number;
+  date: string;
+}
+
+export interface ProposalReceivedPayload {
+  proposalId: number;
+  playerId: number;
+  fromTeamId: number;
+  toTeamId: number;
+  fee: number;
 }
