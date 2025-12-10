@@ -14,6 +14,8 @@ import { MatchService } from "./MatchService";
 import { PlayerService } from "./PlayerService";
 import { ScoutingService } from "./ScoutingService";
 import { SeasonService } from "./SeasonService";
+import { PromotionRelegationService } from "./season/PromotionRelegationService";
+import { SeasonTransitionManager } from "./season/SeasonTransitionManager";
 import { StaffService } from "./StaffService";
 import { StatsService } from "./StatsService";
 import { CupProgressionManager } from "./match/CupProgressionManager";
@@ -41,6 +43,8 @@ export class ServiceContainer implements IServiceContainer {
   public readonly player: PlayerService;
   public readonly scouting: ScoutingService;
   public readonly season: SeasonService;
+  public readonly promotionRelegation: PromotionRelegationService;
+  public readonly seasonTransition: SeasonTransitionManager;
   public readonly staff: StaffService;
   public readonly stats: StatsService;
 
@@ -55,6 +59,12 @@ export class ServiceContainer implements IServiceContainer {
     this.stats = new StatsService(repos);
     this.dailySimulation = new DailySimulationService(repos);
     this.season = new SeasonService(repos);
+    this.promotionRelegation = new PromotionRelegationService(repos);
+    this.seasonTransition = new SeasonTransitionManager(
+      repos,
+      this.promotionRelegation,
+      this.season
+    );
     this.match = new MatchService(repos);
 
     this.financialPenalty = new FinancialPenaltyService(repos);

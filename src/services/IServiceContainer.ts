@@ -11,6 +11,8 @@ import type { MatchService } from "./MatchService";
 import type { PlayerService } from "./PlayerService";
 import type { ScoutingService } from "./ScoutingService";
 import type { SeasonService } from "./SeasonService";
+import type { PromotionRelegationService } from "./season/PromotionRelegationService";
+import type { SeasonTransitionManager } from "./season/SeasonTransitionManager";
 import type { StaffService } from "./StaffService";
 import type { StatsService } from "./StatsService";
 import type { CupProgressionManager } from "./match/CupProgressionManager";
@@ -38,6 +40,8 @@ export interface IServiceContainer {
   player: PlayerService;
   scouting: ScoutingService;
   season: SeasonService;
+  promotionRelegation: PromotionRelegationService;
+  seasonTransition: SeasonTransitionManager;
   staff: StaffService;
   stats: StatsService;
 }
