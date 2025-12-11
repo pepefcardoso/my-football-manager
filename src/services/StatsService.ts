@@ -6,6 +6,9 @@ import type {
 } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import type { ServiceResult } from "./types/ServiceResults";
+import { getBalanceValue } from "../engine/GameBalanceConfig";
+
+const MATCH_CONFIG = getBalanceValue("MATCH");
 
 export class StatsService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -90,8 +93,6 @@ export class StatsService extends BaseService {
     );
   }
 
-  // Métodos privados (Lógica de Negócio Interna)
-
   private async updatePlayerStats(
     competitionId: number,
     seasonId: number,
@@ -114,7 +115,6 @@ export class StatsService extends BaseService {
       }
     >();
 
-    // Agrega estatísticas baseadas nos eventos
     events.forEach((event) => {
       if (!event.playerId) return;
 
@@ -135,7 +135,6 @@ export class StatsService extends BaseService {
       statsMap.set(event.playerId, current);
     });
 
-    // Identifica todos os jogadores envolvidos (via updates ou eventos)
     const allPlayerIds = new Set([
       ...result.playerUpdates.map((u) => u.playerId),
       ...Array.from(statsMap.keys()),
@@ -158,7 +157,6 @@ export class StatsService extends BaseService {
       let cleanSheet = 0;
       let goalsConceded = 0;
 
-      // Lógica específica para goleiros
       if (player.position === "GK") {
         const isHomeTeam = player.teamId === match.homeTeamId;
         const goalsAgainst = isHomeTeam ? result.awayScore : result.homeScore;
@@ -185,7 +183,8 @@ export class StatsService extends BaseService {
           saves: (existing.saves ?? 0) + stats.saves,
           cleanSheets: (existing.cleanSheets ?? 0) + cleanSheet,
           goalsConceded: (existing.goalsConceded ?? 0) + goalsConceded,
-          minutesPlayed: (existing.minutesPlayed ?? 0) + 90,
+          minutesPlayed:
+            (existing.minutesPlayed ?? 0) + MATCH_CONFIG.FULL_MATCH_MINUTES,
         });
       } else {
         await this.repos.competitions.createPlayerStats({
@@ -201,7 +200,7 @@ export class StatsService extends BaseService {
           saves: stats.saves,
           cleanSheets: cleanSheet,
           goalsConceded: goalsConceded,
-          minutesPlayed: 90,
+          minutesPlayed: MATCH_CONFIG.FULL_MATCH_MINUTES,
         });
       }
       updatedCount++;

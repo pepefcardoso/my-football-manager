@@ -26,7 +26,7 @@ export class TransferValuationEngine {
       TRANSFER.POS_WEIGHTS[player.position as Position] || 1.0;
     value *= positionMultiplier;
 
-    let ageMultiplier = TRANSFER.AGE_FACTORS.PRIME;
+    let ageMultiplier: number = TRANSFER.AGE_FACTORS.PRIME;
     if (player.age < 22) {
       ageMultiplier = TRANSFER.AGE_FACTORS.YOUNG;
       if (player.potential > player.overall) {
@@ -56,7 +56,7 @@ export class TransferValuationEngine {
     const marketValue = this.calculateMarketValue(player);
     const CONTRACT_FACTORS = GameBalance.TRANSFER.CONTRACT_FACTORS;
 
-    let contractMultiplier = 1.0;
+    let contractMultiplier: number = 1.0;
 
     if (contractYearsLeft < 1) {
       contractMultiplier = CONTRACT_FACTORS.EXPIRING;
@@ -76,7 +76,7 @@ export class TransferValuationEngine {
     const marketValue = this.calculateMarketValue(player);
     const TRANSFER = GameBalance.TRANSFER;
 
-    let ratio = TRANSFER.WAGE_RATIO_BASE;
+    let ratio: number = TRANSFER.WAGE_RATIO_BASE;
     if (player.overall > 90) ratio = TRANSFER.WAGE_RATIO_OVR_90;
     else if (player.overall > 85) ratio = TRANSFER.WAGE_RATIO_OVR_85;
     else if (player.overall > 80) ratio = TRANSFER.WAGE_RATIO_OVR_80;

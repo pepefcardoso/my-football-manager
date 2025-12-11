@@ -1,6 +1,11 @@
 import { BaseService } from "./BaseService";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import type { ServiceResult } from "./types/ServiceResults";
+import { getBalanceValue } from "../engine/GameBalanceConfig";
+
+const MARKETING_CONFIG = getBalanceValue("MARKETING");
+const FAN_SATISFACTION = MARKETING_CONFIG.FAN_SATISFACTION;
+const TICKET_PRICING = MARKETING_CONFIG.TICKET_PRICING;
 
 export class MarketingService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -12,7 +17,7 @@ export class MarketingService extends BaseService {
     result: "win" | "draw" | "loss",
     isHomeGame: boolean,
     opponentReputation: number,
-    ticketPrice: number = 50
+    ticketPrice: number = TICKET_PRICING.BASE_FAIR_PRICE
   ): Promise<ServiceResult<void>> {
     return this.executeVoid(
       "updateFanSatisfactionAfterMatch",
@@ -36,42 +41,61 @@ export class MarketingService extends BaseService {
           return;
         }
 
-        const currentSatisfaction = team.fanSatisfaction || 50;
+        const currentSatisfaction =
+          team.fanSatisfaction || TICKET_PRICING.BASE_FAIR_PRICE;
         const teamReputation = team.reputation || 0;
 
-        let change = 0;
+        let change: number = FAN_SATISFACTION.DRAW_NEUTRAL;
         const reputationDiff = opponentReputation - teamReputation;
 
         if (result === "win") {
-          change = 2 + Math.max(0, reputationDiff / 1000);
-          if (isHomeGame) change += 1;
+          change =
+            FAN_SATISFACTION.WIN_BASE_GAIN +
+            Math.max(
+              0,
+              reputationDiff / FAN_SATISFACTION.REPUTATION_BONUS_DIVISOR
+            );
+          if (isHomeGame) change += FAN_SATISFACTION.HOME_WIN_BONUS;
         } else if (result === "loss") {
-          change = -3;
-          if (reputationDiff > 2000) change += 1;
-          if (isHomeGame) change -= 1;
+          change = FAN_SATISFACTION.LOSS_BASE_PENALTY;
+          if (reputationDiff > FAN_SATISFACTION.BIG_UPSET_THRESHOLD)
+            change += FAN_SATISFACTION.UPSET_LOSS_MITIGATION;
+          if (isHomeGame) change += FAN_SATISFACTION.HOME_LOSS_EXTRA_PENALTY;
         } else {
-          if (reputationDiff > 500) change = 1;
-          else if (reputationDiff < -500) change = -2;
-          else change = 0;
+          if (reputationDiff > FAN_SATISFACTION.DRAW_VS_STRONGER_THRESHOLD)
+            change = FAN_SATISFACTION.DRAW_VS_STRONGER_GAIN;
+          else if (reputationDiff < FAN_SATISFACTION.DRAW_VS_WEAKER_THRESHOLD)
+            change = FAN_SATISFACTION.DRAW_VS_WEAKER_PENALTY;
+          else change = FAN_SATISFACTION.DRAW_NEUTRAL;
         }
 
         if (isHomeGame) {
-          const fairPrice = 50;
-          const reputationTolerance = teamReputation / 1000;
-          const adjustedFairPrice = fairPrice + reputationTolerance * 5;
+          const adjustedFairPrice =
+            TICKET_PRICING.BASE_FAIR_PRICE +
+            (teamReputation / TICKET_PRICING.REPUTATION_TOLERANCE_DIVISOR) *
+              TICKET_PRICING.REPUTATION_PRICE_MULTIPLIER;
 
-          if (ticketPrice > adjustedFairPrice * 1.5) {
-            change -= 2;
+          if (
+            ticketPrice >
+            adjustedFairPrice * TICKET_PRICING.HIGH_PRICE_THRESHOLD
+          ) {
+            change += TICKET_PRICING.HIGH_PRICE_PENALTY;
             this.logger.info(
               "📉 Penalidade aplicada: Preço do ingresso muito alto."
             );
-          } else if (ticketPrice < adjustedFairPrice * 0.5) {
-            change += 1;
+          } else if (
+            ticketPrice <
+            adjustedFairPrice * TICKET_PRICING.LOW_PRICE_THRESHOLD
+          ) {
+            change += TICKET_PRICING.LOW_PRICE_BONUS;
             this.logger.info("📈 Bônus aplicado: Preço popular.");
           }
         }
 
-        change = Math.max(-5, Math.min(5, Math.round(change)));
+        change = Math.max(
+          -FAN_SATISFACTION.MAX_CHANGE_PER_MATCH,
+          Math.min(FAN_SATISFACTION.MAX_CHANGE_PER_MATCH, Math.round(change))
+        );
 
         const newSatisfaction = Math.max(
           0,
@@ -111,7 +135,8 @@ export class MarketingService extends BaseService {
           return;
         }
 
-        const currentSatisfaction = team.fanSatisfaction || 50;
+        const currentSatisfaction =
+          team.fanSatisfaction || TICKET_PRICING.BASE_FAIR_PRICE;
         const newSatisfaction = Math.max(
           0,
           Math.min(100, currentSatisfaction + change)
@@ -134,7 +159,7 @@ export class MarketingService extends BaseService {
   async getFanSatisfaction(teamId: number): Promise<ServiceResult<number>> {
     return this.execute("getFanSatisfaction", teamId, async (teamId) => {
       const team = await this.repos.teams.findById(teamId);
-      return team?.fanSatisfaction || 50;
+      return team?.fanSatisfaction || TICKET_PRICING.BASE_FAIR_PRICE;
     });
   }
 
@@ -151,18 +176,27 @@ export class MarketingService extends BaseService {
           return { impact: 0, message: "Time não encontrado" };
         }
 
-        const fairPrice = 50;
-        const reputationTolerance = (team.reputation || 0) / 1000;
-        const adjustedFairPrice = fairPrice + reputationTolerance * 5;
+        const teamReputation = team.reputation || 0;
 
-        if (proposedPrice > adjustedFairPrice * 1.5) {
+        const adjustedFairPrice =
+          TICKET_PRICING.BASE_FAIR_PRICE +
+          (teamReputation / TICKET_PRICING.REPUTATION_TOLERANCE_DIVISOR) *
+            TICKET_PRICING.REPUTATION_PRICE_MULTIPLIER;
+
+        if (
+          proposedPrice >
+          adjustedFairPrice * TICKET_PRICING.HIGH_PRICE_THRESHOLD
+        ) {
           return {
-            impact: -2,
+            impact: TICKET_PRICING.HIGH_PRICE_PENALTY,
             message: "Preço muito alto - torcida insatisfeita",
           };
-        } else if (proposedPrice < adjustedFairPrice * 0.5) {
+        } else if (
+          proposedPrice <
+          adjustedFairPrice * TICKET_PRICING.LOW_PRICE_THRESHOLD
+        ) {
           return {
-            impact: 1,
+            impact: TICKET_PRICING.LOW_PRICE_BONUS,
             message: "Preço popular - torcida satisfeita",
           };
         }

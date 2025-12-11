@@ -4,34 +4,21 @@ import type { Staff } from "../domain/models";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import type { ServiceResult } from "./types/ServiceResults";
+import { getBalanceValue } from "../engine/GameBalanceConfig";
 
-const STAFF_IMPACT_CONFIG = {
-  MEDICAL: {
-    BASE_MULTIPLIER: 1.0,
-    MAX_REDUCTION: 0.4,
-  },
-  FITNESS: {
-    CONVERSION_RATE: 0.1,
-  },
-  COACHING: {
-    HEAD_COACH_WEIGHT: 1.0,
-    ASSISTANT_WEIGHT: 0.5,
-    CONVERSION_RATE: 0.2,
-  },
-  SCOUTING: {
-    BASE_UNCERTAINTY: 15,
-    REDUCTION_RATE: 0.1,
-  },
-  YOUTH: {
-    CONVERSION_RATE: 0.1,
-  },
-} as const;
+const STAFF_CONFIG = getBalanceValue("STAFF");
+const SCOUTING_CONFIG = getBalanceValue("SCOUTING");
 
 export class StaffService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
     super(repositories, "StaffService");
   }
 
+  /**
+   *
+   * @param teamId
+   * @returns
+   */
   async getStaffImpact(
     teamId: number
   ): Promise<ServiceResult<TeamStaffImpact>> {
@@ -63,6 +50,11 @@ export class StaffService extends BaseService {
     });
   }
 
+  /**
+   *
+   * @param teamId
+   * @returns
+   */
   async getStaffByTeam(teamId: number): Promise<ServiceResult<Staff[]>> {
     return this.execute("getStaffByTeam", teamId, async (teamId) => {
       this.logger.debug(`Buscando staff do time ${teamId}...`);
@@ -70,6 +62,10 @@ export class StaffService extends BaseService {
     });
   }
 
+  /**
+   *
+   * @returns
+   */
   async getFreeAgents(): Promise<ServiceResult<Staff[]>> {
     return this.execute("getFreeAgents", null, async () => {
       this.logger.debug(`Buscando staff sem contrato...`);
@@ -77,6 +73,14 @@ export class StaffService extends BaseService {
     });
   }
 
+  /**
+   *
+   * @param teamId
+   * @param staffId
+   * @param salary
+   * @param contractEnd
+   * @returns
+   */
   async hireStaff(
     teamId: number,
     staffId: number,
@@ -102,6 +106,11 @@ export class StaffService extends BaseService {
     );
   }
 
+  /**
+   *
+   * @param staffId
+   * @returns
+   */
   async fireStaff(staffId: number): Promise<ServiceResult<void>> {
     return this.executeVoid("fireStaff", staffId, async (staffId) => {
       this.logger.info(`Demitindo staff ${staffId}...`);
@@ -111,8 +120,6 @@ export class StaffService extends BaseService {
       this.logger.info(`Staff ${staffId} demitido com sucesso.`);
     });
   }
-
-  // Métodos privados de cálculo (Lógica Pura)
 
   private categorizeStaff(allStaff: Staff[]): {
     medical: Staff[];
@@ -134,16 +141,13 @@ export class StaffService extends BaseService {
 
   private calculateMedicalImpact(medics: Staff[]): number {
     if (medics.length === 0) {
-      return STAFF_IMPACT_CONFIG.MEDICAL.BASE_MULTIPLIER;
+      return 1.0;
     }
 
     const maxOverall = Math.max(...medics.map((m) => m.overall));
-    const reduction =
-      (maxOverall * STAFF_IMPACT_CONFIG.MEDICAL.MAX_REDUCTION) / 100;
+    const reduction = (maxOverall * STAFF_CONFIG.MEDICAL_MAX_REDUCTION) / 100;
 
-    return Number(
-      (STAFF_IMPACT_CONFIG.MEDICAL.BASE_MULTIPLIER - reduction).toFixed(2)
-    );
+    return Number((1.0 - reduction).toFixed(2));
   }
 
   private calculateFitnessImpact(coaches: Staff[]): number {
@@ -152,7 +156,7 @@ export class StaffService extends BaseService {
     const avgOverall =
       coaches.reduce((acc, c) => acc + c.overall, 0) / coaches.length;
 
-    return Math.round(avgOverall * STAFF_IMPACT_CONFIG.FITNESS.CONVERSION_RATE);
+    return Math.round(avgOverall * STAFF_CONFIG.FITNESS_ENERGY_RATE);
   }
 
   private calculateCoachingImpact(coaches: Staff[]): number {
@@ -164,8 +168,8 @@ export class StaffService extends BaseService {
     coaches.forEach((c) => {
       const weight =
         c.role === StaffRole.HEAD_COACH
-          ? STAFF_IMPACT_CONFIG.COACHING.HEAD_COACH_WEIGHT
-          : STAFF_IMPACT_CONFIG.COACHING.ASSISTANT_WEIGHT;
+          ? 1.0
+          : STAFF_CONFIG.ASSISTANT_COACH_WEIGHT;
 
       impactScore += c.overall * weight;
       totalWeight += weight;
@@ -173,23 +177,18 @@ export class StaffService extends BaseService {
 
     const weightedAvg = totalWeight > 0 ? impactScore / totalWeight : 0;
 
-    return Math.round(
-      weightedAvg * STAFF_IMPACT_CONFIG.COACHING.CONVERSION_RATE
-    );
+    return Math.round(weightedAvg * STAFF_CONFIG.COACHING_CONVERSION_RATE);
   }
 
   private calculateScoutingImpact(scouts: Staff[]): number {
     if (scouts.length === 0) {
-      return STAFF_IMPACT_CONFIG.SCOUTING.BASE_UNCERTAINTY;
+      return SCOUTING_CONFIG.BASE_UNCERTAINTY;
     }
 
     const bestScout = Math.max(...scouts.map((s) => s.overall));
-    const reduction = bestScout * STAFF_IMPACT_CONFIG.SCOUTING.REDUCTION_RATE;
+    const reduction = bestScout * SCOUTING_CONFIG.REDUCTION_RATE;
 
-    return Math.max(
-      0,
-      STAFF_IMPACT_CONFIG.SCOUTING.BASE_UNCERTAINTY - reduction
-    );
+    return Math.max(0, SCOUTING_CONFIG.BASE_UNCERTAINTY - reduction);
   }
 
   private calculateYouthDevelopmentImpact(scouts: Staff[]): number {
@@ -197,6 +196,6 @@ export class StaffService extends BaseService {
 
     const bestScout = Math.max(...scouts.map((s) => s.overall));
 
-    return Math.round(bestScout * STAFF_IMPACT_CONFIG.YOUTH.CONVERSION_RATE);
+    return Math.round(bestScout * STAFF_CONFIG.YOUTH_DEVELOPMENT_RATE);
   }
 }

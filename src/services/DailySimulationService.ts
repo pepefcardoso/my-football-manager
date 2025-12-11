@@ -7,6 +7,14 @@ import { AttributeCalculator } from "../engine/AttributeCalculator";
 import type { Player } from "../domain/models";
 import { TrainingFocus, Position } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
+import { getBalanceValue } from "../engine/GameBalanceConfig";
+
+const TRAINING_CONFIG = getBalanceValue("TRAINING");
+const MORAL_CONFIG = TRAINING_CONFIG.MORAL;
+const ENERGY_COST = TRAINING_CONFIG.ENERGY_COST;
+const FITNESS_CHANGE = TRAINING_CONFIG.FITNESS_CHANGE;
+const INJURY_CONFIG = TRAINING_CONFIG.INJURY;
+const GROWTH_CONFIG = TRAINING_CONFIG.GROWTH;
 
 export interface PlayerTrainingUpdate {
   id: number;
@@ -108,7 +116,7 @@ export class DailySimulationService extends BaseService {
     return {
       id: player.id,
       energy: player.energy,
-      fitness: Math.max(0, player.fitness - 1),
+      fitness: Math.max(0, player.fitness + FITNESS_CHANGE.REST),
       moral: player.moral,
       overall: player.overall,
       injuryDays: newDays,
@@ -151,8 +159,10 @@ export class DailySimulationService extends BaseService {
       await this.processAttributeGrowth(player, trainingFocus, isInjured, logs);
 
     let newMoral = player.moral;
-    if (player.moral > 50) newMoral -= 0.5;
-    if (player.moral < 50) newMoral += 0.5;
+    if (player.moral > MORAL_CONFIG.NEUTRAL_THRESHOLD)
+      newMoral -= MORAL_CONFIG.NATURAL_DECAY_RATE;
+    if (player.moral < MORAL_CONFIG.NEUTRAL_THRESHOLD)
+      newMoral += MORAL_CONFIG.NATURAL_RECOVERY_RATE;
 
     return {
       id: player.id,
@@ -175,20 +185,23 @@ export class DailySimulationService extends BaseService {
 
     switch (trainingFocus) {
       case TrainingFocus.REST:
-        energyDelta = 15 + staffImpact.energyRecoveryBonus;
-        fitnessDelta = -1;
+        energyDelta = ENERGY_COST.REST + staffImpact.energyRecoveryBonus;
+        fitnessDelta = FITNESS_CHANGE.REST;
         break;
       case TrainingFocus.PHYSICAL:
-        energyDelta = -10;
-        fitnessDelta = 2 + staffImpact.energyRecoveryBonus * 0.1;
+        energyDelta = ENERGY_COST.PHYSICAL;
+        fitnessDelta =
+          FITNESS_CHANGE.PHYSICAL_BASE +
+          staffImpact.energyRecoveryBonus *
+            TRAINING_CONFIG.STAFF_BONUS_TO_FITNESS_MULTIPLIER;
         break;
       case TrainingFocus.TACTICAL:
-        energyDelta = -5;
-        fitnessDelta = 0;
+        energyDelta = ENERGY_COST.TACTICAL;
+        fitnessDelta = FITNESS_CHANGE.TACTICAL;
         break;
       case TrainingFocus.TECHNICAL:
-        energyDelta = -7;
-        fitnessDelta = 1;
+        energyDelta = ENERGY_COST.TECHNICAL;
+        fitnessDelta = FITNESS_CHANGE.TECHNICAL;
         break;
     }
 
@@ -205,12 +218,15 @@ export class DailySimulationService extends BaseService {
     }
 
     const injuryRiskBase =
-      (100 - player.energy) * 0.05 +
-      (trainingFocus === TrainingFocus.PHYSICAL ? 2 : 0);
+      (100 - player.energy) * INJURY_CONFIG.RISK_PER_MISSING_ENERGY_PERCENT +
+      (trainingFocus === TrainingFocus.PHYSICAL
+        ? INJURY_CONFIG.PHYSICAL_TRAINING_PENALTY
+        : 0);
 
     const mitigatedRisk = Math.max(
       0,
-      injuryRiskBase - staffImpact.energyRecoveryBonus / 5
+      injuryRiskBase -
+        staffImpact.energyRecoveryBonus / INJURY_CONFIG.STAFF_MITIGATION_DIVISOR
     );
 
     const isInjured = RandomEngine.chance(mitigatedRisk);
@@ -248,7 +264,12 @@ export class DailySimulationService extends BaseService {
     };
 
     if (!isInjured && trainingFocus !== TrainingFocus.REST) {
-      const growthChance = player.age < 21 ? 15 : player.age < 25 ? 8 : 2;
+      const growthChance =
+        player.age < 21
+          ? GROWTH_CONFIG.CHANCE_YOUTH_UNDER_21
+          : player.age < 25
+          ? GROWTH_CONFIG.CHANCE_YOUNG_21_TO_25
+          : GROWTH_CONFIG.CHANCE_PRIME_OVER_25;
 
       if (RandomEngine.chance(growthChance)) {
         if (trainingFocus === TrainingFocus.TECHNICAL) {

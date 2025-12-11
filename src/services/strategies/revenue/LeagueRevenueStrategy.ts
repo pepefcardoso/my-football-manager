@@ -1,19 +1,24 @@
-import { MatchRevenueConfig } from "../../config/ServiceConstants";
 import { BaseRevenueStrategy } from "./BaseRevenueStrategy";
 import type { RevenueContext } from "./IRevenueStrategy";
+import { getBalanceValue } from "../../../engine/GameBalanceConfig";
+
+const REVENUE_IMPORTANCE_CONFIG = getBalanceValue("MATCH").REVENUE.IMPORTANCE;
 
 export class LeagueRevenueStrategy extends BaseRevenueStrategy {
   protected calculateImportance(context: RevenueContext): number {
-    let importance = MatchRevenueConfig.IMPORTANCE.BASE;
+    let importance = REVENUE_IMPORTANCE_CONFIG.BASE;
 
     if (context.competitionTier === 1) {
-      importance *= MatchRevenueConfig.IMPORTANCE.TIER_1_BONUS;
+      importance *= REVENUE_IMPORTANCE_CONFIG.TIER_1_BONUS;
     }
 
-    if (context.round && context.round > 30) {
-      importance *= MatchRevenueConfig.IMPORTANCE.LATE_ROUND_BONUS;
+    if (
+      context.round &&
+      context.round > REVENUE_IMPORTANCE_CONFIG.LATE_ROUND_THRESHOLD
+    ) {
+      importance *= REVENUE_IMPORTANCE_CONFIG.LATE_ROUND_BONUS;
     }
 
-    return Math.min(MatchRevenueConfig.IMPORTANCE.MAX_MULTIPLIER, importance);
+    return Math.min(REVENUE_IMPORTANCE_CONFIG.MAX_MULTIPLIER, importance);
   }
 }

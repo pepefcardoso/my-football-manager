@@ -1,6 +1,5 @@
 import { FinancialCategory } from "../domain/enums";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { MatchRevenueConfig, PenaltyWeights } from "./config/ServiceConstants";
 import { BaseService } from "./BaseService";
 import type { ServiceResult } from "./types/ServiceResults";
 import { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
@@ -17,6 +16,19 @@ import type {
   FinancialHealthResult,
   TransferPermissionResult,
 } from "../domain/types";
+import { getBalanceValue } from "../engine/GameBalanceConfig";
+
+const MARKETING_CONFIG = getBalanceValue("MARKETING");
+const TICKET_PRICING = MARKETING_CONFIG.TICKET_PRICING;
+
+const MATCH_IMPORTANCE_CONFIG = getBalanceValue("MATCH").REVENUE.IMPORTANCE;
+const FINANCE_CONFIG = getBalanceValue("FINANCE");
+const INFRA_CONFIG = getBalanceValue("INFRASTRUCTURE");
+
+const INFRA_MAINTENANCE_COSTS = {
+  MAINTENANCE_COST_PER_SEAT: 2,
+  MAINTENANCE_QUALITY_MULTIPLIER: 1000,
+} as const;
 
 export class FinanceService extends BaseService {
   private healthChecker: FinancialHealthChecker;
@@ -39,7 +51,7 @@ export class FinanceService extends BaseService {
   static calculateMatchDayRevenue(
     stadiumCapacity: number,
     fanSatisfaction: number,
-    ticketPrice: number = MatchRevenueConfig.BASE_TICKET_PRICE
+    ticketPrice: number = TICKET_PRICING.BASE_FAIR_PRICE
   ): { revenue: number; attendance: number } {
     const strategy = RevenueStrategyFactory.getStrategy();
 
@@ -79,11 +91,13 @@ export class FinanceService extends BaseService {
     round?: number,
     isKnockout: boolean = false
   ): number {
-    let importance = 1.0;
-    if (competitionTier === 1) importance *= 1.2;
-    if (isKnockout) importance *= 1.3;
-    if (round && round > 30) importance *= 1.2;
-    return Math.min(2.0, importance);
+    let importance = MATCH_IMPORTANCE_CONFIG.BASE;
+    if (competitionTier === 1)
+      importance *= MATCH_IMPORTANCE_CONFIG.TIER_1_BONUS;
+    if (isKnockout) importance *= MATCH_IMPORTANCE_CONFIG.KNOCKOUT_BONUS;
+    if (round && round > MATCH_IMPORTANCE_CONFIG.LATE_ROUND_THRESHOLD)
+      importance *= MATCH_IMPORTANCE_CONFIG.LATE_ROUND_BONUS;
+    return Math.min(MATCH_IMPORTANCE_CONFIG.MAX_MULTIPLIER, importance);
   }
 
   /**
@@ -123,14 +137,13 @@ export class FinanceService extends BaseService {
     fine: number;
     description: string;
   } {
-    const fine = Math.round(
-      Math.abs(debtAmount) * PenaltyWeights.FINE_PERCENTAGE
-    );
+    const finePercentage = FINANCE_CONFIG.CRISIS_FINE_PERCENTAGE;
+    const fine = Math.round(Math.abs(debtAmount) * finePercentage);
 
     return {
       fine,
       description: `Multa por má gestão financeira (${
-        PenaltyWeights.FINE_PERCENTAGE * 100
+        finePercentage * 100
       }% da dívida: €${debtAmount.toLocaleString("pt-PT")})`,
     };
   }
@@ -159,8 +172,8 @@ export class FinanceService extends BaseService {
         );
 
         const infraMaintenance = this.calculateMonthlyMaintenance(
-          team.stadiumCapacity || 10000,
-          team.stadiumQuality || 50
+          team.stadiumCapacity || INFRA_CONFIG.DEFAULT_CAPACITY,
+          team.stadiumQuality || INFRA_CONFIG.DEFAULT_QUALITY
         );
 
         if (infraMaintenance > 0) {
@@ -281,8 +294,10 @@ export class FinanceService extends BaseService {
     stadiumCapacity: number,
     stadiumQuality: number
   ): number {
-    const seatMaintenance = stadiumCapacity * 2;
-    const qualityUpkeep = stadiumQuality * 1000;
+    const seatMaintenance =
+      stadiumCapacity * INFRA_MAINTENANCE_COSTS.MAINTENANCE_COST_PER_SEAT;
+    const qualityUpkeep =
+      stadiumQuality * INFRA_MAINTENANCE_COSTS.MAINTENANCE_QUALITY_MULTIPLIER;
     return Math.round(seatMaintenance + qualityUpkeep);
   }
 }

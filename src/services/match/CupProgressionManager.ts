@@ -2,12 +2,20 @@ import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { ServiceResult } from "../types/ServiceResults";
 import { CompetitionScheduler } from "../CompetitionScheduler";
+import { getBalanceValue } from "../../engine/GameBalanceConfig";
+
+const MATCH_CONFIG = getBalanceValue("MATCH");
 
 export class CupProgressionManager extends BaseService {
   constructor(repositories: IRepositoryContainer) {
     super(repositories, "CupProgressionManager");
   }
 
+  /**
+   *
+   * @param matchId
+   * @returns
+   */
   async checkAndProgressCup(matchId: number): Promise<ServiceResult<void>> {
     return this.executeVoid("checkAndProgressCup", matchId, async (matchId) => {
       const match = await this.repos.matches.findById(matchId);
@@ -46,7 +54,9 @@ export class CupProgressionManager extends BaseService {
       );
 
       const lastMatchDate = new Date(match.date);
-      lastMatchDate.setDate(lastMatchDate.getDate() + 14);
+      lastMatchDate.setDate(
+        lastMatchDate.getDate() + MATCH_CONFIG.KNOCKOUT_REST_DAYS
+      );
       const nextDateStr = lastMatchDate.toISOString().split("T")[0];
 
       const matchesToSave = nextFixtures.map((f) => ({

@@ -7,11 +7,11 @@ import {
   type ScoutedPlayerView,
   type MaskedAttribute,
 } from "./factories/ReportFactory";
+import { getBalanceValue } from "../engine/GameBalanceConfig";
+import { StaffRole } from "../domain/enums";
 
-const STAFF_IMPACT_CONFIG = {
-  BASE_UNCERTAINTY: 15,
-  REDUCTION_RATE: 0.1,
-} as const;
+const SCOUTING_CONFIG = getBalanceValue("SCOUTING");
+const PROGRESS_CONFIG = SCOUTING_CONFIG.PROGRESS;
 
 export type { ScoutedPlayerView, MaskedAttribute };
 
@@ -143,7 +143,11 @@ export class ScoutingService extends BaseService {
           if (!scout) continue;
 
           const dailyProgress =
-            Math.round(scout.overall / 10) + RandomEngine.getInt(1, 5);
+            Math.round(scout.overall / PROGRESS_CONFIG.SCOUT_OVERALL_DIVISOR) +
+            RandomEngine.getInt(
+              PROGRESS_CONFIG.DAILY_RANDOM_MIN,
+              PROGRESS_CONFIG.DAILY_RANDOM_MAX
+            );
 
           await this.repos.scouting.upsert({
             ...report,
@@ -175,16 +179,16 @@ export class ScoutingService extends BaseService {
       );
 
       const allStaff = await this.repos.staff.findByTeamId(teamId);
-      const scouts = allStaff.filter((s) => s.role === "scout");
+      const scouts = allStaff.filter((s) => s.role === StaffRole.SCOUT);
 
       if (scouts.length === 0) {
-        return STAFF_IMPACT_CONFIG.BASE_UNCERTAINTY;
+        return SCOUTING_CONFIG.BASE_UNCERTAINTY;
       }
 
       const bestScout = Math.max(...scouts.map((s) => s.overall));
-      const reduction = bestScout * STAFF_IMPACT_CONFIG.REDUCTION_RATE;
+      const reduction = bestScout * SCOUTING_CONFIG.REDUCTION_RATE;
 
-      return Math.max(0, STAFF_IMPACT_CONFIG.BASE_UNCERTAINTY - reduction);
+      return Math.max(0, SCOUTING_CONFIG.BASE_UNCERTAINTY - reduction);
     });
   }
 }

@@ -1,12 +1,10 @@
 import { BaseService } from "../BaseService";
-import type { IRepositoryContainer } from "../../repositories/IRepositories";
+import type { IRepositoryContainer } from "../..//";
 import { Result } from "../types/ServiceResults";
 import type { ServiceResult } from "../types/ServiceResults";
+import { getBalanceValue } from "../../engine/GameBalanceConfig";
 
-const TRANSFER_WINDOWS = [
-  { startMonth: 0, startDay: 1, endMonth: 0, endDay: 31, name: "Janeiro" },
-  { startMonth: 6, startDay: 1, endMonth: 6, endDay: 31, name: "Julho" },
-];
+const TRANSFER_WINDOWS = getBalanceValue("SEASON").TRANSFER_WINDOWS;
 
 export class TransferWindowManager extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -71,8 +69,6 @@ export class TransferWindowManager extends BaseService {
       return Result.success(undefined, "Janela de transferências aberta.");
     }
 
-    // Opcional: Se for uma contratação de jogador livre (Free Agent),
-    // poderíamos permitir fora da janela, mas por enquanto vamos bloquear tudo.
     return Result.businessRule(
       "A janela de transferências está fechada neste momento."
     );

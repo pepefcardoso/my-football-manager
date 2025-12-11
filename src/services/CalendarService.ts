@@ -3,6 +3,7 @@ import type { IRepositoryContainer } from "../repositories/IRepositories";
 import type { ServiceResult } from "./types/ServiceResults";
 import { CompetitionScheduler, type MatchPair } from "./CompetitionScheduler";
 import type { Competition } from "../domain/models";
+import { getBalanceValue } from "../engine/GameBalanceConfig";
 
 export interface ScheduledMatch {
   competitionId: number;
@@ -39,6 +40,8 @@ export interface ScheduleSeasonInput {
   allTeams: number[];
 }
 
+const CALENDAR_CONFIG = getBalanceValue("SEASON").CALENDAR;
+
 export class CalendarService extends BaseService {
   private continentalCompIds: Set<number> = new Set();
 
@@ -46,6 +49,12 @@ export class CalendarService extends BaseService {
     super(repositories, "CalendarService");
   }
 
+  /**
+   *
+   * @param competitions
+   * @param allTeams
+   * @returns
+   */
   async scheduleSeason(
     competitions: Competition[],
     allTeams: number[]
@@ -146,8 +155,8 @@ export class CalendarService extends BaseService {
     const stateComps = windows.filter((w) => w.window === "state");
     if (stateComps.length === 0) return;
 
-    const startDate = new Date("2025-01-20");
-    const endDate = new Date("2025-04-30");
+    const startDate = new Date(CALENDAR_CONFIG.STATE_WINDOW.start);
+    const endDate = new Date(CALENDAR_CONFIG.STATE_WINDOW.end);
 
     this.processSchedulingLoop(
       stateComps,
@@ -155,7 +164,7 @@ export class CalendarService extends BaseService {
       endDate,
       occupiedDates,
       allMatches,
-      [0, 6]
+      CALENDAR_CONFIG.NATIONAL_GAME_DAYS
     );
   }
 
@@ -167,8 +176,8 @@ export class CalendarService extends BaseService {
     const nationalComps = windows.filter((w) => w.window === "national");
     if (nationalComps.length === 0) return;
 
-    const startDate = new Date("2025-05-03");
-    const endDate = new Date("2025-12-15");
+    const startDate = new Date(CALENDAR_CONFIG.NATIONAL_WINDOW.start);
+    const endDate = new Date(CALENDAR_CONFIG.NATIONAL_WINDOW.end);
 
     this.processSchedulingLoop(
       nationalComps,
@@ -176,7 +185,7 @@ export class CalendarService extends BaseService {
       endDate,
       occupiedDates,
       allMatches,
-      [0, 6]
+      CALENDAR_CONFIG.NATIONAL_GAME_DAYS
     );
   }
 
@@ -188,8 +197,8 @@ export class CalendarService extends BaseService {
     const continentalComps = windows.filter((w) => w.window === "continental");
     if (continentalComps.length === 0) return;
 
-    const startDate = new Date("2025-05-07");
-    const endDate = new Date("2025-11-30");
+    const startDate = new Date(CALENDAR_CONFIG.CONTINENTAL_WINDOW.start);
+    const endDate = new Date(CALENDAR_CONFIG.CONTINENTAL_WINDOW.end);
 
     this.processSchedulingLoop(
       continentalComps,
@@ -197,8 +206,8 @@ export class CalendarService extends BaseService {
       endDate,
       occupiedDates,
       allMatches,
-      [3],
-      14
+      CALENDAR_CONFIG.CONTINENTAL_GAME_DAYS,
+      CALENDAR_CONFIG.CONTINENTAL_ROUND_STEP
     );
   }
 
@@ -208,8 +217,8 @@ export class CalendarService extends BaseService {
     endDate: Date,
     occupiedDates: Map<string, Set<number>>,
     allMatches: ScheduledMatch[],
-    allowedDays: number[],
-    stepDays: number = 7
+    allowedDays: readonly number[],
+    stepDays: number = CALENDAR_CONFIG.DEFAULT_ROUND_STEP
   ) {
     for (const comp of competitions) {
       const currentDate = new Date(startDate);
@@ -278,16 +287,15 @@ export class CalendarService extends BaseService {
     currentDate: string,
     existingMatches: ScheduledMatch[]
   ): boolean {
+    const restDays = CALENDAR_CONFIG.CONTINENTAL_REST_DAYS;
     const targetDate = new Date(currentDate);
-    const twoDaysAgo = new Date(targetDate);
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    const oneDayAgo = new Date(targetDate);
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    const datesToCheck = [
-      twoDaysAgo.toISOString().split("T")[0],
-      oneDayAgo.toISOString().split("T")[0],
-    ];
+    const datesToCheck: string[] = [];
+    for (let i = 1; i <= restDays; i++) {
+      const pastDate = new Date(targetDate);
+      pastDate.setDate(pastDate.getDate() - i);
+      datesToCheck.push(pastDate.toISOString().split("T")[0]);
+    }
 
     return existingMatches.some((m) => {
       const isContinental = this.continentalCompIds.has(m.competitionId);
