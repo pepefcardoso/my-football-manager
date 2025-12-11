@@ -1,5 +1,5 @@
 import { BaseService } from "../BaseService";
-import type { IRepositoryContainer } from "../..//";
+import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import { Result } from "../types/ServiceResults";
 import type { ServiceResult } from "../types/ServiceResults";
 import { getBalanceValue } from "../../engine/GameBalanceConfig";

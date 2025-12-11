@@ -1,5 +1,8 @@
 import { FinancialCategory } from "../../domain/enums";
 import type { ValidationResult } from "../BaseService";
+import { getBalanceValue } from "../../engine/GameBalanceConfig";
+
+const CONTRACT_CONFIG = getBalanceValue("CONTRACT");
 
 export class FinancialOperationValidator {
   static validateAmount(amount: number): ValidationResult {
@@ -53,7 +56,9 @@ export class FinancialOperationValidator {
     const baseValidation = this.validateAmount(wage);
     if (!baseValidation.isValid) return baseValidation;
 
-    const minWage = isYouth ? 100 : 500;
+    const minWage = isYouth
+      ? CONTRACT_CONFIG.MIN_WAGE_YOUTH
+      : CONTRACT_CONFIG.MIN_WAGE_SENIOR;
 
     if (wage < minWage) {
       return {

@@ -12,6 +12,7 @@ import {
   FinancialCategory,
 } from "../../domain/enums";
 import { FinancialOperationValidator } from "../validators/FinancialOperationValidator";
+import { getBalanceValue } from "../../engine/GameBalanceConfig";
 
 export interface CreateProposalInput {
   playerId: number;
@@ -31,6 +32,8 @@ export interface RespondProposalInput {
   rejectionReason?: string;
   currentDate: string;
 }
+
+const TRANSFER_CONFIG = getBalanceValue("TRANSFER");
 
 export class TransferService extends BaseService {
   private unitOfWork: IUnitOfWork;
@@ -94,7 +97,9 @@ export class TransferService extends BaseService {
         }
 
         const deadlineDate = new Date(currentDate);
-        deadlineDate.setDate(deadlineDate.getDate() + 3);
+        deadlineDate.setDate(
+          deadlineDate.getDate() + TRANSFER_CONFIG.PROPOSAL_RESPONSE_DAYS
+        );
         const responseDeadline = deadlineDate.toISOString().split("T")[0];
 
         const proposalId = await this.repos.transferProposals.create({
@@ -176,7 +181,9 @@ export class TransferService extends BaseService {
           updateData.counterOfferFee = counterOfferFee;
 
           const newDeadline = new Date(currentDate);
-          newDeadline.setDate(newDeadline.getDate() + 2);
+          newDeadline.setDate(
+            newDeadline.getDate() + TRANSFER_CONFIG.COUNTER_RESPONSE_DAYS
+          );
           updateData.responseDeadline = newDeadline.toISOString().split("T")[0];
 
           this.logger.info(
@@ -259,7 +266,7 @@ export class TransferService extends BaseService {
 
         await transactionalRepos.players.update(player.id, {
           teamId: buyingTeam.id,
-          moral: 85,
+          moral: TRANSFER_CONFIG.PLAYER_MORAL_ON_TRANSFER,
         });
 
         await transactionalRepos.transfers.create({

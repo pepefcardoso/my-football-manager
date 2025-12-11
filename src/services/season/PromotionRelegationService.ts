@@ -1,12 +1,15 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { ServiceResult } from "../types/ServiceResults";
+import { getBalanceValue } from "../../engine/GameBalanceConfig";
 
 export interface PromotionRelegationResult {
   championName: string;
   promotedTeams: number[];
   relegatedTeams: number[];
 }
+
+const SLOTS = getBalanceValue("SEASON").PROMOTION_RELEGATION_SLOTS;
 
 export class PromotionRelegationService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -38,7 +41,7 @@ export class PromotionRelegationService extends BaseService {
 
         if (standingsT1.length > 0) {
           championName = standingsT1[0].team?.name || "Desconhecido";
-          const numberToSwap = 4;
+          const numberToSwap = SLOTS;
           relegated = standingsT1.slice(-numberToSwap).map((s) => s.teamId!);
         }
       }
@@ -48,7 +51,7 @@ export class PromotionRelegationService extends BaseService {
           tier2.id,
           seasonId
         );
-        const numberToSwap = 4;
+        const numberToSwap = SLOTS;
         promoted = standingsT2.slice(0, numberToSwap).map((s) => s.teamId!);
       }
 
