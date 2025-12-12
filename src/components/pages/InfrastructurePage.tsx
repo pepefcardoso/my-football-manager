@@ -19,11 +19,11 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
 
     const refreshData = useCallback(async () => {
         try {
-            const teamData = await window.electronAPI.getTeams();
+            const teamData = await window.electronAPI.team.getTeams();
             const myTeam = teamData.find(t => t.id === teamId);
             setTeam(myTeam || null);
 
-            const state = await window.electronAPI.getGameState();
+            const state = await window.electronAPI.game.getGameState();
             setGameState(state);
         } catch (error) {
             logger.error("Erro ao carregar dados:", error);

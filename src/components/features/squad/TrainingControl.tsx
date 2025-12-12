@@ -54,7 +54,7 @@ function TrainingControl({ currentFocus, onUpdate }: TrainingControlProps) {
       setError(null);
 
       try {
-        const success = await window.electronAPI.updateTrainingFocus(focus);
+        const success = await window.electronAPI.game.updateTrainingFocus(focus);
 
         if (success) {
           onUpdate();

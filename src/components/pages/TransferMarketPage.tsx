@@ -24,8 +24,8 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
     const fetchProposals = useCallback(async () => {
         setLoading(true);
         try {
-            const receivedData = await window.electronAPI.getReceivedProposals(teamId);
-            const sentData = await window.electronAPI.getSentProposals(teamId);
+            const receivedData = await window.electronAPI.transfer.getReceivedProposals(teamId);
+            const sentData = await window.electronAPI.transfer.getSentProposals(teamId);
 
             const sortProposals = (a: TransferProposal, b: TransferProposal) => {
                 if (a.status === TransferStatus.PENDING && b.status !== TransferStatus.PENDING) return -1;

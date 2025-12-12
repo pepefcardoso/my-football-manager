@@ -24,7 +24,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
     const fetchGameState = async () => {
         try {
-            const state = await window.electronAPI.getGameState();
+            const state = await window.electronAPI.game.getGameState();
             setGameState(state);
         } catch (error) {
             logger.error("Erro ao carregar estado do jogo:", error);
@@ -39,7 +39,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
         if (simulating) return;
         setSimulating(true);
         try {
-            const result = await window.electronAPI.advanceDay();
+            const result = await window.electronAPI.game.advanceDay();
 
             advanceDateGlobal(result.date);
             await fetchGameState();

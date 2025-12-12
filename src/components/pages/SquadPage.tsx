@@ -19,7 +19,7 @@ function SquadPage({ teamId }: { teamId: number }) {
       setError(null);
 
       try {
-        const data = await window.electronAPI.getPlayers(teamId);
+        const data = await window.electronAPI.player.getPlayers(teamId);
         const sorted = data.sort(
           (a: Player, b: Player) => b.overall - a.overall
         );

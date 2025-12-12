@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { MatchState } from "../domain/enums";
-import type { MatchEvent } from "../domain/models";
 import { Logger } from "../lib/Logger";
+import type { MatchEventData } from "../domain/types";
 
 interface MatchSimulationState {
   matchId: number;
@@ -9,7 +9,7 @@ interface MatchSimulationState {
   currentMinute: number;
   homeScore: number;
   awayScore: number;
-  events: MatchEvent[];
+  events: MatchEventData[];
   isLoading: boolean;
   error: string | null;
 }
@@ -49,7 +49,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
 
   const runSimulationStep = useCallback(
     async (matchId: number) => {
-      let update = await window.electronAPI.simulateMatchMinute(matchId);
+      let update = await window.electronAPI.match.simulateMatchMinute(matchId);
 
       if (update && "data" in update && "success" in update) {
         update = (update as any).data;
@@ -130,7 +130,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
           error: null,
         }));
 
-        const success = await window.electronAPI.startMatch(matchId);
+        const success = await window.electronAPI.match.startMatch(matchId);
 
         if (!success) {
           setSimulation((prev) =>
@@ -186,7 +186,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
         : null
     );
 
-    window.electronAPI.pauseMatch(simulation.matchId);
+    window.electronAPI.match.pauseMatch(simulation.matchId);
   }, [simulation, clearSimulationInterval]);
 
   const resumeMatch = useCallback(() => {
@@ -201,7 +201,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
         : null
     );
 
-    window.electronAPI.resumeMatch(simulation.matchId);
+    window.electronAPI.match.resumeMatch(simulation.matchId);
     startInterval(simulation.matchId, speed);
   }, [simulation, startInterval, speed]);
 
@@ -220,7 +220,7 @@ export function useMatchSimulation(): UseMatchSimulationReturn {
     );
 
     try {
-      let result = await window.electronAPI.simulateFullMatch(
+      let result = await window.electronAPI.match.simulateFullMatch(
         simulation.matchId
       );
 

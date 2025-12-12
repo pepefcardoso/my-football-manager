@@ -13,7 +13,7 @@ function StaffPage({ teamId }: { teamId: number }) {
         const fetchStaff = async () => {
             setLoading(true);
             try {
-                const data = await window.electronAPI.getStaff(teamId);
+                const data = await window.electronAPI.staff.getStaff(teamId);
                 const sorted = data.sort((a: Staff, b: Staff) => a.role.localeCompare(b.role));
                 setStaff(sorted);
             } catch (error) {

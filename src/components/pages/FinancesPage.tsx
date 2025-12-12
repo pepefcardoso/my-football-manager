@@ -15,14 +15,14 @@ function FinancesPage({ teamId }: { teamId: number }) {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const gameState = await window.electronAPI.getGameState();
+                const gameState = await window.electronAPI.game.getGameState();
 
                 if (gameState?.currentSeasonId) {
-                    const data = await window.electronAPI.getFinancialRecords(teamId, gameState.currentSeasonId);
+                    const data = await window.electronAPI.finance.getFinancialRecords(teamId, gameState.currentSeasonId);
                     setRecords(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
                 }
 
-                const healthData = await window.electronAPI.getFinancialHealth(teamId);
+                const healthData = await window.electronAPI.finance.getFinancialHealth(teamId);
                 setHealth(healthData);
 
             } catch (error) {

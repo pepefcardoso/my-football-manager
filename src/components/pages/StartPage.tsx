@@ -12,7 +12,7 @@ function StartPage() {
 
     const handleLoadGame = async () => {
         logger.info("Abrir modal de load...");
-        const success = await window.electronAPI.loadGame();
+        const success = await window.electronAPI.game.loadGame();
         if (success) {
             alert("Funcionalidade de Load em desenvolvimento!");
         }

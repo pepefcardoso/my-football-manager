@@ -55,7 +55,7 @@ function StandingsPage() {
     const loadComps = async () => {
       try {
         const api = window.electronAPI;
-        const comps = await api.getCompetitions();
+        const comps = await api.competition.getCompetitions();
         setCompetitions(comps);
         if (comps.length > 0) {
           setSelectedCompId(comps[0].id);
@@ -76,10 +76,10 @@ function StandingsPage() {
         const api = window.electronAPI;
 
         if (activeTab === "table") {
-          const data = await api.getStandings(selectedCompId, currentSeasonId);
+          const data = await api.competition.getStandings(selectedCompId, currentSeasonId);
           setAllStandings(data);
         } else if (activeTab === "keepers") {
-          const data = await api.getTopGoalkeepers(selectedCompId, currentSeasonId);
+          const data = await api.competition.getTopGoalkeepers(selectedCompId, currentSeasonId);
           const enhancedData = await Promise.all(data.map(async (item: any) => {
             return {
               ...item,
@@ -89,7 +89,7 @@ function StandingsPage() {
           }));
           setTopGoalkeepers(enhancedData);
         } else {
-          const data = await api.getTopScorers(selectedCompId, currentSeasonId);
+          const data = await api.competition.getTopScorers(selectedCompId, currentSeasonId);
           setTopScorers(data);
         }
       } catch (error) {
@@ -150,7 +150,7 @@ function StandingsPage() {
         Array.from(distinctTeamIds).map(async (teamId) => {
           if (!teamId) return;
           try {
-            const form = await window.electronAPI.getTeamForm(
+            const form = await window.electronAPI.competition.getTeamForm(
               teamId,
               selectedCompId,
               currentSeasonId

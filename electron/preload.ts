@@ -1,39 +1,187 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  getTeams: () => ipcRenderer.invoke("get-teams"),
-  getPlayers: (teamId: number) => ipcRenderer.invoke("get-players", teamId),
-  getStaff: (teamId: number) => ipcRenderer.invoke("get-staff", teamId),
-  getMatches: (teamId: number, seasonId: number) =>
-    ipcRenderer.invoke("get-matches", { teamId, seasonId }),
-  getCompetitions: () => ipcRenderer.invoke("get-competitions"),
-  updateTrainingFocus: (focus: string) =>
-    ipcRenderer.invoke("update-training-focus", focus),
-  getGameState: () => ipcRenderer.invoke("get-game-state"),
-  advanceDay: () => ipcRenderer.invoke("advance-day"),
-  saveGame: () => ipcRenderer.invoke("save-game"),
-  loadGame: () => ipcRenderer.invoke("load-game"),
-  startMatch: (matchId: number) => ipcRenderer.invoke("start-match", matchId),
-  pauseMatch: (matchId: number) => ipcRenderer.invoke("pause-match", matchId),
-  resumeMatch: (matchId: number) => ipcRenderer.invoke("resume-match", matchId),
-  simulateMatchMinute: (matchId: number) =>
-    ipcRenderer.invoke("simulate-match-minute", matchId),
-  simulateFullMatch: (matchId: number) =>
-    ipcRenderer.invoke("simulate-full-match", matchId),
-  getMatchState: (matchId: number) =>
-    ipcRenderer.invoke("get-match-state", matchId),
-  simulateMatchesOfDate: (date: string) =>
-    ipcRenderer.invoke("simulate-matches-of-date", date),
-  getFinancialRecords: (teamId: number, seasonId: number) =>
-    ipcRenderer.invoke("get-financial-records", { teamId, seasonId }),
-  getFinancialHealth: (teamId: number) =>
-    ipcRenderer.invoke("get-financial-health", teamId),
-  upgradeInfrastructure: (action: string, teamId: number, seasonId: number) =>
-    ipcRenderer.invoke("upgrade-infrastructure", { action, teamId, seasonId }),
-  getScoutedPlayer: (playerId: number, teamId: number) =>
-    ipcRenderer.invoke("get-scouted-player", { playerId, teamId }),
-  getScoutingList: (teamId: number) =>
-    ipcRenderer.invoke("get-scouting-list", teamId),
-  assignScout: (scoutId: number, playerId: number) =>
-    ipcRenderer.invoke("assign-scout", { scoutId, playerId }),
+  team: {
+    getTeams: () => ipcRenderer.invoke("team:getTeams"),
+  },
+
+  player: {
+    getPlayers: (teamId: number) =>
+      ipcRenderer.invoke("player:getPlayers", teamId),
+    getYouthPlayers: (teamId: number) =>
+      ipcRenderer.invoke("player:getYouthPlayers", teamId),
+    getFreeAgents: () => ipcRenderer.invoke("player:getFreeAgents"),
+    getPlayerWithContract: (playerId: number) =>
+      ipcRenderer.invoke("player:getPlayerWithContract", playerId),
+    updatePlayerCondition: (playerId: number, updates: any) =>
+      ipcRenderer.invoke("player:updatePlayerCondition", {
+        playerId,
+        ...updates,
+      }),
+  },
+
+  staff: {
+    getStaff: (teamId: number) => ipcRenderer.invoke("staff:getStaff", teamId),
+    getFreeAgents: () => ipcRenderer.invoke("staff:getFreeAgents"),
+    hireStaff: (
+      teamId: number,
+      staffId: number,
+      salary: number,
+      contractEnd: string
+    ) =>
+      ipcRenderer.invoke("staff:hireStaff", {
+        teamId,
+        staffId,
+        salary,
+        contractEnd,
+      }),
+    fireStaff: (staffId: number) =>
+      ipcRenderer.invoke("staff:fireStaff", staffId),
+  },
+
+  match: {
+    getMatches: (teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("match:getMatches", { teamId, seasonId }),
+    startMatch: (matchId: number) =>
+      ipcRenderer.invoke("match:startMatch", matchId),
+    pauseMatch: (matchId: number) =>
+      ipcRenderer.invoke("match:pauseMatch", matchId),
+    resumeMatch: (matchId: number) =>
+      ipcRenderer.invoke("match:resumeMatch", matchId),
+    simulateMatchMinute: (matchId: number) =>
+      ipcRenderer.invoke("match:simulateMatchMinute", matchId),
+    simulateFullMatch: (matchId: number) =>
+      ipcRenderer.invoke("match:simulateFullMatch", matchId),
+    getMatchState: (matchId: number) =>
+      ipcRenderer.invoke("match:getMatchState", matchId),
+    simulateMatchesOfDate: (date: string) =>
+      ipcRenderer.invoke("match:simulateMatchesOfDate", date),
+  },
+
+  competition: {
+    getCompetitions: () => ipcRenderer.invoke("competition:getCompetitions"),
+    getTeamForm: (teamId: number, competitionId: number, seasonId: number) =>
+      ipcRenderer.invoke("competition:getTeamForm", {
+        teamId,
+        competitionId,
+        seasonId,
+      }),
+    getStandings: (competitionId: number, seasonId: number) =>
+      ipcRenderer.invoke("competition:getStandings", {
+        competitionId,
+        seasonId,
+      }),
+    getTopScorers: (competitionId: number, seasonId: number) =>
+      ipcRenderer.invoke("competition:getTopScorers", {
+        competitionId,
+        seasonId,
+      }),
+    getTopGoalkeepers: (competitionId: number, seasonId: number) =>
+      ipcRenderer.invoke("competition:getTopGoalkeepers", {
+        competitionId,
+        seasonId,
+      }),
+  },
+
+  game: {
+    getGameState: () => ipcRenderer.invoke("game:getGameState"),
+    advanceDay: () => ipcRenderer.invoke("game:advanceDay"),
+    updateTrainingFocus: (focus: string) =>
+      ipcRenderer.invoke("game:updateTrainingFocus", focus),
+    saveGame: () => ipcRenderer.invoke("game:saveGame"),
+    loadGame: () => ipcRenderer.invoke("game:loadGame"),
+  },
+
+  finance: {
+    checkFinancialHealth: (teamId: number) =>
+      ipcRenderer.invoke("finance:checkFinancialHealth", teamId),
+    canMakeTransfers: (teamId: number) =>
+      ipcRenderer.invoke("finance:canMakeTransfers", teamId),
+    getFinancialRecords: (teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("finance:getFinancialRecords", { teamId, seasonId }),
+    getFinancialHealth: (teamId: number) =>
+      ipcRenderer.invoke("finance:getFinancialHealth", teamId),
+    getMonthlyReport: (teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("finance:getMonthlyReport", { teamId, seasonId }),
+  },
+
+  contract: {
+    getWageBill: (teamId: number) =>
+      ipcRenderer.invoke("contract:getWageBill", teamId),
+    renewPlayerContract: (
+      playerId: number,
+      newWage: number,
+      newEndDate: string
+    ) =>
+      ipcRenderer.invoke("contract:renewPlayerContract", {
+        playerId,
+        newWage,
+        newEndDate,
+      }),
+  },
+
+  infrastructure: {
+    upgradeInfrastructure: (type: string, teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("infrastructure:upgradeInfrastructure", {
+        type,
+        teamId,
+        seasonId,
+      }),
+    getInfrastructureStatus: (teamId: number) =>
+      ipcRenderer.invoke("infrastructure:getInfrastructureStatus", teamId),
+    getUpgradeCost: (teamId: number, type: string) =>
+      ipcRenderer.invoke("infrastructure:getUpgradeCost", { teamId, type }),
+    getExpansionCost: () =>
+      ipcRenderer.invoke("infrastructure:getExpansionCost"),
+  },
+
+  scouting: {
+    getScoutedPlayer: (playerId: number, teamId: number) =>
+      ipcRenderer.invoke("scouting:getScoutedPlayer", { playerId, teamId }),
+    getScoutingList: (teamId: number) =>
+      ipcRenderer.invoke("scouting:getScoutingList", teamId),
+    assignScout: (scoutId: number, playerId: number) =>
+      ipcRenderer.invoke("scouting:assignScout", { scoutId, playerId }),
+    calculateScoutingAccuracy: (teamId: number) =>
+      ipcRenderer.invoke("scouting:calculateScoutingAccuracy", teamId),
+  },
+
+  transfer: {
+    getReceivedProposals: (teamId: number) =>
+      ipcRenderer.invoke("transfer:getReceivedProposals", teamId),
+    getSentProposals: (teamId: number) =>
+      ipcRenderer.invoke("transfer:getSentProposals", teamId),
+    createProposal: (input: any) =>
+      ipcRenderer.invoke("transfer:createProposal", input),
+    respondToProposal: (input: any) =>
+      ipcRenderer.invoke("transfer:respondToProposal", input),
+    finalizeTransfer: (proposalId: number) =>
+      ipcRenderer.invoke("transfer:finalizeTransfer", proposalId),
+    getTransferWindowStatus: (date: string) =>
+      ipcRenderer.invoke("transfer:getTransferWindowStatus", date),
+  },
+
+  marketing: {
+    getFanSatisfaction: (teamId: number) =>
+      ipcRenderer.invoke("marketing:getFanSatisfaction", teamId),
+    calculateTicketPriceImpact: (teamId: number, proposedPrice: number) =>
+      ipcRenderer.invoke("marketing:calculateTicketPriceImpact", {
+        teamId,
+        proposedPrice,
+      }),
+  },
+
+  season: {
+    getCurrentSeason: () => ipcRenderer.invoke("season:getCurrentSeason"),
+    getRelegationZone: (
+      competitionId: number,
+      seasonId: number,
+      zoneSize?: number
+    ) =>
+      ipcRenderer.invoke("season:getRelegationZone", {
+        competitionId,
+        seasonId,
+        zoneSize,
+      }),
+  },
 });

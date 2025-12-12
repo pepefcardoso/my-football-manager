@@ -37,11 +37,11 @@ function ScoutingPage({ teamId }: { teamId: number }) {
             setError(null);
 
             try {
-                const allStaff = await window.electronAPI.getStaff(teamId);
+                const allStaff = await window.electronAPI.staff.getStaff(teamId);
                 const scoutStaff = allStaff.filter((s: Staff) => s.role === "scout");
                 setScouts(scoutStaff);
 
-                const reportList = await window.electronAPI.getScoutingList(teamId);
+                const reportList = await window.electronAPI.scouting.getScoutingList(teamId);
 
                 const transformedReports: ScoutingEntry[] = reportList.map((report: any) => ({
                     id: report.id,

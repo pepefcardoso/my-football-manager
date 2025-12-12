@@ -15,9 +15,9 @@ function MatchesPage({ teamId, teams }: { teamId: number; teams: Team[] }) {
         const loadMatches = async () => {
             setLoading(true);
             try {
-                const state = await window.electronAPI.getGameState();
+                const state = await window.electronAPI.game.getGameState();
                 if (state && state.currentSeasonId) {
-                    const data = await window.electronAPI.getMatches(teamId, state.currentSeasonId);
+                    const data = await window.electronAPI.match.getMatches(teamId, state.currentSeasonId);
                     setMatches(data);
                 }
             } catch (error) {

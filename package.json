@@ -12,10 +12,9 @@
     "deps:validate": "depcruise src",
     "deps:graph": "depcruise src --include-only \"^src/services\" --output-type archi > dependency-graph.html",
     "deps:services": "tsx scripts/generate-service-map.ts",
-    "rebuild": "electron-rebuild -f -w better-sqlite3",
-    "seed": "npm rebuild better-sqlite3 && tsx src/db/seed.ts && npm run rebuild",
     "db:push": "npm rebuild better-sqlite3 && drizzle-kit push && npm run rebuild",
-    "postinstall": "electron-rebuild -f -w better-sqlite3"
+    "db:seed": "npm rebuild better-sqlite3 && tsx src/db/seed.ts && npm run rebuild",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",

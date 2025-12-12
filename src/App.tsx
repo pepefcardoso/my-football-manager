@@ -33,7 +33,7 @@ function App() {
   const handleLoadTeams = useCallback(async () => {
     setLoadingTeams(true);
     try {
-      const data = await window.electronAPI.getTeams();
+      const data = await window.electronAPI.team.getTeams();
       setTeams(data);
     } catch (error) {
       logger.error("Erro ao carregar times:", error);
