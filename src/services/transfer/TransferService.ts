@@ -228,6 +228,14 @@ export class TransferService extends BaseService {
       );
     }
 
+    const activeSeason = await this.repos.seasons.findActiveSeason();
+    if (!activeSeason || !activeSeason.id) {
+      return Result.businessRule(
+        "Não foi possível encontrar a temporada ativa para registrar finanças."
+      );
+    }
+    const currentSeasonId = activeSeason.id;
+
     return this.executeVoid("finalizeTransfer", proposalId, async () => {
       await this.unitOfWork.execute(async (transactionalRepos) => {
         this.logger.info(
@@ -261,7 +269,7 @@ export class TransferService extends BaseService {
 
         await transactionalRepos.financial.addRecord({
           teamId: buyingTeam.id,
-          seasonId: 1, // TODO: Injetar seasonId corretamente via contexto ou repositório
+          seasonId: currentSeasonId,
           date: new Date().toISOString().split("T")[0],
           type: "expense",
           category: FinancialCategory.TRANSFER_OUT,
@@ -277,7 +285,7 @@ export class TransferService extends BaseService {
 
           await transactionalRepos.financial.addRecord({
             teamId: sellingTeam.id,
-            seasonId: 1,
+            seasonId: currentSeasonId,
             date: new Date().toISOString().split("T")[0],
             type: "income",
             category: FinancialCategory.TRANSFER_IN,
@@ -297,7 +305,7 @@ export class TransferService extends BaseService {
           toTeamId: buyingTeam.id,
           fee: proposal.fee,
           date: new Date().toISOString().split("T")[0],
-          seasonId: 1,
+          seasonId: currentSeasonId,
           type: proposal.type,
         });
 

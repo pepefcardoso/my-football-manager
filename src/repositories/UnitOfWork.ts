@@ -16,16 +16,24 @@ export class UnitOfWork implements IUnitOfWork {
   async execute<T>(
     work: (repos: IRepositoryContainer) => Promise<T>
   ): Promise<T> {
-    return this.dbInstance.transaction(async (tx) => {
-      const transactionalRepos = RepositoryFactory.create(tx);
-
+    return new Promise((resolve, reject) => {
       try {
-        const result = await work(transactionalRepos);
-        return result;
+        const result = this.dbInstance.transaction((tx) => {
+          const transactionalRepos = RepositoryFactory.create(tx);
+
+          try {
+            return work(transactionalRepos) as any;
+          } catch (error) {
+            this.logger.error("Transação abortada devido a erro:", error);
+            tx.rollback();
+            throw error;
+          }
+        }) as T;
+
+        resolve(result);
       } catch (error) {
         this.logger.error("Transação abortada devido a erro:", error);
-        tx.rollback();
-        throw error;
+        reject(error);
       }
     });
   }
