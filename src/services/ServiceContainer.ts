@@ -7,6 +7,7 @@ import {
   type MatchFinishedPayload,
   type FinancialCrisisPayload,
   type ContractExpiredPayload,
+  type TransferCompletedPayload,
 } from "./events/GameEventTypes";
 import { CalendarService } from "./CalendarService";
 import { ContractService } from "./ContractService";
@@ -156,6 +157,15 @@ export class ServiceContainer implements IServiceContainer {
       GameEventType.CONTRACT_EXPIRED,
       async (payload: ContractExpiredPayload) => {
         console.log(`Contrato expirado para jogador ${payload.playerId}`);
+      }
+    );
+
+    this.eventBus.subscribe(
+      GameEventType.TRANSFER_COMPLETED,
+      async (payload: TransferCompletedPayload) => {
+        console.log(
+          `[EVENTO] Transferência Finalizada: Jogador ${payload.playerId} de ${payload.fromTeamId} para ${payload.toTeamId} por ${payload.fee}`
+        );
       }
     );
   }
