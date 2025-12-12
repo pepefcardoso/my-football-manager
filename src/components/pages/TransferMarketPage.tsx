@@ -5,7 +5,7 @@ import Badge from "../common/Badge";
 import type { TransferProposal, Team, Player, GameState } from "../../domain/models";
 import { TransferStatus } from "../../domain/enums";
 import { useGameStore } from "../../store/useGameStore";
-import { useTransferStore } from "../../store/useTransferStore";
+import { useTransferStore } from "../../store/useTransferStore"; //
 import { TransferProposalModal } from "../features/transfer/TransferProposalModal";
 
 const logger = new Logger("TransferMarketPage");
@@ -30,19 +30,22 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
         receivedProposals,
         sentProposals,
         loading,
-        fetchProposals,
+        updateProposalState,
     } = useTransferStore((state) => ({
         receivedProposals: state.receivedProposals as ProposalWithDetails[],
         sentProposals: state.sentProposals as ProposalWithDetails[],
         loading: state.loading,
-        fetchProposals: state.fetchProposals,
+        updateProposalState: state.updateProposalState,
     }));
+
+    const fetchProposals = useTransferStore((state) => state.fetchProposals);
 
     const [activeTab, setActiveTab] = useState<TransferTab>("received");
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [playerToPropose, setPlayerToPropose] = useState<PlayerWithContract | null>(null);
     const [marketPlayers, setMarketPlayers] = useState<PlayerWithContract[]>([]);
     const [marketLoading, setMarketLoading] = useState(false);
+    const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     useEffect(() => {
         const fetchContextData = async () => {
@@ -74,6 +77,40 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
 
         fetchMarketData();
     }, [activeTab]);
+
+    const handleFinalizeTransfer = async (proposal: ProposalWithDetails) => {
+        setActionFeedback(null);
+
+        if (proposal.status !== TransferStatus.ACCEPTED) return;
+
+        try {
+            const result = await window.electronAPI.transfer.finalizeTransfer(proposal.id);
+
+            if (result.success) {
+                updateProposalState(proposal.id, TransferStatus.COMPLETED);
+
+                setActionFeedback({
+                    type: 'success',
+                    message: `✅ Transferência de ${proposal.player.lastName} concluída!`,
+                });
+                fetchProposals(teamId);
+            } else {
+                setActionFeedback({
+                    type: 'error',
+                    message: result.message
+                        ? `❌ Falha: ${result.message}`
+                        : "❌ Falha: Erro desconhecido ao finalizar a transferência.",
+                });
+            }
+        } catch (error) {
+            logger.error(`Erro ao finalizar a proposta ${proposal.id}:`, error);
+            setActionFeedback({
+                type: 'error',
+                message: "Erro interno na comunicação com o sistema de transferências.",
+            });
+        }
+    };
+
 
     const getStatusVariant = (status: TransferStatus | string): "warning" | "info" | "success" | "danger" | "neutral" => {
         switch (status) {
@@ -136,8 +173,6 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                             ? formatCurrency(prop.counterOfferFee)
                             : formatCurrency(prop.fee);
 
-                        const actionFee = prop.status === TransferStatus.NEGOTIATING ? prop.counterOfferFee : prop.fee;
-
                         return (
                             <tr key={prop.id} className="hover:bg-slate-800/50 transition-colors">
                                 <td className="p-4 font-medium text-slate-200">
@@ -164,19 +199,20 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                                 <td className="p-4 text-right">
                                     {(prop.status === TransferStatus.PENDING || prop.status === TransferStatus.NEGOTIATING) && (
                                         <button
-                                            onClick={() => logger.info(`Abrir modal de resposta para Prop. ${prop.id}. Valor: ${actionFee}`)}
+                                            // TODO: Implementar Modal de Resposta
+                                            onClick={() => logger.info(`Abrir modal de resposta para Prop. ${prop.id}`)}
                                             className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition-colors">
                                             {isIncoming ? 'Analisar' : 'Detalhes'}
                                         </button>
                                     )}
                                     {prop.status === TransferStatus.ACCEPTED && isIncoming && (
                                         <button
-                                            onClick={() => logger.info(`Finalizar Prop. ${prop.id}`)}
+                                            onClick={() => handleFinalizeTransfer(prop)}
                                             className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition-colors">
                                             Finalizar
                                         </button>
                                     )}
-                                    {(prop.status === TransferStatus.COMPLETED || prop.status === TransferStatus.REJECTED) && (
+                                    {(prop.status === TransferStatus.COMPLETED || prop.status === TransferStatus.REJECTED || prop.status === TransferStatus.WITHDRAWN) && (
                                         <span className="text-slate-600">-</span>
                                     )}
                                 </td>
@@ -275,6 +311,16 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                 <h2 className="text-3xl font-light text-white mb-1">Mercado de Transferências</h2>
                 <p className="text-slate-400 text-sm">Gerencie suas negociações de jogadores.</p>
             </header>
+
+            {/* Exibição da mensagem de feedback [NOVO] */}
+            {actionFeedback && (
+                <div
+                    className={`mb-6 p-4 rounded-lg border ${actionFeedback.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-red-500/10 border-red-500/50 text-red-400'}`}
+                    role="alert"
+                >
+                    {actionFeedback.message}
+                </div>
+            )}
 
             <div className="flex mb-6 border-b border-slate-800">
                 <button
