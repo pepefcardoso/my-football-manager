@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Logger } from "../../lib/Logger";
 import { formatCurrency } from "../../utils/formatters";
 import Badge from "../common/Badge";
@@ -47,18 +47,19 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
     const [marketLoading, setMarketLoading] = useState(false);
     const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
+    const fetchData = useCallback(async () => {
+        try {
+            await fetchProposals(teamId);
+            const state = await window.electronAPI.game.getGameState();
+            setGameState(state);
+        } catch (error) {
+            logger.error("Erro ao carregar dados:", error);
+        }
+    }, [teamId]);
+
     useEffect(() => {
-        const fetchContextData = async () => {
-            try {
-                const state = await window.electronAPI.game.getGameState();
-                setGameState(state);
-            } catch (error) {
-                logger.error("Erro ao carregar GameState:", error);
-            }
-        };
-        fetchProposals(teamId);
-        fetchContextData();
-    }, [fetchProposals, teamId]);
+        fetchData();
+    }, [fetchData]);
 
     useEffect(() => {
         if (activeTab !== "market") return;
