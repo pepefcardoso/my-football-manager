@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Logger } from "../../lib/Logger";
 import { formatCurrency } from "../../utils/formatters";
 import Badge from "../common/Badge";
 import type { TransferProposal, Team, Player, GameState } from "../../domain/models";
 import { TransferStatus } from "../../domain/enums";
 import { useGameStore } from "../../store/useGameStore";
+import { useTransferStore } from "../../store/useTransferStore";
 import { TransferProposalModal } from "../features/transfer/TransferProposalModal";
 
 const logger = new Logger("TransferMarketPage");
@@ -25,35 +26,23 @@ type TransferTab = "market" | "received" | "sent" | "history";
 function TransferMarketPage({ teamId }: { teamId: number }) {
     const userTeam = useGameStore((state) => state.userTeam);
 
+    const {
+        receivedProposals,
+        sentProposals,
+        loading,
+        fetchProposals,
+    } = useTransferStore((state) => ({
+        receivedProposals: state.receivedProposals as ProposalWithDetails[],
+        sentProposals: state.sentProposals as ProposalWithDetails[],
+        loading: state.loading,
+        fetchProposals: state.fetchProposals,
+    }));
+
     const [activeTab, setActiveTab] = useState<TransferTab>("received");
-    const [loading, setLoading] = useState(false);
-    const [receivedProposals, setReceivedProposals] = useState<ProposalWithDetails[]>([]);
-    const [sentProposals, setSentProposals] = useState<ProposalWithDetails[]>([]);
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [playerToPropose, setPlayerToPropose] = useState<PlayerWithContract | null>(null);
-
-    const fetchProposals = useCallback(async () => {
-        setLoading(true);
-        try {
-            const receivedData = await window.electronAPI.transfer.getReceivedProposals(teamId);
-            const sentData = await window.electronAPI.transfer.getSentProposals(teamId);
-
-            const sortProposals = (a: TransferProposal, b: TransferProposal) => {
-                if (a.status === TransferStatus.PENDING && b.status !== TransferStatus.PENDING) return -1;
-                if (a.status !== TransferStatus.PENDING && b.status === TransferStatus.PENDING) return 1;
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            };
-
-            setReceivedProposals(receivedData.sort(sortProposals));
-            setSentProposals(sentData.sort(sortProposals));
-            logger.info(`Propostas carregadas: ${receivedData.length} recebidas, ${sentData.length} enviadas.`);
-
-        } catch (error) {
-            logger.error("Erro ao carregar propostas de transferência:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [teamId]);
+    const [marketPlayers, setMarketPlayers] = useState<PlayerWithContract[]>([]);
+    const [marketLoading, setMarketLoading] = useState(false);
 
     useEffect(() => {
         const fetchContextData = async () => {
@@ -64,17 +53,27 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                 logger.error("Erro ao carregar GameState:", error);
             }
         };
+        fetchProposals(teamId);
         fetchContextData();
-        fetchProposals();
-    }, [fetchProposals]);
+    }, [fetchProposals, teamId]);
 
-    const mockMarketPlayers: PlayerWithContract[] = useMemo(() => {
-        if (!userTeam) return [];
-        return [
-            { id: 9001, firstName: "Agente", lastName: "Livre", age: 25, nationality: "BRA", position: "FW", preferredFoot: "right", overall: 85, potential: 90, finishing: 88, passing: 70, dribbling: 85, defending: 30, shooting: 85, physical: 80, pace: 85, moral: 90, energy: 100, fitness: 95, form: 80, isYouth: false, isInjured: false, injuryType: null, injuryDaysRemaining: 0, isCaptain: false, suspensionGamesRemaining: 0, teamId: null, salary: 0, contractEnd: null },
-            { id: 9002, firstName: "Rivaldo", lastName: "AI", age: 32, nationality: "BRA", position: "MF", preferredFoot: "left", overall: 78, potential: 78, finishing: 75, passing: 85, dribbling: 70, defending: 65, shooting: 70, physical: 75, pace: 70, moral: 70, energy: 80, fitness: 85, form: 70, isYouth: false, isInjured: false, injuryType: null, injuryDaysRemaining: 0, isCaptain: false, suspensionGamesRemaining: 0, teamId: 101, salary: 1000000, contractEnd: '2026-06-30' },
-        ];
-    }, [userTeam]);
+    useEffect(() => {
+        if (activeTab !== "market") return;
+
+        const fetchMarketData = async () => {
+            setMarketLoading(true);
+            try {
+                const freeAgents = await window.electronAPI.player.getFreeAgents();
+                setMarketPlayers(freeAgents as PlayerWithContract[]);
+            } catch (error) {
+                logger.error("Erro ao buscar agentes livres/mercado:", error);
+            } finally {
+                setMarketLoading(false);
+            }
+        };
+
+        fetchMarketData();
+    }, [activeTab]);
 
     const getStatusVariant = (status: TransferStatus | string): "warning" | "info" | "success" | "danger" | "neutral" => {
         switch (status) {
@@ -104,7 +103,6 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
             default: return status;
         }
     };
-
 
     const renderProposalsTable = (proposals: ProposalWithDetails[], isIncoming: boolean) => {
         if (proposals.length === 0) {
@@ -191,12 +189,16 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
     }
 
     const renderTabContent = () => {
-        if (loading) {
-            return (
-                <div className="flex justify-center p-10">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                </div>
-            );
+        const anyLoading = loading || marketLoading;
+
+        if (anyLoading && activeTab !== "market") {
+            if (loading) {
+                return (
+                    <div className="flex justify-center p-10">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                    </div>
+                );
+            }
         }
 
         switch (activeTab) {
@@ -204,26 +206,38 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                 return (
                     <div className="p-8 bg-slate-900/50 rounded-lg border border-slate-800">
                         <h4 className="text-xl font-semibold mb-4">Procurar Jogadores no Mercado</h4>
-                        <p className="text-slate-400 mb-6">Alvos potenciais (mock data):</p>
-                        <div className="mt-4 space-y-4">
-                            {mockMarketPlayers.map((player) => (
-                                <div key={player.id} className="p-4 bg-slate-900 border border-slate-800 rounded-lg flex justify-between items-center">
-                                    <div>
-                                        <p className="font-semibold text-white">{player.lastName}, {player.firstName}</p>
-                                        <p className="text-xs text-slate-400">OVR: {player.overall} | Pos: {player.position} | Time: {player.teamId === null ? "Livre" : "Time AI"}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setPlayerToPropose(player)}
-                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-sm font-bold transition-colors"
-                                    >
-                                        Fazer Proposta
-                                    </button>
+
+                        {marketLoading ? (
+                            <div className="flex justify-center p-10">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                            </div>
+                        ) : (
+                            <>
+                                <p className="text-slate-400 mb-6">Agentes Livres e Alvos Potenciais:</p>
+                                <div className="mt-4 space-y-4">
+                                    {marketPlayers.map((player) => (
+                                        <div key={player.id} className="p-4 bg-slate-900 border border-slate-800 rounded-lg flex justify-between items-center">
+                                            <div>
+                                                <p className="font-semibold text-white">{player.lastName}, {player.firstName}</p>
+                                                <p className="text-xs text-slate-400">OVR: {player.overall} | Pos: {player.position} | Time: {player.teamId === null ? "Livre" : "Time AI"}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setPlayerToPropose(player)}
+                                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-sm font-bold transition-colors"
+                                            >
+                                                Fazer Proposta
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                        <div className="text-center p-8 text-slate-500 italic">
-                            Use a aba "Scouting" para descobrir novos talentos antes de procurá-los aqui.
-                        </div>
+                                {marketPlayers.length === 0 && (
+                                    <div className="text-center p-8 text-slate-500 italic">
+                                        Nenhum agente livre encontrado.
+                                    </div>
+                                )}
+                            </>
+                        )}
+
                     </div>
                 );
             case "received":
@@ -312,7 +326,7 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                     onClose={() => setPlayerToPropose(null)}
                     onProposalSent={() => {
                         setPlayerToPropose(null);
-                        fetchProposals();
+                        fetchProposals(teamId);
                     }}
                 />
             )}

@@ -153,6 +153,57 @@ async function main() {
     .set({ isHuman: true })
     .where(eq(teams.id, humanTeam.id));
 
+  const freeAgentData = [
+    {
+      firstName: "Veterano",
+      lastName: "Livre",
+      age: 34,
+      nationality: "ARG",
+      position: Position.MF,
+      overall: 82,
+      potential: 82,
+      isYouth: false,
+    },
+    {
+      firstName: "Jovem",
+      lastName: "Mercado",
+      age: 20,
+      nationality: "POR",
+      position: Position.FW,
+      overall: 70,
+      potential: 90,
+      isYouth: true,
+    },
+  ];
+
+  logger.info("🆓 Adicionando Agentes Livres ao Mercado...");
+
+  for (const fa of freeAgentData) {
+    const attrs = generateAttributesFromOverall(fa.position, fa.overall);
+
+    await db.insert(players).values({
+      teamId: null,
+      firstName: fa.firstName,
+      lastName: fa.lastName,
+      age: fa.age,
+      nationality: fa.nationality,
+      position: fa.position,
+      preferredFoot: Math.random() > 0.5 ? "right" : "left",
+      overall: fa.overall,
+      potential: fa.potential,
+      ...attrs,
+      moral: randomInt(80, 100),
+      energy: 100,
+      fitness: 95,
+      form: randomInt(60, 80),
+      isYouth: fa.isYouth,
+      isInjured: false,
+      injuryDaysRemaining: 0,
+      isCaptain: false,
+      suspensionGamesRemaining: 0,
+    });
+  }
+
   let playerToSellId: number | undefined;
   let playerToBuyId: number | undefined;
   let playerForHistoryId: number | undefined;
