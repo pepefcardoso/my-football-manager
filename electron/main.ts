@@ -13,6 +13,7 @@ import { serviceContainer } from "../src/services/ServiceContainer";
 import { FinanceService } from "../src/services/FinanceService";
 import { Result } from "../src/services/types/ServiceResults";
 import { TrainingFocus } from "../src/domain/enums";
+import { GameEventType } from "../src/services/events/GameEventTypes";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = new Logger("electron-main");
@@ -26,6 +27,74 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
+
+function setupTransferNotifications(win: BrowserWindow) {
+  const getPlayerTeamId = async () => {
+    const currentState = await db.select().from(gameState).limit(1);
+    return currentState[0]?.playerTeamId;
+  };
+
+  const logger = new Logger("TransferNotificationIPC");
+
+  serviceContainer.eventBus.subscribe(
+    GameEventType.PROPOSAL_RECEIVED,
+    async (payload) => {
+      const playerTeamId = await getPlayerTeamId();
+      if (payload.toTeamId === playerTeamId) {
+        const player = await serviceContainer.player.getPlayerWithContract(
+          payload.playerId
+        );
+        const playerLastName =
+          Result.isSuccess(player) && player.data
+            ? player.data.lastName
+            : `Jogador #${payload.playerId}`;
+
+        logger.info(
+          `Notificando UI: Nova proposta recebida por ${playerLastName}`
+        );
+
+        win.webContents.send("transfer:notification", {
+          type: "PROPOSAL_RECEIVED",
+          message: `Nova Proposta Recebida por ${playerLastName}!`,
+          details: payload,
+        });
+      }
+    }
+  );
+
+  serviceContainer.eventBus.subscribe(
+    GameEventType.TRANSFER_COMPLETED,
+    async (payload) => {
+      const playerTeamId = await getPlayerTeamId();
+
+      if (
+        payload.toTeamId === playerTeamId ||
+        payload.fromTeamId === playerTeamId
+      ) {
+        const player = await serviceContainer.player.getPlayerWithContract(
+          payload.playerId
+        );
+        const playerLastName =
+          Result.isSuccess(player) && player.data
+            ? player.data.lastName
+            : `Jogador #${payload.playerId}`;
+
+        const action =
+          payload.toTeamId === playerTeamId ? "COMPRADO" : "VENDIDO";
+
+        logger.info(
+          `Notificando UI: Transferência concluída: ${playerLastName} (${action})`
+        );
+
+        win.webContents.send("transfer:notification", {
+          type: "TRANSFER_COMPLETED",
+          message: `TRANSFERÊNCIA FINALIZADA: ${playerLastName} (${action})`,
+          details: payload,
+        });
+      }
+    }
+  );
+}
 
 function registerIpcHandlers() {
   ipcMain.handle("team:getTeams", async () => {
@@ -1052,4 +1121,8 @@ app.on("activate", () => {
 app.whenReady().then(() => {
   registerIpcHandlers();
   createWindow();
+
+  if (win) {
+    setupTransferNotifications(win);
+  }
 });

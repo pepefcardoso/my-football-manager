@@ -46,6 +46,12 @@ interface MatchSimulationResult {
   newEvents: MatchEventData[];
 }
 
+interface TransferNotificationPayload {
+  type: "PROPOSAL_RECEIVED" | "TRANSFER_COMPLETED";
+  message: string;
+  details: any;
+}
+
 declare global {
   interface Window {
     electronAPI: {
@@ -198,6 +204,9 @@ declare global {
           proposalId: number
         ) => Promise<{ success: boolean; message: string }>;
         getTransferWindowStatus: (date: string) => Promise<string>;
+        onNotification: (
+          callback: (data: TransferNotificationPayload) => void
+        ) => void;
       };
 
       marketing: {

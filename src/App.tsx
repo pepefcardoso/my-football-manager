@@ -16,6 +16,7 @@ import { Logger } from "./lib/Logger";
 import ScoutingPage from "./components/pages/ScoutingPage";
 import StandingsPage from "./components/pages/StandingsPage";
 import TransferMarketPage from "./components/pages/TransferMarketPage";
+import { TransferNotification } from "./components/common/TransferNotification";
 
 const logger = new Logger("App");
 
@@ -75,37 +76,40 @@ function App() {
 
   if (view === 'game_loop' && userTeam) {
     return (
-      <MainLayout
-        sidebar={
-          <Sidebar
-            activePage={activePage}
-            onNavigate={navigateInGame}
-            team={userTeam}
-          />
-        }
-      >
-        {activePage === "menu" && (
-          <div className="p-8">
-            <h2 className="text-2xl text-white mb-4">Opções do Jogo</h2>
-            <button onClick={resetGame} className="px-4 py-2 bg-red-600 rounded text-white">
-              Sair para o Menu Principal
-            </button>
-          </div>
-        )}
+      <>
+        <MainLayout
+          sidebar={
+            <Sidebar
+              activePage={activePage}
+              onNavigate={navigateInGame}
+              team={userTeam}
+            />
+          }
+        >
+          {activePage === "menu" && (
+            <div className="p-8">
+              <h2 className="text-2xl text-white mb-4">Opções do Jogo</h2>
+              <button onClick={resetGame} className="px-4 py-2 bg-red-600 rounded text-white">
+                Sair para o Menu Principal
+              </button>
+            </div>
+          )}
 
-        {activePage === "club" && <ClubOverviewPage team={userTeam} />}
-        {activePage === "squad" && <SquadPage teamId={userTeam.id} />}
-        {activePage === "staff" && <StaffPage teamId={userTeam.id} />}
-        {activePage === "matches" && <MatchesPage teamId={userTeam.id} teams={teams} />}
+          {activePage === "club" && <ClubOverviewPage team={userTeam} />}
+          {activePage === "squad" && <SquadPage teamId={userTeam.id} />}
+          {activePage === "staff" && <StaffPage teamId={userTeam.id} />}
+          {activePage === "matches" && <MatchesPage teamId={userTeam.id} teams={teams} />}
 
-        {activePage === "youth" && <PlaceholderPage title="Categorias de Base" />}
-        {activePage === "scouting" && <ScoutingPage teamId={userTeam.id} />}
-        {activePage === "transfer" && <TransferMarketPage teamId={userTeam.id} />}
-        {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}
-        {activePage === "infrastructure" && <InfrastructurePage teamId={userTeam.id} />}
-        {activePage === "calendar" && <PlaceholderPage title="Calendário" />}
-        {activePage === "competitions" && <StandingsPage />}
-      </MainLayout>
+          {activePage === "youth" && <PlaceholderPage title="Categorias de Base" />}
+          {activePage === "scouting" && <ScoutingPage teamId={userTeam.id} />}
+          {activePage === "transfer" && <TransferMarketPage teamId={userTeam.id} />}
+          {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}
+          {activePage === "infrastructure" && <InfrastructurePage teamId={userTeam.id} />}
+          {activePage === "calendar" && <PlaceholderPage title="Calendário" />}
+          {activePage === "competitions" && <StandingsPage />}
+        </MainLayout>
+        <TransferNotification />
+      </>
     );
   }
 
