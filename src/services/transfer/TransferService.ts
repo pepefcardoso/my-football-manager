@@ -319,4 +319,30 @@ export class TransferService extends BaseService {
       });
     });
   }
+
+  /**
+   * Busca todas as propostas de transferência recebidas por um time.
+   * Inclui os dados do jogador e do time proponente (fromTeam).
+   */
+  async getReceivedProposals(teamId: number): Promise<ServiceResult<any[]>> {
+    return this.execute("getReceivedProposals", teamId, async (teamId) => {
+      const proposals = await this.repos.transferProposals.findReceivedByTeam(
+        teamId
+      );
+      return proposals;
+    });
+  }
+
+  /**
+   * Busca todas as propostas de transferência enviadas por um time.
+   * Inclui os dados do jogador e do time alvo (toTeam).
+   */
+  async getSentProposals(teamId: number): Promise<ServiceResult<any[]>> {
+    return this.execute("getSentProposals", teamId, async (teamId) => {
+      const proposals = await this.repos.transferProposals.findSentByTeam(
+        teamId
+      );
+      return proposals;
+    });
+  }
 }

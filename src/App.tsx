@@ -15,6 +15,7 @@ import InfrastructurePage from "./components/pages/InfrastructurePage";
 import { Logger } from "./lib/Logger";
 import ScoutingPage from "./components/pages/ScoutingPage";
 import StandingsPage from "./components/pages/StandingsPage";
+import TransferMarketPage from "./components/pages/TransferMarketPage";
 
 const logger = new Logger("App");
 
@@ -99,6 +100,7 @@ function App() {
 
         {activePage === "youth" && <PlaceholderPage title="Categorias de Base" />}
         {activePage === "scouting" && <ScoutingPage teamId={userTeam.id} />}
+        {activePage === "transfer" && <TransferMarketPage teamId={userTeam.id} />}
         {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}
         {activePage === "infrastructure" && <InfrastructurePage teamId={userTeam.id} />}
         {activePage === "calendar" && <PlaceholderPage title="Calendário" />}

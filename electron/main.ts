@@ -582,6 +582,28 @@ function registerIpcHandlers() {
   ipcMain.handle("getStandings", async (_, competitionId, seasonId) => {
     return await competitionRepository.getStandings(competitionId, seasonId);
   });
+
+  ipcMain.handle("transfer:getReceivedProposals", async (event, teamId) => {
+    const result = await serviceContainer.transfer.getReceivedProposals(teamId);
+
+    if (Result.isSuccess(result)) {
+      return result.data;
+    }
+
+    console.error("Erro no IPC de getReceivedProposals:", result.error.message);
+    return [];
+  });
+
+  ipcMain.handle("transfer:getSentProposals", async (event, teamId) => {
+    const result = await serviceContainer.transfer.getSentProposals(teamId);
+
+    if (Result.isSuccess(result)) {
+      return result.data;
+    }
+
+    console.error("Erro no IPC de getSentProposals:", result.error.message);
+    return [];
+  });
 }
 
 let win: BrowserWindow | null;

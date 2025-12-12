@@ -81,6 +81,13 @@ function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
                             Scouting
                         </NavButton>
                         <NavButton
+                            active={activePage === "transfer"}
+                            onClick={() => onNavigate("transfer")}
+                            icon="🔄"
+                        >
+                            Transferências
+                        </NavButton>
+                        <NavButton
                             active={activePage === "finances"}
                             onClick={() => onNavigate("finances")}
                             icon="💰"

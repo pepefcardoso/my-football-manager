@@ -14,6 +14,7 @@ import {
   transfers,
   competitionStandings,
   playerCompetitionStats,
+  transferProposals,
 } from "./schema";
 import { Logger } from "../lib/Logger";
 import { TEAMS_DATA } from "./seeds/data";
@@ -25,7 +26,12 @@ import {
 import { quickSimulateMatch } from "./seeds/match-simulator";
 import { CompetitionScheduler } from "../services/CompetitionScheduler";
 import { eq } from "drizzle-orm";
-import { Position, StaffRole, FinancialCategory } from "../domain/enums";
+import {
+  Position,
+  StaffRole,
+  FinancialCategory,
+  TransferStatus,
+} from "../domain/enums";
 
 const logger = new Logger("Seed");
 
@@ -85,7 +91,7 @@ async function main() {
     "🌱 Iniciando Seed Completo do Banco de Dados (Brasileirão 2025)..."
   );
 
-  logger.info("🗑️  Limpando dados antigos...");
+  logger.info("🗑️  Limpando dados antigos...");
   await db.delete(matchEvents);
   await db.delete(scoutingReports);
   await db.delete(transfers);
@@ -95,6 +101,7 @@ async function main() {
   await db.delete(financialRecords);
   await db.delete(gameState);
   await db.delete(matches);
+  await db.delete(transferProposals);
   await db.delete(players);
   await db.delete(staff);
   await db.delete(competitions);
@@ -112,7 +119,7 @@ async function main() {
     })
     .returning();
 
-  logger.info("🛡️  Criando Times...");
+  logger.info("🛡️  Criando Times...");
   const insertedTeamsMap = new Map<string, typeof teams.$inferSelect>();
 
   for (const t of TEAMS_DATA) {
@@ -140,11 +147,20 @@ async function main() {
 
   const insertedTeams = Array.from(insertedTeamsMap.values());
 
-  const humanTeam = insertedTeams[0];
+  const humanTeam = insertedTeamsMap.get("Botafogo")!;
   await db
     .update(teams)
     .set({ isHuman: true })
     .where(eq(teams.id, humanTeam.id));
+
+  let playerToSellId: number | undefined;
+  let playerToBuyId: number | undefined;
+  let playerForHistoryId: number | undefined;
+
+  const teamProponentId = insertedTeamsMap.get("Flamengo")!.id;
+  const teamTargetId = insertedTeamsMap.get("São Paulo")!.id;
+  const teamHistoryFromId = insertedTeamsMap.get("Palmeiras")!.id;
+  const teamHistoryToId = insertedTeamsMap.get("Corinthians")!.id;
 
   logger.info("🏃 Criando Elencos e Staff...");
   let totalPlayers = 0;
@@ -204,6 +220,20 @@ async function main() {
           type: "professional",
           status: "active",
         });
+
+        if (dbTeam.isHuman && realPlayer.lastName === "Henrique") {
+          playerToSellId = newPlayer.id;
+        } else if (
+          teamData.name === "São Paulo" &&
+          realPlayer.lastName === "Calleri"
+        ) {
+          playerToBuyId = newPlayer.id;
+        } else if (
+          teamData.name === "Palmeiras" &&
+          realPlayer.lastName === "Veiga"
+        ) {
+          playerForHistoryId = newPlayer.id;
+        }
 
         if (requiredPositions[realPlayer.position as Position] > 0) {
           requiredPositions[realPlayer.position as Position]--;
@@ -521,6 +551,51 @@ async function main() {
     points: 0,
   }));
   await db.insert(competitionStandings).values(zeroStandings);
+
+  logger.info("💰 Gerando Propostas de Transferência Iniciais e Histórico...");
+
+  if (playerToSellId && teamProponentId) {
+    await db.insert(transferProposals).values({
+      playerId: playerToSellId,
+      fromTeamId: teamProponentId,
+      toTeamId: humanTeam.id,
+      type: "transfer",
+      status: TransferStatus.PENDING,
+      fee: 35000000,
+      wageOffer: 500000,
+      contractLength: 4,
+      createdAt: "2025-01-14",
+      responseDeadline: "2025-01-18",
+    });
+  }
+
+  if (playerToBuyId && teamTargetId) {
+    await db.insert(transferProposals).values({
+      playerId: playerToBuyId,
+      fromTeamId: humanTeam.id,
+      toTeamId: teamTargetId,
+      type: "transfer",
+      status: TransferStatus.NEGOTIATING,
+      fee: 10000000,
+      wageOffer: 250000,
+      contractLength: 5,
+      createdAt: "2025-01-12",
+      responseDeadline: "2025-01-16",
+      counterOfferFee: 18000000,
+    });
+  }
+
+  if (playerForHistoryId && teamHistoryFromId && teamHistoryToId) {
+    await db.insert(transfers).values({
+      playerId: playerForHistoryId,
+      fromTeamId: teamHistoryFromId,
+      toTeamId: teamHistoryToId,
+      fee: 12500000,
+      date: "2024-07-01",
+      seasonId: season2024.id,
+      type: "transfer",
+    });
+  }
 
   logger.info("💾 Salvando Estado Inicial...");
   await db.insert(gameState).values({

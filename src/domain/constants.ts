@@ -9,4 +9,5 @@ export type MenuOption =
   | "infrastructure"
   | "matches"
   | "competitions"
-  | "calendar";
+  | "calendar"
+  | "transfer";
