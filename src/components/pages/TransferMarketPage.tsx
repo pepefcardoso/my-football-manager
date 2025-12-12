@@ -5,7 +5,7 @@ import Badge from "../common/Badge";
 import type { TransferProposal, Team, Player, GameState } from "../../domain/models";
 import { TransferStatus } from "../../domain/enums";
 import { useGameStore } from "../../store/useGameStore";
-import { useTransferStore } from "../../store/useTransferStore"; //
+import { useTransferStore } from "../../store/useTransferStore";
 import { TransferProposalModal } from "../features/transfer/TransferProposalModal";
 
 const logger = new Logger("TransferMarketPage");
@@ -26,19 +26,10 @@ type TransferTab = "market" | "received" | "sent" | "history";
 function TransferMarketPage({ teamId }: { teamId: number }) {
     const userTeam = useGameStore((state) => state.userTeam);
 
-    const {
-        receivedProposals,
-        sentProposals,
-        loading,
-        updateProposalState,
-    } = useTransferStore((state) => ({
-        receivedProposals: state.receivedProposals as ProposalWithDetails[],
-        sentProposals: state.sentProposals as ProposalWithDetails[],
-        loading: state.loading,
-        updateProposalState: state.updateProposalState,
-    }));
-
-    const fetchProposals = useTransferStore((state) => state.fetchProposals);
+    const receivedProposals = useTransferStore((s) => s.receivedProposals as ProposalWithDetails[]);
+    const sentProposals = useTransferStore((s) => s.sentProposals as ProposalWithDetails[]);
+    const loading = useTransferStore((s) => s.loading);
+    const updateProposalState = useTransferStore((s) => s.updateProposalState);
 
     const [activeTab, setActiveTab] = useState<TransferTab>("received");
     const [gameState, setGameState] = useState<GameState | null>(null);
@@ -49,6 +40,7 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
 
     const fetchData = useCallback(async () => {
         try {
+            const fetchProposals = useTransferStore.getState().fetchProposals;
             await fetchProposals(teamId);
             const state = await window.electronAPI.game.getGameState();
             setGameState(state);
@@ -94,7 +86,8 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                     type: 'success',
                     message: `✅ Transferência de ${proposal.player.lastName} concluída!`,
                 });
-                fetchProposals(teamId);
+                const fetchProposals = useTransferStore.getState().fetchProposals;
+                await fetchProposals(teamId);
             } else {
                 setActionFeedback({
                     type: 'error',
@@ -111,7 +104,6 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
             });
         }
     };
-
 
     const getStatusVariant = (status: TransferStatus | string): "warning" | "info" | "success" | "danger" | "neutral" => {
         switch (status) {
@@ -373,7 +365,7 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                     onClose={() => setPlayerToPropose(null)}
                     onProposalSent={() => {
                         setPlayerToPropose(null);
-                        fetchProposals(teamId);
+                        void useTransferStore.getState().fetchProposals(teamId);
                     }}
                 />
             )}
