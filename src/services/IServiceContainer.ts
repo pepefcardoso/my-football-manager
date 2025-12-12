@@ -24,6 +24,7 @@ import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 import type { TransferWindowManager } from "./transfer/TransferWindowManager";
 import type { TransferService } from "./transfer/TransferService";
 import type { SquadAnalysisService } from "./ai/SquadAnalysisService";
+import type { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
 
 export interface IServiceContainer {
   unitOfWork: IUnitOfWork;
@@ -52,4 +53,5 @@ export interface IServiceContainer {
   transferWindow: TransferWindowManager;
   transfer: TransferService;
   squadAnalysis: SquadAnalysisService;
+  aiTransferDecisionMaker: AITransferDecisionMaker;
 }
