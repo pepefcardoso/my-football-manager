@@ -143,7 +143,7 @@ export interface Match {
   attendance: number | null;
   ticketRevenue: number | null;
   weather: WeatherCondition | string | null;
-  groupName?: string | null; // Adicionado para compatibilidade e uso em fases de grupo
+  groupName?: string | null;
 }
 
 export interface MatchEvent {

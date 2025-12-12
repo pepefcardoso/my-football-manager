@@ -70,10 +70,10 @@ export const clubInterests = sqliteTable(
       .references(() => players.id)
       .notNull(),
 
-    interestLevel: text("interest_level").default("observing").notNull(), // Enum: InterestLevel
-    priority: integer("priority").default(0).notNull(), // 0-100 para ordenação de IA
+    interestLevel: text("interest_level").default("observing").notNull(),
+    priority: integer("priority").default(0).notNull(),
 
-    maxFeeWillingToPay: real("max_fee_willing_to_pay"), // Limite interno da IA
+    maxFeeWillingToPay: real("max_fee_willing_to_pay"),
     dateAdded: text("date_added").notNull(),
   },
   (table) => ({

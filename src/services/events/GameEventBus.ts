@@ -4,8 +4,8 @@ import {
   type MatchFinishedPayload,
   type ContractExpiredPayload,
   type FinancialCrisisPayload,
-  type TransferCompletedPayload, // Importar novo
-  type ProposalReceivedPayload, // Importar novo
+  type TransferCompletedPayload,
+  type ProposalReceivedPayload,
 } from "./GameEventTypes";
 
 type EventHandler<T> = (payload: T) => Promise<void> | void;
