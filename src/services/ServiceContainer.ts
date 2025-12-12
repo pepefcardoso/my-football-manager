@@ -33,6 +33,7 @@ import { MatchResultProcessor } from "./match/MatchResultProcessor";
 import { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
 import { TransferWindowManager } from "./transfer/TransferWindowManager";
 import { TransferService } from "./transfer/TransferService";
+import { SquadAnalysisService } from "./ai/SquadAnalysisService";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: UnitOfWork;
@@ -61,6 +62,7 @@ export class ServiceContainer implements IServiceContainer {
   public readonly stats: StatsService;
   public readonly transferWindow: TransferWindowManager;
   public readonly transfer: TransferService;
+  public readonly squadAnalysis: SquadAnalysisService;
 
   constructor(repos: IRepositoryContainer) {
     this.unitOfWork = new UnitOfWork();
@@ -94,6 +96,7 @@ export class ServiceContainer implements IServiceContainer {
     );
     this.transferWindow = new TransferWindowManager(repos);
     this.transfer = new TransferService(repos, this.unitOfWork, this.eventBus);
+    this.squadAnalysis = new SquadAnalysisService(repos);
     this.setupSubscriptions();
   }
 
