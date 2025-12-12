@@ -29,5 +29,5 @@ coverage/
 *.sln
 *.sw?
 
-docs
+docs/SERVICES_MAP.md
 dependency-graph.html*

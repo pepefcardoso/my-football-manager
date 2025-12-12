@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { TransferService } from "../src/services/transfer/TransferService";
 import {
   TransferStatus,
@@ -15,6 +15,23 @@ import { SquadAnalysisService } from "../src/services/ai/SquadAnalysisService";
 import { TransferWindowManager } from "../src/services/transfer/TransferWindowManager";
 import { FinancialHealthChecker } from "../src/services/finance/FinancialHealthChecker";
 import { Result } from "../src/services/types/ServiceResults";
+
+vi.mock("../src/lib/db", () => {
+  const mockTransaction = <T>(callback: (tx: any) => T): T => {
+    const mockTx = {
+      rollback: vi.fn(),
+    };
+    return callback(mockTx);
+  };
+
+  return {
+    db: {
+      transaction: vi.fn().mockImplementation(mockTransaction),
+    },
+    DbInstance: {} as any,
+    DbTransaction: {} as any,
+  };
+});
 
 const mockRepos = createRepositoryContainer();
 const mockUnitOfWork = new UnitOfWork(vi.fn() as any);
@@ -43,9 +60,35 @@ describe("Transferência de Ponta a Ponta (Integração de Serviços)", () => {
   const BUYING_TEAM_ID = 1;
   const SELLING_TEAM_ID = 99;
   const PLAYER_ID = 1001;
+  const ACCEPT_FEE = 2000000;
+
+  const getBaseProposal = async (id: number, status: TransferStatus) => {
+    if (id === 123) {
+      return {
+        id: 123,
+        playerId: PLAYER_ID,
+        fromTeamId: SELLING_TEAM_ID,
+        toTeamId: BUYING_TEAM_ID,
+        type: TransferType.TRANSFER,
+        status: status,
+        fee: ACCEPT_FEE,
+        wageOffer: 100000,
+        contractLength: 4,
+        createdAt: "2025-07-01",
+        responseDeadline: "2025-07-04",
+        counterOfferFee: null,
+        player: await mockRepos.players.findById(PLAYER_ID),
+        fromTeam: await mockRepos.teams.findById(SELLING_TEAM_ID),
+        toTeam: await mockRepos.teams.findById(BUYING_TEAM_ID),
+      };
+    }
+    return undefined;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    vi.spyOn(mockEventBus, "publish").mockClear();
 
     mockRepos.teams.findById = vi.fn().mockImplementation(async (id) => {
       if (id === BUYING_TEAM_ID) {
@@ -94,35 +137,41 @@ describe("Transferência de Ponta a Ponta (Integração de Serviços)", () => {
       contractEnd: "2027-12-31",
     });
 
-    mockRepos.transferProposals.create = vi.fn().mockResolvedValue(123);
-    mockRepos.transferProposals.findById = vi
+    mockRepos.transfers.findByPlayerId = vi.fn().mockResolvedValue([]);
+    mockRepos.players.findByTeamId = vi.fn().mockResolvedValue([]);
+
+    mockRepos.transferProposals.findActiveProposal = vi
       .fn()
-      .mockImplementation(async (id) => {
-        if (id === 123) {
-          return {
-            id: 123,
-            playerId: PLAYER_ID,
-            fromTeamId: SELLING_TEAM_ID,
-            toTeamId: BUYING_TEAM_ID,
-            type: TransferType.TRANSFER,
-            status: TransferStatus.PENDING,
-            fee: 1000000,
-            wageOffer: 100000,
-            contractLength: 4,
-            createdAt: "2025-07-01",
-            responseDeadline: "2025-07-04",
-            counterOfferFee: null,
-          };
-        }
-        return undefined;
+      .mockResolvedValue(undefined);
+
+    mockRepos.transferProposals.create = vi.fn().mockResolvedValue(123);
+
+    const findByIdMock = vi.fn() as Mock;
+
+    findByIdMock
+      .mockImplementationOnce(async (id: number) => {
+        return getBaseProposal(id, TransferStatus.PENDING);
+      })
+      .mockImplementationOnce(async (id: number) => {
+        return getBaseProposal(id, TransferStatus.PENDING);
+      })
+      .mockImplementationOnce(async (id: number) => {
+        return getBaseProposal(id, TransferStatus.ACCEPTED);
+      })
+      .mockImplementation(async (id: number) => {
+        return getBaseProposal(id, TransferStatus.COMPLETED);
       });
-    mockRepos.transferProposals.update = vi.fn().mockResolvedValue(undefined);
+
+    mockRepos.transferProposals.findById = findByIdMock;
+
+    mockRepos.teams.updateBudget = vi.fn().mockResolvedValue(undefined);
+    mockRepos.financial.addRecord = vi.fn().mockResolvedValue(undefined);
+    mockRepos.players.update = vi.fn().mockResolvedValue(undefined);
     mockRepos.transfers.create = vi.fn().mockResolvedValue(undefined);
+    mockRepos.transferProposals.update = vi.fn().mockResolvedValue(undefined);
     mockRepos.seasons.findActiveSeason = vi
       .fn()
       .mockResolvedValue({ id: 1, year: 2025 });
-    mockRepos.financial.addRecord = vi.fn().mockResolvedValue(undefined);
-    mockRepos.players.update = vi.fn().mockResolvedValue(undefined);
 
     mockUnitOfWork.execute = vi.fn().mockImplementation(async (work) => {
       return work(mockRepos);
@@ -132,13 +181,12 @@ describe("Transferência de Ponta a Ponta (Integração de Serviços)", () => {
   });
 
   it("deve executar o fluxo de transferência completo (Proposta -> Aceite -> Finalização)", async () => {
-    const initialOfferFee = 1000000;
     const offerInput = {
       playerId: PLAYER_ID,
       fromTeamId: SELLING_TEAM_ID,
       toTeamId: BUYING_TEAM_ID,
       type: TransferType.TRANSFER,
-      fee: initialOfferFee,
+      fee: ACCEPT_FEE,
       wageOffer: 100000,
       contractLength: 4,
       currentDate: "2025-07-01",
@@ -151,51 +199,17 @@ describe("Transferência de Ponta a Ponta (Integração de Serviços)", () => {
     expect(Result.isSuccess(proposalResult)).toBe(true);
     const proposalId = Result.unwrap(proposalResult);
 
-    mockRepos.transferProposals.findById = vi
-      .fn()
-      .mockImplementation(async (id) => {
-        if (id === proposalId) {
-          return {
-            id: proposalId,
-            playerId: PLAYER_ID,
-            fromTeamId: SELLING_TEAM_ID,
-            toTeamId: BUYING_TEAM_ID,
-            type: TransferType.TRANSFER,
-            status: TransferStatus.PENDING,
-            fee: initialOfferFee,
-            wageOffer: 100000,
-            contractLength: 4,
-            createdAt: "2025-07-01",
-            responseDeadline: "2025-07-04",
-            counterOfferFee: null,
-            player: await mockRepos.players.findById(PLAYER_ID),
-            fromTeam: await mockRepos.teams.findById(SELLING_TEAM_ID),
-            toTeam: await mockRepos.teams.findById(BUYING_TEAM_ID),
-          };
-        }
-        return undefined;
-      });
-
-    vi.spyOn(transferService, "respondToProposal").mockImplementation(
-      async (input) => {
-        if (input.response === "accept") {
-          await mockRepos.transferProposals.update(input.proposalId, {
-            status: TransferStatus.ACCEPTED,
-          });
-          return Result.ok("Aceite pela AI");
-        }
-        return Result.businessRule("Não implementado para este teste");
-      }
-    );
-
     const aiEvaluation = await aiDecisionMaker.evaluateIncomingProposal(
       proposalId,
       "2025-07-02"
     );
     expect(Result.isSuccess(aiEvaluation)).toBe(true);
+
+    expect(Result.unwrap(aiEvaluation).decision).toBe("accept");
+
     expect(mockRepos.transferProposals.update).toHaveBeenCalledWith(
       proposalId,
-      { status: TransferStatus.ACCEPTED }
+      expect.objectContaining({ status: TransferStatus.ACCEPTED })
     );
 
     const finalizeResult = await transferService.finalizeTransfer(proposalId);
@@ -205,11 +219,11 @@ describe("Transferência de Ponta a Ponta (Integração de Serviços)", () => {
 
     expect(mockRepos.teams.updateBudget).toHaveBeenCalledWith(
       BUYING_TEAM_ID,
-      10000000 - initialOfferFee
+      10000000 - ACCEPT_FEE
     );
     expect(mockRepos.teams.updateBudget).toHaveBeenCalledWith(
       SELLING_TEAM_ID,
-      5000000 + initialOfferFee
+      5000000 + ACCEPT_FEE
     );
 
     expect(mockRepos.financial.addRecord).toHaveBeenCalledWith(
@@ -217,7 +231,7 @@ describe("Transferência de Ponta a Ponta (Integração de Serviços)", () => {
         teamId: BUYING_TEAM_ID,
         type: "expense",
         category: FinancialCategory.TRANSFER_OUT,
-        amount: initialOfferFee,
+        amount: ACCEPT_FEE,
       })
     );
     expect(mockRepos.financial.addRecord).toHaveBeenCalledWith(
@@ -225,7 +239,7 @@ describe("Transferência de Ponta a Ponta (Integração de Serviços)", () => {
         teamId: SELLING_TEAM_ID,
         type: "income",
         category: FinancialCategory.TRANSFER_IN,
-        amount: initialOfferFee,
+        amount: ACCEPT_FEE,
       })
     );
 
@@ -245,7 +259,7 @@ describe("Transferência de Ponta a Ponta (Integração de Serviços)", () => {
 
     expect(mockEventBus.publish).toHaveBeenCalledWith(
       "TRANSFER_COMPLETED",
-      expect.objectContaining({ playerId: PLAYER_ID, fee: initialOfferFee })
+      expect.objectContaining({ playerId: PLAYER_ID, fee: ACCEPT_FEE })
     );
   });
 });

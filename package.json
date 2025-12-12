@@ -14,7 +14,8 @@
     "deps:services": "tsx scripts/generate-service-map.ts",
     "db:push": "npm rebuild better-sqlite3 && drizzle-kit push && npm run rebuild",
     "db:seed": "npm rebuild better-sqlite3 && tsx src/db/seed.ts && npm run rebuild",
-    "rebuild": "electron-rebuild -f -w better-sqlite3"
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "test": "vitest"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
