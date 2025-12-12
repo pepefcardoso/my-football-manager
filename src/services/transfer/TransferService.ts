@@ -11,8 +11,11 @@ import {
   TransferType,
   FinancialCategory,
 } from "../../domain/enums";
-import { FinancialOperationValidator } from "../validators/FinancialOperationValidator";
 import { getBalanceValue } from "../../engine/GameBalanceConfig";
+import {
+  TransferValidator,
+  type TransferValidationContext,
+} from "./validators/TransferValidator";
 
 export interface CreateProposalInput {
   playerId: number;
@@ -23,6 +26,7 @@ export interface CreateProposalInput {
   wageOffer: number;
   contractLength: number;
   currentDate: string;
+  seasonId: number;
 }
 
 export interface RespondProposalInput {
@@ -38,6 +42,7 @@ const TRANSFER_CONFIG = getBalanceValue("TRANSFER");
 export class TransferService extends BaseService {
   private unitOfWork: IUnitOfWork;
   private eventBus: GameEventBus;
+  private transferValidator: TransferValidator;
 
   constructor(
     repositories: IRepositoryContainer,
@@ -47,6 +52,7 @@ export class TransferService extends BaseService {
     super(repositories, "TransferService");
     this.unitOfWork = unitOfWork;
     this.eventBus = eventBus;
+    this.transferValidator = new TransferValidator(repositories);
   }
 
   async createProposal(
@@ -64,27 +70,33 @@ export class TransferService extends BaseService {
         wageOffer,
         contractLength,
         currentDate,
+        seasonId,
       }) => {
-        const buyingTeam = await this.repos.teams.findById(toTeamId);
-        if (!buyingTeam) throw new Error("Time comprador não encontrado.");
+        const validationContext: TransferValidationContext = {
+          playerId,
+          fromTeamId,
+          toTeamId,
+          fee,
+          wageOffer,
+          contractLength,
+          transferType: type as any,
+          currentDate,
+          seasonId,
+        };
 
-        const player = await this.repos.players.findById(playerId);
-        if (!player) throw new Error("Jogador não encontrado.");
+        const validationResult = await this.transferValidator.validateTransfer(
+          validationContext
+        );
 
-        if (player.teamId !== fromTeamId && fromTeamId !== 0) {
-          throw new Error(
-            "O jogador não pertence ao time vendedor especificado."
-          );
+        if (Result.isFailure(validationResult)) {
+          return validationResult as any;
         }
 
-        const budgetValidation = FinancialOperationValidator.validateBudget(
-          buyingTeam.budget,
-          fee
-        );
-        if (!budgetValidation.isValid) {
-          throw new Error(
-            `Orçamento insuficiente. Disponível: €${buyingTeam.budget}, Necessário: €${fee}`
-          );
+        const validationData = validationResult.data;
+
+        if (!validationData.isValid) {
+          const errorMessage = validationData.errors.join(" | ");
+          return Result.businessRule(errorMessage);
         }
 
         const existing = await this.repos.transferProposals.findActiveProposal(
@@ -93,7 +105,17 @@ export class TransferService extends BaseService {
           toTeamId
         );
         if (existing) {
-          throw new Error("Já existe uma negociação ativa para este jogador.");
+          return Result.conflict(
+            "Já existe uma negociação ativa para este jogador."
+          );
+        }
+
+        const buyingTeam = await this.repos.teams.findById(toTeamId);
+
+        if (!buyingTeam) {
+          return Result.notFound(
+            "Time comprador não encontrado, apesar da validação inicial."
+          );
         }
 
         const deadlineDate = new Date(currentDate);
