@@ -121,6 +121,29 @@ export class GameEngine {
           }
         }
 
+        const aiTransferResult =
+          await serviceContainer.dailyTransferProcessor.processDailyTransfers(
+            dateStr,
+            seasonId
+          );
+
+        if (Result.isSuccess(aiTransferResult) && aiTransferResult.data > 0) {
+          updates.logs.push(
+            `O mercado de transferências da IA teve ${aiTransferResult.data} ações.`
+          );
+        }
+
+        const contractExpiryResult =
+          await serviceContainer.contract.checkExpiringContracts(dateStr);
+        if (
+          Result.isSuccess(contractExpiryResult) &&
+          contractExpiryResult.data.playersReleased > 0
+        ) {
+          updates.logs.push(
+            `${contractExpiryResult.data.playersReleased} contratos de jogadores expiraram.`
+          );
+        }
+
         // TODO: Treinamento e Recuperação Diária de Jogadores
         // Implementar usando DailySimulationService (já existe no projeto)
 

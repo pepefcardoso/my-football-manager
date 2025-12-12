@@ -35,6 +35,7 @@ import { TransferWindowManager } from "./transfer/TransferWindowManager";
 import { TransferService } from "./transfer/TransferService";
 import { SquadAnalysisService } from "./ai/SquadAnalysisService";
 import { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
+import { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: UnitOfWork;
@@ -65,6 +66,7 @@ export class ServiceContainer implements IServiceContainer {
   public readonly transfer: TransferService;
   public readonly squadAnalysis: SquadAnalysisService;
   public readonly aiTransferDecisionMaker: AITransferDecisionMaker;
+  public readonly dailyTransferProcessor: DailyTransferProcessor;
 
   constructor(repos: IRepositoryContainer) {
     this.unitOfWork = new UnitOfWork();
@@ -105,6 +107,11 @@ export class ServiceContainer implements IServiceContainer {
       this.squadAnalysis,
       this.transferWindow,
       this.financialHealth
+    );
+    this.dailyTransferProcessor = new DailyTransferProcessor(
+      repos,
+      this.aiTransferDecisionMaker,
+      this.transfer
     );
     this.setupSubscriptions();
   }
