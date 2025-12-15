@@ -10,6 +10,8 @@ import type { GameSave, SaveValidationResult } from "../domain/GameSaveTypes";
 import { SaveManager } from "./SaveManager";
 import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 import { UnitOfWork } from "../repositories/UnitOfWork";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import * as schema from "../db/schema";
 
 const logger = new Logger("GameEngine");
 
@@ -20,12 +22,13 @@ export class GameEngine {
 
   constructor(
     repositories: IRepositoryContainer,
+    db: BetterSQLite3Database<typeof schema>,
     initialDate?: string,
     unitOfWork?: IUnitOfWork
   ) {
     this.timeEngine = new TimeEngine(initialDate || "2025-01-15");
-    const uow = unitOfWork || new UnitOfWork();
-    this.saveManager = new SaveManager(repositories, uow);
+    const uow = unitOfWork || new UnitOfWork(db);
+    this.saveManager = new SaveManager(repositories, uow, db);
   }
 
   setGameState(state: GameState) {

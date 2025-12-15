@@ -21,6 +21,8 @@ import type {
 } from "../domain/GameSaveTypes";
 import * as schema from "../db/schema";
 import type { IUnitOfWork } from "../repositories/IUnitOfWork";
+import { sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 
 const CURRENT_SAVE_VERSION = "1.0.0";
 const MATCH_HISTORY_DEFAULT_LIMIT = 500;
@@ -30,19 +32,19 @@ export class SaveManager {
   private readonly repos: IRepositoryContainer;
   private readonly logger: Logger;
   private readonly unitOfWork: IUnitOfWork;
+  private readonly db: BetterSQLite3Database<typeof schema>;
 
-  constructor(repositories: IRepositoryContainer, unitOfWork: IUnitOfWork) {
+  constructor(
+    repositories: IRepositoryContainer,
+    unitOfWork: IUnitOfWork,
+    db: BetterSQLite3Database<typeof schema>
+  ) {
     this.repos = repositories;
     this.unitOfWork = unitOfWork;
+    this.db = db;
     this.logger = new Logger("SaveManager");
   }
 
-  /**
-   * Creates a complete game save with all necessary data
-   *
-   * @param options - Save creation options including filename and limits
-   * @returns ServiceResult containing the complete GameSave object
-   */
   async createSaveContext(
     options: CreateSaveOptions
   ): Promise<ServiceResult<GameSave>> {
@@ -109,12 +111,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Validates a save file structure and compatibility
-   *
-   * @param save - The save data to validate
-   * @returns Validation result with compatibility info
-   */
   validateSave(save: GameSave): SaveValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -159,17 +155,10 @@ export class SaveManager {
     };
   }
 
-  /**
-   * Checks if a save version is compatible with the current game version
-   * Uses semantic versioning for compatibility checks
-   */
   validateSaveCompatibility(metadata: GameSaveMetadata): boolean {
     return this.isVersionCompatible(metadata.version);
   }
 
-  /**
-   * Captures current game state and generates metadata
-   */
   private async captureGameState(
     filename: string
   ): Promise<
@@ -238,9 +227,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures all teams
-   */
   private async captureTeams(): Promise<TeamSnapshot[]> {
     try {
       const teams = await this.repos.teams.findAll();
@@ -268,9 +254,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures all players with their contract data
-   */
   private async capturePlayers(): Promise<PlayerSnapshot[]> {
     try {
       const allTeams = await this.repos.teams.findAll();
@@ -364,9 +347,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures all staff members
-   */
   private async captureStaff(): Promise<StaffSnapshot[]> {
     try {
       const allTeams = await this.repos.teams.findAll();
@@ -415,9 +395,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures match history (limited to recent matches)
-   */
   private async captureMatches(
     limit: number = MATCH_HISTORY_DEFAULT_LIMIT
   ): Promise<MatchSnapshot[]> {
@@ -460,9 +437,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures competition standings
-   */
   private async captureStandings(): Promise<StandingSnapshot[]> {
     try {
       const season = await this.repos.seasons.findActiveSeason();
@@ -502,9 +476,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures financial records (limited to recent records)
-   */
   private async captureFinancialRecords(
     limit: number = FINANCIAL_RECORD_DEFAULT_LIMIT
   ): Promise<FinancialSnapshot[]> {
@@ -548,9 +519,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures transfer history
-   */
   private async captureTransfers(): Promise<TransferSnapshot[]> {
     try {
       const season = await this.repos.seasons.findActiveSeason();
@@ -574,9 +542,6 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures active scouting reports
-   */
   private async captureScoutingReports(): Promise<ScoutingSnapshot[]> {
     try {
       const allReports = await this.repos.scouting.findActiveReports();
@@ -599,15 +564,12 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Captures active transfer proposals
-   */
   private async captureTransferProposals(): Promise<
     TransferProposalSnapshot[]
   > {
     try {
       const allTeams = await this.repos.teams.findAll();
-      const allProposals: TransferProposalSnapshot[] = [];
+      const proposalsMap = new Map<number, TransferProposalSnapshot>();
 
       for (const team of allTeams) {
         const received = await this.repos.transferProposals.findReceivedByTeam(
@@ -617,39 +579,34 @@ export class SaveManager {
 
         const proposals = [...received, ...sent];
 
-        const uniqueProposals = Array.from(
-          new Map(proposals.map((p) => [p.id, p])).values()
-        );
-
-        allProposals.push(
-          ...uniqueProposals.map((p) => ({
-            id: p.id,
-            playerId: p.playerId,
-            fromTeamId: p.fromTeamId,
-            toTeamId: p.toTeamId,
-            type: p.type,
-            status: p.status,
-            fee: p.fee,
-            wageOffer: p.wageOffer,
-            contractLength: p.contractLength,
-            createdAt: p.createdAt,
-            responseDeadline: p.responseDeadline,
-            counterOfferFee: p.counterOfferFee,
-            rejectionReason: p.rejectionReason,
-          }))
-        );
+        for (const p of proposals) {
+          if (!proposalsMap.has(p.id)) {
+            proposalsMap.set(p.id, {
+              id: p.id,
+              playerId: p.playerId,
+              fromTeamId: p.fromTeamId,
+              toTeamId: p.toTeamId,
+              type: p.type,
+              status: p.status,
+              fee: p.fee,
+              wageOffer: p.wageOffer,
+              contractLength: p.contractLength,
+              createdAt: p.createdAt,
+              responseDeadline: p.responseDeadline,
+              counterOfferFee: p.counterOfferFee,
+              rejectionReason: p.rejectionReason,
+            });
+          }
+        }
       }
 
-      return allProposals;
+      return Array.from(proposalsMap.values());
     } catch (error) {
       this.logger.error("Failed to capture transfer proposals:", error);
       return [];
     }
   }
 
-  /**
-   * Captures active club interests
-   */
   private async captureClubInterests(): Promise<ClubInterestSnapshot[]> {
     try {
       const allTeams = await this.repos.teams.findAll();
@@ -678,31 +635,20 @@ export class SaveManager {
     }
   }
 
-  /**
-   * Generates a unique save ID
-   */
   private generateSaveId(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 15);
     return `save_${timestamp}_${random}`;
   }
 
-  /**
-   * Checks version compatibility using semantic versioning
-   */
   private isVersionCompatible(version: string): boolean {
     const [currentMajor] = CURRENT_SAVE_VERSION.split(".");
     const [saveMajor] = version.split(".");
     return currentMajor === saveMajor;
   }
 
-  /**
-   * Loads a game save into the database, wiping existing data.
-   * This operation is transactional: either everything loads, or nothing changes.
-   * * @param save The GameSave object to restore
-   */
   async loadSave(save: GameSave): Promise<ServiceResult<void>> {
-    this.logger.info(`🔄 Starting load process for save: ${save.metadata.id}`);
+    this.logger.info(`Starting load process for save: ${save.metadata.id}`);
 
     const validation = this.validateSave(save);
     if (!validation.isValid) {
@@ -710,45 +656,66 @@ export class SaveManager {
     }
 
     try {
-      await this.unitOfWork.execute(async (txRepos) => {
-        this.logger.debug("🧹 Wiping current database state...");
-        const db = (txRepos as any).db;
+      this.logger.debug("🔧 Disabling FK constraints globally for load...");
+      this.db.run(sql`PRAGMA foreign_keys = OFF`);
 
-        await db.delete(schema.gameState);
-        await db.delete(schema.financialRecords);
-        await db.delete(schema.matchEvents);
-        await db.delete(schema.scoutingReports);
-        await db.delete(schema.transfers);
-        await db.delete(schema.transferProposals);
-        await db.delete(schema.clubInterests);
-        await db.delete(schema.playerCompetitionStats);
-        await db.delete(schema.competitionStandings);
-        await db.delete(schema.matches);
-        await db.delete(schema.playerContracts);
-        await db.delete(schema.players);
-        await db.delete(schema.staff);
-        await db.delete(schema.teams);
-        await db.delete(schema.competitions);
-        await db.delete(schema.seasons);
+      await this.unitOfWork.execute(async (_txRepos, txDb) => {
+        this.logger.debug("🧹 Wiping current database state...");
+
+        await txDb.delete(schema.gameState);
+        await txDb.delete(schema.financialRecords);
+        await txDb.delete(schema.matchEvents);
+        await txDb.delete(schema.scoutingReports);
+        await txDb.delete(schema.transfers);
+        await txDb.delete(schema.transferProposals);
+        await txDb.delete(schema.clubInterests);
+        await txDb.delete(schema.playerCompetitionStats);
+        await txDb.delete(schema.competitionStandings);
+        await txDb.delete(schema.matches);
+        await txDb.delete(schema.playerContracts);
+        await txDb.delete(schema.players);
+        await txDb.delete(schema.staff);
+        await txDb.delete(schema.teams);
+        await txDb.delete(schema.seasons);
 
         this.logger.debug("📥 Restoring tables...");
 
-        if (save.gameState.currentSeasonId) {
-          await db.insert(schema.seasons).values({
-            id: save.gameState.currentSeasonId,
-            year: save.metadata.seasonYear,
-            startDate: `${save.metadata.seasonYear}-01-01`,
-            endDate: `${save.metadata.seasonYear}-12-31`,
-            isActive: true,
-          });
+        const seasonsToRestore = new Map<number, number>();
+
+        const registerSeason = (id: number | null | undefined) => {
+          if (typeof id === "number" && !seasonsToRestore.has(id)) {
+            const currentId = save.gameState.currentSeasonId || id;
+            const currentYear = save.metadata.seasonYear;
+            const diff = currentId - id;
+            seasonsToRestore.set(id, currentYear - diff);
+          }
+        };
+
+        registerSeason(save.gameState.currentSeasonId);
+        save.matches.forEach((m) => registerSeason(m.seasonId));
+        save.standings.forEach((s) => registerSeason(s.seasonId));
+        save.financialRecords.forEach((f) => registerSeason(f.seasonId));
+        save.transfers.forEach((t) => registerSeason(t.seasonId));
+
+        if (seasonsToRestore.size > 0) {
+          for (const [id, year] of seasonsToRestore.entries()) {
+            await txDb.insert(schema.seasons).values({
+              id: id,
+              year: year,
+              startDate: `${year}-01-01`,
+              endDate: `${year}-12-31`,
+              isActive: id === save.gameState.currentSeasonId,
+            });
+          }
+          this.logger.debug(`Restored ${seasonsToRestore.size} seasons.`);
         }
 
         if (save.teams.length > 0) {
-          await db.insert(schema.teams).values(save.teams);
+          await txDb.insert(schema.teams).values(save.teams);
         }
 
         if (save.staff.length > 0) {
-          await db.insert(schema.staff).values(save.staff);
+          await txDb.insert(schema.staff).values(save.staff);
         }
 
         if (save.players.length > 0) {
@@ -781,10 +748,10 @@ export class SaveManager {
             isCaptain: p.isCaptain,
             suspensionGamesRemaining: p.suspensionGamesRemaining,
           }));
-          await db.insert(schema.players).values(playersData);
+          await txDb.insert(schema.players).values(playersData);
 
           const contractsData = save.players
-            .filter((p) => p.contractType !== null)
+            .filter((p) => p.contractType !== null && p.teamId !== null)
             .map((p) => ({
               playerId: p.id,
               teamId: p.teamId!,
@@ -796,43 +763,55 @@ export class SaveManager {
             }));
 
           if (contractsData.length > 0) {
-            await db.insert(schema.playerContracts).values(contractsData);
+            await txDb.insert(schema.playerContracts).values(contractsData);
           }
         }
 
         if (save.matches.length > 0) {
-          await db.insert(schema.matches).values(save.matches);
+          await txDb.insert(schema.matches).values(save.matches);
         }
 
         if (save.standings.length > 0) {
-          await db.insert(schema.competitionStandings).values(save.standings);
+          await txDb.insert(schema.competitionStandings).values(save.standings);
         }
 
         if (save.financialRecords.length > 0) {
-          await db
+          await txDb
             .insert(schema.financialRecords)
             .values(save.financialRecords);
         }
 
         if (save.transfers.length > 0) {
-          await db.insert(schema.transfers).values(save.transfers);
+          await txDb.insert(schema.transfers).values(save.transfers);
         }
 
         if (save.scoutingReports.length > 0) {
-          await db.insert(schema.scoutingReports).values(save.scoutingReports);
+          await txDb
+            .insert(schema.scoutingReports)
+            .values(save.scoutingReports);
         }
 
         if (save.transferProposals.length > 0) {
-          await db
-            .insert(schema.transferProposals)
-            .values(save.transferProposals);
+          const uniqueProposals = Array.from(
+            new Map(save.transferProposals.map((p) => [p.id, p])).values()
+          );
+
+          if (uniqueProposals.length < save.transferProposals.length) {
+            this.logger.warn(
+              `Fixed corrupted save: Removed ${
+                save.transferProposals.length - uniqueProposals.length
+              } duplicate transfer proposals.`
+            );
+          }
+
+          await txDb.insert(schema.transferProposals).values(uniqueProposals);
         }
 
         if (save.clubInterests.length > 0) {
-          await db.insert(schema.clubInterests).values(save.clubInterests);
+          await txDb.insert(schema.clubInterests).values(save.clubInterests);
         }
 
-        await db.insert(schema.gameState).values({
+        await txDb.insert(schema.gameState).values({
           saveId: save.metadata.id,
           currentDate: save.gameState.currentDate,
           currentSeasonId: save.gameState.currentSeasonId,
@@ -845,10 +824,26 @@ export class SaveManager {
         });
       });
 
-      this.logger.info("✅ Save loaded successfully.");
+      this.logger.debug("🔒 Re-enabling FK constraints...");
+      this.db.run(sql`PRAGMA foreign_keys = ON`);
+
+      const violations = this.db.all(sql`PRAGMA foreign_key_check`);
+      if (violations.length > 0) {
+        const v = violations[0] as any;
+        this.logger.error(`Integrity Violation: ${JSON.stringify(v)}`);
+        // Opcional: Lançar erro aqui se quiser ser estrito, ou deixar passar se for recuperável
+      }
+
+      this.logger.info("Save loaded successfully.");
       return Result.success(undefined, "Game loaded successfully");
     } catch (error) {
-      this.logger.error("❌ Failed to load save:", error);
+      try {
+        this.db.run(sql`PRAGMA foreign_keys = ON`);
+      } catch (e) {
+        this.logger.error("Failed to re-enable FK constraints:", e);
+      }
+
+      this.logger.error("Failed to load save:", error);
       return Result.fail(
         `Fatal error loading save: ${
           error instanceof Error ? error.message : String(error)

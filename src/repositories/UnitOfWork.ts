@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { db, type DbInstance } from "../lib/db";
 import type { IUnitOfWork } from "./IUnitOfWork";
 import type { IRepositoryContainer } from "./IRepositories";
@@ -14,27 +15,26 @@ export class UnitOfWork implements IUnitOfWork {
   }
 
   async execute<T>(
-    work: (repos: IRepositoryContainer) => Promise<T>
+    work: (repos: IRepositoryContainer, db: DbInstance) => Promise<T>
   ): Promise<T> {
-    return new Promise((resolve, reject) => {
+    try {
+      this.dbInstance.run(sql`BEGIN TRANSACTION`);
+
+      const transactionalRepos = RepositoryFactory.create(this.dbInstance);
+
+      const result = await work(transactionalRepos, this.dbInstance);
+
+      this.dbInstance.run(sql`COMMIT`);
+
+      return result;
+    } catch (error) {
+      this.logger.error("Transação abortada. Iniciando Rollback...", error);
       try {
-        const result = this.dbInstance.transaction((tx) => {
-          const transactionalRepos = RepositoryFactory.create(tx);
-
-          try {
-            return work(transactionalRepos) as any;
-          } catch (error) {
-            this.logger.error("Transação abortada devido a erro:", error);
-            tx.rollback();
-            throw error;
-          }
-        }) as T;
-
-        resolve(result);
-      } catch (error) {
-        this.logger.error("Transação abortada devido a erro:", error);
-        reject(error);
+        this.dbInstance.run(sql`ROLLBACK`);
+      } catch (rollbackError) {
+        this.logger.error("Erro crítico no Rollback:", rollbackError);
       }
-    });
+      throw error;
+    }
   }
 }

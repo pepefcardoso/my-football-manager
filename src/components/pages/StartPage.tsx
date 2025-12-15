@@ -10,6 +10,7 @@ function StartPage() {
     const setView = useGameStore((state) => state.setView);
     const setNewGameSetup = useGameStore((state) => state.setNewGameSetup);
     const setGameLoading = useGameStore((state) => state.setLoading);
+    const startGame = useGameStore((state) => state.startGame);
 
     const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
     const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
@@ -32,15 +33,33 @@ function StartPage() {
             const result = await window.electronAPI.game.loadGame(filename);
 
             if (result.success) {
-                logger.info("Save carregado com sucesso.");
-                setIsLoadModalOpen(false);
-                setView('game_loop');
+                logger.info("Save carregado no banco de dados. Recuperando estado da UI...");
+
+                const gameState = await window.electronAPI.game.getGameState();
+
+                if (gameState && gameState.playerTeamId) {
+                    const teams = await window.electronAPI.team.getTeams();
+                    const myTeam = teams.find(t => t.id === gameState.playerTeamId);
+
+                    if (myTeam) {
+                        useGameStore.getState().advanceDate(gameState.currentDate);
+                        startGame(myTeam);
+
+                        setIsLoadModalOpen(false);
+                        logger.info("UI Sincronizada. Entrando no jogo.");
+                    } else {
+                        throw new Error("Time do jogador não encontrado no save.");
+                    }
+                } else {
+                    throw new Error("Estado do jogo inválido ou sem time definido.");
+                }
+
             } else {
                 alert(`Erro ao carregar: ${result.message}`);
             }
         } catch (error) {
             logger.error("Erro crítico ao carregar jogo:", error);
-            alert("Erro crítico ao carregar o jogo.");
+            alert("Erro crítico ao carregar o jogo. Verifique o console.");
         } finally {
             setGameLoading(false);
         }

@@ -16,8 +16,11 @@ import { Result } from "../src/services/types/ServiceResults";
 import { TrainingFocus } from "../src/domain/enums";
 import { GameEventType } from "../src/services/events/GameEventTypes";
 import { GameEngine } from "../src/engine/GameEngine";
-import { repositoryContainer } from "../src/repositories/RepositoryContainer";
+import { repositoryContainer, RepositoryFactory } from "../src/repositories/RepositoryContainer";
 import { existsSync, mkdirSync } from "node:fs";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import * as schema from "../src/db/schema";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = new Logger("electron-main");
@@ -429,7 +432,7 @@ function registerIpcHandlers() {
           .set({ isHuman: true })
           .where(eq(teams.id, teamId));
 
-        const gameEngine = new GameEngine(repositoryContainer);
+        const gameEngine = new GameEngine(repositoryContainer, db);
         const saveResult = await gameEngine.createGameSave(saveName);
 
         if (Result.isFailure(saveResult)) {
@@ -726,7 +729,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle("game:saveGame", async (_, filename: string) => {
     try {
-      const gameEngine = new GameEngine(repositoryContainer);
+      const gameEngine = new GameEngine(repositoryContainer, db);
       const saveResult = await gameEngine.createGameSave(filename);
 
       if (Result.isFailure(saveResult)) {
@@ -794,7 +797,13 @@ function registerIpcHandlers() {
       const content = await fs.readFile(filePath, "utf-8");
       const gameSave = JSON.parse(content);
 
-      const gameEngine = new GameEngine(repositoryContainer);
+      const sqlite = new Database("data/database.sqlite");
+      const db = drizzle(sqlite, { schema });
+
+      const repos = RepositoryFactory.create(db);
+
+      const gameEngine = new GameEngine(repos, db);
+
       const result = await gameEngine.loadGameSave(gameSave);
 
       if (Result.isFailure(result)) {
