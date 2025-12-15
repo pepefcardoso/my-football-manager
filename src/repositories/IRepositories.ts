@@ -9,6 +9,7 @@ import type {
   FinancialRecord,
 } from "../domain/models";
 import type { ClubInterestInsert } from "./ClubInterestRepository";
+import type { GameState } from "../domain/models";
 
 export interface PlayerCompetitionStats {
   id: number;
@@ -204,6 +205,11 @@ export interface ITransferProposalRepository {
   expireProposals(currentDate: string): Promise<number>;
 }
 
+export interface IGameStateRepository {
+  findCurrent(): Promise<GameState | undefined>;
+  save(state: Partial<GameState>): Promise<void>;
+}
+
 export interface IRepositoryContainer {
   players: IPlayerRepository;
   teams: ITeamRepository;
@@ -216,6 +222,7 @@ export interface IRepositoryContainer {
   transfers: ITransferRepository;
   transferProposals: ITransferProposalRepository;
   clubInterests: IClubInterestRepository;
+  gameState: IGameStateRepository;
 }
 
 export type ServiceFactory<T> = (deps: IRepositoryContainer) => T;

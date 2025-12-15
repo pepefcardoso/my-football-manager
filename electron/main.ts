@@ -14,6 +14,8 @@ import { FinanceService } from "../src/services/FinanceService";
 import { Result } from "../src/services/types/ServiceResults";
 import { TrainingFocus } from "../src/domain/enums";
 import { GameEventType } from "../src/services/events/GameEventTypes";
+import { GameEngine } from "../src/engine/GameEngine";
+import { repositoryContainer } from "../src/repositories/RepositoryContainer";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = new Logger("electron-main");
@@ -646,7 +648,26 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("game:saveGame", async () => {
+  ipcMain.handle("game:saveGame", async (_, filename: string) => {
+    const gameEngine = new GameEngine(repositoryContainer);
+
+    const saveContextResult = await gameEngine.saveManager.createSaveContext(
+      filename
+    );
+
+    if (Result.isFailure(saveContextResult)) {
+      logger.error("Falha ao criar contexto de save:", saveContextResult.error);
+      return false;
+    }
+
+    const { metadata } = saveContextResult.data;
+
+    // TODO: Na Fase 2.2, aqui será implementada a escrita do arquivo JSON
+    // Usando 'metadata' para logar por enquanto, resolvendo o erro de unused variable
+    logger.info(
+      `Preparando save para: ${metadata.filename} (ID: ${metadata.id})`
+    );
+
     return true;
   });
 

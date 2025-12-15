@@ -275,12 +275,15 @@ export const financialRecords = sqliteTable("financial_records", {
 
 export const gameState = sqliteTable("game_state", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  saveId: text("save_id").notNull(),
   currentDate: text("current_date").notNull(),
   currentSeasonId: integer("current_season_id").references(() => seasons.id),
   managerName: text("manager_name").default("Treinador").notNull(),
   playerTeamId: integer("player_team_id").references(() => teams.id),
   simulationSpeed: integer("simulation_speed").default(1).notNull(),
   trainingFocus: text("training_focus").default("technical"),
+  totalPlayTime: integer("total_play_time").default(0),
+  lastPlayedAt: text("last_played_at"),
 });
 
 export const teamsRelations = relations(teams, ({ many, one }) => ({

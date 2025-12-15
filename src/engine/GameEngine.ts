@@ -1,19 +1,27 @@
 import type { GameState, Match, Player } from "../domain/models";
-import type { MatchResult, GameEvent } from "../domain/types";
+import type {
+  MatchResult,
+  GameEvent,
+  GameSaveMetadata,
+  GameSave,
+} from "../domain/types";
 import { FinanceService } from "../services/FinanceService";
 import { serviceContainer } from "../services/ServiceContainer";
 import { Logger } from "../lib/Logger";
-import { Result } from "../services/types/ServiceResults";
+import { Result, type ServiceResult } from "../services/types/ServiceResults";
 import { TimeEngine } from "./TimeEngine";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
 
 const logger = new Logger("GameEngine");
 
 export class GameEngine {
   private timeEngine: TimeEngine;
   private gameState: GameState | null = null;
+  public readonly saveManager: SaveManager;
 
-  constructor(initialDate?: string) {
+  constructor(repositories: IRepositoryContainer, initialDate?: string) {
     this.timeEngine = new TimeEngine(initialDate || "2025-01-01");
+    this.saveManager = new SaveManager(repositories);
   }
 
   setGameState(state: GameState) {
@@ -317,29 +325,71 @@ export interface FinancialChange {
   description: string;
 }
 
-export interface GameSave {
-  gameState: GameState;
-  currentDate: string;
-  version: string;
-  timestamp: string;
-}
-
 export class SaveManager {
-  static createSave(gameState: GameState, currentDate: string): GameSave {
-    return {
-      gameState,
-      currentDate,
-      version: "1.0.0",
-      timestamp: new Date().toISOString(),
-    };
+  private repos: IRepositoryContainer;
+
+  constructor(repositories: IRepositoryContainer) {
+    this.repos = repositories;
   }
 
-  static validateSave(save: GameSave): boolean {
-    return !!(
-      save.gameState &&
-      save.currentDate &&
-      save.version &&
-      save.timestamp
-    );
+  async createSaveContext(filename: string): Promise<ServiceResult<GameSave>> {
+    try {
+      const state = await this.repos.gameState.findCurrent();
+
+      if (!state) {
+        return Result.fail("Não há estado de jogo ativo para salvar.");
+      }
+
+      let teamName = "Desempregado";
+      let teamReputation = 0;
+      let primaryColor = "#333333";
+
+      if (state.playerTeamId) {
+        const team = await this.repos.teams.findById(state.playerTeamId);
+        if (team) {
+          teamName = team.name;
+          teamReputation = team.reputation;
+          primaryColor = team.primaryColor;
+        }
+      }
+
+      let seasonYear = new Date(state.currentDate).getFullYear();
+      if (state.currentSeasonId) {
+        const activeSeason = await this.repos.seasons.findActiveSeason();
+        if (activeSeason) seasonYear = activeSeason.year;
+      }
+
+      // TODO: Obter saveId real do estado (assumindo que foi adicionado ao schema)
+      const saveId = (state as any).saveId || crypto.randomUUID();
+      const totalPlayTime = (state as any).totalPlayTime || 0;
+
+      const metadata: GameSaveMetadata = {
+        id: saveId,
+        filename: filename,
+        managerName: state.managerName,
+        teamName: teamName,
+        teamId: state.playerTeamId || 0,
+        currentDate: state.currentDate,
+        seasonYear: seasonYear,
+        reputation: teamReputation,
+        playTimeSeconds: totalPlayTime,
+        lastSaveTimestamp: new Date().toISOString(),
+        version: "0.1.0",
+        primaryColor: primaryColor,
+      };
+
+      return Result.success({
+        metadata,
+      });
+    } catch (error) {
+      logger.error("Erro ao criar contexto de save:", error);
+      return Result.fail("Falha interna ao gerar dados de salvamento.");
+    }
+  }
+
+  validateSaveCompatibility(metadata: GameSaveMetadata): boolean {
+    const currentMajor = "0";
+    const saveMajor = metadata.version.split(".")[0];
+    return currentMajor === saveMajor;
   }
 }

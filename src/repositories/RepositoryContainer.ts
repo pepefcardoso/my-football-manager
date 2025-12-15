@@ -41,6 +41,10 @@ import {
   clubInterestRepository,
   ClubInterestRepository,
 } from "./ClubInterestRepository";
+import {
+  gameStateRepository,
+  GameStateRepository,
+} from "./GameStateRepository";
 
 /**
  * Container que permite instanciar repositórios com um contexto específico (transação)
@@ -59,6 +63,7 @@ export class RepositoryFactory {
       transfers: new TransferRepository(context),
       transferProposals: new TransferProposalRepository(context),
       clubInterests: new ClubInterestRepository(context),
+      gameState: new GameStateRepository(context),
     };
   }
 }
@@ -78,6 +83,7 @@ class ProductionRepositoryContainer implements IRepositoryContainer {
   public readonly transfers = transferRepository;
   public readonly transferProposals = transferProposalRepository;
   public readonly clubInterests = clubInterestRepository;
+  public readonly gameState = gameStateRepository;
 }
 
 export const repositoryContainer: IRepositoryContainer =

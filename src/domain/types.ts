@@ -7,7 +7,6 @@ import type {
   PlayerContract,
   Staff,
   Team,
-  GameState,
 } from "./models";
 
 export type BadgeVariant =
@@ -203,12 +202,7 @@ export interface FinancialChange {
 }
 
 export interface GameSave {
-  gameState: GameState;
-  currentDate: string;
-  version: string;
-  timestamp: string;
-  managerName: string;
-  teamName: string;
+  metadata: GameSaveMetadata;
 }
 
 export interface PlayerListItem {
@@ -296,4 +290,19 @@ export interface FinancialHealthResult {
 export interface TransferPermissionResult {
   allowed: boolean;
   reason?: string;
+}
+
+export interface GameSaveMetadata {
+  id: string;
+  filename: string;
+  managerName: string;
+  teamName: string;
+  teamId: number;
+  currentDate: string;
+  seasonYear: number;
+  reputation: number;
+  playTimeSeconds: number;
+  lastSaveTimestamp: string;
+  version: string;
+  primaryColor: string;
 }
