@@ -5,7 +5,8 @@ import {
 } from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema";
 import path from "path";
-import { fileURLToPath } from "url";
+import fs from "fs";
+import { app } from "electron";
 import { Logger } from "./Logger";
 
 export type DbInstance = BetterSQLite3Database<typeof schema>;
@@ -13,22 +14,53 @@ export type DbTransaction = Parameters<
   Parameters<DbInstance["transaction"]>[0]
 >[0];
 
-let dbPath: string;
 const logger = new Logger("Database");
 
-if (process.env.NODE_ENV === "development") {
-  dbPath = path.join(process.cwd(), "data", "database.sqlite");
-} else if ((process as any).resourcesPath) {
-  dbPath = path.join((process as any).resourcesPath, "database.sqlite");
-} else {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  dbPath = path.join(__dirname, "../../data/database.sqlite");
+/**
+ * Determines the database path based on the environment.
+ */
+const getDatabasePath = (): string => {
+  if (process.env.NODE_ENV === "development") {
+    return path.join(process.cwd(), "data", "database.sqlite");
+  }
+
+  if (app) {
+    return path.join(app.getPath("userData"), "database.sqlite");
+  }
+
+  return path.join(process.cwd(), "data", "database.sqlite");
+};
+
+/**
+ * Ensures the directory for the database exists.
+ */
+const ensureDatabaseDirectory = (filePath: string) => {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    logger.info(`Creating database directory at: ${dir}`);
+    fs.mkdirSync(dir, { recursive: true });
+  }
+};
+
+const dbPath = getDatabasePath();
+ensureDatabaseDirectory(dbPath);
+
+let sqlite: Database.Database;
+
+try {
+  logger.info("Initializing Database persistence layer...");
+  logger.info(`Storage Path: ${dbPath}`);
+
+  sqlite = new Database(dbPath);
+
+  sqlite.pragma("journal_mode = WAL");
+
+  sqlite.pragma("foreign_keys = ON");
+
+  logger.info("Database connection established successfully.");
+} catch (error) {
+  logger.error("Critical Error: Failed to initialize database.", error);
+  throw error;
 }
-
-logger.info("📁 Database path:", dbPath);
-
-const sqlite = new Database(dbPath);
-sqlite.pragma("journal_mode = WAL");
 
 export const db = drizzle(sqlite, { schema });
