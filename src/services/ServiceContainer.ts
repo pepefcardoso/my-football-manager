@@ -37,6 +37,7 @@ import { TransferService } from "./transfer/TransferService";
 import { SquadAnalysisService } from "./ai/SquadAnalysisService";
 import { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
 import { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
+import { EventService } from "./narrative/EventService";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: UnitOfWork;
@@ -68,6 +69,7 @@ export class ServiceContainer implements IServiceContainer {
   public readonly squadAnalysis: SquadAnalysisService;
   public readonly aiTransferDecisionMaker: AITransferDecisionMaker;
   public readonly dailyTransferProcessor: DailyTransferProcessor;
+  public readonly eventService: EventService;
 
   constructor(repos: IRepositoryContainer) {
     this.unitOfWork = new UnitOfWork();
@@ -114,6 +116,7 @@ export class ServiceContainer implements IServiceContainer {
       this.aiTransferDecisionMaker,
       this.transfer
     );
+    this.eventService = new EventService(repos);
     this.setupSubscriptions();
   }
 

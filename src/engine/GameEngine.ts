@@ -12,6 +12,7 @@ import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 import { UnitOfWork } from "../repositories/UnitOfWork";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema";
+import type { NarrativeEvent } from "../domain/narrative";
 
 const logger = new Logger("GameEngine");
 
@@ -87,6 +88,7 @@ export class GameEngine {
       financialChanges: [],
       news: [],
       logs: [],
+      narrativeEvent: null,
     };
 
     if (this.gameState?.currentSeasonId && this.gameState?.playerTeamId) {
@@ -117,6 +119,27 @@ export class GameEngine {
               description: expenseResult.data.message,
             });
           }
+        }
+
+        const eventResult =
+          await serviceContainer.eventService.generateDailyEvent(
+            teamId,
+            dateStr
+          );
+
+        if (Result.isSuccess(eventResult) && eventResult.data) {
+          updates.narrativeEvent = eventResult.data;
+          updates.logs.push(`🔔 Novo evento: ${eventResult.data.title}`);
+
+          updates.news.push({
+            type: "news",
+            title: eventResult.data.title,
+            description: eventResult.data.description,
+            importance:
+              eventResult.data.importance === "critical" ? "high" : "medium",
+            date: dateStr,
+            relatedEntityId: teamId,
+          });
         }
 
         const simulationResults =
@@ -356,6 +379,7 @@ export interface DailyUpdateResult {
   financialChanges: FinancialChange[];
   news: GameEvent[];
   logs: string[];
+  narrativeEvent?: NarrativeEvent | null;
 }
 
 export interface InjuryEvent {

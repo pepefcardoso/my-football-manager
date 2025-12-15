@@ -26,6 +26,7 @@ import type { TransferService } from "./transfer/TransferService";
 import type { SquadAnalysisService } from "./ai/SquadAnalysisService";
 import type { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
 import type { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
+import type { EventService } from "./narrative/EventService";
 
 export interface IServiceContainer {
   unitOfWork: IUnitOfWork;
@@ -56,4 +57,5 @@ export interface IServiceContainer {
   squadAnalysis: SquadAnalysisService;
   aiTransferDecisionMaker: AITransferDecisionMaker;
   dailyTransferProcessor: DailyTransferProcessor;
+  eventService: EventService;
 }
