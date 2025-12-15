@@ -312,6 +312,17 @@ export class MatchService extends BaseService {
       attendance
     );
 
+    if (match.competitionId && match.seasonId) {
+      await this.resultProcessor.updateStandings(
+        match.competitionId,
+        match.seasonId,
+        match.homeTeamId!,
+        match.awayTeamId!,
+        result.homeScore,
+        result.awayScore
+      );
+    }
+
     await this.financialsProcessor.processFinancials(
       match,
       homeTeam,
