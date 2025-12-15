@@ -650,6 +650,7 @@ async function main() {
 
   logger.info("💾 Salvando Estado Inicial...");
   await db.insert(gameState).values({
+    saveId: "save_init_seed",
     currentDate: "2025-01-15",
     currentSeasonId: season2025.id,
     managerName: "Treinador",

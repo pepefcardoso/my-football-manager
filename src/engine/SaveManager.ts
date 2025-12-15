@@ -4,6 +4,8 @@ import { Result } from "../services/types/ServiceResults";
 import type { ServiceResult } from "../services/types/ServiceResults";
 import type {
   GameSave,
+  CreateSaveOptions,
+  SaveValidationResult,
   GameSaveMetadata,
   GameStateSnapshot,
   TeamSnapshot,
@@ -16,9 +18,9 @@ import type {
   ScoutingSnapshot,
   TransferProposalSnapshot,
   ClubInterestSnapshot,
-  CreateSaveOptions,
-  SaveValidationResult,
 } from "../domain/GameSaveTypes";
+import * as schema from "../db/schema";
+import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 
 const CURRENT_SAVE_VERSION = "1.0.0";
 const MATCH_HISTORY_DEFAULT_LIMIT = 500;
@@ -27,9 +29,11 @@ const FINANCIAL_RECORD_DEFAULT_LIMIT = 1000;
 export class SaveManager {
   private readonly repos: IRepositoryContainer;
   private readonly logger: Logger;
+  private readonly unitOfWork: IUnitOfWork;
 
-  constructor(repositories: IRepositoryContainer) {
+  constructor(repositories: IRepositoryContainer, unitOfWork: IUnitOfWork) {
     this.repos = repositories;
+    this.unitOfWork = unitOfWork;
     this.logger = new Logger("SaveManager");
   }
 
@@ -690,5 +694,166 @@ export class SaveManager {
     const [currentMajor] = CURRENT_SAVE_VERSION.split(".");
     const [saveMajor] = version.split(".");
     return currentMajor === saveMajor;
+  }
+
+  /**
+   * Loads a game save into the database, wiping existing data.
+   * This operation is transactional: either everything loads, or nothing changes.
+   * * @param save The GameSave object to restore
+   */
+  async loadSave(save: GameSave): Promise<ServiceResult<void>> {
+    this.logger.info(`🔄 Starting load process for save: ${save.metadata.id}`);
+
+    const validation = this.validateSave(save);
+    if (!validation.isValid) {
+      return Result.fail(`Invalid save file: ${validation.errors.join(", ")}`);
+    }
+
+    try {
+      await this.unitOfWork.execute(async (txRepos) => {
+        this.logger.debug("🧹 Wiping current database state...");
+        const db = (txRepos as any).db;
+
+        await db.delete(schema.gameState);
+        await db.delete(schema.financialRecords);
+        await db.delete(schema.matchEvents);
+        await db.delete(schema.scoutingReports);
+        await db.delete(schema.transfers);
+        await db.delete(schema.transferProposals);
+        await db.delete(schema.clubInterests);
+        await db.delete(schema.playerCompetitionStats);
+        await db.delete(schema.competitionStandings);
+        await db.delete(schema.matches);
+        await db.delete(schema.playerContracts);
+        await db.delete(schema.players);
+        await db.delete(schema.staff);
+        await db.delete(schema.teams);
+        await db.delete(schema.competitions);
+        await db.delete(schema.seasons);
+
+        this.logger.debug("📥 Restoring tables...");
+
+        if (save.gameState.currentSeasonId) {
+          await db.insert(schema.seasons).values({
+            id: save.gameState.currentSeasonId,
+            year: save.metadata.seasonYear,
+            startDate: `${save.metadata.seasonYear}-01-01`,
+            endDate: `${save.metadata.seasonYear}-12-31`,
+            isActive: true,
+          });
+        }
+
+        if (save.teams.length > 0) {
+          await db.insert(schema.teams).values(save.teams);
+        }
+
+        if (save.staff.length > 0) {
+          await db.insert(schema.staff).values(save.staff);
+        }
+
+        if (save.players.length > 0) {
+          const playersData = save.players.map((p) => ({
+            id: p.id,
+            teamId: p.teamId,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            age: p.age,
+            nationality: p.nationality,
+            position: p.position,
+            preferredFoot: p.preferredFoot,
+            overall: p.overall,
+            potential: p.potential,
+            finishing: p.finishing,
+            passing: p.passing,
+            dribbling: p.dribbling,
+            defending: p.defending,
+            shooting: p.shooting,
+            physical: p.physical,
+            pace: p.pace,
+            moral: p.moral,
+            energy: p.energy,
+            fitness: p.fitness,
+            form: p.form,
+            isYouth: p.isYouth,
+            isInjured: p.isInjured,
+            injuryType: p.injuryType,
+            injuryDaysRemaining: p.injuryDaysRemaining,
+            isCaptain: p.isCaptain,
+            suspensionGamesRemaining: p.suspensionGamesRemaining,
+          }));
+          await db.insert(schema.players).values(playersData);
+
+          const contractsData = save.players
+            .filter((p) => p.contractType !== null)
+            .map((p) => ({
+              playerId: p.id,
+              teamId: p.teamId!,
+              startDate: p.contractStartDate || new Date().toISOString(),
+              endDate: p.contractEndDate || new Date().toISOString(),
+              wage: p.contractWage || 0,
+              type: p.contractType || "professional",
+              status: p.contractStatus || "active",
+            }));
+
+          if (contractsData.length > 0) {
+            await db.insert(schema.playerContracts).values(contractsData);
+          }
+        }
+
+        if (save.matches.length > 0) {
+          await db.insert(schema.matches).values(save.matches);
+        }
+
+        if (save.standings.length > 0) {
+          await db.insert(schema.competitionStandings).values(save.standings);
+        }
+
+        if (save.financialRecords.length > 0) {
+          await db
+            .insert(schema.financialRecords)
+            .values(save.financialRecords);
+        }
+
+        if (save.transfers.length > 0) {
+          await db.insert(schema.transfers).values(save.transfers);
+        }
+
+        if (save.scoutingReports.length > 0) {
+          await db.insert(schema.scoutingReports).values(save.scoutingReports);
+        }
+
+        if (save.transferProposals.length > 0) {
+          await db
+            .insert(schema.transferProposals)
+            .values(save.transferProposals);
+        }
+
+        if (save.clubInterests.length > 0) {
+          await db.insert(schema.clubInterests).values(save.clubInterests);
+        }
+
+        await db.insert(schema.gameState).values({
+          saveId: save.metadata.id,
+          currentDate: save.gameState.currentDate,
+          currentSeasonId: save.gameState.currentSeasonId,
+          managerName: save.gameState.managerName,
+          playerTeamId: save.gameState.playerTeamId,
+          trainingFocus: save.gameState.trainingFocus,
+          simulationSpeed: save.gameState.simulationSpeed,
+          totalPlayTime: save.gameState.totalPlayTime,
+          lastPlayedAt: new Date().toISOString(),
+        });
+      });
+
+      this.logger.info("✅ Save loaded successfully.");
+      return Result.success(undefined, "Game loaded successfully");
+    } catch (error) {
+      this.logger.error("❌ Failed to load save:", error);
+      return Result.fail(
+        `Fatal error loading save: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   }
 }

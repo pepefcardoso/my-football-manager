@@ -88,7 +88,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     advanceDay: () => ipcRenderer.invoke("game:advanceDay"),
     updateTrainingFocus: (focus: string) =>
       ipcRenderer.invoke("game:updateTrainingFocus", focus),
-    saveGame: () => ipcRenderer.invoke("game:saveGame"),
+    saveGame: (filename?: string) => ipcRenderer.invoke("game:saveGame", filename),
     loadGame: () => ipcRenderer.invoke("game:loadGame"),
   },
 

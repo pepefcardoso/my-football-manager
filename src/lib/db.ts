@@ -6,8 +6,10 @@ import {
 import * as schema from "../db/schema";
 import path from "path";
 import fs from "fs";
-import { app } from "electron";
+import { createRequire } from "module";
 import { Logger } from "./Logger";
+
+const require = createRequire(import.meta.url);
 
 export type DbInstance = BetterSQLite3Database<typeof schema>;
 export type DbTransaction = Parameters<
@@ -24,8 +26,15 @@ const getDatabasePath = (): string => {
     return path.join(process.cwd(), "data", "database.sqlite");
   }
 
-  if (app) {
-    return path.join(app.getPath("userData"), "database.sqlite");
+  if (process.versions.electron) {
+    try {
+      const { app } = require("electron");
+      if (app) {
+        return path.join(app.getPath("userData"), "database.sqlite");
+      }
+    } catch (error) {
+      logger.warn("Could not load electron module:", error);
+    }
   }
 
   return path.join(process.cwd(), "data", "database.sqlite");

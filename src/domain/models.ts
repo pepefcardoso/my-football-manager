@@ -193,12 +193,15 @@ export interface FinancialRecord {
 
 export interface GameState {
   id: number;
+  saveId: string;
   currentDate: string;
   currentSeasonId: number | null;
   managerName: string;
   playerTeamId: number | null;
   simulationSpeed: number;
   trainingFocus: string | null;
+  totalPlayTime?: number;
+  lastPlayedAt?: string | null;
 }
 
 export interface TransferProposal {

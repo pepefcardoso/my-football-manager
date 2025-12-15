@@ -156,7 +156,6 @@ export const competitions = sqliteTable("competitions", {
   tier: integer("tier").default(1).notNull(),
   type: text("type").notNull().default("league"),
   priority: integer("priority").default(1).notNull(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: text("config", { mode: "json" })
     .$type<Record<string, any>>()
     .notNull()

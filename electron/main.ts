@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import path from "node:path";
+import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { teamRepository } from "../src/repositories/TeamRepository";
 import { matchRepository } from "../src/repositories/MatchRepository";
@@ -41,23 +42,16 @@ function setupTransferNotifications(win: BrowserWindow) {
   serviceContainer.eventBus.subscribe(
     GameEventType.PROPOSAL_RECEIVED,
     async (payload) => {
-      const playerTeamId = await getPlayerTeamId();
-      if (payload.toTeamId === playerTeamId) {
-        const player = await serviceContainer.player.getPlayerWithContract(
-          payload.playerId
-        );
-        const playerLastName =
-          Result.isSuccess(player) && player.data
-            ? player.data.lastName
-            : `Jogador #${payload.playerId}`;
+      const playerTeamId = async () => {
+        const currentState = await db.select().from(gameState).limit(1);
+        return currentState[0]?.playerTeamId;
+      };
 
-        logger.info(
-          `Notificando UI: Nova proposta recebida por ${playerLastName}`
-        );
-
+      const playerTeam = await playerTeamId();
+      if (payload.toTeamId === playerTeam) {
         win.webContents.send("transfer:notification", {
           type: "PROPOSAL_RECEIVED",
-          message: `Nova Proposta Recebida por ${playerLastName}!`,
+          message: `Nova Proposta Recebida!`,
           details: payload,
         });
       }
@@ -648,60 +642,111 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("game:saveGame", async (_, filename: string) => {
+  ipcMain.handle("game:saveGame", async (_, filename?: string) => {
     try {
       const gameEngine = new GameEngine(repositoryContainer);
 
-      const saveResult = await gameEngine.createGameSave(filename);
+      const targetFilename =
+        filename || `save_${new Date().toISOString().split("T")[0]}`;
+      const saveResult = await gameEngine.createGameSave(targetFilename);
 
       if (Result.isFailure(saveResult)) {
-        logger.error("Falha ao criar save:", saveResult.error.message);
-        return {
-          success: false,
-          message: saveResult.error.message,
-        };
+        logger.error("Falha ao criar dados do save:", saveResult.error.message);
+        return { success: false, message: saveResult.error.message };
       }
 
       const gameSave = saveResult.data;
 
       const validation = gameEngine.validateGameSave(gameSave);
       if (!validation.isValid) {
-        logger.error("Save validation failed:", validation.errors);
+        logger.error("Validação do save falhou:", validation.errors);
         return {
           success: false,
-          message: `Validação falhou: ${validation.errors.join(", ")}`,
+          message: `Erro de validação: ${validation.errors.join(", ")}`,
         };
       }
 
-      if (validation.warnings.length > 0) {
-        logger.warn("Save validation warnings:", validation.warnings);
+      let filePath = "";
+
+      if (filename && filename.endsWith(".json")) {
+        filePath = filename;
+      } else {
+        const { canceled, filePath: selectedPath } =
+          await dialog.showSaveDialog({
+            title: "Salvar Jogo",
+            defaultPath: `${targetFilename}.json`,
+            filters: [
+              { name: "Football Manager 2D Save", extensions: ["json"] },
+            ],
+          });
+
+        if (canceled || !selectedPath) {
+          return {
+            success: false,
+            message: "Operação cancelada pelo utilizador.",
+          };
+        }
+        filePath = selectedPath;
       }
 
-      // TODO: Phase 2.2 - Persist to file system
-      logger.info(`Save ready for persistence: ${gameSave.metadata.filename}`, {
-        saveId: gameSave.metadata.id,
-        teams: gameSave.teams.length,
-        players: gameSave.players.length,
-        matches: gameSave.matches.length,
-      });
+      await fs.writeFile(filePath, JSON.stringify(gameSave, null, 2), "utf-8");
+
+      logger.info(`Jogo salvo com sucesso em: ${filePath}`);
 
       return {
         success: true,
-        message:
-          "Save criado com sucesso (persistência será implementada na Fase 2.2)",
+        message: "Jogo salvo com sucesso!",
         metadata: gameSave.metadata,
       };
     } catch (error) {
-      logger.error("Erro ao salvar jogo:", error);
+      logger.error("Erro crítico ao salvar jogo:", error);
       return {
         success: false,
-        message: "Erro interno ao salvar jogo",
+        message: `Erro ao escrever arquivo: ${
+          error instanceof Error ? error.message : "Desconhecido"
+        }`,
       };
     }
   });
 
   ipcMain.handle("game:loadGame", async () => {
-    return true;
+    try {
+      const { dialog } = await import("electron");
+
+      const { filePaths } = await dialog.showOpenDialog({
+        properties: ["openFile"],
+        filters: [{ name: "Football Manager 2D Save", extensions: ["json"] }],
+      });
+
+      if (filePaths.length === 0) {
+        return { success: false, message: "Seleção cancelada." };
+      }
+
+      const filePath = filePaths[0];
+      logger.info(`Loading save file from: ${filePath}`);
+
+      const fileContent = await fs.readFile(filePath, "utf-8");
+      const saveData = JSON.parse(fileContent);
+
+      const gameEngine = new GameEngine(repositoryContainer);
+
+      const result = await gameEngine.loadGameSave(saveData);
+
+      if (Result.isSuccess(result)) {
+        logger.info("Save loaded successfully into DB.");
+
+        // Optional: Trigger a window reload to refresh UI with new data
+        // win?.reload();
+
+        return { success: true, message: "Jogo carregado com sucesso!" };
+      } else {
+        logger.error("Failed to load save in engine:", result.error);
+        return { success: false, message: result.error.message };
+      }
+    } catch (error) {
+      logger.error("IPC Error [game:loadGame]:", error);
+      return { success: false, message: "Erro ao ler arquivo de save." };
+    }
   });
 
   ipcMain.handle("finance:checkFinancialHealth", async (_, teamId: number) => {

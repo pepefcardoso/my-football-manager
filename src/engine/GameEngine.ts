@@ -8,6 +8,8 @@ import { TimeEngine } from "./TimeEngine";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import type { GameSave, SaveValidationResult } from "../domain/GameSaveTypes";
 import { SaveManager } from "./SaveManager";
+import type { IUnitOfWork } from "../repositories/IUnitOfWork";
+import { UnitOfWork } from "../repositories/UnitOfWork";
 
 const logger = new Logger("GameEngine");
 
@@ -16,9 +18,14 @@ export class GameEngine {
   private gameState: GameState | null = null;
   public readonly saveManager: SaveManager;
 
-  constructor(repositories: IRepositoryContainer, initialDate?: string) {
-    this.timeEngine = new TimeEngine(initialDate || "2025-01-01");
-    this.saveManager = new SaveManager(repositories);
+  constructor(
+    repositories: IRepositoryContainer,
+    initialDate?: string,
+    unitOfWork?: IUnitOfWork
+  ) {
+    this.timeEngine = new TimeEngine(initialDate || "2025-01-15");
+    const uow = unitOfWork || new UnitOfWork();
+    this.saveManager = new SaveManager(repositories, uow);
   }
 
   setGameState(state: GameState) {
@@ -303,6 +310,35 @@ export class GameEngine {
    */
   validateGameSave(save: GameSave): SaveValidationResult {
     return this.saveManager.validateSave(save);
+  }
+
+  /**
+   * Loads a game save into the engine and database
+   */
+  async loadGameSave(saveData: GameSave): Promise<ServiceResult<void>> {
+    const restoreResult = await this.saveManager.loadSave(saveData);
+
+    if (Result.isFailure(restoreResult)) {
+      return restoreResult;
+    }
+
+    this.timeEngine = new TimeEngine(saveData.gameState.currentDate);
+
+    const newState: GameState = {
+      id: 1,
+      saveId: saveData.gameState.saveId,
+      currentDate: saveData.gameState.currentDate,
+      currentSeasonId: saveData.gameState.currentSeasonId,
+      managerName: saveData.gameState.managerName,
+      playerTeamId: saveData.gameState.playerTeamId,
+      simulationSpeed: saveData.gameState.simulationSpeed,
+      trainingFocus: saveData.gameState.trainingFocus,
+      totalPlayTime: saveData.gameState.totalPlayTime,
+    };
+
+    this.setGameState(newState);
+
+    return Result.success(undefined, "Game loaded and engine state updated.");
   }
 }
 

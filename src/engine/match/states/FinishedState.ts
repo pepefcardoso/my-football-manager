@@ -6,7 +6,6 @@ import { Logger } from "../../../lib/Logger";
 const logger = new Logger("FinishedState");
 
 export class FinishedState implements IMatchState {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(private readonly _context: IMatchEngineContext) {}
 
   getStateEnum(): MatchState {
