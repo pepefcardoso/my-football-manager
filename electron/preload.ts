@@ -88,8 +88,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
     advanceDay: () => ipcRenderer.invoke("game:advanceDay"),
     updateTrainingFocus: (focus: string) =>
       ipcRenderer.invoke("game:updateTrainingFocus", focus),
-    saveGame: (filename?: string) => ipcRenderer.invoke("game:saveGame", filename),
-    loadGame: () => ipcRenderer.invoke("game:loadGame"),
+    saveGame: (filename: string) =>
+      ipcRenderer.invoke("game:saveGame", filename),
+    listSaves: () => ipcRenderer.invoke("game:listSaves"),
+    loadGame: (filename: string) =>
+      ipcRenderer.invoke("game:loadGame", filename),
+    startNewGame: (data: {
+      teamId: number;
+      saveName: string;
+      managerName: string;
+    }) => ipcRenderer.invoke("game:startNewGame", data),
   },
 
   finance: {

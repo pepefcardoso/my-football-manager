@@ -27,9 +27,11 @@ function App() {
   const startGame = useGameStore((state) => state.startGame);
   const navigateInGame = useGameStore((state) => state.navigateInGame);
   const resetGame = useGameStore((state) => state.resetGame);
+  const newGameSetup = useGameStore((state) => state.newGameSetup);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
+  const [initializingGame, setInitializingGame] = useState(false);
 
   const handleLoadTeams = useCallback(async () => {
     setLoadingTeams(true);
@@ -49,26 +51,73 @@ function App() {
     }
   }, [view, teams.length, handleLoadTeams]);
 
+  const handleTeamSelected = async (team: Team) => {
+    if (!newGameSetup) {
+      logger.error("Tentativa de iniciar jogo sem setup (nome do save).");
+      resetGame();
+      return;
+    }
+
+    setInitializingGame(true);
+    logger.info(`Criando novo jogo para ${newGameSetup.managerName} no time ${team.name} (Save: ${newGameSetup.saveName})`);
+
+    try {
+      const result = await window.electronAPI.game.startNewGame({
+        teamId: team.id,
+        saveName: newGameSetup.saveName,
+        managerName: newGameSetup.managerName
+      });
+
+      if (result.success) {
+        startGame(team);
+      } else {
+        alert(`Erro ao criar jogo: ${result.message}`);
+      }
+    } catch (error) {
+      logger.error("Erro crítico na criação do jogo:", error);
+      alert("Falha crítica ao criar o arquivo de save.");
+    } finally {
+      setInitializingGame(false);
+    }
+  };
+
   if (view === 'start_screen') {
     return <StartPage />;
   }
 
   if (view === 'team_selection') {
     return (
-      <div className="h-screen w-full bg-slate-950 overflow-auto">
-        <div className="p-4">
+      <div className="h-screen w-full bg-slate-950 overflow-auto relative">
+        {initializingGame && (
+          <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-white">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
+            <p className="text-lg font-light">Criando universo do jogo...</p>
+            <p className="text-sm text-slate-400">Configurando banco de dados e salvando arquivo.</p>
+          </div>
+        )}
+
+        <div className="p-4 flex justify-between items-center">
           <button
             onClick={resetGame}
-            className="text-slate-400 hover:text-white flex items-center gap-2"
+            disabled={initializingGame}
+            className="text-slate-400 hover:text-white flex items-center gap-2 disabled:opacity-50"
           >
             ← Voltar
           </button>
+
+          {newGameSetup && (
+            <div className="text-right text-xs text-slate-500">
+              <p>Save: <span className="text-emerald-500">{newGameSetup.saveName}</span></p>
+              <p>Treinador: <span className="text-emerald-500">{newGameSetup.managerName}</span></p>
+            </div>
+          )}
         </div>
+
         <MenuPage
           teams={teams}
           loading={loadingTeams}
           onLoadTeams={handleLoadTeams}
-          onSelectTeam={startGame}
+          onSelectTeam={handleTeamSelected}
         />
       </div>
     );
@@ -99,7 +148,6 @@ function App() {
           {activePage === "squad" && <SquadPage teamId={userTeam.id} />}
           {activePage === "staff" && <StaffPage teamId={userTeam.id} />}
           {activePage === "matches" && <MatchesPage teamId={userTeam.id} teams={teams} />}
-
           {activePage === "youth" && <PlaceholderPage title="Categorias de Base" />}
           {activePage === "scouting" && <ScoutingPage teamId={userTeam.id} />}
           {activePage === "transfer" && <TransferMarketPage teamId={userTeam.id} />}

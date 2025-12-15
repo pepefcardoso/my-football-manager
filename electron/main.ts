@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -6,7 +6,7 @@ import { teamRepository } from "../src/repositories/TeamRepository";
 import { matchRepository } from "../src/repositories/MatchRepository";
 import { competitionRepository } from "../src/repositories/CompetitionRepository";
 import { seasonRepository } from "../src/repositories/SeasonRepository";
-import { gameState } from "../src/db/schema";
+import { gameState, teams } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "../src/lib/db";
 import { Logger } from "../src/lib/Logger";
@@ -17,6 +17,7 @@ import { TrainingFocus } from "../src/domain/enums";
 import { GameEventType } from "../src/services/events/GameEventTypes";
 import { GameEngine } from "../src/engine/GameEngine";
 import { repositoryContainer } from "../src/repositories/RepositoryContainer";
+import { existsSync, mkdirSync } from "node:fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = new Logger("electron-main");
@@ -30,6 +31,13 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
+
+const USER_DATA_PATH = app.getPath("userData");
+const SAVES_DIR = path.join(USER_DATA_PATH, "saves");
+
+if (!existsSync(SAVES_DIR)) {
+  mkdirSync(SAVES_DIR, { recursive: true });
+}
 
 function setupTransferNotifications(win: BrowserWindow) {
   const getPlayerTeamId = async () => {
@@ -379,6 +387,80 @@ function registerIpcHandlers() {
     }
   );
 
+  ipcMain.handle(
+    "game:startNewGame",
+    async (_, { teamId, saveName, managerName }) => {
+      try {
+        logger.info(
+          `Iniciando novo jogo: Save=${saveName}, TimeID=${teamId}, Manager=${managerName}`
+        );
+
+        const INITIAL_DATE = "2025-01-15";
+        const activeSeason = await seasonRepository.findActiveSeason();
+        const seasonId = activeSeason ? activeSeason.id : 1;
+
+        const current = await db.select().from(gameState).limit(1);
+
+        const newStateData = {
+          playerTeamId: teamId,
+          managerName: managerName,
+          saveId: saveName,
+          currentDate: INITIAL_DATE,
+          currentSeasonId: seasonId,
+          totalPlayTime: 0,
+          lastPlayedAt: new Date().toISOString(),
+          simulationSpeed: 1,
+          trainingFocus: "technical",
+        };
+
+        if (current.length > 0) {
+          await db
+            .update(gameState)
+            .set(newStateData)
+            .where(eq(gameState.id, current[0].id));
+        } else {
+          await db.insert(gameState).values(newStateData as any);
+        }
+
+        // Opcional: Definir o time como 'Humano' na tabela de times e resetar outros
+        await db.update(teams).set({ isHuman: false });
+        await db
+          .update(teams)
+          .set({ isHuman: true })
+          .where(eq(teams.id, teamId));
+
+        const gameEngine = new GameEngine(repositoryContainer);
+        const saveResult = await gameEngine.createGameSave(saveName);
+
+        if (Result.isFailure(saveResult)) {
+          throw new Error(saveResult.error.message);
+        }
+
+        const gameSave = saveResult.data;
+
+        const safeFilename = saveName.endsWith(".json")
+          ? saveName
+          : `${saveName}.json`;
+        const filePath = path.join(SAVES_DIR, safeFilename);
+
+        await fs.writeFile(filePath, JSON.stringify(gameSave, null, 2));
+
+        logger.info(`Novo jogo criado e salvo em: ${filePath}`);
+
+        return { success: true, message: "Novo jogo configurado com sucesso!" };
+      } catch (error) {
+        logger.error("Erro fatal ao criar novo jogo:", error);
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Erro desconhecido ao iniciar jogo.",
+        };
+      }
+    }
+  );
+
   ipcMain.handle("game:getGameState", async () => {
     try {
       const state = await db.select().from(gameState).limit(1);
@@ -642,56 +724,19 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("game:saveGame", async (_, filename?: string) => {
+  ipcMain.handle("game:saveGame", async (_, filename: string) => {
     try {
       const gameEngine = new GameEngine(repositoryContainer);
-
-      const targetFilename =
-        filename || `save_${new Date().toISOString().split("T")[0]}`;
-      const saveResult = await gameEngine.createGameSave(targetFilename);
+      const saveResult = await gameEngine.createGameSave(filename);
 
       if (Result.isFailure(saveResult)) {
-        logger.error("Falha ao criar dados do save:", saveResult.error.message);
         return { success: false, message: saveResult.error.message };
       }
 
       const gameSave = saveResult.data;
 
-      const validation = gameEngine.validateGameSave(gameSave);
-      if (!validation.isValid) {
-        logger.error("Validação do save falhou:", validation.errors);
-        return {
-          success: false,
-          message: `Erro de validação: ${validation.errors.join(", ")}`,
-        };
-      }
-
-      let filePath = "";
-
-      if (filename && filename.endsWith(".json")) {
-        filePath = filename;
-      } else {
-        const { canceled, filePath: selectedPath } =
-          await dialog.showSaveDialog({
-            title: "Salvar Jogo",
-            defaultPath: `${targetFilename}.json`,
-            filters: [
-              { name: "Football Manager 2D Save", extensions: ["json"] },
-            ],
-          });
-
-        if (canceled || !selectedPath) {
-          return {
-            success: false,
-            message: "Operação cancelada pelo utilizador.",
-          };
-        }
-        filePath = selectedPath;
-      }
-
-      await fs.writeFile(filePath, JSON.stringify(gameSave, null, 2), "utf-8");
-
-      logger.info(`Jogo salvo com sucesso em: ${filePath}`);
+      const filePath = path.join(SAVES_DIR, `${filename}.json`);
+      await fs.writeFile(filePath, JSON.stringify(gameSave, null, 2));
 
       return {
         success: true,
@@ -699,53 +744,67 @@ function registerIpcHandlers() {
         metadata: gameSave.metadata,
       };
     } catch (error) {
-      logger.error("Erro crítico ao salvar jogo:", error);
-      return {
-        success: false,
-        message: `Erro ao escrever arquivo: ${
-          error instanceof Error ? error.message : "Desconhecido"
-        }`,
-      };
+      logger.error("Erro ao salvar jogo:", error);
+      return { success: false, message: "Erro interno ao salvar arquivo." };
     }
   });
 
-  ipcMain.handle("game:loadGame", async () => {
+  ipcMain.handle("game:listSaves", async () => {
     try {
-      const { dialog } = await import("electron");
+      const files = await fs.readdir(SAVES_DIR);
+      const jsonFiles = files.filter((f) => f.endsWith(".json"));
 
-      const { filePaths } = await dialog.showOpenDialog({
-        properties: ["openFile"],
-        filters: [{ name: "Football Manager 2D Save", extensions: ["json"] }],
-      });
+      const savesMetadata = [];
 
-      if (filePaths.length === 0) {
-        return { success: false, message: "Seleção cancelada." };
+      for (const file of jsonFiles) {
+        try {
+          const content = await fs.readFile(
+            path.join(SAVES_DIR, file),
+            "utf-8"
+          );
+          const save = JSON.parse(content);
+          if (save.metadata) {
+            savesMetadata.push({
+              ...save.metadata,
+              filename: file.replace(".json", ""),
+            });
+          }
+        } catch (err) {
+          logger.error("Erro ao ler arquivo de save:", err);
+          logger.warn(`Arquivo de save corrompido ignorado: ${file}`);
+        }
       }
 
-      const filePath = filePaths[0];
-      logger.info(`Loading save file from: ${filePath}`);
+      return savesMetadata.sort(
+        (a, b) =>
+          new Date(b.lastSaveTimestamp).getTime() -
+          new Date(a.lastSaveTimestamp).getTime()
+      );
+    } catch (error) {
+      logger.error("Erro ao listar saves:", error);
+      return [];
+    }
+  });
 
-      const fileContent = await fs.readFile(filePath, "utf-8");
-      const saveData = JSON.parse(fileContent);
+  ipcMain.handle("game:loadGame", async (_, filename: string) => {
+    try {
+      const file = filename.endsWith(".json") ? filename : `${filename}.json`;
+      const filePath = path.join(SAVES_DIR, file);
+
+      const content = await fs.readFile(filePath, "utf-8");
+      const gameSave = JSON.parse(content);
 
       const gameEngine = new GameEngine(repositoryContainer);
+      const result = await gameEngine.loadGameSave(gameSave);
 
-      const result = await gameEngine.loadGameSave(saveData);
-
-      if (Result.isSuccess(result)) {
-        logger.info("Save loaded successfully into DB.");
-
-        // Optional: Trigger a window reload to refresh UI with new data
-        // win?.reload();
-
-        return { success: true, message: "Jogo carregado com sucesso!" };
-      } else {
-        logger.error("Failed to load save in engine:", result.error);
+      if (Result.isFailure(result)) {
         return { success: false, message: result.error.message };
       }
+
+      return { success: true, message: "Jogo carregado com sucesso!" };
     } catch (error) {
-      logger.error("IPC Error [game:loadGame]:", error);
-      return { success: false, message: "Erro ao ler arquivo de save." };
+      logger.error("Erro ao carregar save:", error);
+      return { success: false, message: "Falha ao ler arquivo de save." };
     }
   });
 

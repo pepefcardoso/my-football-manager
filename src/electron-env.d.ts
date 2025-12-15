@@ -133,7 +133,15 @@ declare global {
         }>;
         updateTrainingFocus: (focus: string) => Promise<boolean>;
         saveGame: () => Promise<boolean>;
-        loadGame: () => Promise<boolean>;
+        listSaves: () => Promise<GameSaveMetadata[]>;
+        loadGame: (
+          filename: string
+        ) => Promise<{ success: boolean; message: string }>;
+        startNewGame: (data: {
+          teamId: number;
+          saveName: string;
+          managerName: string;
+        }) => Promise<{ success: boolean; message: string }>;
       };
 
       finance: {
