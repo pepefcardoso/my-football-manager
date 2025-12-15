@@ -20,9 +20,8 @@ export class SeasonService extends BaseService {
 
   /**
    * Inicia uma nova temporada no jogo.
-   * Cria o registro da temporada, gera o calendário de partidas para todas as competições
-   * e inicializa as tabelas de classificação.
-   * @param year - O ano da temporada (ex: 2025).
+   * Garante a integridade desativando explicitamente a temporada anterior.
+   * * @param year - O ano da temporada (ex: 2025).
    * @returns ServiceResult void em caso de sucesso.
    */
   async startNewSeason(year: number): Promise<ServiceResult<void>> {
@@ -30,6 +29,14 @@ export class SeasonService extends BaseService {
       this.logger.info(
         `🔄 Iniciando procedimentos para a temporada ${year}...`
       );
+
+      const activeSeason = await this.repos.seasons.findActiveSeason();
+      if (activeSeason) {
+        this.logger.info(
+          `Inativando temporada anterior (ID: ${activeSeason.id} - ${activeSeason.year})...`
+        );
+        await this.repos.seasons.deactivate(activeSeason.id);
+      }
 
       const startDate = `${year}-01-15`;
       const endDate = `${year}-12-15`;
@@ -87,7 +94,12 @@ export class SeasonService extends BaseService {
       this.logger.debug(
         `Persistindo ${matchesToSave.length} partidas no banco de dados...`
       );
-      await this.repos.matches.createMany(matchesToSave as any);
+
+      const batchSize = 100;
+      for (let i = 0; i < matchesToSave.length; i += batchSize) {
+        const batch = matchesToSave.slice(i, i + batchSize);
+        await this.repos.matches.createMany(batch as any);
+      }
 
       await this.initializeStandings(newSeason.id, competitions, allTeams);
 
@@ -109,9 +121,6 @@ export class SeasonService extends BaseService {
 
   /**
    * Retorna o objeto Team do campeão de uma competição específica na temporada.
-   * @param seasonId - ID da temporada.
-   * @param competitionId - ID da competição.
-   * @returns Objeto Team do campeão ou null se não definido.
    */
   async getSeasonChampion(
     seasonId: number,
@@ -137,10 +146,6 @@ export class SeasonService extends BaseService {
 
   /**
    * Lista os artilheiros de uma competição na temporada.
-   * @param seasonId - ID da temporada.
-   * @param competitionId - ID da competição.
-   * @param limit - Número máximo de jogadores a retornar (padrão: 10).
-   * @returns Array de estatísticas de jogadores.
    */
   async getTopScorers(
     seasonId: number,
@@ -162,11 +167,6 @@ export class SeasonService extends BaseService {
 
   /**
    * Retorna as entradas da tabela de classificação correspondentes à zona de rebaixamento.
-   * Pega os últimos 'zoneSize' times da tabela ordenada.
-   * @param seasonId - ID da temporada.
-   * @param competitionId - ID da competição.
-   * @param zoneSize - Quantidade de times rebaixados (padrão: 4).
-   * @returns Array com as classificações dos times na zona de rebaixamento.
    */
   async getRelegationZone(
     seasonId: number,

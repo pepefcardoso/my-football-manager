@@ -161,6 +161,7 @@ export interface ICompetitionRepository {
 export interface ISeasonRepository {
   findActiveSeason(): Promise<Season | undefined>;
   create(year: number, startDate: string, endDate: string): Promise<Season>;
+  deactivate(id: number): Promise<void>;
 }
 
 export interface IFinancialRepository {
