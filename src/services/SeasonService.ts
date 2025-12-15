@@ -4,6 +4,7 @@ import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { Result } from "./types/ServiceResults";
 import type { ServiceResult } from "./types/ServiceResults";
 import type { SeasonSelect } from "../repositories/SeasonRepository";
+import type { Team, CompetitionStanding } from "../domain/models";
 
 export interface SeasonSummary {
   seasonYear: number;
@@ -21,9 +22,8 @@ export class SeasonService extends BaseService {
    * Inicia uma nova temporada no jogo.
    * Cria o registro da temporada, gera o calendário de partidas para todas as competições
    * e inicializa as tabelas de classificação.
-   * * @param year - O ano da temporada (ex: 2025).
+   * @param year - O ano da temporada (ex: 2025).
    * @returns ServiceResult void em caso de sucesso.
-   * @throws Error se houver falha no agendamento do calendário.
    */
   async startNewSeason(year: number): Promise<ServiceResult<void>> {
     return this.executeVoid("startNewSeason", year, async (year) => {
@@ -99,7 +99,7 @@ export class SeasonService extends BaseService {
 
   /**
    * Obtém a temporada atualmente ativa no jogo.
-   * * @returns O objeto da temporada (SeasonSelect) ou undefined se nenhuma estiver ativa.
+   * @returns O objeto da temporada (SeasonSelect) ou undefined se nenhuma estiver ativa.
    */
   async getCurrentSeason(): Promise<ServiceResult<SeasonSelect | undefined>> {
     return this.execute("getCurrentSeason", null, async () => {
@@ -108,15 +108,15 @@ export class SeasonService extends BaseService {
   }
 
   /**
-   * Retorna o nome do campeão de uma competição específica na temporada.
-   * * @param seasonId - ID da temporada.
+   * Retorna o objeto Team do campeão de uma competição específica na temporada.
+   * @param seasonId - ID da temporada.
    * @param competitionId - ID da competição.
-   * @returns Nome do time campeão ou null se não definido.
+   * @returns Objeto Team do campeão ou null se não definido.
    */
   async getSeasonChampion(
     seasonId: number,
     competitionId: number
-  ): Promise<ServiceResult<string | null>> {
+  ): Promise<ServiceResult<Team | null>> {
     return this.execute(
       "getSeasonChampion",
       { seasonId, competitionId },
@@ -127,7 +127,7 @@ export class SeasonService extends BaseService {
         );
 
         if (standings.length > 0 && standings[0].team) {
-          return standings[0].team.name;
+          return standings[0].team as unknown as Team;
         }
 
         return null;
@@ -137,7 +137,7 @@ export class SeasonService extends BaseService {
 
   /**
    * Lista os artilheiros de uma competição na temporada.
-   * * @param seasonId - ID da temporada.
+   * @param seasonId - ID da temporada.
    * @param competitionId - ID da competição.
    * @param limit - Número máximo de jogadores a retornar (padrão: 10).
    * @returns Array de estatísticas de jogadores.
@@ -161,8 +161,9 @@ export class SeasonService extends BaseService {
   }
 
   /**
-   * Retorna os times na zona de rebaixamento de uma competição.
-   * * @param seasonId - ID da temporada.
+   * Retorna as entradas da tabela de classificação correspondentes à zona de rebaixamento.
+   * Pega os últimos 'zoneSize' times da tabela ordenada.
+   * @param seasonId - ID da temporada.
    * @param competitionId - ID da competição.
    * @param zoneSize - Quantidade de times rebaixados (padrão: 4).
    * @returns Array com as classificações dos times na zona de rebaixamento.
@@ -171,7 +172,7 @@ export class SeasonService extends BaseService {
     seasonId: number,
     competitionId: number,
     zoneSize: number = 4
-  ): Promise<ServiceResult<any[]>> {
+  ): Promise<ServiceResult<CompetitionStanding[]>> {
     return this.execute(
       "getRelegationZone",
       { seasonId, competitionId, zoneSize },
@@ -181,7 +182,9 @@ export class SeasonService extends BaseService {
           seasonId
         );
 
-        return standings.slice(-zoneSize);
+        const zone = standings.slice(-zoneSize);
+
+        return zone as unknown as CompetitionStanding[];
       }
     );
   }
