@@ -353,4 +353,77 @@ export class TransferService extends BaseService {
       return proposals;
     });
   }
+
+  /**
+   * Fetches transfer history for a specific team.
+   * Returns all completed transfers where the team was involved (buyer or seller).
+   *
+   * @param teamId - The ID of the team
+   * @returns List of historical transfer records with player and team details
+   */
+  async getTransferHistory(teamId: number): Promise<
+    ServiceResult<
+      Array<{
+        id: number;
+        playerId: number;
+        playerName: string;
+        fromTeamId: number | null;
+        fromTeamName: string;
+        toTeamId: number | null;
+        toTeamName: string;
+        fee: number;
+        date: string;
+        type: string;
+        seasonId: number | null;
+      }>
+    >
+  > {
+    return this.execute("getTransferHistory", teamId, async (teamId) => {
+      this.logger.info(`Fetching transfer history for team ${teamId}...`);
+
+      const allTransfers = await this.repos.transfers.findRecent(100);
+
+      const relevantTransfers = allTransfers.filter(
+        (t) => t.fromTeamId === teamId || t.toTeamId === teamId
+      );
+
+      const enrichedTransfers = await Promise.all(
+        relevantTransfers.map(async (transfer) => {
+          const player = await this.repos.players.findById(transfer.playerId!);
+          const fromTeam = transfer.fromTeamId
+            ? await this.repos.teams.findById(transfer.fromTeamId)
+            : null;
+          const toTeam = transfer.toTeamId
+            ? await this.repos.teams.findById(transfer.toTeamId)
+            : null;
+
+          return {
+            id: transfer.id,
+            playerId: transfer.playerId!,
+            playerName: player
+              ? `${player.firstName} ${player.lastName}`
+              : "Desconhecido",
+            fromTeamId: transfer.fromTeamId,
+            fromTeamName: fromTeam?.shortName || "Agente Livre",
+            toTeamId: transfer.toTeamId,
+            toTeamName: toTeam?.shortName || "Sem Clube",
+            fee: transfer.fee,
+            date: transfer.date,
+            type: transfer.type,
+            seasonId: transfer.seasonId,
+          };
+        })
+      );
+
+      enrichedTransfers.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      this.logger.info(
+        `Found ${enrichedTransfers.length} historical transfers for team ${teamId}`
+      );
+
+      return enrichedTransfers;
+    });
+  }
 }

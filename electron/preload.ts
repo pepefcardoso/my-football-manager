@@ -169,6 +169,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("transfer:getTransferWindowStatus", date),
     onNotification: (callback: (data: any) => void) =>
       ipcRenderer.on("transfer:notification", (_, data) => callback(data)),
+    getTransferHistory: (teamId: number) =>
+      ipcRenderer.invoke("transfer:getTransferHistory", teamId),
   },
 
   marketing: {

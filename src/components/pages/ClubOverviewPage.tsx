@@ -16,24 +16,38 @@ interface SeasonSummary {
 
 function ClubOverviewPage({ team }: { team: Team }) {
     const [gameState, setGameState] = useState<GameState | null>(null);
+    const [allTeams, setAllTeams] = useState<Team[]>([]);
     const [simulating, setSimulating] = useState(false);
     const [showSeasonModal, setShowSeasonModal] = useState(false);
     const [seasonSummary, setSeasonSummary] = useState<SeasonSummary | null>(null);
 
     const advanceDateGlobal = useGameStore((state) => state.advanceDate);
 
+    useEffect(() => {
+        const loadInitialData = async () => {
+            try {
+                const [state, teamsList] = await Promise.all([
+                    window.electronAPI.game.getGameState(),
+                    window.electronAPI.team.getTeams()
+                ]);
+                setGameState(state);
+                setAllTeams(teamsList);
+            } catch (error) {
+                logger.error("Erro ao carregar dados iniciais:", error);
+            }
+        };
+
+        loadInitialData();
+    }, []);
+
     const fetchGameState = async () => {
         try {
             const state = await window.electronAPI.game.getGameState();
             setGameState(state);
         } catch (error) {
-            logger.error("Erro ao carregar estado do jogo:", error);
+            logger.error("Erro ao atualizar estado do jogo:", error);
         }
     };
-
-    useEffect(() => {
-        fetchGameState();
-    }, []);
 
     const handleAdvanceDay = async () => {
         if (simulating) return;
@@ -58,6 +72,10 @@ function ClubOverviewPage({ team }: { team: Team }) {
         } finally {
             setSimulating(false);
         }
+    };
+
+    const getTeamName = (id: number) => {
+        return allTeams.find(t => t.id === id)?.name || "Time Desconhecido";
     };
 
     return (
@@ -115,40 +133,73 @@ function ClubOverviewPage({ team }: { team: Team }) {
             )}
 
             {showSeasonModal && seasonSummary && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-                        <div className="bg-gradient-to-r from-emerald-600 to-cyan-600 p-6 text-center">
-                            <h2 className="text-3xl font-black text-white tracking-tighter uppercase">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+                    <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
+
+                        <div className="bg-gradient-to-r from-emerald-600 to-cyan-600 p-8 text-center relative overflow-hidden">
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                            <h2 className="text-4xl font-black text-white tracking-tighter uppercase relative z-10 drop-shadow-md">
                                 Temporada Encerrada!
                             </h2>
-                            <p className="text-emerald-100 mt-2 font-medium">
-                                Resumo do Ano {seasonSummary.seasonYear}
+                            <p className="text-emerald-100 mt-2 font-medium relative z-10 text-lg">
+                                Resumo Oficial do Ano {seasonSummary.seasonYear}
                             </p>
                         </div>
 
-                        <div className="p-8 space-y-6">
-                            <div className="text-center">
-                                <p className="text-slate-400 text-sm uppercase tracking-widest mb-1">Campeão Nacional</p>
-                                <p className="text-3xl font-bold text-white flex items-center justify-center gap-2">
-                                    🏆 {seasonSummary.championName}
+                        <div className="p-8 space-y-8">
+
+                            <div className="text-center bg-slate-950/50 p-6 rounded-lg border border-slate-800">
+                                <p className="text-amber-400 text-xs uppercase tracking-[0.2em] font-bold mb-2">Campeão Nacional</p>
+                                <p className="text-4xl font-bold text-white flex items-center justify-center gap-3">
+                                    <span className="text-5xl">🏆</span> {seasonSummary.championName}
                                 </p>
                             </div>
 
-                            <div className="bg-slate-950/50 rounded-lg p-4 border border-slate-800">
-                                <h4 className="text-emerald-400 font-bold mb-2 text-sm uppercase">Novidades</h4>
-                                <ul className="text-slate-300 space-y-2 text-sm">
-                                    <li>• Calendário de {seasonSummary.seasonYear + 1} gerado.</li>
-                                    <li>• Jogadores retornaram de férias.</li>
-                                    <li>• Orçamentos atualizados.</li>
-                                </ul>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                                <div className="bg-slate-950/30 p-5 rounded-lg border border-slate-800">
+                                    <h4 className="text-emerald-400 font-bold mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">
+                                        <span>🔼</span> Promovidos (Série B)
+                                    </h4>
+                                    <ul className="space-y-2">
+                                        {seasonSummary.promotedTeams.map((teamId) => (
+                                            <li key={teamId} className="text-slate-300 text-sm flex items-center gap-2 p-2 bg-slate-900/50 rounded">
+                                                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                                {getTeamName(teamId)}
+                                            </li>
+                                        ))}
+                                        {seasonSummary.promotedTeams.length === 0 && (
+                                            <li className="text-slate-500 text-xs italic">Nenhum time promovido.</li>
+                                        )}
+                                    </ul>
+                                </div>
+
+                                <div className="bg-slate-950/30 p-5 rounded-lg border border-slate-800">
+                                    <h4 className="text-red-400 font-bold mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">
+                                        <span>🔻</span> Rebaixados (Série A)
+                                    </h4>
+                                    <ul className="space-y-2">
+                                        {seasonSummary.relegatedTeams.map((teamId) => (
+                                            <li key={teamId} className="text-slate-300 text-sm flex items-center gap-2 p-2 bg-slate-900/50 rounded">
+                                                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                                {getTeamName(teamId)}
+                                            </li>
+                                        ))}
+                                        {seasonSummary.relegatedTeams.length === 0 && (
+                                            <li className="text-slate-500 text-xs italic">Nenhum time rebaixado.</li>
+                                        )}
+                                    </ul>
+                                </div>
                             </div>
 
-                            <button
-                                onClick={() => setShowSeasonModal(false)}
-                                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors"
-                            >
-                                Começar Temporada {seasonSummary.seasonYear + 1}
-                            </button>
+                            <div className="pt-4 border-t border-slate-800">
+                                <button
+                                    onClick={() => setShowSeasonModal(false)}
+                                    className="w-full py-4 bg-white hover:bg-slate-200 text-slate-900 font-bold rounded-lg transition-all shadow-lg hover:shadow-white/10 flex items-center justify-center gap-2"
+                                >
+                                    <span>📅</span> Iniciar Pré-Temporada {seasonSummary.seasonYear + 1}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

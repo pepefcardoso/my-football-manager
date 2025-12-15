@@ -16,7 +16,10 @@ import { Result } from "../src/services/types/ServiceResults";
 import { TrainingFocus } from "../src/domain/enums";
 import { GameEventType } from "../src/services/events/GameEventTypes";
 import { GameEngine } from "../src/engine/GameEngine";
-import { repositoryContainer, RepositoryFactory } from "../src/repositories/RepositoryContainer";
+import {
+  repositoryContainer,
+  RepositoryFactory,
+} from "../src/repositories/RepositoryContainer";
 import { existsSync, mkdirSync } from "node:fs";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -1083,6 +1086,27 @@ function registerIpcHandlers() {
       }
     }
   );
+
+  ipcMain.handle("transfer:getTransferHistory", async (_, teamId: number) => {
+    try {
+      const allTransfers = await serviceContainer.transfer.getTransferHistory(
+        teamId
+      );
+
+      if (Result.isSuccess(allTransfers)) {
+        return allTransfers.data;
+      }
+
+      logger.error(
+        "Erro ao buscar histórico de transferências:",
+        allTransfers.error.message
+      );
+      return [];
+    } catch (error) {
+      logger.error("IPC Error [transfer:getTransferHistory]:", error);
+      return [];
+    }
+  });
 
   ipcMain.handle("transfer:getReceivedProposals", async (_, teamId) => {
     const result = await serviceContainer.transfer.getReceivedProposals(teamId);

@@ -21,6 +21,20 @@ interface PlayerWithContract extends Player {
     contractEnd: string | null | undefined;
 }
 
+interface TransferHistoryRecord {
+    id: number;
+    playerId: number;
+    playerName: string;
+    fromTeamId: number | null;
+    fromTeamName: string;
+    toTeamId: number | null;
+    toTeamName: string;
+    fee: number;
+    date: string;
+    type: string;
+    seasonId: number | null;
+}
+
 type TransferTab = "market" | "received" | "sent" | "history";
 
 function TransferMarketPage({ teamId }: { teamId: number }) {
@@ -37,6 +51,9 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
     const [marketPlayers, setMarketPlayers] = useState<PlayerWithContract[]>([]);
     const [marketLoading, setMarketLoading] = useState(false);
     const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [transferHistory, setTransferHistory] = useState<TransferHistoryRecord[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyFilter, setHistoryFilter] = useState<'all' | 'in' | 'out'>('all');
 
     const fetchData = useCallback(async () => {
         try {
@@ -70,6 +87,27 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
 
         fetchMarketData();
     }, [activeTab]);
+
+    useEffect(() => {
+        if (activeTab !== "history") return;
+
+        const fetchHistory = async () => {
+            setHistoryLoading(true);
+            try {
+                const historyData = await window.electronAPI.transfer.getTransferHistory(teamId);
+
+                setTransferHistory(historyData || []);
+                logger.info(`Loaded ${historyData?.length || 0} transfer history records`);
+            } catch (error) {
+                logger.error("Erro ao buscar histórico de transferências:", error);
+                setTransferHistory([]);
+            } finally {
+                setHistoryLoading(false);
+            }
+        };
+
+        fetchHistory();
+    }, [activeTab, teamId]);
 
     const handleFinalizeTransfer = async (proposal: ProposalWithDetails) => {
         setActionFeedback(null);
@@ -192,7 +230,6 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                                 <td className="p-4 text-right">
                                     {(prop.status === TransferStatus.PENDING || prop.status === TransferStatus.NEGOTIATING) && (
                                         <button
-                                            // TODO: Implementar Modal de Resposta
                                             onClick={() => logger.info(`Abrir modal de resposta para Prop. ${prop.id}`)}
                                             className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition-colors">
                                             {isIncoming ? 'Analisar' : 'Detalhes'}
@@ -216,6 +253,13 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
             </table>
         );
     }
+
+    const filteredHistory = transferHistory.filter((record) => {
+        if (historyFilter === 'all') return true;
+        if (historyFilter === 'in') return record.toTeamId === teamId;
+        if (historyFilter === 'out') return record.fromTeamId === teamId;
+        return true;
+    });
 
     const renderTabContent = () => {
         const anyLoading = loading || marketLoading;
@@ -266,9 +310,9 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                                 )}
                             </>
                         )}
-
                     </div>
                 );
+
             case "received":
                 return (
                     <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
@@ -276,6 +320,7 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                         {renderProposalsTable(receivedProposals, true)}
                     </div>
                 );
+
             case "sent":
                 return (
                     <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
@@ -283,14 +328,104 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                         {renderProposalsTable(sentProposals, false)}
                     </div>
                 );
+
             case "history":
                 return (
-                    <div className="p-8 bg-slate-900/50 rounded-lg border border-slate-800">
-                        <h4 className="text-xl font-semibold mb-4">Histórico de Transferências Concluídas</h4>
-                        <p className="text-slate-400">Registro de todas as movimentações (compras, vendas e empréstimos) finalizadas nesta temporada e anteriores.</p>
-                        <div className="mt-4 p-4 bg-slate-800/50 rounded text-slate-500 text-sm">
-                            <p>Esta seção será implementada na Fase 5, com um novo serviço de Histórico de Transferências.</p>
+                    <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
+                        <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+                            <h4 className="text-xl font-semibold">Histórico de Transferências</h4>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setHistoryFilter('all')}
+                                    className={`px-3 py-1 text-xs rounded transition-colors ${historyFilter === 'all'
+                                            ? 'bg-emerald-600 text-white'
+                                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                        }`}
+                                >
+                                    Todas
+                                </button>
+                                <button
+                                    onClick={() => setHistoryFilter('in')}
+                                    className={`px-3 py-1 text-xs rounded transition-colors ${historyFilter === 'in'
+                                            ? 'bg-emerald-600 text-white'
+                                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                        }`}
+                                >
+                                    Entradas
+                                </button>
+                                <button
+                                    onClick={() => setHistoryFilter('out')}
+                                    className={`px-3 py-1 text-xs rounded transition-colors ${historyFilter === 'out'
+                                            ? 'bg-emerald-600 text-white'
+                                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                        }`}
+                                >
+                                    Saídas
+                                </button>
+                            </div>
                         </div>
+
+                        {historyLoading ? (
+                            <div className="flex justify-center p-10">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                            </div>
+                        ) : filteredHistory.length === 0 ? (
+                            <div className="text-center p-8 text-slate-500">
+                                <p className="mb-2">Nenhuma transferência concluída encontrada.</p>
+                                <p className="text-xs text-slate-600">
+                                    As transferências finalizadas aparecerão aqui.
+                                </p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-900 text-slate-400 uppercase text-xs">
+                                    <tr>
+                                        <th className="p-4">Data</th>
+                                        <th className="p-4">Jogador</th>
+                                        <th className="p-4">De</th>
+                                        <th className="p-4">Para</th>
+                                        <th className="p-4 text-right">Valor</th>
+                                        <th className="p-4 text-center">Tipo</th>
+                                        <th className="p-4 text-center">Direção</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {filteredHistory.map((record) => {
+                                        const isIncoming = record.toTeamId === teamId;
+                                        const directionColor = isIncoming ? 'text-emerald-400' : 'text-red-400';
+                                        const directionIcon = isIncoming ? '📥' : '📤';
+                                        const directionLabel = isIncoming ? 'Compra' : 'Venda';
+
+                                        return (
+                                            <tr key={record.id} className="hover:bg-slate-800/50 transition-colors">
+                                                <td className="p-4 text-slate-400 font-mono text-xs">
+                                                    {new Date(record.date).toLocaleDateString('pt-PT', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric'
+                                                    })}
+                                                </td>
+                                                <td className="p-4 font-medium text-white">{record.playerName}</td>
+                                                <td className="p-4 text-slate-400">{record.fromTeamName}</td>
+                                                <td className="p-4 text-slate-400">{record.toTeamName}</td>
+                                                <td className="p-4 text-right font-mono text-emerald-400">
+                                                    {formatCurrency(record.fee)}
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    <Badge variant="neutral">{record.type}</Badge>
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    <span className={`flex items-center justify-center gap-1 ${directionColor}`}>
+                                                        <span>{directionIcon}</span>
+                                                        <span className="text-xs font-bold">{directionLabel}</span>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 );
         }
@@ -305,7 +440,6 @@ function TransferMarketPage({ teamId }: { teamId: number }) {
                 <p className="text-slate-400 text-sm">Gerencie suas negociações de jogadores.</p>
             </header>
 
-            {/* Exibição da mensagem de feedback [NOVO] */}
             {actionFeedback && (
                 <div
                     className={`mb-6 p-4 rounded-lg border ${actionFeedback.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-red-500/10 border-red-500/50 text-red-400'}`}

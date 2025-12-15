@@ -29,6 +29,21 @@ interface PlayerStatRow {
   assists: number;
   matches: number;
 }
+
+interface TransferHistoryRecord {
+  id: number;
+  playerId: number;
+  playerName: string;
+  fromTeamId: number | null;
+  fromTeamName: string;
+  toTeamId: number | null;
+  toTeamName: string;
+  fee: number;
+  date: string;
+  type: string;
+  seasonId: number | null;
+}
+
 interface GoalkeeperStatRow {
   id: number;
   playerId: number;
@@ -215,6 +230,7 @@ declare global {
         onNotification: (
           callback: (data: TransferNotificationPayload) => void
         ) => void;
+        getTransferHistory: (teamId: number) => Promise<TransferHistoryRecord[]>;
       };
 
       marketing: {
