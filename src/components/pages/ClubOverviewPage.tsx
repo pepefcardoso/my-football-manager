@@ -63,6 +63,11 @@ function ClubOverviewPage({ team }: { team: Team }) {
                 setShowSeasonModal(true);
             }
 
+            if ((result as any).narrativeEvent) {
+                const event = (result as any).narrativeEvent;
+                useGameStore.getState().triggerEvent(event);
+            }
+
             if (result.messages && result.messages.length > 0) {
                 result.messages.forEach(msg => logger.info(msg));
             }

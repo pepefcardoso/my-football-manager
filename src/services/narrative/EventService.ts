@@ -176,4 +176,111 @@ export class EventService extends BaseService {
 
     return RandomEngine.pickOne(possibleEvents);
   }
+
+  /**
+   * Processa a escolha do jogador frente a um evento.
+   * Aplica os efeitos (mudança de moral, dinheiro, reputação) baseados na opção.
+   */
+  async processEventResponse(
+    eventId: string,
+    optionId: string,
+    teamId: number
+  ): Promise<ServiceResult<string>> {
+    return this.execute(
+      "processEventResponse",
+      { eventId, optionId },
+      async () => {
+        this.logger.info(
+          `Processando resposta evento ${eventId}: opção ${optionId}`
+        );
+
+        const team = await this.repos.teams.findById(teamId);
+        if (!team) throw new Error("Time não encontrado.");
+
+        let effectMessage = "Nenhum efeito imediato.";
+
+        switch (optionId) {
+          case "acknowledge":
+            effectMessage = "O conselho espera melhorias financeiras.";
+            break;
+
+          case "ignore":
+            await this.repos.teams.update(teamId, {
+              fanSatisfaction: Math.max(0, (team.fanSatisfaction || 50) - 5),
+            });
+            effectMessage =
+              "A torcida ficou insatisfeita com a falta de ação (-5 Satisfação).";
+            break;
+
+          case "invest_youth": {
+            const investCost = 2000000;
+            if (team.budget >= investCost) {
+              await this.repos.teams.updateBudget(
+                teamId,
+                team.budget - investCost
+              );
+              await this.repos.teams.update(teamId, {
+                youthAcademyQuality: Math.min(
+                  100,
+                  (team.youthAcademyQuality || 0) + 5
+                ),
+              });
+              effectMessage =
+                "Investimento realizado na base (+5 Qualidade Base, -€2M).";
+            } else {
+              effectMessage = "Saldo insuficiente para o investimento.";
+            }
+            break;
+          }
+
+          case "save":
+            effectMessage = "O dinheiro foi mantido em caixa.";
+            break;
+
+          case "meeting":
+            effectMessage =
+              "A reunião acalmou os ânimos, mas cansou os jogadores.";
+            break;
+
+          case "discipline":
+            await this.repos.teams.update(teamId, {
+              fanSatisfaction: (team.fanSatisfaction || 0) + 2,
+            });
+            effectMessage =
+              "A torcida gostou da postura firme (+2 Satisfação), mas alguns jogadores reclamam.";
+            break;
+
+          case "accept":
+            await this.repos.teams.update(teamId, {
+              reputation: (team.reputation || 0) + 50,
+            });
+            effectMessage = "Sua imagem pública melhorou (+50 Reputação).";
+            break;
+
+          case "decline":
+            effectMessage = "Você manteve o foco no trabalho.";
+            break;
+
+          case "send_reserves":
+            effectMessage = "O patrocinador não gostou muito, mas aceitou.";
+            break;
+
+          case "send_stars":
+            await this.repos.financial.addRecord({
+              teamId,
+              amount: 500000,
+              category: "sponsors",
+              type: "income",
+              seasonId: 1,
+              date: new Date().toISOString().split("T")[0],
+              description: "Bônus por evento com estrelas",
+            });
+            effectMessage = "O evento foi um sucesso! (+€500k Receita).";
+            break;
+        }
+
+        return effectMessage;
+      }
+    );
+  }
 }

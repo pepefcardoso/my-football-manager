@@ -98,6 +98,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       saveName: string;
       managerName: string;
     }) => ipcRenderer.invoke("game:startNewGame", data),
+    respondToEvent: (data: any) =>
+      ipcRenderer.invoke("game:respondToEvent", data),
   },
 
   finance: {

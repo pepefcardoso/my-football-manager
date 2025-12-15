@@ -157,6 +157,11 @@ declare global {
           saveName: string;
           managerName: string;
         }) => Promise<{ success: boolean; message: string }>;
+        respondToEvent: (data: {
+          eventId: string;
+          optionId: string;
+          teamId: number;
+        }) => Promise<{ success: boolean; message: string }>;
       };
 
       finance: {
@@ -230,7 +235,9 @@ declare global {
         onNotification: (
           callback: (data: TransferNotificationPayload) => void
         ) => void;
-        getTransferHistory: (teamId: number) => Promise<TransferHistoryRecord[]>;
+        getTransferHistory: (
+          teamId: number
+        ) => Promise<TransferHistoryRecord[]>;
       };
 
       marketing: {

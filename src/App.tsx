@@ -17,6 +17,7 @@ import ScoutingPage from "./components/pages/ScoutingPage";
 import StandingsPage from "./components/pages/StandingsPage";
 import TransferMarketPage from "./components/pages/TransferMarketPage";
 import { TransferNotification } from "./components/common/TransferNotification";
+import { EventModal } from "./components/features/events/EventModal";
 
 const logger = new Logger("App");
 
@@ -28,6 +29,8 @@ function App() {
   const navigateInGame = useGameStore((state) => state.navigateInGame);
   const resetGame = useGameStore((state) => state.resetGame);
   const newGameSetup = useGameStore((state) => state.newGameSetup);
+  const currentEvent = useGameStore((state) => state.currentEvent);
+  const resolveEvent = useGameStore((state) => state.resolveEvent);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
@@ -157,6 +160,14 @@ function App() {
           {activePage === "competitions" && <StandingsPage />}
         </MainLayout>
         <TransferNotification />
+
+        {currentEvent && (
+          <EventModal
+            event={currentEvent}
+            teamId={userTeam.id}
+            onResolve={resolveEvent}
+          />
+        )}
       </>
     );
   }

@@ -1270,6 +1270,21 @@ function registerIpcHandlers() {
       }
     }
   );
+
+  ipcMain.handle(
+    "game:respondToEvent",
+    async (_, { eventId, optionId, teamId }) => {
+      const result = await serviceContainer.eventService.processEventResponse(
+        eventId,
+        optionId,
+        teamId
+      );
+      if (Result.isSuccess(result)) {
+        return { success: true, message: result.data };
+      }
+      return { success: false, message: result.error.message };
+    }
+  );
 }
 
 let win: BrowserWindow | null;
