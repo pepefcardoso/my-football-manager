@@ -649,26 +649,55 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("game:saveGame", async (_, filename: string) => {
-    const gameEngine = new GameEngine(repositoryContainer);
+    try {
+      const gameEngine = new GameEngine(repositoryContainer);
 
-    const saveContextResult = await gameEngine.saveManager.createSaveContext(
-      filename
-    );
+      const saveResult = await gameEngine.createGameSave(filename);
 
-    if (Result.isFailure(saveContextResult)) {
-      logger.error("Falha ao criar contexto de save:", saveContextResult.error);
-      return false;
+      if (Result.isFailure(saveResult)) {
+        logger.error("Falha ao criar save:", saveResult.error.message);
+        return {
+          success: false,
+          message: saveResult.error.message,
+        };
+      }
+
+      const gameSave = saveResult.data;
+
+      const validation = gameEngine.validateGameSave(gameSave);
+      if (!validation.isValid) {
+        logger.error("Save validation failed:", validation.errors);
+        return {
+          success: false,
+          message: `Validação falhou: ${validation.errors.join(", ")}`,
+        };
+      }
+
+      if (validation.warnings.length > 0) {
+        logger.warn("Save validation warnings:", validation.warnings);
+      }
+
+      // TODO: Phase 2.2 - Persist to file system
+      logger.info(`Save ready for persistence: ${gameSave.metadata.filename}`, {
+        saveId: gameSave.metadata.id,
+        teams: gameSave.teams.length,
+        players: gameSave.players.length,
+        matches: gameSave.matches.length,
+      });
+
+      return {
+        success: true,
+        message:
+          "Save criado com sucesso (persistência será implementada na Fase 2.2)",
+        metadata: gameSave.metadata,
+      };
+    } catch (error) {
+      logger.error("Erro ao salvar jogo:", error);
+      return {
+        success: false,
+        message: "Erro interno ao salvar jogo",
+      };
     }
-
-    const { metadata } = saveContextResult.data;
-
-    // TODO: Na Fase 2.2, aqui será implementada a escrita do arquivo JSON
-    // Usando 'metadata' para logar por enquanto, resolvendo o erro de unused variable
-    logger.info(
-      `Preparando save para: ${metadata.filename} (ID: ${metadata.id})`
-    );
-
-    return true;
   });
 
   ipcMain.handle("game:loadGame", async () => {

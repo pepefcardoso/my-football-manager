@@ -201,10 +201,6 @@ export interface FinancialChange {
   teamId: number;
 }
 
-export interface GameSave {
-  metadata: GameSaveMetadata;
-}
-
 export interface PlayerListItem {
   id: number;
   fullName: string;
@@ -290,19 +286,4 @@ export interface FinancialHealthResult {
 export interface TransferPermissionResult {
   allowed: boolean;
   reason?: string;
-}
-
-export interface GameSaveMetadata {
-  id: string;
-  filename: string;
-  managerName: string;
-  teamName: string;
-  teamId: number;
-  currentDate: string;
-  seasonYear: number;
-  reputation: number;
-  playTimeSeconds: number;
-  lastSaveTimestamp: string;
-  version: string;
-  primaryColor: string;
 }

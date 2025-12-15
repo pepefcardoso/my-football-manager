@@ -1,16 +1,13 @@
 import type { GameState, Match, Player } from "../domain/models";
-import type {
-  MatchResult,
-  GameEvent,
-  GameSaveMetadata,
-  GameSave,
-} from "../domain/types";
+import type { MatchResult, GameEvent } from "../domain/types";
 import { FinanceService } from "../services/FinanceService";
 import { serviceContainer } from "../services/ServiceContainer";
 import { Logger } from "../lib/Logger";
 import { Result, type ServiceResult } from "../services/types/ServiceResults";
 import { TimeEngine } from "./TimeEngine";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
+import type { GameSave, SaveValidationResult } from "../domain/GameSaveTypes";
+import { SaveManager } from "./SaveManager";
 
 const logger = new Logger("GameEngine");
 
@@ -283,6 +280,30 @@ export class GameEngine {
     if (player.fitness < 40) return "Fora de forma";
     return "Disponível";
   }
+
+  /**
+   * Creates a complete game save with all necessary data
+   *
+   * @param filename - User-defined filename for the save
+   * @returns ServiceResult containing the complete GameSave object ready for persistence
+   */
+  async createGameSave(filename: string): Promise<ServiceResult<GameSave>> {
+    return this.saveManager.createSaveContext({
+      filename,
+      matchHistoryLimit: 500,
+      financialRecordLimit: 1000,
+    });
+  }
+
+  /**
+   * Validates if a save file is compatible with the current game version
+   *
+   * @param save - The save data to validate
+   * @returns Validation result with compatibility info and any errors/warnings
+   */
+  validateGameSave(save: GameSave): SaveValidationResult {
+    return this.saveManager.validateSave(save);
+  }
 }
 
 export interface DailyUpdateResult {
@@ -323,73 +344,4 @@ export interface FinancialChange {
   amount: number;
   category: string;
   description: string;
-}
-
-export class SaveManager {
-  private repos: IRepositoryContainer;
-
-  constructor(repositories: IRepositoryContainer) {
-    this.repos = repositories;
-  }
-
-  async createSaveContext(filename: string): Promise<ServiceResult<GameSave>> {
-    try {
-      const state = await this.repos.gameState.findCurrent();
-
-      if (!state) {
-        return Result.fail("Não há estado de jogo ativo para salvar.");
-      }
-
-      let teamName = "Desempregado";
-      let teamReputation = 0;
-      let primaryColor = "#333333";
-
-      if (state.playerTeamId) {
-        const team = await this.repos.teams.findById(state.playerTeamId);
-        if (team) {
-          teamName = team.name;
-          teamReputation = team.reputation;
-          primaryColor = team.primaryColor;
-        }
-      }
-
-      let seasonYear = new Date(state.currentDate).getFullYear();
-      if (state.currentSeasonId) {
-        const activeSeason = await this.repos.seasons.findActiveSeason();
-        if (activeSeason) seasonYear = activeSeason.year;
-      }
-
-      // TODO: Obter saveId real do estado (assumindo que foi adicionado ao schema)
-      const saveId = (state as any).saveId || crypto.randomUUID();
-      const totalPlayTime = (state as any).totalPlayTime || 0;
-
-      const metadata: GameSaveMetadata = {
-        id: saveId,
-        filename: filename,
-        managerName: state.managerName,
-        teamName: teamName,
-        teamId: state.playerTeamId || 0,
-        currentDate: state.currentDate,
-        seasonYear: seasonYear,
-        reputation: teamReputation,
-        playTimeSeconds: totalPlayTime,
-        lastSaveTimestamp: new Date().toISOString(),
-        version: "0.1.0",
-        primaryColor: primaryColor,
-      };
-
-      return Result.success({
-        metadata,
-      });
-    } catch (error) {
-      logger.error("Erro ao criar contexto de save:", error);
-      return Result.fail("Falha interna ao gerar dados de salvamento.");
-    }
-  }
-
-  validateSaveCompatibility(metadata: GameSaveMetadata): boolean {
-    const currentMajor = "0";
-    const saveMajor = metadata.version.split(".")[0];
-    return currentMajor === saveMajor;
-  }
 }
