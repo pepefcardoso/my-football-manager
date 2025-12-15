@@ -6,6 +6,7 @@ import type {
   NarrativeEvent,
   EventTriggerContext,
 } from "../../domain/narrative";
+import { EventLibrary } from "../../domain/events/EventLibrary";
 
 export class EventService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -24,7 +25,7 @@ export class EventService extends BaseService {
       "generateDailyEvent",
       { teamId, currentDate },
       async () => {
-        const EVENT_CHANCE = 5;
+        const EVENT_CHANCE = 15;
 
         if (!RandomEngine.chance(EVENT_CHANCE)) {
           return null;
@@ -57,8 +58,6 @@ export class EventService extends BaseService {
         ? players.reduce((sum, p) => sum + p.moral, 0) / players.length
         : 50;
 
-    // TODO: Buscar posição na liga (requer query complexa ou cache)
-
     return {
       teamId,
       currentDate,
@@ -74,34 +73,26 @@ export class EventService extends BaseService {
   ): NarrativeEvent | null {
     const possibleEvents: NarrativeEvent[] = [];
 
-    if (context.budget < 0) {
-      possibleEvents.push({
-        id: `fin_crisis_${Date.now()}`,
-        title: "Crise Financeira",
-        description:
-          "O conselho está preocupado com as dívidas recentes. Precisamos cortar gastos imediatamente.",
-        category: "board",
-        importance: "high",
-        date: context.currentDate,
-        options: [
-          { id: "acknowledge", label: "Entendido, vou vender jogadores." },
-          { id: "ignore", label: "Os resultados em campo pagarão as contas." },
-        ],
-      });
-    }
+    const takeoverEvent = EventLibrary.getClubTakeover(context);
+    if (takeoverEvent) return takeoverEvent;
+
+    const crisisEvent = EventLibrary.getDressingRoomCrisis(context);
+    if (crisisEvent) possibleEvents.push(crisisEvent);
+
+    const interviewEvent = EventLibrary.getMediaInterview(context);
+    if (interviewEvent) possibleEvents.push(interviewEvent);
 
     if (context.budget > 50_000_000) {
       possibleEvents.push({
         id: `fin_surplus_${Date.now()}`,
         title: "Oportunidade de Investimento",
-        description:
-          "Com o caixa positivo, o diretor de futebol sugere melhorar as instalações da base.",
+        description: "Com o caixa positivo, o diretor sugere melhorar a base.",
         category: "board",
         importance: "medium",
         date: context.currentDate,
         options: [
-          { id: "invest_youth", label: "Investir na Base" },
-          { id: "save", label: "Guardar para transferências" },
+          { id: "invest_youth", label: "Investir na Base (-€2M)" },
+          { id: "save", label: "Guardar Dinheiro" },
         ],
       });
     }
@@ -110,67 +101,12 @@ export class EventService extends BaseService {
       possibleEvents.push({
         id: `fan_protest_${Date.now()}`,
         title: "Protesto da Torcida",
-        description:
-          "Um grupo de torcedores organizados está protestando em frente ao CT contra a má gestão.",
+        description: "Torcedores protestam no CT contra a má fase.",
         category: "fan",
         importance: "critical",
         date: context.currentDate,
       });
-    } else if (context.fanSatisfaction > 80) {
-      possibleEvents.push({
-        id: `fan_praise_${Date.now()}`,
-        title: "Elogios nas Redes Sociais",
-        description:
-          "A torcida está eufórica com o desempenho recente do time. A venda de camisas aumentou.",
-        category: "fan",
-        importance: "low",
-        date: context.currentDate,
-      });
     }
-
-    if (context.averageMorale < 40) {
-      possibleEvents.push({
-        id: `player_unrest_${Date.now()}`,
-        title: "Clima Tenso no Vestiário",
-        description:
-          "Alguns líderes do elenco questionam seus métodos de treinamento.",
-        category: "player",
-        importance: "high",
-        date: context.currentDate,
-        options: [
-          { id: "meeting", label: "Convocar reunião de time" },
-          { id: "discipline", label: "Exigir profissionalismo" },
-        ],
-      });
-    }
-
-    possibleEvents.push({
-      id: `media_interview_${Date.now()}`,
-      title: "Solicitação de Entrevista",
-      description:
-        "Um jornal local gostaria de fazer uma matéria sobre sua filosofia de jogo.",
-      category: "media",
-      importance: "low",
-      date: context.currentDate,
-      options: [
-        { id: "accept", label: "Aceitar (+Reputação)" },
-        { id: "decline", label: "Recusar (Focar no trabalho)" },
-      ],
-    });
-
-    possibleEvents.push({
-      id: `sponsor_event_${Date.now()}`,
-      title: "Evento do Patrocinador",
-      description:
-        "O patrocinador master exige a presença de alguns jogadores em um evento comercial.",
-      category: "sponsor",
-      importance: "low",
-      date: context.currentDate,
-      options: [
-        { id: "send_reserves", label: "Enviar reservas" },
-        { id: "send_stars", label: "Enviar estrelas (-Energia, +Receita)" },
-      ],
-    });
 
     if (possibleEvents.length === 0) return null;
 
@@ -199,84 +135,93 @@ export class EventService extends BaseService {
 
         let effectMessage = "Nenhum efeito imediato.";
 
-        switch (optionId) {
-          case "acknowledge":
-            effectMessage = "O conselho espera melhorias financeiras.";
-            break;
-
-          case "ignore":
-            await this.repos.teams.update(teamId, {
-              fanSatisfaction: Math.max(0, (team.fanSatisfaction || 50) - 5),
-            });
-            effectMessage =
-              "A torcida ficou insatisfeita com a falta de ação (-5 Satisfação).";
-            break;
-
-          case "invest_youth": {
-            const investCost = 2000000;
-            if (team.budget >= investCost) {
-              await this.repos.teams.updateBudget(
-                teamId,
-                team.budget - investCost
-              );
-              await this.repos.teams.update(teamId, {
-                youthAcademyQuality: Math.min(
-                  100,
-                  (team.youthAcademyQuality || 0) + 5
-                ),
-              });
-              effectMessage =
-                "Investimento realizado na base (+5 Qualidade Base, -€2M).";
-            } else {
-              effectMessage = "Saldo insuficiente para o investimento.";
-            }
-            break;
-          }
-
-          case "save":
-            effectMessage = "O dinheiro foi mantido em caixa.";
-            break;
-
-          case "meeting":
-            effectMessage =
-              "A reunião acalmou os ânimos, mas cansou os jogadores.";
-            break;
-
-          case "discipline":
-            await this.repos.teams.update(teamId, {
-              fanSatisfaction: (team.fanSatisfaction || 0) + 2,
-            });
-            effectMessage =
-              "A torcida gostou da postura firme (+2 Satisfação), mas alguns jogadores reclamam.";
-            break;
-
-          case "accept":
-            await this.repos.teams.update(teamId, {
-              reputation: (team.reputation || 0) + 50,
-            });
-            effectMessage = "Sua imagem pública melhorou (+50 Reputação).";
-            break;
-
-          case "decline":
-            effectMessage = "Você manteve o foco no trabalho.";
-            break;
-
-          case "send_reserves":
-            effectMessage = "O patrocinador não gostou muito, mas aceitou.";
-            break;
-
-          case "send_stars":
-            await this.repos.financial.addRecord({
+        if (optionId === "crisis_meeting") {
+          const players = await this.repos.players.findByTeamId(teamId);
+          const updates = players.map((p) => ({
+            id: p.id,
+            energy: Math.max(0, p.energy - 10),
+            fitness: p.fitness,
+            moral: Math.min(100, p.moral + 15),
+          }));
+          await this.repos.players.updateDailyStatsBatch(updates);
+          effectMessage =
+            "A reunião foi produtiva. A moral subiu (+15), mas o time perdeu energia de treino.";
+        } else if (optionId === "crisis_hardline") {
+          const players = await this.repos.players.findByTeamId(teamId);
+          const updates = players.map((p) => ({
+            id: p.id,
+            energy: p.energy,
+            fitness: Math.min(100, p.fitness + 5),
+            moral: Math.max(0, p.moral - 5),
+          }));
+          await this.repos.players.updateDailyStatsBatch(updates);
+          effectMessage =
+            "Alguns jogadores reclamaram da cobrança (-5 Moral), mas o foco físico melhorou.";
+        } else if (optionId === "crisis_ignore") {
+          effectMessage = "Você ignorou o problema. O clima continua tenso.";
+        } else if (optionId === "media_praise_players") {
+          const players = await this.repos.players.findByTeamId(teamId);
+          const updates = players.map((p) => ({
+            id: p.id,
+            energy: p.energy,
+            fitness: p.fitness,
+            moral: Math.min(100, p.moral + 5),
+          }));
+          await this.repos.players.updateDailyStatsBatch(updates);
+          await this.repos.teams.update(teamId, {
+            reputation: (team.reputation || 0) + 20,
+          });
+          effectMessage =
+            "O elenco gostou da proteção pública (+5 Moral). Reputação subiu levemente.";
+        } else if (optionId === "media_promise_title") {
+          await this.repos.teams.update(teamId, {
+            fanSatisfaction: Math.min(100, (team.fanSatisfaction || 0) + 10),
+          });
+          effectMessage =
+            "A torcida está eufórica com a promessa! (+10 Satisfação). Não os decepcione.";
+        } else if (optionId === "takeover_welcome") {
+          const injection = 50_000_000;
+          await this.repos.teams.updateBudget(
+            teamId,
+            (team.budget || 0) + injection
+          );
+          await this.repos.financial.addRecord({
+            teamId,
+            amount: injection,
+            category: "sponsors",
+            type: "income",
+            seasonId: 1,
+            date: new Date().toISOString().split("T")[0],
+            description: "Injeção de Capital (Novos Donos)",
+          });
+          effectMessage =
+            "O negócio foi fechado! €50.000.000 foram adicionados ao orçamento.";
+        } else if (optionId === "takeover_cautious") {
+          await this.repos.teams.update(teamId, {
+            fanSatisfaction: (team.fanSatisfaction || 0) + 5,
+          });
+          effectMessage =
+            "A torcida respeita sua postura de proteger a tradição do clube.";
+        } else if (optionId === "invest_youth") {
+          const investCost = 2000000;
+          if (team.budget >= investCost) {
+            await this.repos.teams.updateBudget(
               teamId,
-              amount: 500000,
-              category: "sponsors",
-              type: "income",
-              seasonId: 1,
-              date: new Date().toISOString().split("T")[0],
-              description: "Bônus por evento com estrelas",
+              team.budget - investCost
+            );
+            await this.repos.teams.update(teamId, {
+              youthAcademyQuality: Math.min(
+                100,
+                (team.youthAcademyQuality || 0) + 5
+              ),
             });
-            effectMessage = "O evento foi um sucesso! (+€500k Receita).";
-            break;
+            effectMessage =
+              "Investimento realizado na base (+5 Qualidade Base, -€2M).";
+          } else {
+            effectMessage = "Saldo insuficiente para o investimento.";
+          }
+        } else if (optionId === "save") {
+          effectMessage = "Dinheiro mantido em caixa.";
         }
 
         return effectMessage;

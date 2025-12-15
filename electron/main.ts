@@ -607,6 +607,8 @@ function registerIpcHandlers() {
         }
       }
 
+      let narrativeEvent = null;
+
       if (state.playerTeamId) {
         const staffImpactResult = await serviceContainer.staff.getStaffImpact(
           state.playerTeamId
@@ -626,6 +628,17 @@ function registerIpcHandlers() {
           if (Result.isSuccess(simResult)) {
             logs.push(...simResult.data.logs);
           }
+        }
+
+        const eventResult =
+          await serviceContainer.eventService.generateDailyEvent(
+            state.playerTeamId,
+            nextDate
+          );
+
+        if (Result.isSuccess(eventResult) && eventResult.data) {
+          narrativeEvent = eventResult.data;
+          logs.push(`🔔 Novo evento: ${eventResult.data.title}`);
         }
       }
 
@@ -706,6 +719,7 @@ function registerIpcHandlers() {
       return {
         date: nextDate,
         messages: logs,
+        narrativeEvent,
       };
     } catch (error) {
       logger.error("IPC Error [game:advanceDay]:", error);
