@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { teams } from "../db/schema";
 import { BaseRepository } from "./BaseRepository";
+import type { TeamAchievement } from "../domain/models";
 
 export type TeamSelect = typeof teams.$inferSelect;
 export type TeamInsert = typeof teams.$inferInsert;
@@ -43,6 +44,33 @@ export class TeamRepository extends BaseRepository {
       .update(teams)
       .set({ budget: newBudget })
       .where(eq(teams.id, id));
+  }
+
+  /**
+   * Adiciona uma conquista (título ou posição relevante) ao histórico do clube.
+   * Recupera o histórico atual, adiciona o novo item e persiste.
+   * * @param teamId ID do time
+   * @param achievement Objeto contendo detalhes da conquista
+   */
+  async addAchievement(
+    teamId: number,
+    achievement: TeamAchievement
+  ): Promise<void> {
+    const team = await this.findById(teamId);
+
+    if (!team) {
+      throw new Error(
+        `TeamRepository: Time ${teamId} não encontrado ao adicionar conquista.`
+      );
+    }
+
+    const currentHistory = team.history || [];
+    const newHistory = [...currentHistory, achievement];
+
+    await this.db
+      .update(teams)
+      .set({ history: newHistory })
+      .where(eq(teams.id, teamId));
   }
 }
 

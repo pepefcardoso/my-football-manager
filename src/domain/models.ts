@@ -86,6 +86,7 @@ export interface Team {
   executiveDirectorId: number | null;
   transferBudget: number;
   transferStrategy: TransferStrategy | string;
+  history: TeamAchievement[];
 }
 
 export interface Competition {
@@ -228,4 +229,15 @@ export interface ClubInterest {
   priority: number;
   maxFeeWillingToPay: number | null;
   dateAdded: string;
+}
+
+export interface TeamAchievement {
+  seasonId: number;
+  seasonYear: number;
+  competitionId: number;
+  competitionName: string;
+  type: "league" | "cup";
+  position: number;
+  description: string;
+  date: string;
 }

@@ -6,6 +6,7 @@ import {
   index,
 } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
+import type { TeamAchievement } from "../domain/models";
 
 export const teams = sqliteTable("teams", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -29,6 +30,10 @@ export const teams = sqliteTable("teams", {
   executiveDirectorId: integer("executive_director_id"),
   transferBudget: real("transfer_budget").default(0).notNull(),
   transferStrategy: text("transfer_strategy").default("balanced").notNull(),
+  history: text("history", { mode: "json" })
+    .$type<TeamAchievement[]>()
+    .default([])
+    .notNull(),
 });
 
 export const transferProposals = sqliteTable(
