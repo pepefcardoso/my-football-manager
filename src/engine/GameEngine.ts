@@ -36,7 +36,7 @@ export class GameEngine {
     this.gameState = state;
 
     if (state.currentDate) {
-      this.timeEngine = new TimeEngine(state.currentDate);
+      this.timeEngine.setDate(state.currentDate);
     }
   }
 
@@ -54,6 +54,26 @@ export class GameEngine {
 
   advanceDays(days: number): string {
     return this.timeEngine.addDays(days);
+  }
+
+  startSimulation(onUpdateUI: (data: DailyUpdateResult) => void) {
+    this.timeEngine.setSimulationSpeed(
+      this.gameState?.simulationSpeed === 2 ? 200 : 1000
+    );
+
+    this.timeEngine.start(async () => {
+      const result = await this.processDailyUpdate();
+
+      if (this.gameState) {
+        this.gameState.currentDate = result.date;
+      }
+
+      onUpdateUI(result);
+    });
+  }
+
+  stopSimulation() {
+    this.timeEngine.stop();
   }
 
   getWeekday(): string {
@@ -181,22 +201,10 @@ export class GameEngine {
             `${contractExpiryResult.data.playersReleased} contratos de jogadores expiraram.`
           );
         }
-
-        // TODO: Treinamento e Recuperação Diária de Jogadores
-        // Implementar usando DailySimulationService (já existe no projeto)
-
-        // Opcional: Verificar saúde financeira diariamente para aplicar penalidades imediatas
-        // await FinanceService.checkFinancialHealth(teamId);
       } catch (error) {
         logger.error("Erro no processamento financeiro diário:", error);
       }
     }
-
-    // Atualizar jogadores (moral, energia, fitness)
-    // Implementar após ter acesso ao DB (PlayerRepository)
-
-    // Processar partidas do dia
-    // Implementar motor de partidas (MatchService)
 
     return updates;
   }
@@ -314,12 +322,6 @@ export class GameEngine {
     return "Disponível";
   }
 
-  /**
-   * Creates a complete game save with all necessary data
-   *
-   * @param filename - User-defined filename for the save
-   * @returns ServiceResult containing the complete GameSave object ready for persistence
-   */
   async createGameSave(filename: string): Promise<ServiceResult<GameSave>> {
     return this.saveManager.createSaveContext({
       filename,
@@ -328,19 +330,10 @@ export class GameEngine {
     });
   }
 
-  /**
-   * Validates if a save file is compatible with the current game version
-   *
-   * @param save - The save data to validate
-   * @returns Validation result with compatibility info and any errors/warnings
-   */
   validateGameSave(save: GameSave): SaveValidationResult {
     return this.saveManager.validateSave(save);
   }
 
-  /**
-   * Loads a game save into the engine and database
-   */
   async loadGameSave(saveData: GameSave): Promise<ServiceResult<void>> {
     const restoreResult = await this.saveManager.loadSave(saveData);
 
