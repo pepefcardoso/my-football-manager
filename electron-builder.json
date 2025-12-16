@@ -1,0 +1,91 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "productName": "Football Manager 2D",
+  "appId": "com.footballmanager.app",
+  "directories": {
+    "output": "release/${version}",
+    "buildResources": "build"
+  },
+  "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
+  "extraResources": [
+    {
+      "from": "data/migrations",
+      "to": "data/migrations"
+    }
+  ],
+  "asarUnpack": ["node_modules/better-sqlite3/**/*"],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "build/icon.ico",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "publisherName": "Football Manager Dev Team",
+    "verifyUpdateCodeSignature": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Football Manager 2D",
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "installerHeaderIcon": "build/icon.ico",
+    "license": "LICENSE",
+    "warningsAsErrors": false
+  },
+  "portable": {
+    "artifactName": "${productName}-${version}-Portable.${ext}"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "icon": "build/icon.icns",
+    "category": "public.app-category.sports",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist"
+  },
+  "dmg": {
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ],
+    "window": {
+      "width": 540,
+      "height": 380
+    }
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "build/icons",
+    "category": "Game",
+    "synopsis": "Football Club Manager Simulator",
+    "description": "A comprehensive football club management simulator with match engine, transfers, and finances."
+  },
+  "publish": null,
+  "buildDependenciesFromSource": false,
+  "nodeGypRebuild": false,
+  "npmRebuild": true
+}

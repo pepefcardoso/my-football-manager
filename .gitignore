@@ -30,3 +30,53 @@ coverage/
 
 docs/SERVICES_MAP.md
 dependency-graph.html*
+
+# ============================================================================
+# BUILD & RELEASE (Adições)
+# ============================================================================
+
+# Electron Builder outputs
+release/
+out/
+
+# Build cache
+.electron-builder-cache/
+node_modules/.cache/electron-builder/
+
+# Platform-specific builds
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.snap
+
+# Temporary build files
+build/iconset.iconset/
+build/*.tmp
+
+# Code signing certificates (NUNCA COMMITAR)
+*.p12
+*.pem
+*.key
+*.crt
+
+# Release artifacts
+*.blockmap
+*.yaml
+latest*.yml
+
+# OS-specific
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows image file caches
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.Spotlight-V100
+.Trashes
+._*
