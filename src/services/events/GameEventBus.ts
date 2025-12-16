@@ -6,6 +6,7 @@ import {
   type FinancialCrisisPayload,
   type TransferCompletedPayload,
   type ProposalReceivedPayload,
+  type ScheduledEventPayload,
 } from "./GameEventTypes";
 
 type EventHandler<T> = (payload: T) => Promise<void> | void;
@@ -37,6 +38,10 @@ export class GameEventBus {
   public subscribe(
     eventType: GameEventType.PROPOSAL_RECEIVED,
     handler: EventHandler<ProposalReceivedPayload>
+  ): void;
+  public subscribe(
+    eventType: GameEventType.SCHEDULED_EVENT_TRIGGERED,
+    handler: EventHandler<ScheduledEventPayload>
   ): void;
 
   public subscribe<T>(
@@ -83,6 +88,10 @@ export class GameEventBus {
   public async publish(
     eventType: GameEventType.PROPOSAL_RECEIVED,
     payload: ProposalReceivedPayload
+  ): Promise<void>;
+  public async publish(
+    eventType: GameEventType.SCHEDULED_EVENT_TRIGGERED,
+    payload: ScheduledEventPayload
   ): Promise<void>;
 
   public async publish<T>(eventType: GameEventType, payload: T): Promise<void> {

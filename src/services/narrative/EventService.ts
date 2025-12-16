@@ -1,22 +1,78 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import type { ServiceResult } from "../types/ServiceResults";
+import { Result, type ServiceResult } from "../types/ServiceResults";
 import { RandomEngine } from "../../engine/RandomEngine";
 import type {
   NarrativeEvent,
   EventTriggerContext,
 } from "../../domain/narrative";
 import { EventLibrary } from "../../domain/events/EventLibrary";
+import { GameEventType } from "../events/GameEventTypes";
+import type { GameEventBus } from "../events/GameEventBus";
 
 export class EventService extends BaseService {
-  constructor(repositories: IRepositoryContainer) {
+  private eventBus: GameEventBus;
+
+  constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
     super(repositories, "EventService");
+    this.eventBus = eventBus;
   }
 
-  /**
-   * Avalia o estado atual do clube e decide se um evento narrativo deve ocorrer.
-   * Deve ser chamado uma vez por dia durante o processamento diário.
-   */
+  async processDailyEvents(
+    teamId: number,
+    currentDate: string
+  ): Promise<ServiceResult<NarrativeEvent | null>> {
+    return this.execute(
+      "processDailyEvents",
+      { teamId, currentDate },
+      async () => {
+        const scheduled = await this.repos.scheduledEvents.findPendingByDate(
+          currentDate,
+          teamId
+        );
+
+        if (scheduled.length > 0) {
+          const eventToTrigger = scheduled[0];
+
+          await this.repos.scheduledEvents.markAsProcessed(eventToTrigger.id);
+
+          if (this.eventBus) {
+            await this.eventBus.publish(
+              GameEventType.SCHEDULED_EVENT_TRIGGERED,
+              {
+                eventId: eventToTrigger.id,
+                type: eventToTrigger.type,
+                title: eventToTrigger.title,
+                date: currentDate,
+              }
+            );
+          }
+
+          return {
+            id: `scheduled_${eventToTrigger.id}`,
+            title: eventToTrigger.title,
+            description: eventToTrigger.description,
+            category: "board",
+            importance: "high",
+            date: currentDate,
+            options: eventToTrigger.metadata?.options || [],
+          };
+        }
+
+        const randomEventResult = await this.generateDailyEvent(
+          teamId,
+          currentDate
+        );
+
+        if (Result.isFailure(randomEventResult)) {
+          return null;
+        }
+
+        return randomEventResult.data;
+      }
+    );
+  }
+
   async generateDailyEvent(
     teamId: number,
     currentDate: string
@@ -113,10 +169,6 @@ export class EventService extends BaseService {
     return RandomEngine.pickOne(possibleEvents);
   }
 
-  /**
-   * Processa a escolha do jogador frente a um evento.
-   * Aplica os efeitos (mudança de moral, dinheiro, reputação) baseados na opção.
-   */
   async processEventResponse(
     eventId: string,
     optionId: string,

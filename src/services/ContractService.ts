@@ -1,7 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { playerContracts } from "../db/schema";
 import { db } from "../lib/db";
-import { FinancialCategory } from "../domain/enums";
 import { BaseService } from "./BaseService";
 import { Result } from "./types/ServiceResults";
 import type { ServiceResult } from "./types/ServiceResults";
@@ -78,42 +77,25 @@ export class ContractService extends BaseService {
   async processDailyWages(
     input: ProcessDailyWagesInput
   ): Promise<ServiceResult<void>> {
-    return this.executeVoid(
-      "processDailyWages",
-      input,
-      async ({ teamId, currentDate, seasonId }) => {
-        const wageBillResult = await this.calculateMonthlyWageBill(teamId);
-        if (Result.isFailure(wageBillResult))
-          throw new Error(wageBillResult.error.message);
+    return this.executeVoid("processDailyWages", input, async ({ teamId }) => {
+      const wageBillResult = await this.calculateMonthlyWageBill(teamId);
 
-        const wageBill = wageBillResult.data;
-        const dailyPlayerWages = Math.round(wageBill.playerWages / 30);
-        const dailyStaffWages = Math.round(wageBill.staffWages / 30);
-
-        if (dailyPlayerWages > 0) {
-          await this.repos.financial.addRecord({
-            teamId,
-            seasonId,
-            date: currentDate,
-            type: "expense",
-            category: FinancialCategory.SALARY,
-            amount: dailyPlayerWages,
-            description: "Salários Diários - Jogadores",
-          });
-        }
-        if (dailyStaffWages > 0) {
-          await this.repos.financial.addRecord({
-            teamId,
-            seasonId,
-            date: currentDate,
-            type: "expense",
-            category: FinancialCategory.STAFF_SALARY,
-            amount: dailyStaffWages,
-            description: "Salários Diários - Staff",
-          });
-        }
+      if (Result.isFailure(wageBillResult)) {
+        this.logger.warn(
+          `Falha ao calcular salários diários para time ${teamId}`
+        );
+        return;
       }
-    );
+
+      const wageBill = wageBillResult.data;
+      const dailyTotal = Math.round(wageBill.total / 30);
+
+      this.logger.debug(
+        `Custo diário estimado de salários (Time ${teamId}): €${dailyTotal.toLocaleString(
+          "pt-PT"
+        )}`
+      );
+    });
   }
 
   async renewPlayerContract(

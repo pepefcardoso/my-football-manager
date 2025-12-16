@@ -278,6 +278,28 @@ export const financialRecords = sqliteTable("financial_records", {
   description: text("description"),
 });
 
+export const scheduledEvents = sqliteTable(
+  "scheduled_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: integer("team_id")
+      .references(() => teams.id)
+      .notNull(),
+    date: text("date").notNull(),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    processed: integer("processed", { mode: "boolean" })
+      .default(false)
+      .notNull(),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>(),
+  },
+  (table) => ({
+    dateIdx: index("idx_scheduled_events_date").on(table.date),
+    processedIdx: index("idx_scheduled_events_processed").on(table.processed),
+  })
+);
+
 export const gameState = sqliteTable("game_state", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   saveId: text("save_id").notNull(),

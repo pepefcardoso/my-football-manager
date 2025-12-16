@@ -23,6 +23,7 @@ export class GameEngine {
   private gameState: GameState | null = null;
   private stopChecker: StopConditionChecker;
   public readonly saveManager: SaveManager;
+  private readonly repos: IRepositoryContainer;
 
   constructor(
     repositories: IRepositoryContainer,
@@ -30,6 +31,7 @@ export class GameEngine {
     initialDate?: string,
     unitOfWork?: IUnitOfWork
   ) {
+    this.repos = repositories;
     this.timeEngine = new TimeEngine(initialDate || "2025-01-15");
     const uow = unitOfWork || new UnitOfWork(db);
     this.saveManager = new SaveManager(repositories, uow, db);
@@ -66,19 +68,9 @@ export class GameEngine {
     );
 
     this.timeEngine.start(async () => {
-      const nextDate = new Date(this.getCurrentDate());
-      nextDate.setDate(nextDate.getDate() + 1);
-      const nextDateStr = nextDate.toISOString().split("T")[0];
+      const result = await this.advanceDayWithCheck();
 
-      const stopCheck = await this.stopChecker.checkStopConditions(
-        nextDateStr,
-        this.gameState?.playerTeamId || null
-      );
-
-      if (stopCheck.shouldStop) {
-        logger.info(`Simulação interrompida: ${stopCheck.reason}`);
-        this.stopSimulation();
-
+      if (!result.advanced) {
         onUpdateUI({
           date: this.getCurrentDate(),
           playersUpdated: 0,
@@ -90,21 +82,16 @@ export class GameEngine {
           financialChanges: [],
           news: [],
           logs: [
-            `Simulação pausada: ${this.translateStopReason(stopCheck.reason)}`,
+            `Simulação pausada: ${this.translateStopReason(result.stopReason)}`,
           ],
           narrativeEvent: null,
         });
         return;
       }
 
-      this.timeEngine.advanceDay();
-      const result = await this.processDailyUpdate();
-
-      if (this.gameState) {
-        this.gameState.currentDate = result.date;
+      if (result.result) {
+        onUpdateUI(result.result);
       }
-
-      onUpdateUI(result);
     });
   }
 
@@ -208,7 +195,7 @@ export class GameEngine {
         }
 
         const eventResult =
-          await serviceContainer.eventService.generateDailyEvent(
+          await serviceContainer.eventService.processDailyEvents(
             teamId,
             dateStr
           );
@@ -457,6 +444,14 @@ export class GameEngine {
 
     if (this.gameState) {
       this.gameState.currentDate = result.date;
+
+      await this.repos.gameState.save({
+        ...this.gameState,
+        currentDate: result.date,
+        lastPlayedAt: new Date().toISOString(),
+      });
+
+      logger.debug(`Estado do jogo persistido: ${result.date}`);
     }
 
     return {

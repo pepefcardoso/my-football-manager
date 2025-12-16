@@ -45,10 +45,11 @@ import {
   gameStateRepository,
   GameStateRepository,
 } from "./GameStateRepository";
+import {
+  scheduledEventRepository,
+  ScheduledEventRepository,
+} from "./ScheduledEventRepository";
 
-/**
- * Container que permite instanciar repositórios com um contexto específico (transação)
- */
 export class RepositoryFactory {
   static create(context: DbInstance | DbTransaction): IRepositoryContainer {
     return {
@@ -64,13 +65,11 @@ export class RepositoryFactory {
       transferProposals: new TransferProposalRepository(context),
       clubInterests: new ClubInterestRepository(context),
       gameState: new GameStateRepository(context),
+      scheduledEvents: new ScheduledEventRepository(context),
     };
   }
 }
 
-/**
- * Container de produção com implementações singleton (contexto global)
- */
 class ProductionRepositoryContainer implements IRepositoryContainer {
   public readonly players = playerRepository;
   public readonly teams = teamRepository;
@@ -84,6 +83,7 @@ class ProductionRepositoryContainer implements IRepositoryContainer {
   public readonly transferProposals = transferProposalRepository;
   public readonly clubInterests = clubInterestRepository;
   public readonly gameState = gameStateRepository;
+  public readonly scheduledEvents = scheduledEventRepository;
 }
 
 export const repositoryContainer: IRepositoryContainer =

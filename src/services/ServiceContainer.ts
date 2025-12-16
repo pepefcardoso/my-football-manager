@@ -97,7 +97,7 @@ export class ServiceContainer implements IServiceContainer {
     this.scouting = new ScoutingService(repos);
     this.staff = new StaffService(repos);
     this.playerDevelopment = new PlayerDevelopmentService(repos);
-    this.dailySimulation = new DailySimulationService(repos);
+    this.dailySimulation = new DailySimulationService(repos, this.playerDevelopment);
     this.season = new SeasonService(repos);
     this.finance = new FinanceService(repos, this.eventBus);
     this.promotionRelegation = new PromotionRelegationService(repos);
@@ -121,7 +121,7 @@ export class ServiceContainer implements IServiceContainer {
       this.aiTransferDecisionMaker,
       this.transfer
     );
-    this.eventService = new EventService(repos);
+    this.eventService = new EventService(repos, this.eventBus);
     this.cpuSimulation = new CPUSimulationService(
       repos,
       this.dailySimulation,

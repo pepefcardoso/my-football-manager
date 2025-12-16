@@ -206,6 +206,12 @@ export interface ITransferProposalRepository {
   expireProposals(currentDate: string): Promise<number>;
 }
 
+export interface IScheduledEventRepository {
+  create(data: any): Promise<void>;
+  findPendingByDate(date: string, teamId: number): Promise<any[]>;
+  markAsProcessed(id: number): Promise<void>;
+}
+
 export interface IGameStateRepository {
   findCurrent(): Promise<GameState | undefined>;
   save(state: Partial<GameState>): Promise<void>;
@@ -224,6 +230,7 @@ export interface IRepositoryContainer {
   transferProposals: ITransferProposalRepository;
   clubInterests: IClubInterestRepository;
   gameState: IGameStateRepository;
+  scheduledEvents: IScheduledEventRepository;
 }
 
 export type ServiceFactory<T> = (deps: IRepositoryContainer) => T;

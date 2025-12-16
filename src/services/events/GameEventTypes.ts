@@ -4,6 +4,7 @@ export enum GameEventType {
   FINANCIAL_CRISIS = "FINANCIAL_CRISIS",
   TRANSFER_COMPLETED = "TRANSFER_COMPLETED",
   PROPOSAL_RECEIVED = "PROPOSAL_RECEIVED",
+  SCHEDULED_EVENT_TRIGGERED = "SCHEDULED_EVENT_TRIGGERED",
 }
 
 export interface MatchFinishedPayload {
@@ -46,4 +47,11 @@ export interface ProposalReceivedPayload {
   fromTeamId: number;
   toTeamId: number;
   fee: number;
+}
+
+export interface ScheduledEventPayload {
+  eventId: number;
+  type: string;
+  title: string;
+  date: string;
 }
