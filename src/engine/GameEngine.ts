@@ -14,6 +14,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema";
 import type { NarrativeEvent } from "../domain/narrative";
 import { StopConditionChecker } from "./StopConditionChecker";
+import { TrainingFocus } from "../domain/enums";
 
 const logger = new Logger("GameEngine");
 
@@ -152,6 +153,36 @@ export class GameEngine {
       const dateStr = this.getCurrentDate();
 
       try {
+        const currentFocus =
+          (this.gameState.trainingFocus as TrainingFocus) ||
+          TrainingFocus.TECHNICAL;
+
+        const staffImpactResult = await serviceContainer.staff.getStaffImpact(
+          teamId
+        );
+
+        if (Result.isSuccess(staffImpactResult)) {
+          const trainingResult =
+            await serviceContainer.dailySimulation.processTeamDailyLoop(
+              teamId,
+              currentFocus,
+              staffImpactResult.data
+            );
+
+          if (Result.isSuccess(trainingResult)) {
+            updates.playersUpdated = trainingResult.data.playerUpdates.length;
+            updates.logs.push(...trainingResult.data.logs);
+          }
+        }
+
+        const cpuResult =
+          await serviceContainer.cpuSimulation.processAllAITeams();
+        if (Result.isSuccess(cpuResult)) {
+          logger.debug(
+            `Simulação diária executada para ${cpuResult.data} times da IA.`
+          );
+        }
+
         await serviceContainer.contract.processDailyWages({
           teamId,
           currentDate: dateStr,

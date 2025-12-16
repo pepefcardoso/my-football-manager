@@ -38,6 +38,8 @@ import { SquadAnalysisService } from "./ai/SquadAnalysisService";
 import { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
 import { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
 import { EventService } from "./narrative/EventService";
+import { CPUSimulationService } from "./ai/CPUSimulationService";
+import { PlayerDevelopmentService } from "./PlayerDevelopmentService";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: UnitOfWork;
@@ -70,6 +72,8 @@ export class ServiceContainer implements IServiceContainer {
   public readonly aiTransferDecisionMaker: AITransferDecisionMaker;
   public readonly dailyTransferProcessor: DailyTransferProcessor;
   public readonly eventService: EventService;
+  public readonly cpuSimulation: CPUSimulationService;
+  public readonly playerDevelopment: PlayerDevelopmentService;
 
   constructor(repos: IRepositoryContainer) {
     this.unitOfWork = new UnitOfWork();
@@ -92,6 +96,7 @@ export class ServiceContainer implements IServiceContainer {
     this.player = new PlayerService(repos);
     this.scouting = new ScoutingService(repos);
     this.staff = new StaffService(repos);
+    this.playerDevelopment = new PlayerDevelopmentService(repos);
     this.dailySimulation = new DailySimulationService(repos);
     this.season = new SeasonService(repos);
     this.finance = new FinanceService(repos, this.eventBus);
@@ -117,6 +122,11 @@ export class ServiceContainer implements IServiceContainer {
       this.transfer
     );
     this.eventService = new EventService(repos);
+    this.cpuSimulation = new CPUSimulationService(
+      repos,
+      this.dailySimulation,
+      this.staff
+    );
     this.setupSubscriptions();
   }
 

@@ -93,6 +93,7 @@ export const players = sqliteTable("players", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   age: integer("age").notNull(),
+  birthDate: text("birth_date"),
   nationality: text("nationality").default("BRA").notNull(),
   position: text("position").notNull(),
   preferredFoot: text("preferred_foot").default("right").notNull(),
