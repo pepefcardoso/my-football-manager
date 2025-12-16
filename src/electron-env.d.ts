@@ -144,6 +144,8 @@ declare global {
         advanceDay: () => Promise<{
           date: string;
           messages: string[];
+          stopReason?: string;
+          narrativeEvent?: NarrativeEvent | null;
           seasonRollover?: any;
         }>;
         updateTrainingFocus: (focus: string) => Promise<boolean>;

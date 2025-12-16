@@ -318,34 +318,22 @@ function registerIpcHandlers() {
 
   ipcMain.handle("game:advanceDay", async () => {
     try {
-      const result = await gameEngine.processDailyUpdate();
-      gameEngine.advanceDay();
+      const result = await gameEngine.advanceDayWithCheck();
 
-      const currentDate = gameEngine.getCurrentDate();
-      const [, month, day] = currentDate.split("-").map(Number);
-
-      if (month === 12 && day === 15) {
-        const state = gameEngine.getGameState();
-        if (state && state.currentSeasonId) {
-          const summaryResult =
-            await serviceContainer.seasonTransition.processEndOfSeason(
-              state.currentSeasonId
-            );
-          if (Result.isSuccess(summaryResult)) {
-            return {
-              date: currentDate,
-              messages: result.logs,
-              narrativeEvent: result.narrativeEvent,
-              seasonRollover: summaryResult.data,
-            };
-          }
-        }
+      if (!result.advanced) {
+        return {
+          date: result.date,
+          messages: [],
+          stopReason: result.stopReason,
+          stopMetadata: result.stopMetadata,
+        };
       }
 
       return {
-        date: currentDate,
-        messages: result.logs,
-        narrativeEvent: result.narrativeEvent,
+        date: result.date,
+        messages: result.result?.logs || [],
+        narrativeEvent: result.result?.narrativeEvent || null,
+        stopReason: undefined,
       };
     } catch (error) {
       logger.error("IPC Error [game:advanceDay]:", error);

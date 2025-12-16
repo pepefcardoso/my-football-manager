@@ -13,12 +13,14 @@ import { UnitOfWork } from "../repositories/UnitOfWork";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema";
 import type { NarrativeEvent } from "../domain/narrative";
+import { StopConditionChecker } from "./StopConditionChecker";
 
 const logger = new Logger("GameEngine");
 
 export class GameEngine {
   private timeEngine: TimeEngine;
   private gameState: GameState | null = null;
+  private stopChecker: StopConditionChecker;
   public readonly saveManager: SaveManager;
 
   constructor(
@@ -30,6 +32,7 @@ export class GameEngine {
     this.timeEngine = new TimeEngine(initialDate || "2025-01-15");
     const uow = unitOfWork || new UnitOfWork(db);
     this.saveManager = new SaveManager(repositories, uow, db);
+    this.stopChecker = new StopConditionChecker(repositories);
   }
 
   setGameState(state: GameState) {
@@ -62,6 +65,38 @@ export class GameEngine {
     );
 
     this.timeEngine.start(async () => {
+      const nextDate = new Date(this.getCurrentDate());
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nextDateStr = nextDate.toISOString().split("T")[0];
+
+      const stopCheck = await this.stopChecker.checkStopConditions(
+        nextDateStr,
+        this.gameState?.playerTeamId || null
+      );
+
+      if (stopCheck.shouldStop) {
+        logger.info(`Simulação interrompida: ${stopCheck.reason}`);
+        this.stopSimulation();
+
+        onUpdateUI({
+          date: this.getCurrentDate(),
+          playersUpdated: 0,
+          matchesPlayed: [],
+          matchResults: [],
+          injuries: [],
+          suspensions: [],
+          contractExpiries: [],
+          financialChanges: [],
+          news: [],
+          logs: [
+            `Simulação pausada: ${this.translateStopReason(stopCheck.reason)}`,
+          ],
+          narrativeEvent: null,
+        });
+        return;
+      }
+
+      this.timeEngine.advanceDay();
       const result = await this.processDailyUpdate();
 
       if (this.gameState) {
@@ -358,6 +393,57 @@ export class GameEngine {
     this.setGameState(newState);
 
     return Result.success(undefined, "Game loaded and engine state updated.");
+  }
+
+  async advanceDayWithCheck(): Promise<{
+    advanced: boolean;
+    stopReason?: string;
+    stopMetadata?: any;
+    date: string;
+    result?: DailyUpdateResult;
+  }> {
+    const currentDateObj = new Date(this.getCurrentDate());
+    currentDateObj.setDate(currentDateObj.getDate() + 1);
+    const nextDate = currentDateObj.toISOString().split("T")[0];
+
+    const condition = await this.stopChecker.checkStopConditions(
+      nextDate,
+      this.gameState?.playerTeamId || null
+    );
+
+    if (condition.shouldStop) {
+      this.stopSimulation();
+      return {
+        advanced: false,
+        stopReason: condition.reason,
+        stopMetadata: condition.metadata,
+        date: this.getCurrentDate(),
+      };
+    }
+
+    this.timeEngine.advanceDay();
+    const result = await this.processDailyUpdate();
+
+    if (this.gameState) {
+      this.gameState.currentDate = result.date;
+    }
+
+    return {
+      advanced: true,
+      date: this.getCurrentDate(),
+      result,
+    };
+  }
+
+  private translateStopReason(reason?: string): string {
+    switch (reason) {
+      case "match_day":
+        return "Dia de Jogo";
+      case "season_end":
+        return "Fim de Temporada";
+      default:
+        return "Evento Importante";
+    }
   }
 }
 
