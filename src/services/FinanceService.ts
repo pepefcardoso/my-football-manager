@@ -189,8 +189,8 @@ export class FinanceService extends BaseService {
         }
 
         const currentBudget = team.budget ?? 0;
-        const totalExpense = wageData.total + infraMaintenance;
-        const newBudget = currentBudget - totalExpense;
+        const totalExpense = Math.round(wageData.total + infraMaintenance);
+        const newBudget = Math.round(currentBudget - totalExpense);
 
         await this.repos.teams.updateBudget(teamId, newBudget);
 
