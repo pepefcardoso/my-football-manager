@@ -1304,10 +1304,19 @@ function registerIpcHandlers() {
 let win: BrowserWindow | null;
 
 function createWindow() {
+  const iconName = process.platform === "win32" ? "icon.ico" : "icon.png";
+
+  const iconPath = path.join(process.env.VITE_PUBLIC as string, iconName);
+
+  const finalIcon = existsSync(iconPath)
+    ? iconPath
+    : path.join(process.env.VITE_PUBLIC as string, "icon.png");
+
   win = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: path.join(process.env.VITE_PUBLIC as string, "electron-vite.svg"),
+    icon: finalIcon,
+    title: "Football Manager 2D",
     webPreferences: {
       preload: path.join(__dirname, "preload.mjs"),
       nodeIntegration: false,
