@@ -17,11 +17,16 @@ interface SeasonSummary {
 function ClubOverviewPage({ team }: { team: Team }) {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [allTeams, setAllTeams] = useState<Team[]>([]);
-    const [simulating, setSimulating] = useState(false);
     const [showSeasonModal, setShowSeasonModal] = useState(false);
     const [seasonSummary, setSeasonSummary] = useState<SeasonSummary | null>(null);
 
-    const advanceDateGlobal = useGameStore((state) => state.advanceDate);
+    const {
+        currentDate,
+        isProcessing,
+        setProcessing,
+        advanceDate,
+        triggerEvent
+    } = useGameStore();
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -32,6 +37,10 @@ function ClubOverviewPage({ team }: { team: Team }) {
                 ]);
                 setGameState(state);
                 setAllTeams(teamsList);
+
+                if (state?.currentDate && state.currentDate !== currentDate) {
+                    advanceDate(state.currentDate);
+                }
             } catch (error) {
                 logger.error("Erro ao carregar dados iniciais:", error);
             }
@@ -50,12 +59,14 @@ function ClubOverviewPage({ team }: { team: Team }) {
     };
 
     const handleAdvanceDay = async () => {
-        if (simulating) return;
-        setSimulating(true);
+        if (isProcessing) return;
+
+        setProcessing(true);
+
         try {
             const result = await window.electronAPI.game.advanceDay();
 
-            advanceDateGlobal(result.date);
+            advanceDate(result.date);
             await fetchGameState();
 
             if ((result as any).seasonRollover) {
@@ -65,23 +76,27 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
             if ((result as any).narrativeEvent) {
                 const event = (result as any).narrativeEvent;
-                useGameStore.getState().triggerEvent(event);
+                triggerEvent(event);
             }
 
             if (result.messages && result.messages.length > 0) {
-                result.messages.forEach(msg => logger.info(msg));
+                result.messages.forEach((msg: string) => logger.info(msg));
             }
 
         } catch (error) {
             logger.error("Erro ao avançar dia:", error);
         } finally {
-            setSimulating(false);
+            setProcessing(false);
         }
     };
 
     const getTeamName = (id: number) => {
         return allTeams.find(t => t.id === id)?.name || "Time Desconhecido";
     };
+
+    const displayDate = currentDate
+        ? new Date(currentDate).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
+        : 'Data Desconhecida';
 
     return (
         <div className="p-8 relative">
@@ -101,22 +116,20 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
                 <div className="flex flex-col items-end gap-2">
                     <div className="text-slate-400 text-sm font-mono bg-slate-900 px-3 py-1 rounded border border-slate-800">
-                        {gameState?.currentDate
-                            ? new Date(gameState.currentDate).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
-                            : 'Data Desconhecida'}
+                        {displayDate}
                     </div>
                     <button
                         onClick={handleAdvanceDay}
-                        disabled={simulating}
+                        disabled={isProcessing}
                         className={`
                             px-6 py-3 rounded-lg font-bold text-white shadow-lg transition-all
-                            ${simulating
+                            ${isProcessing
                                 ? "bg-slate-700 cursor-wait"
                                 : "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transform hover:scale-105"
                             }
                         `}
                     >
-                        {simulating ? "Simulando..." : "Avançar Dia ➤"}
+                        {isProcessing ? "Simulando..." : "Avançar Dia ➤"}
                     </button>
                 </div>
             </header>
