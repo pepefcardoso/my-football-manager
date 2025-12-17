@@ -1,6 +1,11 @@
 import type { Player, Team } from "../domain/models";
 import { MatchEngine } from "../engine/MatchEngine";
-import type { MatchConfig, MatchResult, TeamLineup } from "../domain/types";
+import type {
+  MatchConfig,
+  MatchResult,
+  TeamLineup,
+  TacticsConfig,
+} from "../domain/types";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import { Result } from "./types/ServiceResults";
@@ -11,6 +16,14 @@ import { MatchFinancialsProcessor } from "./match/MatchFinancialsProcessor";
 import { GameEventBus } from "./events/GameEventBus";
 import { GameEventType } from "./events/GameEventTypes";
 import { MatchDataValidator } from "./validators/MatchDataValidator";
+import {
+  MatchSubstitutionManager,
+  type SubstitutionRequest,
+} from "./match/MatchSubstitutionManager";
+import {
+  MatchTacticsManager,
+  type UpdateLiveTacticsRequest,
+} from "./match/MatchTacticsManager";
 
 export class MatchService extends BaseService {
   private engines: Map<number, MatchEngine> = new Map();
@@ -19,6 +32,8 @@ export class MatchService extends BaseService {
   private resultProcessor: MatchResultProcessor;
   private revenueCalculator: MatchRevenueCalculator;
   private financialsProcessor: MatchFinancialsProcessor;
+  private substitutionManager: MatchSubstitutionManager;
+  private tacticsManager: MatchTacticsManager;
 
   constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
     super(repositories, "MatchService");
@@ -27,15 +42,19 @@ export class MatchService extends BaseService {
     this.resultProcessor = new MatchResultProcessor(repositories);
     this.revenueCalculator = new MatchRevenueCalculator(repositories);
     this.financialsProcessor = new MatchFinancialsProcessor(repositories);
+    this.substitutionManager = new MatchSubstitutionManager(repositories);
+    this.tacticsManager = new MatchTacticsManager(repositories);
   }
 
   /**
    * Inicializa o motor de jogo (MatchEngine) para uma partida específica.
    * Carrega os dados dos times, jogadores e configurações na memória para permitir a simulação.
-   * * @param matchId - O ID único da partida a ser inicializada.
+   *
+   * @param matchId - O ID único da partida a ser inicializada.
    * @returns Um ServiceResult vazio em caso de sucesso ou erro de validação.
    * @throws Error se os times ou a partida não forem encontrados no banco de dados.
-   * * @example
+   *
+   * @example
    * await matchService.initializeMatch(105);
    */
   async initializeMatch(matchId: number): Promise<ServiceResult<void>> {
@@ -52,7 +71,8 @@ export class MatchService extends BaseService {
   /**
    * Inicia a simulação de uma partida que foi previamente inicializada.
    * Altera o estado interno do motor para 'PLAYING'.
-   * * @param matchId - O ID da partida.
+   *
+   * @param matchId - O ID da partida.
    * @returns Um ServiceResult vazio.
    * @throws Error se o motor da partida não tiver sido inicializado.
    */
@@ -71,7 +91,8 @@ export class MatchService extends BaseService {
 
   /**
    * Pausa a simulação de uma partida em andamento.
-   * * @param matchId - O ID da partida.
+   *
+   * @param matchId - O ID da partida.
    * @returns Um ServiceResult vazio.
    * @throws Error se o motor da partida não estiver carregado.
    */
@@ -90,7 +111,8 @@ export class MatchService extends BaseService {
 
   /**
    * Retoma a simulação de uma partida pausada.
-   * * @param matchId - O ID da partida.
+   *
+   * @param matchId - O ID da partida.
    * @returns Um ServiceResult vazio.
    * @throws Error se o motor da partida não estiver carregado.
    */
@@ -110,7 +132,8 @@ export class MatchService extends BaseService {
   /**
    * Avança a simulação da partida em um minuto.
    * Gera eventos, atualiza o placar e retorna o estado atualizado.
-   * * @param matchId - O ID da partida.
+   *
+   * @param matchId - O ID da partida.
    * @returns Objeto contendo o minuto atual, o placar e os novos eventos gerados neste ciclo.
    * @throws Error se o motor da partida não estiver carregado.
    */
@@ -146,7 +169,8 @@ export class MatchService extends BaseService {
   /**
    * Simula uma partida inteira (ou o restante dela) instantaneamente.
    * Persiste o resultado, estatísticas e atualiza a tabela do campeonato.
-   * * @param matchId - O ID da partida.
+   *
+   * @param matchId - O ID da partida.
    * @returns O resultado completo da partida (MatchResult).
    */
   async simulateFullMatch(
@@ -171,7 +195,8 @@ export class MatchService extends BaseService {
 
   /**
    * Recupera o estado atual de uma partida carregada na memória (para UI).
-   * * @param matchId - O ID da partida.
+   *
+   * @param matchId - O ID da partida.
    * @returns Objeto com estado, minuto, placar e histórico de eventos.
    * @throws Error se a partida não estiver em memória.
    */
@@ -198,7 +223,8 @@ export class MatchService extends BaseService {
   /**
    * Simula todas as partidas pendentes para uma data específica.
    * Útil para avançar o dia e processar jogos da CPU.
-   * * @param date - A data no formato 'YYYY-MM-DD'.
+   *
+   * @param date - A data no formato 'YYYY-MM-DD'.
    * @returns Resumo das partidas jogadas e seus resultados.
    */
   async simulateMatchesOfDate(date: string): Promise<
@@ -222,6 +248,181 @@ export class MatchService extends BaseService {
 
       return { matchesPlayed: results.length, results };
     });
+  }
+
+  /**
+   * 🆕 TASK 4.2: Realiza uma substituição seguindo as regras FIFA.
+   *
+   * Validações aplicadas:
+   * - Limite de 5 substituições por time
+   * - Partida deve estar pausada
+   * - Jogador a sair deve estar em campo
+   * - Jogador a entrar deve estar no banco
+   * - Nenhum dos dois pode estar lesionado
+   *
+   * @param request - Dados da substituição (matchId, isHome, playerOutId, playerInId)
+   * @returns ServiceResult void
+   * @throws Error se alguma regra FIFA for violada
+   *
+   * @example
+   * await matchService.substitutePlayer({
+   *   matchId: 42,
+   *   isHome: true,
+   *   playerOutId: 105,
+   *   playerInId: 78
+   * });
+   */
+  async substitutePlayer(
+    request: SubstitutionRequest
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "substitutePlayer",
+      request,
+      async ({ matchId, isHome, playerOutId, playerInId }) => {
+        const engine = this.engines.get(matchId);
+        if (!engine) {
+          throw new Error(
+            `Partida ${matchId} não encontrada ou não inicializada.`
+          );
+        }
+
+        const currentState = engine.getState();
+        const onFieldPlayers = isHome
+          ? engine.getHomePlayersOnField()
+          : engine.getAwayPlayersOnField();
+        const benchPlayers = isHome
+          ? engine.getHomeBench()
+          : engine.getAwayBench();
+        const substitutionsUsed = engine.getSubstitutionsUsed(isHome);
+
+        const validationResult =
+          await this.substitutionManager.validateSubstitution(
+            { matchId, isHome, playerOutId, playerInId },
+            currentState,
+            onFieldPlayers,
+            benchPlayers,
+            substitutionsUsed
+          );
+
+        if (Result.isFailure(validationResult)) {
+          throw new Error(validationResult.error.message);
+        }
+
+        const validated = validationResult.data;
+
+        const success = engine.substitute(isHome, playerOutId, playerInId);
+
+        if (!success) {
+          throw new Error("Falha técnica ao processar substituição no motor.");
+        }
+
+        const currentMinute = engine.getCurrentMinute();
+        const recordResult = await this.substitutionManager.recordSubstitution(
+          matchId,
+          validated,
+          currentMinute
+        );
+
+        if (Result.isFailure(recordResult)) {
+          this.logger.warn(
+            `Substituição executada, mas falha ao registrar no banco: ${recordResult.error.message}`
+          );
+        }
+
+        engine.updateTeamStrengths();
+
+        this.logger.info(
+          `✅ Substituição concluída com sucesso: ${validated.playerOut.firstName} ➡️ ${validated.playerIn.firstName} (${validated.substitutionNumber}/5)`
+        );
+      }
+    );
+  }
+
+  /**
+   * @param request - Dados da mudança tática
+   * @returns ServiceResult void
+   *
+   * @example
+   * await matchService.updateLiveTactics({
+   *   matchId: 42,
+   *   isHome: true,
+   *   tactics: {
+   *     mentality: "ultra_attacking",
+   *     style: "pressing"
+   *   }
+   * });
+   */
+  async updateLiveTactics(
+    request: UpdateLiveTacticsRequest
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "updateLiveTactics",
+      request,
+      async ({ matchId, isHome, tactics }) => {
+        const engine = this.engines.get(matchId);
+        if (!engine) {
+          throw new Error(
+            `Partida ${matchId} não encontrada ou não inicializada. Táticas só podem ser alteradas durante partidas ativas.`
+          );
+        }
+
+        const updateResult = await this.tacticsManager.updateLiveTactics({
+          matchId,
+          isHome,
+          tactics,
+        });
+
+        if (Result.isFailure(updateResult)) {
+          throw new Error(updateResult.error.message);
+        }
+
+        // TODO adicionar: engine.updateTactics(isHome, tactics)
+        engine.updateTeamStrengths();
+
+        this.logger.info(
+          `🎯 Táticas atualizadas para o time ${
+            isHome ? "mandante" : "visitante"
+          } na partida ${matchId}.`
+        );
+      }
+    );
+  }
+
+  /**
+   * @param matchId - ID da partida
+   * @param isHome - Time a analisar
+   * @returns Análise tática com recomendações
+   */
+  async analyzeTactics(
+    matchId: number,
+    isHome: boolean
+  ): Promise<ServiceResult<any>> {
+    return this.tacticsManager.analyzeTactics(matchId, isHome);
+  }
+
+  /**
+   * @param matchId - ID da partida
+   * @param isHome - Time a sugerir
+   * @returns Sugestão tática
+   */
+  async suggestTactics(
+    matchId: number,
+    isHome: boolean
+  ): Promise<ServiceResult<Partial<TacticsConfig>>> {
+    const engine = this.engines.get(matchId);
+    if (!engine) {
+      return Result.fail("Partida não está carregada em memória.");
+    }
+
+    const currentMinute = engine.getCurrentMinute();
+    const score = engine.getCurrentScore();
+
+    return this.tacticsManager.suggestTactics(
+      matchId,
+      isHome,
+      currentMinute,
+      score
+    );
   }
 
   private async ensureEngineInitialized(matchId: number): Promise<MatchEngine> {
@@ -299,43 +500,6 @@ export class MatchService extends BaseService {
     engine = new MatchEngine(config, isKnockout);
     this.engines.set(matchId, engine);
     return engine;
-  }
-
-  async substitutePlayer(
-    matchId: number,
-    isHome: boolean,
-    playerOutId: number,
-    playerInId: number
-  ): Promise<ServiceResult<void>> {
-    return this.executeVoid(
-      "substitutePlayer",
-      { matchId, isHome },
-      async () => {
-        const engine = this.engines.get(matchId);
-        if (!engine) {
-          throw new Error(
-            `Partida ${matchId} não encontrada ou não inicializada.`
-          );
-        }
-
-        const validation = engine.canSubstitute(isHome);
-        if (!validation.allowed) {
-          throw new Error(validation.reason!);
-        }
-
-        const success = engine.substitute(isHome, playerOutId, playerInId);
-
-        if (!success) {
-          throw new Error("Falha técnica ao processar substituição.");
-        }
-
-        this.logger.info(
-          `[Match ${matchId}] Substituição processada para o time ${
-            isHome ? "Mandante" : "Visitante"
-          }`
-        );
-      }
-    );
   }
 
   private async saveMatchResult(

@@ -68,6 +68,35 @@ contextBridge.exposeInMainWorld("electronAPI", {
         playerOutId,
         playerInId,
       }),
+    updateLiveTactics: (
+      matchId: number,
+      isHome: boolean,
+      tactics: Partial<{
+        style:
+          | "possession"
+          | "counter_attack"
+          | "pressing"
+          | "long_ball"
+          | "balanced";
+        marking: "zonal" | "man_to_man" | "mixed" | "pressing_high";
+        mentality:
+          | "ultra_defensive"
+          | "defensive"
+          | "normal"
+          | "attacking"
+          | "ultra_attacking";
+        passingDirectness: "short" | "mixed" | "long" | "direct";
+      }>
+    ) =>
+      ipcRenderer.invoke("match:updateLiveTactics", {
+        matchId,
+        isHome,
+        tactics,
+      }),
+    analyzeTactics: (matchId: number, isHome: boolean) =>
+      ipcRenderer.invoke("match:analyzeTactics", { matchId, isHome }),
+    suggestTactics: (matchId: number, isHome: boolean) =>
+      ipcRenderer.invoke("match:suggestTactics", { matchId, isHome }),
   },
 
   competition: {

@@ -163,20 +163,107 @@ function registerIpcHandlers() {
   ipcMain.handle(
     "match:substitutePlayer",
     async (_, { matchId, isHome, playerOutId, playerInId }) => {
-      const result = await serviceContainer.match.substitutePlayer(
-        matchId,
-        isHome,
-        playerOutId,
-        playerInId
-      );
-      return {
-        success: result.success,
-        message: result.success
-          ? "Substituição realizada!"
-          : (result as any).error.message,
-      };
+      try {
+        const result = await serviceContainer.match.substitutePlayer({
+          matchId,
+          isHome,
+          playerOutId,
+          playerInId,
+        });
+
+        if (Result.isSuccess(result)) {
+          return {
+            success: true,
+            message: "Substituição realizada com sucesso!",
+          };
+        }
+
+        return {
+          success: false,
+          message: result.error.message,
+        };
+      } catch (error) {
+        logger.error("Erro ao realizar substituição:", error);
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Erro desconhecido ao realizar substituição.",
+        };
+      }
     }
   );
+
+  ipcMain.handle(
+    "match:updateLiveTactics",
+    async (_, { matchId, isHome, tactics }) => {
+      try {
+        const result = await serviceContainer.match.updateLiveTactics({
+          matchId,
+          isHome,
+          tactics,
+        });
+
+        if (Result.isSuccess(result)) {
+          return {
+            success: true,
+            message: "Táticas atualizadas com sucesso!",
+          };
+        }
+
+        return {
+          success: false,
+          message: result.error.message,
+        };
+      } catch (error) {
+        logger.error("Erro ao atualizar táticas:", error);
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Erro desconhecido ao atualizar táticas.",
+        };
+      }
+    }
+  );
+
+  ipcMain.handle("match:analyzeTactics", async (_, { matchId, isHome }) => {
+    try {
+      const result = await serviceContainer.match.analyzeTactics(
+        matchId,
+        isHome
+      );
+
+      if (Result.isSuccess(result)) {
+        return result.data;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error("Erro ao analisar táticas:", error);
+      return null;
+    }
+  });
+
+  ipcMain.handle("match:suggestTactics", async (_, { matchId, isHome }) => {
+    try {
+      const result = await serviceContainer.match.suggestTactics(
+        matchId,
+        isHome
+      );
+
+      if (Result.isSuccess(result)) {
+        return result.data;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error("Erro ao sugerir táticas:", error);
+      return null;
+    }
+  });
 
   ipcMain.handle("match:startMatch", async (_, matchId: number) => {
     const initResult = await serviceContainer.match.initializeMatch(matchId);

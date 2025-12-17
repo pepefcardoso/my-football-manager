@@ -2,39 +2,14 @@ import type { MatchEventType, MatchState, Position, StaffRole } from "./enums";
 import type {
   CompetitionStanding,
   FinancialRecord,
+  Formation,
   Match,
   Player,
   PlayerContract,
   Staff,
+  TacticsConfig,
   Team,
 } from "./models";
-
-export interface TacticsConfig {
-  style:
-    | "possession"
-    | "counter_attack"
-    | "balanced"
-    | "long_ball"
-    | "pressing";
-  marking: "man_to_man" | "zonal" | "mixed" | "pressing_high";
-  mentality:
-    | "ultra_defensive"
-    | "defensive"
-    | "normal"
-    | "attacking"
-    | "ultra_attacking";
-  passingDirectness: "short" | "mixed" | "long" | "direct";
-}
-
-export type Formation =
-  | "4-4-2"
-  | "4-3-3"
-  | "3-5-2"
-  | "4-2-3-1"
-  | "5-3-2"
-  | "3-4-3"
-  | "4-1-4-1"
-  | "4-5-1";
 
 export interface TeamLineup {
   formation: Formation;

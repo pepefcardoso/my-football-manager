@@ -43,6 +43,13 @@
       "when": 1765884543551,
       "tag": "0005_shallow_preak",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1766008819283,
+      "tag": "0006_special_caretaker",
+      "breakpoints": true
     }
   ]
 }
