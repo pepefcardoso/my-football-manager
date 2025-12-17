@@ -1,6 +1,6 @@
-import type { Team } from "../domain/models";
+import type { Player, Team } from "../domain/models";
 import { MatchEngine } from "../engine/MatchEngine";
-import type { MatchConfig, MatchResult } from "../domain/types";
+import type { MatchConfig, MatchResult, TeamLineup } from "../domain/types";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import { Result } from "./types/ServiceResults";
@@ -246,6 +246,21 @@ export class MatchService extends BaseService {
     const homeTeam = mapToDomainTeam(homeTeamData);
     const awayTeam = mapToDomainTeam(awayTeamData);
 
+    const createDefaultLineup = (
+      team: Team,
+      players: Player[]
+    ): TeamLineup => ({
+      formation: team.defaultFormation || "4-4-2",
+      starters: players.slice(0, 11).map((p) => p.id),
+      bench: players.slice(11, 18).map((p) => p.id),
+      tactics: {
+        style: team.defaultGameStyle || "balanced",
+        marking: team.defaultMarking || "man_to_man",
+        mentality: team.defaultMentality || "normal",
+        passingDirectness: team.defaultPassingDirectness || "mixed",
+      },
+    });
+
     const allHomePlayers = await this.repos.players.findByTeamId(
       match.homeTeamId!
     );
@@ -261,6 +276,8 @@ export class MatchService extends BaseService {
       awayTeam,
       homePlayers,
       awayPlayers,
+      homeTactics: createDefaultLineup(homeTeam, homePlayers),
+      awayTactics: createDefaultLineup(awayTeam, awayPlayers),
       weather: (match.weather as any) || "sunny",
     };
 
@@ -282,6 +299,43 @@ export class MatchService extends BaseService {
     engine = new MatchEngine(config, isKnockout);
     this.engines.set(matchId, engine);
     return engine;
+  }
+
+  async substitutePlayer(
+    matchId: number,
+    isHome: boolean,
+    playerOutId: number,
+    playerInId: number
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "substitutePlayer",
+      { matchId, isHome },
+      async () => {
+        const engine = this.engines.get(matchId);
+        if (!engine) {
+          throw new Error(
+            `Partida ${matchId} não encontrada ou não inicializada.`
+          );
+        }
+
+        const validation = engine.canSubstitute(isHome);
+        if (!validation.allowed) {
+          throw new Error(validation.reason!);
+        }
+
+        const success = engine.substitute(isHome, playerOutId, playerInId);
+
+        if (!success) {
+          throw new Error("Falha técnica ao processar substituição.");
+        }
+
+        this.logger.info(
+          `[Match ${matchId}] Substituição processada para o time ${
+            isHome ? "Mandante" : "Visitante"
+          }`
+        );
+      }
+    );
   }
 
   private async saveMatchResult(

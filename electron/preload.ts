@@ -56,6 +56,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("match:getMatchState", matchId),
     simulateMatchesOfDate: (date: string) =>
       ipcRenderer.invoke("match:simulateMatchesOfDate", date),
+    substitutePlayer: (
+      matchId: number,
+      isHome: boolean,
+      playerOutId: number,
+      playerInId: number
+    ) =>
+      ipcRenderer.invoke("match:substitutePlayer", {
+        matchId,
+        isHome,
+        playerOutId,
+        playerInId,
+      }),
   },
 
   competition: {

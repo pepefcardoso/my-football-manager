@@ -120,11 +120,37 @@ export class MatchEngine implements IMatchEngineContext {
     });
   }
 
+  public canSubstitute(isHome: boolean): { allowed: boolean; reason?: string } {
+    const state = this.getState();
+    const subsUsed = isHome
+      ? this.homeSubstitutionsUsed
+      : this.awaySubstitutionsUsed;
+
+    if (state !== MatchState.PAUSED && state !== MatchState.NOT_STARTED) {
+      return {
+        allowed: false,
+        reason: "A partida precisa estar pausada para realizar substituições.",
+      };
+    }
+
+    if (subsUsed >= this.MAX_SUBSTITUTIONS) {
+      return { allowed: false, reason: "Limite de 5 substituições atingido." };
+    }
+
+    return { allowed: true };
+  }
+
   public substitute(
     isHome: boolean,
     playerOutId: number,
     playerInId: number
   ): boolean {
+    const check = this.canSubstitute(isHome);
+    if (!check.allowed) {
+      logger.warn(`[Substitution] Negada: ${check.reason}`);
+      return false;
+    }
+
     const teamName = isHome
       ? this.config.homeTeam.shortName
       : this.config.awayTeam.shortName;

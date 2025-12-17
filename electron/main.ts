@@ -160,6 +160,24 @@ function registerIpcHandlers() {
     );
   });
 
+  ipcMain.handle(
+    "match:substitutePlayer",
+    async (_, { matchId, isHome, playerOutId, playerInId }) => {
+      const result = await serviceContainer.match.substitutePlayer(
+        matchId,
+        isHome,
+        playerOutId,
+        playerInId
+      );
+      return {
+        success: result.success,
+        message: result.success
+          ? "Substituição realizada!"
+          : (result as any).error.message,
+      };
+    }
+  );
+
   ipcMain.handle("match:startMatch", async (_, matchId: number) => {
     const initResult = await serviceContainer.match.initializeMatch(matchId);
     if (Result.isFailure(initResult)) return false;
