@@ -1,32 +1,50 @@
 import type { TeamStrength } from "../domain/types";
-import type { EngineTeam, EnginePosition } from "./types/EngineTypes";
+import type {
+  EngineTeam,
+  EnginePosition,
+  EnginePlayer,
+} from "./types/EngineTypes";
 import { GameBalance } from "./GameBalanceConfig";
 
 export class TeamStrengthCalculator {
-  /**
-   * Calcula a força baseada na estrutura do EngineTeam.
-   * Utiliza os pesos definidos em GameBalanceConfig para garantir consistência.
-   */
   public static calculate(team: EngineTeam): TeamStrength {
     const { players, tacticalBonus } = team;
 
     if (players.length === 0) return this.getDefaultStrength();
 
-    let totalOverall = 0;
+    const totalOverall = players.reduce((acc, p) => acc + p.overall, 0);
+    const totalMoral = players.reduce((acc, p) => acc + p.condition.moral, 0);
+    const totalEnergy = players.reduce((acc, p) => acc + p.condition.energy, 0);
+
+    return {
+      overall: Math.round(totalOverall / players.length),
+      attack: this.calculateSectorStrength(players, "FW", tacticalBonus),
+      midfield: this.calculateSectorStrength(players, "MF", tacticalBonus),
+      defense: this.calculateSectorStrength(players, "DF", tacticalBonus),
+      moralBonus: Math.round((totalMoral / players.length - 50) / 10),
+      fitnessMultiplier: Number(
+        (0.7 + (totalEnergy / players.length / 100) * 0.3).toFixed(2)
+      ),
+    };
+  }
+
+  public static calculateSectorStrength(
+    players: EnginePlayer[],
+    sector: "DF" | "MF" | "FW",
+    tacticalBonus: number
+  ): number {
+    const sectorPlayers = players.filter((p) => {
+      if (sector === "DF") return p.position === "DF" || p.position === "GK";
+      return p.position === sector;
+    });
+
+    if (sectorPlayers.length === 0) return 30;
+
+    let totalWeightedScore = 0;
     let totalMoral = 0;
     let totalEnergy = 0;
 
-    const stats = {
-      attack: { sum: 0, count: 0 },
-      midfield: { sum: 0, count: 0 },
-      defense: { sum: 0, count: 0 },
-    };
-
-    for (const p of players) {
-      totalOverall += p.overall;
-      totalMoral += p.condition.moral;
-      totalEnergy += p.condition.energy;
-
+    for (const p of sectorPlayers) {
       const weights = GameBalance.ATTRIBUTE_WEIGHTS[
         p.position as EnginePosition
       ] || {
@@ -40,7 +58,6 @@ export class TeamStrengthCalculator {
       };
 
       const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
-
       const weightedScore =
         (p.skills.defending * weights.defending +
           p.skills.physical * weights.physical +
@@ -51,33 +68,21 @@ export class TeamStrengthCalculator {
           p.skills.shooting * weights.shooting) /
         totalWeight;
 
-      if (p.position === "FW") {
-        stats.attack.sum += weightedScore;
-        stats.attack.count++;
-      } else if (p.position === "MF") {
-        stats.midfield.sum += weightedScore;
-        stats.midfield.count++;
-      } else if (p.position === "DF" || p.position === "GK") {
-        stats.defense.sum += weightedScore;
-        stats.defense.count++;
-      }
+      totalWeightedScore += weightedScore;
+      totalMoral += p.condition.moral;
+      totalEnergy += p.condition.energy;
     }
 
-    const getAvg = (set: { sum: number; count: number }) =>
-      set.count > 0 ? set.sum / set.count : 50;
+    const avgAttributePower = totalWeightedScore / sectorPlayers.length;
+    const avgMoral = totalMoral / sectorPlayers.length;
+    const avgEnergy = totalEnergy / sectorPlayers.length;
 
-    const tacticalMultiplier = 1 + tacticalBonus / 100;
+    const attributePart = avgAttributePower * 0.7;
+    const tacticalPart = avgAttributePower * (1 + tacticalBonus / 100) * 0.2;
+    const conditionPart =
+      avgAttributePower * (avgMoral / 100) * (avgEnergy / 100) * 0.1;
 
-    return {
-      overall: Math.round(totalOverall / players.length),
-      attack: Math.round(getAvg(stats.attack) * tacticalMultiplier),
-      midfield: Math.round(getAvg(stats.midfield) * tacticalMultiplier),
-      defense: Math.round(getAvg(stats.defense) * tacticalMultiplier),
-      moralBonus: Math.round((totalMoral / players.length - 50) / 10),
-      fitnessMultiplier: Number(
-        (0.7 + (totalEnergy / players.length / 100) * 0.3).toFixed(2)
-      ),
-    };
+    return Math.round(attributePart + tacticalPart + conditionPart);
   }
 
   private static getDefaultStrength(): TeamStrength {
