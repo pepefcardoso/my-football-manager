@@ -9,6 +9,64 @@ import type {
   Team,
 } from "./models";
 
+export interface TacticsConfig {
+  style:
+    | "possession"
+    | "counter_attack"
+    | "balanced"
+    | "long_ball"
+    | "pressing";
+  marking: "man_to_man" | "zonal" | "mixed" | "pressing_high";
+  mentality:
+    | "ultra_defensive"
+    | "defensive"
+    | "normal"
+    | "attacking"
+    | "ultra_attacking";
+  passingDirectness: "short" | "mixed" | "long" | "direct";
+}
+
+export type Formation =
+  | "4-4-2"
+  | "4-3-3"
+  | "3-5-2"
+  | "4-2-3-1"
+  | "5-3-2"
+  | "3-4-3"
+  | "4-1-4-1"
+  | "4-5-1";
+
+export interface TeamLineup {
+  formation: Formation;
+  starters: number[];
+  bench: number[];
+  tactics: TacticsConfig;
+}
+
+export interface MatchConfig {
+  homeTeam: Team;
+  awayTeam: Team;
+  homeTactics: TeamLineup;
+  awayTactics: TeamLineup;
+  homePlayers: Player[];
+  awayPlayers: Player[];
+  weather?: "sunny" | "rainy" | "cloudy" | "windy";
+}
+
+export interface PlayerMatchUpdate {
+  playerId: number;
+  energy: number;
+  moral: number;
+  rating: number;
+  goals: number;
+  assists: number;
+  isInjured: boolean;
+  injuryDays?: number;
+  injuryType?: string;
+  minutesPlayed: number;
+  substitutions: number;
+}
+
 export type BadgeVariant =
   | "default"
   | "success"
@@ -69,25 +127,14 @@ export interface SimPlayer
     | "isInjured"
   > {
   name: string;
-  currentPosition?: Position | string;
+  assignedPosition?: Position | string;
+  minutesPlayed: number;
 }
 
 export interface SimTeam extends Pick<Team, "id" | "name"> {
   players: SimPlayer[];
-  tactics?: {
-    aggression: "low" | "normal" | "high";
-    style?: "possession" | "counter" | "balanced";
-  };
-}
-
-export interface MatchConfig {
-  homeTeam: Team;
-  awayTeam: Team;
-  homePlayers: Player[];
-  awayPlayers: Player[];
-  weather?: "sunny" | "rainy" | "cloudy" | "windy";
-  homeTacticalBonus?: number;
-  awayTacticalBonus?: number;
+  tactics: TacticsConfig;
+  formation: Formation;
 }
 
 export interface MatchEventData {
@@ -110,18 +157,6 @@ export interface MatchStats {
   awayCorners: number;
   homeFouls: number;
   awayFouls: number;
-}
-
-export interface PlayerMatchUpdate {
-  playerId: number;
-  energy: number;
-  moral: number;
-  rating: number;
-  goals: number;
-  assists: number;
-  isInjured: boolean;
-  injuryDays?: number;
-  injuryType?: string;
 }
 
 export interface MatchResult {

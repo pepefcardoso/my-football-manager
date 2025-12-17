@@ -34,7 +34,45 @@ export const teams = sqliteTable("teams", {
     .$type<TeamAchievement[]>()
     .default([])
     .notNull(),
+  defaultFormation: text("default_formation").default("4-4-2").notNull(),
+  defaultGameStyle: text("default_game_style").default("balanced").notNull(),
+  defaultMarking: text("default_marking").default("man_to_man").notNull(),
+  defaultMentality: text("default_mentality").default("normal").notNull(),
+  defaultPassingDirectness: text("default_passing_directness")
+    .default("mixed")
+    .notNull(),
 });
+
+export const matchTactics = sqliteTable(
+  "match_tactics",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    matchId: integer("match_id")
+      .references(() => matches.id, { onDelete: "cascade" })
+      .notNull(),
+    teamId: integer("team_id")
+      .references(() => teams.id)
+      .notNull(),
+    isHome: integer("is_home", { mode: "boolean" }).notNull(),
+    formation: text("formation").notNull().default("4-4-2"),
+    gameStyle: text("game_style").notNull().default("balanced"),
+    marking: text("marking").notNull().default("man_to_man"),
+    mentality: text("mentality").notNull().default("normal"),
+    passingDirectness: text("passing_directness").notNull().default("mixed"),
+    startingLineup: text("starting_lineup", { mode: "json" })
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    bench: text("bench", { mode: "json" })
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+  },
+  (table) => ({
+    matchIdx: index("idx_match_tactics_match").on(table.matchId),
+    teamIdx: index("idx_match_tactics_team").on(table.teamId),
+  })
+);
 
 export const transferProposals = sqliteTable(
   "transfer_proposals",
@@ -311,6 +349,11 @@ export const gameState = sqliteTable("game_state", {
   trainingFocus: text("training_focus").default("technical"),
   totalPlayTime: integer("total_play_time").default(0),
   lastPlayedAt: text("last_played_at"),
+  playerFormation: text("player_formation").default("4-4-2"),
+  playerGameStyle: text("player_game_style").default("balanced"),
+  playerMarking: text("player_marking").default("man_to_man"),
+  playerMentality: text("player_mentality").default("normal"),
+  playerPassingDirectness: text("player_passing_directness").default("mixed"),
 });
 
 export const teamsRelations = relations(teams, ({ many, one }) => ({
@@ -328,6 +371,7 @@ export const teamsRelations = relations(teams, ({ many, one }) => ({
     relationName: "proposalsReceived",
   }),
   interests: many(clubInterests),
+  matchTactics: many(matchTactics),
 }));
 
 export const playersRelations = relations(players, ({ one, many }) => ({
@@ -375,6 +419,7 @@ export const matchesRelations = relations(matches, ({ one, many }) => ({
     relationName: "awayTeam",
   }),
   events: many(matchEvents),
+  tactics: many(matchTactics),
 }));
 
 export const scoutingReportsRelations = relations(
@@ -481,3 +526,14 @@ export const playerCompetitionStatsRelations = relations(
     }),
   })
 );
+
+export const matchTacticsRelations = relations(matchTactics, ({ one }) => ({
+  match: one(matches, {
+    fields: [matchTactics.matchId],
+    references: [matches.id],
+  }),
+  team: one(teams, {
+    fields: [matchTactics.teamId],
+    references: [teams.id],
+  }),
+}));
