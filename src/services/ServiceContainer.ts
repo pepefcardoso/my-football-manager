@@ -131,6 +131,7 @@ export class ServiceContainer implements IServiceContainer {
     this.eventService = new EventService(repos, this.eventBus);
     this.cpuSimulation = new CPUSimulationService(
       repos,
+      this.unitOfWork,
       this.dailySimulation,
       this.staff
     );

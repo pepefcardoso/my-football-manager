@@ -140,8 +140,8 @@ export class GameEngine {
     const seasonId = this.gameState.currentSeasonId;
     const teamId = this.gameState.playerTeamId;
 
-    return await this.unitOfWork.execute(async (txRepos) => {
-      try {
+    try {
+      return await this.unitOfWork.execute(async (txRepos) => {
         const txServices = new ServiceContainer(txRepos, this.unitOfWork);
         const newDateStr = this.timeEngine.advanceDay();
         updates.date = newDateStr;
@@ -197,15 +197,6 @@ export class GameEngine {
         if (Result.isSuccess(eventResult) && eventResult.data) {
           updates.narrativeEvent = eventResult.data;
           updates.logs.push(`🔔 Novo evento: ${eventResult.data.title}`);
-          updates.news.push({
-            type: "news",
-            title: eventResult.data.title,
-            description: eventResult.data.description,
-            importance:
-              eventResult.data.importance === "critical" ? "high" : "medium",
-            date: newDateStr,
-            relatedEntityId: teamId,
-          });
         }
 
         const simulationResults = await txServices.match.simulateMatchesOfDate(
@@ -215,32 +206,7 @@ export class GameEngine {
           const simData = simulationResults.data;
           if (simData.matchesPlayed > 0) {
             updates.matchResults = simData.results.map((r) => r.result);
-            logger.info(
-              `${simData.matchesPlayed} partidas simuladas neste dia.`
-            );
           }
-        }
-
-        const aiTransferResult =
-          await txServices.dailyTransferProcessor.processDailyTransfers(
-            newDateStr,
-            seasonId
-          );
-        if (Result.isSuccess(aiTransferResult) && aiTransferResult.data > 0) {
-          updates.logs.push(
-            `Mercado: IA realizou ${aiTransferResult.data} ações.`
-          );
-        }
-
-        const contractExpiryResult =
-          await txServices.contract.checkExpiringContracts(newDateStr);
-        if (
-          Result.isSuccess(contractExpiryResult) &&
-          contractExpiryResult.data.playersReleased > 0
-        ) {
-          updates.logs.push(
-            `${contractExpiryResult.data.playersReleased} contratos expirados.`
-          );
         }
 
         if (this.gameState) {
@@ -253,17 +219,28 @@ export class GameEngine {
         }
 
         return updates;
-      } catch (error) {
-        const previousDate = new Date(this.getCurrentDate());
-        previousDate.setDate(previousDate.getDate() - 1);
-        this.timeEngine.setDate(previousDate.toISOString().split("T")[0]);
-        logger.error(
-          "Falha crítica no processamento diário. Rollback automático.",
-          error
-        );
-        throw error;
-      }
-    });
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      logger.error(
+        `[FALHA CRÍTICA] Erro no processamento diário: ${errorMessage}`,
+        {
+          stack: error instanceof Error ? error.stack : undefined,
+          date: updates.date,
+        }
+      );
+
+      const previousDate = new Date(this.getCurrentDate());
+      previousDate.setDate(previousDate.getDate() - 1);
+      this.timeEngine.setDate(previousDate.toISOString().split("T")[0]);
+
+      updates.logs.push(
+        `❌ ERRO CRÍTICO: A simulação foi interrompida. Detalhes: ${errorMessage}`
+      );
+      return updates;
+    }
   }
 
   calculatePlayerMoralChange(
