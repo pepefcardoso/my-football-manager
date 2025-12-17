@@ -39,34 +39,43 @@ export class MatchEngine implements IMatchEngineContext {
 
   public readonly config: MatchConfig;
   public readonly rng: RandomEngine;
-  private homeStrength: TeamStrength;
-  private awayStrength: TeamStrength;
+  private _homeStrength!: TeamStrength;
+  private _awayStrength!: TeamStrength;
   private weatherMultiplier: number = 1.0;
 
-  constructor(config: MatchConfig, isKnockout: boolean, seed?: number) {
+  constructor(config: MatchConfig, _isKnockout: boolean, seed?: number) {
     this.config = config;
     const matchSeed = seed || Date.now();
     this.rng = new RandomEngine(matchSeed);
 
     this.currentState = new NotStartedState(this);
 
-    this.homeStrength = TeamStrengthCalculator.calculate({
-      id: config.homeTeam.id.toString(),
-      tacticalBonus: config.homeTacticalBonus || 0,
-      players: config.homePlayers.map((p) =>
-        DomainToEngineAdapter.toEnginePlayer(p)
-      ),
-    });
-
-    this.awayStrength = TeamStrengthCalculator.calculate({
-      id: config.awayTeam.id.toString(),
-      tacticalBonus: config.awayTacticalBonus || 0,
-      players: config.awayPlayers.map((p) =>
-        DomainToEngineAdapter.toEnginePlayer(p)
-      ),
-    });
-
+    this.updateTeamStrengths();
     this.applyWeatherEffects(config.weather || "sunny");
+  }
+
+  public updateTeamStrengths(): void {
+    this._homeStrength = TeamStrengthCalculator.calculate(
+      {
+        id: this.config.homeTeam.id.toString(),
+        tacticalBonus: 0,
+        players: this.config.homePlayers.map((p) =>
+          DomainToEngineAdapter.toEnginePlayer(p)
+        ),
+      },
+      this.config.homeTactics?.tactics
+    );
+
+    this._awayStrength = TeamStrengthCalculator.calculate(
+      {
+        id: this.config.awayTeam.id.toString(),
+        tacticalBonus: 0,
+        players: this.config.awayPlayers.map((p) =>
+          DomainToEngineAdapter.toEnginePlayer(p)
+        ),
+      },
+      this.config.awayTactics?.tactics
+    );
   }
 
   private applyWeatherEffects(weather: string): void {
@@ -76,10 +85,6 @@ export class MatchEngine implements IMatchEngineContext {
       ];
     this.weatherMultiplier = penalty || 1.0;
   }
-
-  // ============================================
-  // TRANSIÇÕES DE ESTADO (Resolvendo Ciclos)
-  // ============================================
 
   public transitionToPlaying(): void {
     this.setState(new PlayingState(this));
@@ -96,10 +101,6 @@ export class MatchEngine implements IMatchEngineContext {
   public setState(newState: IMatchState): void {
     this.currentState = newState;
   }
-
-  // ============================================
-  // API PÚBLICA DE CONTROLE
-  // ============================================
 
   public start(): void {
     this.currentState.start();
@@ -126,10 +127,6 @@ export class MatchEngine implements IMatchEngineContext {
       this.simulateMinute();
     }
   }
-
-  // ============================================
-  // MÉTODOS DE DADOS E MUTAÇÃO (Interface)
-  // ============================================
 
   public incrementMinute(): void {
     this.currentMinute++;
@@ -192,24 +189,19 @@ export class MatchEngine implements IMatchEngineContext {
   }
 
   public getHomeStrength(): TeamStrength {
-    return this.homeStrength;
+    return this._homeStrength;
   }
 
   public getAwayStrength(): TeamStrength {
-    return this.awayStrength;
+    return this._awayStrength;
   }
 
   public getWeatherMultiplier(): number {
     return this.weatherMultiplier;
   }
 
-  // ============================================
-  // FINALIZAÇÃO
-  // ============================================
-
   public getMatchResult(): MatchResult {
     if (this.currentState.getStateEnum() !== MatchState.FINISHED) {
-      console.warn("Warning: getMatchResult() called before match finished.");
       this.simulateToCompletion();
     }
     return this.compileFinalResult();
@@ -276,6 +268,8 @@ export class MatchEngine implements IMatchEngineContext {
           assists: this.events.filter(
             (e) => e.type === MatchEventType.ASSIST && e.playerId === player.id
           ).length,
+          minutesPlayed: 90,
+          substitutions: 0,
         });
       }
     };

@@ -18,6 +18,7 @@ export interface IMatchEngineContext {
   getAwayStrength(): TeamStrength;
   getWeatherMultiplier(): number;
   getEvents(): any[];
+  updateTeamStrengths(): void;
 
   incrementMinute(): void;
   addScore(isHome: boolean): void;
