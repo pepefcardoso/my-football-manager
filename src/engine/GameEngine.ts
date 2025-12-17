@@ -22,8 +22,10 @@ export class GameEngine {
   private timeEngine: TimeEngine;
   private gameState: GameState | null = null;
   private stopChecker: StopConditionChecker;
-  public readonly saveManager: SaveManager;
   private readonly repos: IRepositoryContainer;
+  private readonly unitOfWork: IUnitOfWork;
+
+  public readonly saveManager: SaveManager;
 
   constructor(
     repositories: IRepositoryContainer,
@@ -33,8 +35,10 @@ export class GameEngine {
   ) {
     this.repos = repositories;
     this.timeEngine = new TimeEngine(initialDate || "2025-01-15");
-    const uow = unitOfWork || new UnitOfWork(db);
-    this.saveManager = new SaveManager(repositories, uow, db);
+
+    this.unitOfWork = unitOfWork || new UnitOfWork(db);
+
+    this.saveManager = new SaveManager(repositories, this.unitOfWork, db);
     this.stopChecker = new StopConditionChecker(repositories);
   }
 

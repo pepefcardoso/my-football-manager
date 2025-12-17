@@ -25,6 +25,7 @@ import { ScoutingService } from "./ScoutingService";
 import { SeasonService } from "./SeasonService";
 import { PromotionRelegationService } from "./season/PromotionRelegationService";
 import { SeasonTransitionManager } from "./season/SeasonTransitionManager";
+import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 import { StaffService } from "./StaffService";
 import { StatsService } from "./StatsService";
 import { CupProgressionManager } from "./match/CupProgressionManager";
@@ -42,7 +43,7 @@ import { CPUSimulationService } from "./ai/CPUSimulationService";
 import { PlayerDevelopmentService } from "./PlayerDevelopmentService";
 
 export class ServiceContainer implements IServiceContainer {
-  public readonly unitOfWork: UnitOfWork;
+  public readonly unitOfWork: IUnitOfWork;
   public readonly eventBus: GameEventBus;
   public readonly calendar: CalendarService;
   public readonly contract: ContractService;
@@ -75,10 +76,13 @@ export class ServiceContainer implements IServiceContainer {
   public readonly cpuSimulation: CPUSimulationService;
   public readonly playerDevelopment: PlayerDevelopmentService;
 
-  constructor(repos: IRepositoryContainer) {
-    this.unitOfWork = new UnitOfWork();
-    this.eventBus = new GameEventBus();
-
+  constructor(
+    repos: IRepositoryContainer,
+    unitOfWork?: IUnitOfWork,
+    eventBus?: GameEventBus
+  ) {
+    this.unitOfWork = unitOfWork || new UnitOfWork();
+    this.eventBus = eventBus || new GameEventBus();
     this.wageCalculator = new WageCalculator(repos);
     this.financialPenalty = new FinancialPenaltyService(repos);
     this.matchRevenue = new MatchRevenueCalculator(repos);
@@ -97,7 +101,10 @@ export class ServiceContainer implements IServiceContainer {
     this.scouting = new ScoutingService(repos);
     this.staff = new StaffService(repos);
     this.playerDevelopment = new PlayerDevelopmentService(repos);
-    this.dailySimulation = new DailySimulationService(repos, this.playerDevelopment);
+    this.dailySimulation = new DailySimulationService(
+      repos,
+      this.playerDevelopment
+    );
     this.season = new SeasonService(repos);
     this.finance = new FinanceService(repos, this.eventBus);
     this.promotionRelegation = new PromotionRelegationService(repos);
@@ -127,7 +134,9 @@ export class ServiceContainer implements IServiceContainer {
       this.dailySimulation,
       this.staff
     );
-    this.setupSubscriptions();
+    if (!unitOfWork && !eventBus) {
+      this.setupSubscriptions();
+    }
   }
 
   private setupSubscriptions() {
