@@ -16,6 +16,9 @@ import { PlayingState } from "./match/states/PlayingState";
 import { PausedState } from "./match/states/PausedState";
 import { FinishedState } from "./match/states/FinishedState";
 import type { IMatchEngineContext } from "./match/IMatchEngineContext";
+import { Logger } from "../lib/Logger";
+
+const logger = new Logger("MatchEngine");
 
 export class MatchEngine implements IMatchEngineContext {
   private currentState: IMatchState;
@@ -41,25 +44,59 @@ export class MatchEngine implements IMatchEngineContext {
   public readonly rng: RandomEngine;
   private _homeStrength!: TeamStrength;
   private _awayStrength!: TeamStrength;
+  private homePlayersOnField: Player[];
+  private awayPlayersOnField: Player[];
+  private homeBench: Player[];
+  private awayBench: Player[];
+  private homeSubstitutionsUsed: number = 0;
+  private awaySubstitutionsUsed: number = 0;
+  private readonly MAX_SUBSTITUTIONS = 5;
   private weatherMultiplier: number = 1.0;
 
-  constructor(config: MatchConfig, _isKnockout: boolean, seed?: number) {
+  constructor(config: MatchConfig, private isKnockout: boolean, seed?: number) {
     this.config = config;
     const matchSeed = seed || Date.now();
     this.rng = new RandomEngine(matchSeed);
-
     this.currentState = new NotStartedState(this);
-
+    this.homePlayersOnField = this.selectStartingLineup(config.homePlayers);
+    this.awayPlayersOnField = this.selectStartingLineup(config.awayPlayers);
+    this.homeBench = this.selectBench(
+      config.homePlayers,
+      this.homePlayersOnField
+    );
+    this.awayBench = this.selectBench(
+      config.awayPlayers,
+      this.awayPlayersOnField
+    );
     this.updateTeamStrengths();
     this.applyWeatherEffects(config.weather || "sunny");
   }
 
+  private selectStartingLineup(players: Player[]): Player[] {
+    const sorted = [...players]
+      .filter((p) => !p.isInjured && p.energy > 30)
+      .sort((a, b) => b.overall - a.overall);
+
+    return sorted.slice(0, 11);
+  }
+
+  private selectBench(allPlayers: Player[], starters: Player[]): Player[] {
+    const starterIds = new Set(starters.map((p) => p.id));
+    return allPlayers
+      .filter((p) => !starterIds.has(p.id) && !p.isInjured && p.energy > 20)
+      .slice(0, 7);
+  }
+
   public updateTeamStrengths(): void {
+    logger.debug(
+      `Recalculando forças dos times (Minuto ${this.currentMinute})...`
+    );
+
     this._homeStrength = TeamStrengthCalculator.calculate(
       {
         id: this.config.homeTeam.id.toString(),
         tacticalBonus: 0,
-        players: this.config.homePlayers.map((p) =>
+        players: this.homePlayersOnField.map((p) =>
           DomainToEngineAdapter.toEnginePlayer(p)
         ),
       },
@@ -70,12 +107,113 @@ export class MatchEngine implements IMatchEngineContext {
       {
         id: this.config.awayTeam.id.toString(),
         tacticalBonus: 0,
-        players: this.config.awayPlayers.map((p) =>
+        players: this.awayPlayersOnField.map((p) =>
           DomainToEngineAdapter.toEnginePlayer(p)
         ),
       },
       this.config.awayTactics?.tactics
     );
+
+    logger.debug("Forças atualizadas:", {
+      home: this._homeStrength.overall,
+      away: this._awayStrength.overall,
+    });
+  }
+
+  public substitute(
+    isHome: boolean,
+    playerOutId: number,
+    playerInId: number
+  ): boolean {
+    const teamName = isHome
+      ? this.config.homeTeam.shortName
+      : this.config.awayTeam.shortName;
+    const onField = isHome ? this.homePlayersOnField : this.awayPlayersOnField;
+    const bench = isHome ? this.homeBench : this.awayBench;
+    const subsUsed = isHome
+      ? this.homeSubstitutionsUsed
+      : this.awaySubstitutionsUsed;
+
+    if (subsUsed >= this.MAX_SUBSTITUTIONS) {
+      logger.warn(
+        `[${teamName}] Limite de substituições atingido (${this.MAX_SUBSTITUTIONS}).`
+      );
+      return false;
+    }
+
+    const playerOutIndex = onField.findIndex((p) => p.id === playerOutId);
+    if (playerOutIndex === -1) {
+      logger.warn(`[${teamName}] Jogador #${playerOutId} não está em campo.`);
+      return false;
+    }
+
+    const playerInIndex = bench.findIndex((p) => p.id === playerInId);
+    if (playerInIndex === -1) {
+      logger.warn(`[${teamName}] Jogador #${playerInId} não está no banco.`);
+      return false;
+    }
+
+    const playerOut = onField[playerOutIndex];
+    const playerIn = bench[playerInIndex];
+
+    onField[playerOutIndex] = playerIn;
+    bench[playerInIndex] = playerOut;
+
+    if (isHome) {
+      this.homeSubstitutionsUsed++;
+    } else {
+      this.awaySubstitutionsUsed++;
+    }
+
+    this.addEvent(
+      this.currentMinute,
+      MatchEventType.SUBSTITUTION,
+      isHome ? this.config.homeTeam.id : this.config.awayTeam.id,
+      playerInId,
+      `🔄 Substituição: Sai ${playerOut.firstName} ${playerOut.lastName}, entra ${playerIn.firstName} ${playerIn.lastName}.`
+    );
+
+    logger.info(
+      `[${teamName}] Substituição executada (${subsUsed + 1}/${
+        this.MAX_SUBSTITUTIONS
+      }): ` +
+        `Sai #${playerOutId} (${playerOut.firstName}), Entra #${playerInId} (${playerIn.firstName})`
+    );
+
+    this.updateTeamStrengths();
+
+    return true;
+  }
+
+  private drainPlayerEnergy(): void {
+    const homeMarking = this.config.homeTactics?.tactics?.marking || "zonal";
+    const awayMarking = this.config.awayTactics?.tactics?.marking || "zonal";
+
+    const homeDrain = this.calculateEnergyDrain(homeMarking);
+    const awayDrain = this.calculateEnergyDrain(awayMarking);
+
+    this.homePlayersOnField.forEach((p) => {
+      p.energy = Math.max(0, p.energy - homeDrain);
+    });
+
+    this.awayPlayersOnField.forEach((p) => {
+      p.energy = Math.max(0, p.energy - awayDrain);
+    });
+  }
+
+  private calculateEnergyDrain(marking: string): number {
+    const baseDrain = 0.5;
+
+    switch (marking) {
+      case "pressing_high":
+        return baseDrain * 1.5;
+      case "man_to_man":
+        return baseDrain * 1.3;
+      case "zonal":
+      case "mixed":
+      default:
+        return baseDrain;
+    }
   }
 
   private applyWeatherEffects(weather: string): void {
@@ -116,6 +254,7 @@ export class MatchEngine implements IMatchEngineContext {
 
   public simulateMinute(): void {
     this.currentState.simulateMinute();
+    this.drainPlayerEnergy();
   }
 
   public simulateToCompletion(): void {
@@ -200,6 +339,26 @@ export class MatchEngine implements IMatchEngineContext {
     return this.weatherMultiplier;
   }
 
+  public getHomePlayersOnField(): Player[] {
+    return [...this.homePlayersOnField];
+  }
+
+  public getAwayPlayersOnField(): Player[] {
+    return [...this.awayPlayersOnField];
+  }
+
+  public getHomeBench(): Player[] {
+    return [...this.homeBench];
+  }
+
+  public getAwayBench(): Player[] {
+    return [...this.awayBench];
+  }
+
+  public getSubstitutionsUsed(isHome: boolean): number {
+    return isHome ? this.homeSubstitutionsUsed : this.awaySubstitutionsUsed;
+  }
+
   public getMatchResult(): MatchResult {
     if (this.currentState.getStateEnum() !== MatchState.FINISHED) {
       this.simulateToCompletion();
@@ -258,7 +417,7 @@ export class MatchEngine implements IMatchEngineContext {
 
         updates.push({
           playerId: player.id,
-          energy: Math.max(0, player.energy - 15),
+          energy: Math.max(0, player.energy),
           moral: Math.round(newMoral),
           isInjured: false,
           rating: won ? 7.0 : draw ? 6.5 : 6.0,
@@ -274,8 +433,8 @@ export class MatchEngine implements IMatchEngineContext {
       }
     };
 
-    process(this.config.homePlayers, homeWon, draw, awayRep, homeRep);
-    process(this.config.awayPlayers, !homeWon, draw, homeRep, awayRep);
+    process(this.homePlayersOnField, homeWon, draw, awayRep, homeRep);
+    process(this.awayPlayersOnField, !homeWon, draw, homeRep, awayRep);
 
     return updates;
   }

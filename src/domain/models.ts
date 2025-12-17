@@ -9,6 +9,7 @@ import type {
   TransferType,
   WeatherCondition,
 } from "./enums";
+import type { Formation, TacticsConfig } from "./types";
 
 export interface Player {
   id: number;
@@ -87,6 +88,11 @@ export interface Team {
   transferBudget: number;
   transferStrategy: TransferStrategy | string;
   history: TeamAchievement[];
+  defaultFormation: Formation;
+    defaultGameStyle: TacticsConfig["style"];
+    defaultMarking: TacticsConfig["marking"];
+    defaultMentality: TacticsConfig["mentality"];
+    defaultPassingDirectness: TacticsConfig["passingDirectness"];
 }
 
 export interface Competition {
