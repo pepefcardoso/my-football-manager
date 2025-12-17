@@ -1,7 +1,7 @@
 import type { GameState, Match, Player } from "../domain/models";
 import type { MatchResult, GameEvent } from "../domain/types";
 import { FinanceService } from "../services/FinanceService";
-import { serviceContainer } from "../services/ServiceContainer";
+import { ServiceContainer } from "../services/ServiceContainer";
 import { Logger } from "../lib/Logger";
 import { Result, type ServiceResult } from "../services/types/ServiceResults";
 import { TimeEngine } from "./TimeEngine";
@@ -22,7 +22,6 @@ export class GameEngine {
   private timeEngine: TimeEngine;
   private gameState: GameState | null = null;
   private stopChecker: StopConditionChecker;
-  private readonly repos: IRepositoryContainer;
   private readonly unitOfWork: IUnitOfWork;
 
   public readonly saveManager: SaveManager;
@@ -33,18 +32,14 @@ export class GameEngine {
     initialDate?: string,
     unitOfWork?: IUnitOfWork
   ) {
-    this.repos = repositories;
     this.timeEngine = new TimeEngine(initialDate || "2025-01-15");
-
     this.unitOfWork = unitOfWork || new UnitOfWork(db);
-
     this.saveManager = new SaveManager(repositories, this.unitOfWork, db);
     this.stopChecker = new StopConditionChecker(repositories);
   }
 
   setGameState(state: GameState) {
     this.gameState = state;
-
     if (state.currentDate) {
       this.timeEngine.setDate(state.currentDate);
     }
@@ -138,55 +133,52 @@ export class GameEngine {
       narrativeEvent: null,
     };
 
-    if (this.gameState?.currentSeasonId && this.gameState?.playerTeamId) {
-      const seasonId = this.gameState.currentSeasonId;
-      const teamId = this.gameState.playerTeamId;
-      const dateStr = this.getCurrentDate();
+    if (!this.gameState?.currentSeasonId || !this.gameState?.playerTeamId) {
+      return updates;
+    }
 
+    const seasonId = this.gameState.currentSeasonId;
+    const teamId = this.gameState.playerTeamId;
+
+    return await this.unitOfWork.execute(async (txRepos) => {
       try {
+        const txServices = new ServiceContainer(txRepos, this.unitOfWork);
+        const newDateStr = this.timeEngine.advanceDay();
+        updates.date = newDateStr;
+
         const currentFocus =
-          (this.gameState.trainingFocus as TrainingFocus) ||
+          (this.gameState!.trainingFocus as TrainingFocus) ||
           TrainingFocus.TECHNICAL;
 
-        const staffImpactResult = await serviceContainer.staff.getStaffImpact(
-          teamId
-        );
-
+        const staffImpactResult = await txServices.staff.getStaffImpact(teamId);
         if (Result.isSuccess(staffImpactResult)) {
           const trainingResult =
-            await serviceContainer.dailySimulation.processTeamDailyLoop(
+            await txServices.dailySimulation.processTeamDailyLoop(
               teamId,
               currentFocus,
               staffImpactResult.data
             );
-
           if (Result.isSuccess(trainingResult)) {
             updates.playersUpdated = trainingResult.data.playerUpdates.length;
             updates.logs.push(...trainingResult.data.logs);
           }
         }
 
-        const cpuResult =
-          await serviceContainer.cpuSimulation.processAllAITeams();
-        if (Result.isSuccess(cpuResult)) {
-          logger.debug(
-            `Simulação diária executada para ${cpuResult.data} times da IA.`
-          );
-        }
-
-        await serviceContainer.contract.processDailyWages({
+        await txServices.cpuSimulation.processAllAITeams();
+        await txServices.contract.processDailyWages({
           teamId,
-          currentDate: dateStr,
+          currentDate: newDateStr,
           seasonId,
         });
 
-        if (FinanceService.isPayDay(dateStr)) {
-          const expenseResult =
-            await serviceContainer.finance.processMonthlyExpenses({
+        if (FinanceService.isPayDay(newDateStr)) {
+          const expenseResult = await txServices.finance.processMonthlyExpenses(
+            {
               teamId,
-              currentDate: dateStr,
+              currentDate: newDateStr,
               seasonId,
-            });
+            }
+          );
 
           if (Result.isSuccess(expenseResult)) {
             updates.financialChanges.push({
@@ -198,38 +190,31 @@ export class GameEngine {
           }
         }
 
-        const eventResult =
-          await serviceContainer.eventService.processDailyEvents(
-            teamId,
-            dateStr
-          );
-
+        const eventResult = await txServices.eventService.processDailyEvents(
+          teamId,
+          newDateStr
+        );
         if (Result.isSuccess(eventResult) && eventResult.data) {
           updates.narrativeEvent = eventResult.data;
           updates.logs.push(`🔔 Novo evento: ${eventResult.data.title}`);
-
           updates.news.push({
             type: "news",
             title: eventResult.data.title,
             description: eventResult.data.description,
             importance:
               eventResult.data.importance === "critical" ? "high" : "medium",
-            date: dateStr,
+            date: newDateStr,
             relatedEntityId: teamId,
           });
         }
 
-        const simulationResults =
-          await serviceContainer.match.simulateMatchesOfDate(dateStr);
-
+        const simulationResults = await txServices.match.simulateMatchesOfDate(
+          newDateStr
+        );
         if (Result.isSuccess(simulationResults)) {
           const simData = simulationResults.data;
-
           if (simData.matchesPlayed > 0) {
-            updates.matchResults = simData.results.map(
-              (r: { result: MatchResult }) => r.result
-            );
-
+            updates.matchResults = simData.results.map((r) => r.result);
             logger.info(
               `${simData.matchesPlayed} partidas simuladas neste dia.`
             );
@@ -237,33 +222,48 @@ export class GameEngine {
         }
 
         const aiTransferResult =
-          await serviceContainer.dailyTransferProcessor.processDailyTransfers(
-            dateStr,
+          await txServices.dailyTransferProcessor.processDailyTransfers(
+            newDateStr,
             seasonId
           );
-
         if (Result.isSuccess(aiTransferResult) && aiTransferResult.data > 0) {
           updates.logs.push(
-            `O mercado de transferências da IA teve ${aiTransferResult.data} ações.`
+            `Mercado: IA realizou ${aiTransferResult.data} ações.`
           );
         }
 
         const contractExpiryResult =
-          await serviceContainer.contract.checkExpiringContracts(dateStr);
+          await txServices.contract.checkExpiringContracts(newDateStr);
         if (
           Result.isSuccess(contractExpiryResult) &&
           contractExpiryResult.data.playersReleased > 0
         ) {
           updates.logs.push(
-            `${contractExpiryResult.data.playersReleased} contratos de jogadores expiraram.`
+            `${contractExpiryResult.data.playersReleased} contratos expirados.`
           );
         }
-      } catch (error) {
-        logger.error("Erro no processamento financeiro diário:", error);
-      }
-    }
 
-    return updates;
+        if (this.gameState) {
+          this.gameState.currentDate = newDateStr;
+          await txRepos.gameState.save({
+            ...this.gameState,
+            currentDate: newDateStr,
+            lastPlayedAt: new Date().toISOString(),
+          });
+        }
+
+        return updates;
+      } catch (error) {
+        const previousDate = new Date(this.getCurrentDate());
+        previousDate.setDate(previousDate.getDate() - 1);
+        this.timeEngine.setDate(previousDate.toISOString().split("T")[0]);
+        logger.error(
+          "Falha crítica no processamento diário. Rollback automático.",
+          error
+        );
+        throw error;
+      }
+    });
   }
 
   calculatePlayerMoralChange(
@@ -272,7 +272,6 @@ export class GameEngine {
     opponentReputation: number
   ): number {
     const reputationDiff = opponentReputation - teamReputation;
-
     if (result === "win") {
       return Math.max(5, Math.min(15, 10 + reputationDiff / 500));
     } else if (result === "loss") {
@@ -288,11 +287,8 @@ export class GameEngine {
     trainingCenterQuality: number
   ): number {
     const baseRecovery = restDays * 15;
-
     const coachBonus = staffEnergyBonus;
-
     const facilityBonus = (trainingCenterQuality - 50) * 0.1;
-
     return Math.min(100, baseRecovery + coachBonus + facilityBonus);
   }
 
@@ -303,22 +299,16 @@ export class GameEngine {
     physical: number
   ): number {
     let risk = 0;
-
     if (fitness < 70) risk += (70 - fitness) * 0.5;
-
     if (energy < 50) risk += (50 - energy) * 0.8;
-
     if (age > 30) risk += (age - 30) * 2;
-
     risk -= (physical - 50) * 0.3;
-
     return Math.max(0, Math.min(100, risk));
   }
 
   applyMatchFatigue(player: Player, minutesPlayed: number): Player {
     const fatigueAmount = minutesPlayed * 0.5;
     const newEnergy = Math.max(0, player.energy - fatigueAmount);
-
     return {
       ...player,
       energy: Math.round(newEnergy),
@@ -327,11 +317,9 @@ export class GameEngine {
 
   calculatePlayerForm(recentPerformances: number[]): number {
     if (recentPerformances.length === 0) return 50;
-
     const average =
       recentPerformances.reduce((sum, val) => sum + val, 0) /
       recentPerformances.length;
-
     return Math.round(Math.max(0, Math.min(100, average)));
   }
 
@@ -344,7 +332,6 @@ export class GameEngine {
     medicalMultiplier: number = 1.0
   ): number {
     let baseDuration = 0;
-
     switch (severity) {
       case "light":
         baseDuration = Math.floor(Math.random() * 7) + 3;
@@ -356,7 +343,6 @@ export class GameEngine {
         baseDuration = Math.floor(Math.random() * 90) + 60;
         break;
     }
-
     return Math.max(1, Math.round(baseDuration * medicalMultiplier));
   }
 
@@ -393,13 +379,10 @@ export class GameEngine {
 
   async loadGameSave(saveData: GameSave): Promise<ServiceResult<void>> {
     const restoreResult = await this.saveManager.loadSave(saveData);
-
     if (Result.isFailure(restoreResult)) {
       return restoreResult;
     }
-
     this.timeEngine = new TimeEngine(saveData.gameState.currentDate);
-
     const newState: GameState = {
       id: 1,
       saveId: saveData.gameState.saveId,
@@ -411,9 +394,7 @@ export class GameEngine {
       trainingFocus: saveData.gameState.trainingFocus,
       totalPlayTime: saveData.gameState.totalPlayTime,
     };
-
     this.setGameState(newState);
-
     return Result.success(undefined, "Game loaded and engine state updated.");
   }
 
@@ -443,20 +424,7 @@ export class GameEngine {
       };
     }
 
-    this.timeEngine.advanceDay();
     const result = await this.processDailyUpdate();
-
-    if (this.gameState) {
-      this.gameState.currentDate = result.date;
-
-      await this.repos.gameState.save({
-        ...this.gameState,
-        currentDate: result.date,
-        lastPlayedAt: new Date().toISOString(),
-      });
-
-      logger.debug(`Estado do jogo persistido: ${result.date}`);
-    }
 
     return {
       advanced: true,
@@ -501,6 +469,7 @@ export interface InjuryEvent {
 export interface SuspensionEvent {
   playerId: number;
   playerName: string;
+  teamId: number;
   games: number;
   reason: string;
 }
