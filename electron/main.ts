@@ -161,6 +161,18 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle(
+    "match:savePreMatchTactics",
+    async (_, { matchId, homeLineup, awayLineup }) => {
+      const result = await serviceContainer.match.savePreMatchTactics(
+        matchId,
+        homeLineup,
+        awayLineup
+      );
+      return Result.isSuccess(result);
+    }
+  );
+
+  ipcMain.handle(
     "match:substitutePlayer",
     async (_, { matchId, isHome, playerOutId, playerInId }) => {
       try {

@@ -132,6 +132,11 @@ declare global {
           matchId: number,
           isHome: boolean
         ) => Promise<Partial<TacticsConfig>>;
+        savePreMatchTactics: (
+          matchId: number,
+          homeLineup: any,
+          awayLineup: any
+        ) => Promise<boolean>;
       };
 
       competition: {

@@ -1,8 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { Player } from "../../../../domain/models";
-import { Logger } from "../../../../lib/Logger";
-
-const logger = new Logger("SubstitutionModal");
 
 interface SubstitutionModalProps {
     matchId: number;
@@ -10,45 +7,21 @@ interface SubstitutionModalProps {
     isHome: boolean;
     onClose: () => void;
     onConfirm: (playerOutId: number, playerInId: number) => Promise<void>;
+    currentOnField: Player[];
+    currentBench: Player[];
 }
 
 export function SubstitutionModal({
-    matchId,
-    teamId,
     isHome,
     onClose,
     onConfirm,
+    currentOnField,
+    currentBench
 }: SubstitutionModalProps) {
-    const [onFieldPlayers, setOnFieldPlayers] = useState<Player[]>([]);
-    const [benchPlayers, setBenchPlayers] = useState<Player[]>([]);
     const [selectedOut, setSelectedOut] = useState<number | null>(null);
     const [selectedIn, setSelectedIn] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const loadSquad = async () => {
-            try {
-                const allPlayers = await window.electronAPI.player.getPlayers(teamId);
-
-                const available = allPlayers.filter(p => !p.isInjured || p.injuryDaysRemaining === 0);
-
-                // TODO endpoint 'getMatchState' retornaria 
-                // exatamente quem está em campo.
-                // Para garantir consistência com o Engine, o ideal seria o Engine enviar essa lista.
-
-                const sorted = [...available].sort((a, b) => b.overall - a.overall);
-                setOnFieldPlayers(sorted.slice(0, 11));
-                setBenchPlayers(sorted.slice(11, 18));
-
-            } catch (err) {
-                logger.error("Erro ao carregar elenco para substituição", err);
-                setError("Não foi possível carregar os jogadores.");
-            }
-        };
-
-        loadSquad();
-    }, [matchId, teamId]);
 
     const handleConfirm = async () => {
         if (!selectedOut || !selectedIn) {
@@ -88,7 +61,7 @@ export function SubstitutionModal({
                             🔻 Sair
                         </h3>
                         <div className="space-y-2">
-                            {onFieldPlayers.map((player) => (
+                            {currentOnField.map((player) => (
                                 <button
                                     key={player.id}
                                     onClick={() => setSelectedOut(player.id)}
@@ -114,10 +87,10 @@ export function SubstitutionModal({
 
                     <div className="bg-slate-950/30 p-4 rounded-xl border border-emerald-900/20">
                         <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
-                            pV Entrar
+                            🔼 Entrar
                         </h3>
                         <div className="space-y-2">
-                            {benchPlayers.map((player) => (
+                            {currentBench.map((player) => (
                                 <button
                                     key={player.id}
                                     onClick={() => setSelectedIn(player.id)}

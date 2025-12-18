@@ -30,6 +30,7 @@ interface DraggedPlayer {
 }
 
 export function PreMatchScreen({
+    matchId,
     homeTeam,
     awayTeam,
     onConfirm,
@@ -144,7 +145,7 @@ export function PreMatchScreen({
         [draggedPlayer, starters, bench, availablePlayers]
     );
 
-    const handleConfirm = useCallback(() => {
+    const handleConfirm = useCallback(async () => {
         const finalStarters = starters.filter((p): p is Player => p !== null);
 
         if (finalStarters.length < 11) {
@@ -152,15 +153,27 @@ export function PreMatchScreen({
             return;
         }
 
-        const lineup: PreMatchLineup = {
+        const myLineup: PreMatchLineup = {
             formation,
             starters: finalStarters.map((p) => p.id),
             bench: bench.map((p) => p.id),
             tactics,
         };
 
-        onConfirm(lineup);
-    }, [formation, starters, bench, tactics, onConfirm]);
+        try {
+            await window.electronAPI.match.savePreMatchTactics(
+                matchId,
+                myLineup,
+                { ...myLineup, starters: [], bench: [] }
+            );
+
+            onConfirm(myLineup);
+        } catch (err) {
+            logger.error("Erro ao salvar táticas", err);
+            alert("Erro ao salvar táticas. Tente novamente.");
+        }
+
+    }, [formation, starters, bench, tactics, onConfirm, matchId]);
 
     if (loading) {
         return (

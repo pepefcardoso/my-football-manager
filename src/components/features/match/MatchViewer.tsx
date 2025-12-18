@@ -4,7 +4,7 @@ import { MatchScoreboard } from "./MatchScoreboard";
 import { MatchEvents } from "./MatchEvents";
 import { InGameTacticsPanel } from "./pre-game/InGameTacticsPanel";
 import { SubstitutionModal } from "./pre-game/SubstitutionModal";
-import type { TacticsConfig } from "../../../domain/models";
+import type { TacticsConfig, Player } from "../../../domain/models";
 import { useGameStore } from "../../../store/useGameStore";
 import { Logger } from "../../../lib/Logger";
 
@@ -99,6 +99,18 @@ export function MatchViewer({
     }
   };
 
+  const getLineups = () => {
+    if (!simulation) return { onField: [], bench: [] };
+
+    const simData = simulation as any;
+
+    if (isUserHome) {
+      return simData.homeLineup || { onField: [], bench: [] };
+    } else {
+      return simData.awayLineup || { onField: [], bench: [] };
+    }
+  };
+
   if (!simulation) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-8 animate-in fade-in">
@@ -125,6 +137,8 @@ export function MatchViewer({
     );
   }
 
+  const { onField, bench } = getLineups();
+
   return (
     <div className="h-screen bg-slate-950 text-white flex flex-col overflow-hidden relative">
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -136,7 +150,7 @@ export function MatchViewer({
           currentMinute={simulation.currentMinute}
           state={simulation.state as any}
           isLoading={simulation.isLoading}
-          error={simulation.error}
+          error={simulation.error as string | null}
           speed={speed}
           onSpeedChange={setSpeed}
           onPause={pauseMatch}
@@ -166,6 +180,8 @@ export function MatchViewer({
           isHome={isUserHome}
           onClose={() => setIsSubModalOpen(false)}
           onConfirm={handleConfirmSubstitution}
+          currentOnField={onField as Player[]}
+          currentBench={bench as Player[]}
         />
       )}
     </div>

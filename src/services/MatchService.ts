@@ -1,11 +1,6 @@
-import type { Player, Team } from "../domain/models";
+import type { Player, TacticsConfig, Team } from "../domain/models";
 import { MatchEngine } from "../engine/MatchEngine";
-import type {
-  MatchConfig,
-  MatchResult,
-  TeamLineup,
-  TacticsConfig,
-} from "../domain/types";
+import type { MatchConfig, MatchResult, TeamLineup } from "../domain/types";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import { Result } from "./types/ServiceResults";
@@ -46,17 +41,6 @@ export class MatchService extends BaseService {
     this.tacticsManager = new MatchTacticsManager(repositories);
   }
 
-  /**
-   * Inicializa o motor de jogo (MatchEngine) para uma partida específica.
-   * Carrega os dados dos times, jogadores e configurações na memória para permitir a simulação.
-   *
-   * @param matchId - O ID único da partida a ser inicializada.
-   * @returns Um ServiceResult vazio em caso de sucesso ou erro de validação.
-   * @throws Error se os times ou a partida não forem encontrados no banco de dados.
-   *
-   * @example
-   * await matchService.initializeMatch(105);
-   */
   async initializeMatch(matchId: number): Promise<ServiceResult<void>> {
     const validation = MatchDataValidator.validateMatchIds(matchId);
     if (!validation.isValid) {
@@ -68,14 +52,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Inicia a simulação de uma partida que foi previamente inicializada.
-   * Altera o estado interno do motor para 'PLAYING'.
-   *
-   * @param matchId - O ID da partida.
-   * @returns Um ServiceResult vazio.
-   * @throws Error se o motor da partida não tiver sido inicializado.
-   */
   async startMatch(matchId: number): Promise<ServiceResult<void>> {
     const validation = MatchDataValidator.validateMatchIds(matchId);
     if (!validation.isValid) {
@@ -89,13 +65,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Pausa a simulação de uma partida em andamento.
-   *
-   * @param matchId - O ID da partida.
-   * @returns Um ServiceResult vazio.
-   * @throws Error se o motor da partida não estiver carregado.
-   */
   async pauseMatch(matchId: number): Promise<ServiceResult<void>> {
     const validation = MatchDataValidator.validateMatchIds(matchId);
     if (!validation.isValid) {
@@ -109,13 +78,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Retoma a simulação de uma partida pausada.
-   *
-   * @param matchId - O ID da partida.
-   * @returns Um ServiceResult vazio.
-   * @throws Error se o motor da partida não estiver carregado.
-   */
   async resumeMatch(matchId: number): Promise<ServiceResult<void>> {
     const validation = MatchDataValidator.validateMatchIds(matchId);
     if (!validation.isValid) {
@@ -129,14 +91,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Avança a simulação da partida em um minuto.
-   * Gera eventos, atualiza o placar e retorna o estado atualizado.
-   *
-   * @param matchId - O ID da partida.
-   * @returns Objeto contendo o minuto atual, o placar e os novos eventos gerados neste ciclo.
-   * @throws Error se o motor da partida não estiver carregado.
-   */
   async simulateMinute(matchId: number): Promise<
     ServiceResult<{
       currentMinute: number;
@@ -166,13 +120,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Simula uma partida inteira (ou o restante dela) instantaneamente.
-   * Persiste o resultado, estatísticas e atualiza a tabela do campeonato.
-   *
-   * @param matchId - O ID da partida.
-   * @returns O resultado completo da partida (MatchResult).
-   */
   async simulateFullMatch(
     matchId: number
   ): Promise<ServiceResult<MatchResult>> {
@@ -193,13 +140,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * Recupera o estado atual de uma partida carregada na memória (para UI).
-   *
-   * @param matchId - O ID da partida.
-   * @returns Objeto com estado, minuto, placar e histórico de eventos.
-   * @throws Error se a partida não estiver em memória.
-   */
   async getMatchState(matchId: number): Promise<ServiceResult<any>> {
     const validation = MatchDataValidator.validateMatchIds(matchId);
     if (!validation.isValid) {
@@ -216,17 +156,18 @@ export class MatchService extends BaseService {
         currentMinute: engine.getCurrentMinute(),
         score: engine.getCurrentScore(),
         events: engine.getEvents(),
+        homeLineup: {
+          onField: engine.getHomePlayersOnField(),
+          bench: engine.getHomeBench(),
+        },
+        awayLineup: {
+          onField: engine.getAwayPlayersOnField(),
+          bench: engine.getAwayBench(),
+        },
       };
     });
   }
 
-  /**
-   * Simula todas as partidas pendentes para uma data específica.
-   * Útil para avançar o dia e processar jogos da CPU.
-   *
-   * @param date - A data no formato 'YYYY-MM-DD'.
-   * @returns Resumo das partidas jogadas e seus resultados.
-   */
   async simulateMatchesOfDate(date: string): Promise<
     ServiceResult<{
       matchesPlayed: number;
@@ -250,28 +191,6 @@ export class MatchService extends BaseService {
     });
   }
 
-  /**
-   * 🆕 TASK 4.2: Realiza uma substituição seguindo as regras FIFA.
-   *
-   * Validações aplicadas:
-   * - Limite de 5 substituições por time
-   * - Partida deve estar pausada
-   * - Jogador a sair deve estar em campo
-   * - Jogador a entrar deve estar no banco
-   * - Nenhum dos dois pode estar lesionado
-   *
-   * @param request - Dados da substituição (matchId, isHome, playerOutId, playerInId)
-   * @returns ServiceResult void
-   * @throws Error se alguma regra FIFA for violada
-   *
-   * @example
-   * await matchService.substitutePlayer({
-   *   matchId: 42,
-   *   isHome: true,
-   *   playerOutId: 105,
-   *   playerInId: 78
-   * });
-   */
   async substitutePlayer(
     request: SubstitutionRequest
   ): Promise<ServiceResult<void>> {
@@ -338,20 +257,6 @@ export class MatchService extends BaseService {
     );
   }
 
-  /**
-   * @param request - Dados da mudança tática
-   * @returns ServiceResult void
-   *
-   * @example
-   * await matchService.updateLiveTactics({
-   *   matchId: 42,
-   *   isHome: true,
-   *   tactics: {
-   *     mentality: "ultra_attacking",
-   *     style: "pressing"
-   *   }
-   * });
-   */
   async updateLiveTactics(
     request: UpdateLiveTacticsRequest
   ): Promise<ServiceResult<void>> {
@@ -376,7 +281,6 @@ export class MatchService extends BaseService {
           throw new Error(updateResult.error.message);
         }
 
-        // TODO adicionar: engine.updateTactics(isHome, tactics)
         engine.updateTeamStrengths();
 
         this.logger.info(
@@ -388,11 +292,6 @@ export class MatchService extends BaseService {
     );
   }
 
-  /**
-   * @param matchId - ID da partida
-   * @param isHome - Time a analisar
-   * @returns Análise tática com recomendações
-   */
   async analyzeTactics(
     matchId: number,
     isHome: boolean
@@ -400,11 +299,6 @@ export class MatchService extends BaseService {
     return this.tacticsManager.analyzeTactics(matchId, isHome);
   }
 
-  /**
-   * @param matchId - ID da partida
-   * @param isHome - Time a sugerir
-   * @returns Sugestão tática
-   */
   async suggestTactics(
     matchId: number,
     isHome: boolean
@@ -425,6 +319,35 @@ export class MatchService extends BaseService {
     );
   }
 
+  async savePreMatchTactics(
+    matchId: number,
+    homeLineup: TeamLineup,
+    awayLineup: TeamLineup
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid("savePreMatchTactics", { matchId }, async () => {
+      const match = await this.repos.matches.findById(matchId);
+      if (!match) throw new Error("Partida não encontrada.");
+
+      const matchRepo = this.repos.matches as any;
+
+      if (matchRepo.upsertMatchTactics) {
+        await matchRepo.upsertMatchTactics(
+          matchId,
+          match.homeTeamId!,
+          true,
+          homeLineup
+        );
+
+        await matchRepo.upsertMatchTactics(
+          matchId,
+          match.awayTeamId!,
+          false,
+          awayLineup
+        );
+      }
+    });
+  }
+
   private async ensureEngineInitialized(matchId: number): Promise<MatchEngine> {
     let engine = this.engines.get(matchId);
     if (engine) return engine;
@@ -437,30 +360,8 @@ export class MatchService extends BaseService {
     if (!homeTeamData || !awayTeamData)
       throw new Error("Times não encontrados.");
 
-    const mapToDomainTeam = (dbTeam: any): Team => ({
-      ...dbTeam,
-      primaryColor: dbTeam.primaryColor ?? "#000000",
-      secondaryColor: dbTeam.secondaryColor ?? "#ffffff",
-      isHuman: dbTeam.isHuman ?? false,
-    });
-
-    const homeTeam = mapToDomainTeam(homeTeamData);
-    const awayTeam = mapToDomainTeam(awayTeamData);
-
-    const createDefaultLineup = (
-      team: Team,
-      players: Player[]
-    ): TeamLineup => ({
-      formation: team.defaultFormation || "4-4-2",
-      starters: players.slice(0, 11).map((p) => p.id),
-      bench: players.slice(11, 18).map((p) => p.id),
-      tactics: {
-        style: team.defaultGameStyle || "balanced",
-        marking: team.defaultMarking || "man_to_man",
-        mentality: team.defaultMentality || "normal",
-        passingDirectness: team.defaultPassingDirectness || "mixed",
-      },
-    });
+    const homeTeam = this.mapToDomainTeam(homeTeamData);
+    const awayTeam = this.mapToDomainTeam(awayTeamData);
 
     const allHomePlayers = await this.repos.players.findByTeamId(
       match.homeTeamId!
@@ -472,13 +373,36 @@ export class MatchService extends BaseService {
     const homePlayers = allHomePlayers.filter((p) => !p.isInjured);
     const awayPlayers = allAwayPlayers.filter((p) => !p.isInjured);
 
+    const matchRepo = this.repos.matches as any;
+    let savedHomeTactics = null;
+    let savedAwayTactics = null;
+
+    if (matchRepo.findMatchTactics) {
+      savedHomeTactics = await matchRepo.findMatchTactics(
+        matchId,
+        match.homeTeamId!
+      );
+      savedAwayTactics = await matchRepo.findMatchTactics(
+        matchId,
+        match.awayTeamId!
+      );
+    }
+
     const config: MatchConfig = {
       homeTeam,
       awayTeam,
       homePlayers,
       awayPlayers,
-      homeTactics: createDefaultLineup(homeTeam, homePlayers),
-      awayTactics: createDefaultLineup(awayTeam, awayPlayers),
+      homeTactics: this.loadOrGenerateLineup(
+        savedHomeTactics,
+        homeTeam,
+        homePlayers
+      ),
+      awayTactics: this.loadOrGenerateLineup(
+        savedAwayTactics,
+        awayTeam,
+        awayPlayers
+      ),
       weather: (match.weather as any) || "sunny",
     };
 
@@ -500,6 +424,50 @@ export class MatchService extends BaseService {
     engine = new MatchEngine(config, isKnockout);
     this.engines.set(matchId, engine);
     return engine;
+  }
+
+  private mapToDomainTeam(dbTeam: any): Team {
+    return {
+      ...dbTeam,
+      primaryColor: dbTeam.primaryColor ?? "#000000",
+      secondaryColor: dbTeam.secondaryColor ?? "#ffffff",
+      isHuman: dbTeam.isHuman ?? false,
+    };
+  }
+
+  private loadOrGenerateLineup(
+    saved: any,
+    team: Team,
+    availablePlayers: Player[]
+  ): TeamLineup {
+    if (saved && saved.startingLineup && saved.startingLineup.length > 0) {
+      return {
+        formation: saved.formation,
+        starters: saved.startingLineup,
+        bench: saved.bench,
+        tactics: {
+          style: saved.gameStyle,
+          marking: saved.marking,
+          mentality: saved.mentality,
+          passingDirectness: saved.passingDirectness,
+        },
+      };
+    }
+    return this.createDefaultLineup(team, availablePlayers);
+  }
+
+  private createDefaultLineup(team: Team, players: Player[]): TeamLineup {
+    return {
+      formation: team.defaultFormation || "4-4-2",
+      starters: players.slice(0, 11).map((p) => p.id),
+      bench: players.slice(11, 18).map((p) => p.id),
+      tactics: {
+        style: team.defaultGameStyle || "balanced",
+        marking: team.defaultMarking || "man_to_man",
+        mentality: team.defaultMentality || "normal",
+        passingDirectness: team.defaultPassingDirectness || "mixed",
+      },
+    };
   }
 
   private async saveMatchResult(

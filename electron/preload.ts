@@ -97,6 +97,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("match:analyzeTactics", { matchId, isHome }),
     suggestTactics: (matchId: number, isHome: boolean) =>
       ipcRenderer.invoke("match:suggestTactics", { matchId, isHome }),
+    savePreMatchTactics: (matchId: number, homeLineup: any, awayLineup: any) =>
+      ipcRenderer.invoke("match:savePreMatchTactics", {
+        matchId,
+        homeLineup,
+        awayLineup,
+      }),
   },
 
   competition: {
