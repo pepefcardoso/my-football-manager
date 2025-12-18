@@ -1,7 +1,7 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { ServiceResult } from "../types/ServiceResults";
-import type { TacticsConfig } from "../../domain/types";
+import type { TacticsConfig } from "../../domain/models";
 
 export interface UpdateLiveTacticsRequest {
   matchId: number;

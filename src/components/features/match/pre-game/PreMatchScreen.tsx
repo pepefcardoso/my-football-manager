@@ -30,16 +30,13 @@ interface DraggedPlayer {
 }
 
 export function PreMatchScreen({
-    matchId,
     homeTeam,
     awayTeam,
     onConfirm,
     onCancel,
 }: PreMatchScreenProps) {
-    const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Estado do Lineup
     const [formation, setFormation] = useState<Formation>(
         homeTeam.defaultFormation || "4-4-2"
     );
@@ -49,7 +46,6 @@ export function PreMatchScreen({
     const [bench, setBench] = useState<Player[]>([]);
     const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
 
-    // Estado Tático
     const [tactics, setTactics] = useState<TacticsConfig>({
         style: homeTeam.defaultGameStyle || "balanced",
         marking: homeTeam.defaultMarking || "man_to_man",
@@ -57,24 +53,19 @@ export function PreMatchScreen({
         passingDirectness: homeTeam.defaultPassingDirectness || "mixed",
     });
 
-    // Drag & Drop State
     const [draggedPlayer, setDraggedPlayer] = useState<DraggedPlayer | null>(
         null
     );
 
-    // Carregar jogadores
     useEffect(() => {
         const loadPlayers = async () => {
             try {
                 const data = await window.electronAPI.player.getPlayers(homeTeam.id);
-                const availablePlayers = data.filter(
+                const validPlayers = data.filter(
                     (p: Player) => !p.isInjured && p.suspensionGamesRemaining === 0
                 );
 
-                setPlayers(availablePlayers);
-
-                // Auto-selecionar os 11 melhores
-                const sorted = [...availablePlayers].sort(
+                const sorted = [...validPlayers].sort(
                     (a, b) => b.overall - a.overall
                 );
                 const top11 = sorted.slice(0, 11);
@@ -93,7 +84,6 @@ export function PreMatchScreen({
         loadPlayers();
     }, [homeTeam.id]);
 
-    // Handlers de Drag & Drop
     const handleDragStart = useCallback(
         (player: Player, sourceType: "field" | "bench", sourceIndex?: number) => {
             setDraggedPlayer({ player, sourceType, sourceIndex });
@@ -107,7 +97,6 @@ export function PreMatchScreen({
 
             const { player, sourceType, sourceIndex } = draggedPlayer;
 
-            // Campo -> Campo (Trocar posições)
             if (sourceType === "field" && targetType === "field" && targetIndex !== undefined && sourceIndex !== undefined) {
                 const newStarters = [...starters];
                 const temp = newStarters[targetIndex];
@@ -116,7 +105,6 @@ export function PreMatchScreen({
                 setStarters(newStarters);
             }
 
-            // Banco -> Campo
             if (sourceType === "bench" && targetType === "field" && targetIndex !== undefined) {
                 const newStarters = [...starters];
                 const replacedPlayer = newStarters[targetIndex];
@@ -128,7 +116,6 @@ export function PreMatchScreen({
                 setBench(newBench);
             }
 
-            // Campo -> Banco
             if (sourceType === "field" && targetType === "bench" && sourceIndex !== undefined) {
                 const newStarters = [...starters];
                 newStarters[sourceIndex] = null;
@@ -137,7 +124,6 @@ export function PreMatchScreen({
                 setBench([...bench, player]);
             }
 
-            // Disponíveis -> Campo
             if (sourceType === "bench" && targetType === "field" && targetIndex !== undefined) {
                 const isAvailable = availablePlayers.some((p) => p.id === player.id);
                 if (isAvailable) {
@@ -186,7 +172,6 @@ export function PreMatchScreen({
 
     return (
         <div className="h-screen bg-slate-950 text-white flex flex-col overflow-hidden">
-            {/* Header */}
             <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold">Preparação Pré-Jogo</h1>
@@ -210,9 +195,7 @@ export function PreMatchScreen({
                 </div>
             </header>
 
-            {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Left Panel - Formation & Field */}
                 <div className="flex-1 flex flex-col p-6 overflow-y-auto">
                     <FormationSelector
                         formation={formation}
@@ -228,7 +211,6 @@ export function PreMatchScreen({
                     />
                 </div>
 
-                {/* Right Panel - Tactics & Bench */}
                 <div className="w-96 bg-slate-900 border-l border-slate-800 flex flex-col overflow-hidden">
                     <TacticsPanel tactics={tactics} onChange={setTactics} />
 

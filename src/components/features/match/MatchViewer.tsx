@@ -1,4 +1,4 @@
-import { useState } from "react"; // Removido useEffect não usado
+import { useState } from "react";
 import { useMatchSimulation } from "../../../hooks/useMatchSimulation";
 import { MatchScoreboard } from "./MatchScoreboard";
 import { MatchEvents } from "./MatchEvents";
