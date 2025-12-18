@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import TrainingControl from "../features/squad/TrainingControl";
 import type { GameState, Team } from "../../domain/models";
 import StatCard from "../common/StatCard";
@@ -18,6 +18,8 @@ function ClubOverviewPage({ team }: { team: Team }) {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [seasonSummary, setSeasonSummary] = useState<SeasonSummary | null>(null);
     const [showSeasonModal, setShowSeasonModal] = useState(false);
+
+    const isSimulatingRef = useRef(false);
 
     const {
         currentDate,
@@ -41,29 +43,38 @@ function ClubOverviewPage({ team }: { team: Team }) {
             }
         };
         fetchState();
+
+        return () => {
+            isSimulatingRef.current = false;
+        };
     }, [advanceDate]);
 
-    const handleAdvanceDay = useCallback(async () => {
-        if (isProcessing) return;
-
-        setProcessing(true);
-
+    const processSingleDay = useCallback(async (): Promise<{ shouldStop: boolean; reason?: string }> => {
         try {
             const result = await window.electronAPI.game.advanceDay();
 
-            if (result.stopReason === 'match_day') {
-                logger.info("⏸️ Simulação pausada: Dia de Jogo.");
-                setProcessing(false);
-                navigateInGame("matches");
-                return;
-            }
+            if (result.stopReason) {
+                if (result.stopReason === 'match_day') {
+                    logger.info("⏸️ Simulação pausada: Dia de Jogo.");
+                    navigateInGame("matches");
+                    return { shouldStop: true, reason: 'match_day' };
+                }
 
-            if (result.stopReason === 'financial_crisis') {
-                logger.warn("⏸️ Simulação pausada: Crise Financeira.");
-                setProcessing(false);
-                navigateInGame("finances");
-                alert("Atenção: A diretoria exige uma reunião sobre as finanças!");
-                return;
+                if (result.stopReason === 'financial_crisis') {
+                    logger.warn("⏸️ Simulação pausada: Crise Financeira.");
+                    navigateInGame("finances");
+                    alert("Atenção: A diretoria exige uma reunião sobre as finanças!");
+                    return { shouldStop: true, reason: 'financial_crisis' };
+                }
+
+                if (result.stopReason === 'transfer_proposal') {
+                    logger.info("⏸️ Simulação pausada: Proposta de Transferência.");
+                    navigateInGame("transfer");
+                    // TODO: mostrar notificação toast aqui
+                    return { shouldStop: true, reason: 'transfer_proposal' };
+                }
+
+                return { shouldStop: true, reason: result.stopReason };
             }
 
             if (result.date) {
@@ -74,20 +85,54 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
             if ((result as any).narrativeEvent) {
                 triggerEvent((result as any).narrativeEvent);
+                return { shouldStop: true, reason: 'event' };
             }
 
             if ((result as any).seasonRollover) {
                 setSeasonSummary((result as any).seasonRollover);
                 setShowSeasonModal(true);
+                return { shouldStop: true, reason: 'season_end' };
             }
+
+            return { shouldStop: false };
 
         } catch (error) {
             logger.error("Erro crítico ao avançar dia:", error);
             alert("Erro ao processar a simulação. Verifique o console.");
-        } finally {
-            setProcessing(false);
+            return { shouldStop: true, reason: 'error' };
         }
-    }, [isProcessing, setProcessing, advanceDate, triggerEvent, navigateInGame]);
+    }, [navigateInGame, advanceDate, triggerEvent]);
+
+    const handleAdvanceOneDay = useCallback(async () => {
+        if (isProcessing) return;
+        setProcessing(true);
+        await processSingleDay();
+        setProcessing(false);
+    }, [isProcessing, setProcessing, processSingleDay]);
+
+    const handleSimulateContinue = useCallback(async () => {
+        if (isProcessing) return;
+
+        setProcessing(true);
+        isSimulatingRef.current = true;
+
+        while (isSimulatingRef.current) {
+            const result = await processSingleDay();
+
+            if (result.shouldStop) {
+                isSimulatingRef.current = false;
+                break;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        setProcessing(false);
+    }, [isProcessing, setProcessing, processSingleDay]);
+
+    const handleStopSimulation = () => {
+        isSimulatingRef.current = false;
+    };
 
     const displayDate = currentDate
         ? new Date(currentDate).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -118,36 +163,38 @@ function ClubOverviewPage({ team }: { team: Team }) {
                         📅 {displayDate}
                     </div>
 
-                    <button
-                        onClick={handleAdvanceDay}
-                        disabled={isProcessing}
-                        className={`
-                            group relative px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all duration-300
-                            ${isProcessing
-                                ? "bg-slate-700 cursor-not-allowed pr-12"
-                                : "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 hover:scale-[1.02] active:scale-95"
-                            }
-                        `}
-                    >
-                        <div className="flex items-center gap-2">
-                            {isProcessing ? (
-                                <>
-                                    <span>Processando</span>
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                        <svg className="animate-spin h-5 w-5 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleAdvanceOneDay}
+                            disabled={isProcessing}
+                            className="px-4 py-3 rounded-lg font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Avançar apenas 1 dia"
+                        >
+                            +1 Dia
+                        </button>
+
+                        {isProcessing ? (
+                            <button
+                                onClick={handleStopSimulation}
+                                className="px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all duration-300 bg-red-600 hover:bg-red-500 hover:scale-[1.02] active:scale-95"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <span>Parar</span>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                </div>
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleSimulateContinue}
+                                className="group relative px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all duration-300 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 hover:scale-[1.02] active:scale-95"
+                            >
+                                <div className="flex items-center gap-2">
                                     <span>Continuar</span>
                                     <span className="text-emerald-200 group-hover:translate-x-1 transition-transform">➤</span>
-                                </>
-                            )}
-                        </div>
-                    </button>
+                                </div>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </header>
 

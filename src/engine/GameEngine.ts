@@ -84,7 +84,9 @@ export class GameEngine {
             `Simulação pausada: ${this.translateStopReason(result.stopReason)}`,
           ],
           narrativeEvent: null,
+          stopReason: result.stopReason,
         });
+        this.stopSimulation();
         return;
       }
 
@@ -118,6 +120,9 @@ export class GameEngine {
     return day === 3 || day === 6;
   }
 
+  /**
+   * Processa toda a lógica de um dia dentro de uma ÚNICA transação.
+   */
   async processDailyUpdate(): Promise<DailyUpdateResult> {
     const updates: DailyUpdateResult = {
       date: this.getCurrentDate(),
@@ -143,6 +148,7 @@ export class GameEngine {
     try {
       return await this.unitOfWork.execute(async (txRepos) => {
         const txServices = new ServiceContainer(txRepos, this.unitOfWork);
+
         const newDateStr = this.timeEngine.advanceDay();
         updates.date = newDateStr;
 
@@ -165,6 +171,7 @@ export class GameEngine {
         }
 
         await txServices.cpuSimulation.processAllAITeams();
+
         await txServices.contract.processDailyWages({
           teamId,
           currentDate: newDateStr,
@@ -208,6 +215,11 @@ export class GameEngine {
             updates.matchResults = simData.results.map((r) => r.result);
           }
         }
+
+        await txServices.dailyTransferProcessor.processDailyTransfers(
+          newDateStr,
+          seasonId
+        );
 
         if (this.gameState) {
           this.gameState.currentDate = newDateStr;
@@ -416,6 +428,10 @@ export class GameEngine {
         return "Dia de Jogo";
       case "season_end":
         return "Fim de Temporada";
+      case "transfer_proposal":
+        return "Proposta de Transferência";
+      case "financial_crisis":
+        return "Crise Financeira";
       default:
         return "Evento Importante";
     }
@@ -434,6 +450,7 @@ export interface DailyUpdateResult {
   news: GameEvent[];
   logs: string[];
   narrativeEvent?: NarrativeEvent | null;
+  stopReason?: string;
 }
 
 export interface InjuryEvent {

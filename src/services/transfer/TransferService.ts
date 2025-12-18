@@ -40,7 +40,7 @@ export interface RespondProposalInput {
 const TRANSFER_CONFIG = getBalanceValue("TRANSFER");
 
 export class TransferService extends BaseService {
-  private unitOfWork: IUnitOfWork;
+  private unitOfWork: IUnitOfWork; // TODO REMOVER
   private eventBus: GameEventBus;
   private transferValidator: TransferValidator;
 
@@ -237,86 +237,78 @@ export class TransferService extends BaseService {
     const currentSeasonId = activeSeason.id;
 
     return this.executeVoid("finalizeTransfer", proposalId, async () => {
-      await this.unitOfWork.execute(async (transactionalRepos) => {
-        this.logger.info(
-          `🔄 Iniciando transação da transferência #${proposalId}...`
+      this.logger.info(
+        `🔄 Iniciando transação da transferência #${proposalId}...`
+      );
+
+      const buyingTeam = await this.repos.teams.findById(proposal.toTeamId!);
+      const sellingTeam = await this.repos.teams.findById(proposal.fromTeamId);
+      const player = await this.repos.players.findById(proposal.playerId);
+
+      if (!buyingTeam || !player) {
+        throw new Error("Entidades inválidas no momento da finalização.");
+      }
+
+      if (buyingTeam.budget < proposal.fee) {
+        throw new Error(
+          `Falha na transação: O comprador ${buyingTeam.name} não tem fundos (€${buyingTeam.budget} < €${proposal.fee}).`
         );
+      }
 
-        const buyingTeam = await transactionalRepos.teams.findById(
-          proposal.toTeamId!
-        );
-        const sellingTeam = await transactionalRepos.teams.findById(
-          proposal.fromTeamId
-        );
-        const player = await transactionalRepos.players.findById(
-          proposal.playerId
-        );
+      await this.repos.teams.updateBudget(
+        buyingTeam.id,
+        buyingTeam.budget - proposal.fee
+      );
 
-        if (!buyingTeam || !player) {
-          throw new Error("Entidades inválidas no momento da finalização.");
-        }
-
-        if (buyingTeam.budget < proposal.fee) {
-          throw new Error(
-            `Falha na transação: O comprador ${buyingTeam.name} não tem fundos (€${buyingTeam.budget} < €${proposal.fee}).`
-          );
-        }
-
-        await transactionalRepos.teams.updateBudget(
-          buyingTeam.id,
-          buyingTeam.budget - proposal.fee
-        );
-
-        await transactionalRepos.financial.addRecord({
-          teamId: buyingTeam.id,
-          seasonId: currentSeasonId,
-          date: new Date().toISOString().split("T")[0],
-          type: "expense",
-          category: FinancialCategory.TRANSFER_OUT,
-          amount: proposal.fee,
-          description: `Compra de ${player.firstName} ${player.lastName}`,
-        });
-
-        if (sellingTeam) {
-          await transactionalRepos.teams.updateBudget(
-            sellingTeam.id,
-            sellingTeam.budget + proposal.fee
-          );
-
-          await transactionalRepos.financial.addRecord({
-            teamId: sellingTeam.id,
-            seasonId: currentSeasonId,
-            date: new Date().toISOString().split("T")[0],
-            type: "income",
-            category: FinancialCategory.TRANSFER_IN,
-            amount: proposal.fee,
-            description: `Venda de ${player.firstName} ${player.lastName}`,
-          });
-        }
-
-        await transactionalRepos.players.update(player.id, {
-          teamId: buyingTeam.id,
-          moral: TRANSFER_CONFIG.PLAYER_MORAL_ON_TRANSFER,
-        });
-
-        await transactionalRepos.transfers.create({
-          playerId: player.id,
-          fromTeamId: proposal.fromTeamId,
-          toTeamId: buyingTeam.id,
-          fee: proposal.fee,
-          date: new Date().toISOString().split("T")[0],
-          seasonId: currentSeasonId,
-          type: proposal.type,
-        });
-
-        await transactionalRepos.transferProposals.update(proposal.id, {
-          status: TransferStatus.COMPLETED,
-        });
-
-        this.logger.info(
-          `✅ Transação concluída: ${player.lastName} -> ${buyingTeam.shortName}`
-        );
+      await this.repos.financial.addRecord({
+        teamId: buyingTeam.id,
+        seasonId: currentSeasonId,
+        date: new Date().toISOString().split("T")[0],
+        type: "expense",
+        category: FinancialCategory.TRANSFER_OUT,
+        amount: proposal.fee,
+        description: `Compra de ${player.firstName} ${player.lastName}`,
       });
+
+      if (sellingTeam) {
+        await this.repos.teams.updateBudget(
+          sellingTeam.id,
+          sellingTeam.budget + proposal.fee
+        );
+
+        await this.repos.financial.addRecord({
+          teamId: sellingTeam.id,
+          seasonId: currentSeasonId,
+          date: new Date().toISOString().split("T")[0],
+          type: "income",
+          category: FinancialCategory.TRANSFER_IN,
+          amount: proposal.fee,
+          description: `Venda de ${player.firstName} ${player.lastName}`,
+        });
+      }
+
+      await this.repos.players.update(player.id, {
+        teamId: buyingTeam.id,
+        moral: TRANSFER_CONFIG.PLAYER_MORAL_ON_TRANSFER,
+      });
+
+      await this.repos.transfers.create({
+        playerId: player.id,
+        fromTeamId: proposal.fromTeamId,
+        toTeamId: buyingTeam.id,
+        fee: proposal.fee,
+        date: new Date().toISOString().split("T")[0],
+        seasonId: currentSeasonId,
+        type: proposal.type,
+      });
+
+      await this.repos.transferProposals.update(proposal.id, {
+        status: TransferStatus.COMPLETED,
+      });
+
+      this.logger.info(
+        `✅ Transação concluída: ${player.lastName} -> ${buyingTeam.shortName}`
+      );
 
       await this.eventBus.publish(GameEventType.TRANSFER_COMPLETED, {
         playerId: proposal.playerId,
@@ -328,10 +320,6 @@ export class TransferService extends BaseService {
     });
   }
 
-  /**
-   * Busca todas as propostas de transferência recebidas por um time.
-   * Inclui os dados do jogador e do time proponente (fromTeam).
-   */
   async getReceivedProposals(teamId: number): Promise<ServiceResult<any[]>> {
     return this.execute("getReceivedProposals", teamId, async (teamId) => {
       const proposals = await this.repos.transferProposals.findReceivedByTeam(
@@ -341,10 +329,6 @@ export class TransferService extends BaseService {
     });
   }
 
-  /**
-   * Busca todas as propostas de transferência enviadas por um time.
-   * Inclui os dados do jogador e do time alvo (toTeam).
-   */
   async getSentProposals(teamId: number): Promise<ServiceResult<any[]>> {
     return this.execute("getSentProposals", teamId, async (teamId) => {
       const proposals = await this.repos.transferProposals.findSentByTeam(
@@ -354,13 +338,6 @@ export class TransferService extends BaseService {
     });
   }
 
-  /**
-   * Fetches transfer history for a specific team.
-   * Returns all completed transfers where the team was involved (buyer or seller).
-   *
-   * @param teamId - The ID of the team
-   * @returns List of historical transfer records with player and team details
-   */
   async getTransferHistory(teamId: number): Promise<
     ServiceResult<
       Array<{

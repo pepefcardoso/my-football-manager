@@ -9,26 +9,23 @@ import type { IUnitOfWork } from "../../repositories/IUnitOfWork";
 import type { TeamStaffImpact } from "../../domain/types";
 
 export class CPUSimulationService extends BaseService {
-  private unitOfWork: IUnitOfWork;
-
   constructor(
     repositories: IRepositoryContainer,
-    unitOfWork: IUnitOfWork,
+    unitOfWork: IUnitOfWork, // TODO REMOVER
     private dailySimulation: DailySimulationService,
     private staffService: StaffService
   ) {
     super(repositories, "CPUSimulationService");
-    this.unitOfWork = unitOfWork;
   }
 
   async processAllAITeams(): Promise<ServiceResult<number>> {
     return this.execute("processAllAITeams", null, async () => {
-      return await this.unitOfWork.execute(async (txRepos) => {
-        const allTeams = await txRepos.teams.findAll();
-        const aiTeams = allTeams.filter((t) => !t.isHuman);
-        let processedCount = 0;
+      const allTeams = await this.repos.teams.findAll();
+      const aiTeams = allTeams.filter((t) => !t.isHuman);
+      let processedCount = 0;
 
-        for (const team of aiTeams) {
+      for (const team of aiTeams) {
+        try {
           const focus = TrainingFocus.TECHNICAL; // TODO: Evoluir baseado na estratégia do time
 
           const staffImpactResult = await this.staffService.getStaffImpact(
@@ -46,10 +43,12 @@ export class CPUSimulationService extends BaseService {
           );
 
           processedCount++;
+        } catch (err) {
+          this.logger.error("Erro ao processar AI Time ID ${team.id}: ", err);
         }
+      }
 
-        return processedCount;
-      });
+      return processedCount;
     });
   }
 
