@@ -1,5 +1,6 @@
 import type { Player } from "../../../../domain/models";
-
+import { FORMATION_LAYOUTS, DEFAULT_LAYOUT } from "../../../../domain/tactics/formationLayouts";
+import { calculatePositionPenalty } from "../../../../domain/logic/penaltyCalculator";
 
 interface LineupHealthIndicatorProps {
     starters: (Player | null)[];
@@ -17,6 +18,7 @@ export function LineupHealthIndicator({
     formation,
 }: LineupHealthIndicatorProps) {
     const issues: LineupIssue[] = [];
+    const layout = FORMATION_LAYOUTS[formation] || DEFAULT_LAYOUT;
 
     const emptyPositions = starters.filter((p) => p === null).length;
     if (emptyPositions > 0) {
@@ -27,32 +29,47 @@ export function LineupHealthIndicator({
         });
     }
 
-    const lowEnergyPlayers = starters.filter(
-        (p) => p !== null && p.energy < 40
-    ).length;
+    const lowEnergyPlayers = starters.filter((p) => p !== null && p.energy < 50).length;
     if (lowEnergyPlayers > 0) {
         issues.push({
             severity: "warning",
-            message: `${lowEnergyPlayers} jogador(es) com energia crítica`,
+            message: `${lowEnergyPlayers} jogador(es) cansado(s) (<50%)`,
             icon: "⚡",
         });
     }
 
-    const lowMoralPlayers = starters.filter(
-        (p) => p !== null && p.moral < 50
-    ).length;
-    if (lowMoralPlayers > 0) {
+    let severePosPenaltyCount = 0;
+    let mediumPosPenaltyCount = 0;
+
+    starters.forEach((player, index) => {
+        if (!player) return;
+
+        const expectedRole = layout[index]?.role || "MF";
+
+        const { severity } = calculatePositionPenalty(player, expectedRole);
+
+        if (severity === "critical" || severity === "high") {
+            severePosPenaltyCount++;
+        } else if (severity === "medium") {
+            mediumPosPenaltyCount++;
+        }
+    });
+
+    if (severePosPenaltyCount > 0) {
+        issues.push({
+            severity: "critical",
+            message: `${severePosPenaltyCount} jogador(es) totalmente fora de posição!`,
+            icon: "🚨",
+        });
+    } else if (mediumPosPenaltyCount > 0) {
         issues.push({
             severity: "warning",
-            message: `${lowMoralPlayers} jogador(es) desmotivado(s)`,
-            icon: "😔",
+            message: `${mediumPosPenaltyCount} jogador(es) improvisado(s).`,
+            icon: "⚠️",
         });
     }
 
-    // Verificar jogadores lesionados (não deveriam estar aqui)
-    const injuredPlayers = starters.filter(
-        (p) => p !== null && p.isInjured
-    ).length;
+    const injuredPlayers = starters.filter((p) => p !== null && p.isInjured).length;
     if (injuredPlayers > 0) {
         issues.push({
             severity: "critical",
@@ -60,9 +77,6 @@ export function LineupHealthIndicator({
             icon: "🩹",
         });
     }
-
-    // TODO: Detectar jogadores fora de posição
-    // (requer mapeamento formação -> posições esperadas)
 
     const criticalIssues = issues.filter((i) => i.severity === "critical").length;
     const warnings = issues.filter((i) => i.severity === "warning").length;
@@ -75,53 +89,51 @@ export function LineupHealthIndicator({
 
     const getHealthLabel = () => {
         if (criticalIssues > 0) return "Lineup Crítico";
-        if (warnings > 0) return "Avisos Detectados";
-        return "Lineup Saudável";
+        if (warnings > 0) return "Atenção Requerida";
+        return "Pronto para Jogo";
     };
 
     const getHealthIcon = () => {
-        if (criticalIssues > 0) return "🚨";
+        if (criticalIssues > 0) return "🛑";
         if (warnings > 0) return "⚠️";
         return "✅";
     };
 
     return (
-        <div className={`rounded-lg border-2 p-4 ${getHealthColor()}`}>
-            <div className="flex items-center justify-between mb-3">
+        <div className={`rounded-lg border-2 p-4 mb-4 transition-colors ${getHealthColor()}`}>
+            <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                     <span className="text-2xl">{getHealthIcon()}</span>
-                    <h3 className="font-bold text-white">{getHealthLabel()}</h3>
-                </div>
-                <div className="text-xs text-slate-400">
-                    Formação: <span className="text-white font-mono">{formation}</span>
+                    <div>
+                        <h3 className="font-bold text-white leading-none">{getHealthLabel()}</h3>
+                        <span className="text-xs text-slate-400">Formação: {formation}</span>
+                    </div>
                 </div>
             </div>
 
-            {issues.length > 0 && (
-                <div className="space-y-2">
+            {issues.length > 0 ? (
+                <div className="space-y-1">
                     {issues.map((issue, index) => (
                         <div
                             key={index}
                             className={`
-                flex items-start gap-2 p-2 rounded text-sm
-                ${issue.severity === "critical"
+                                flex items-center gap-2 px-2 py-1 rounded text-xs font-medium
+                                ${issue.severity === "critical"
                                     ? "bg-red-500/20 text-red-300"
                                     : issue.severity === "warning"
                                         ? "bg-amber-500/20 text-amber-300"
                                         : "bg-blue-500/20 text-blue-300"
                                 }
-              `}
+                            `}
                         >
-                            <span className="text-base">{issue.icon}</span>
-                            <span className="flex-1">{issue.message}</span>
+                            <span>{issue.icon}</span>
+                            <span>{issue.message}</span>
                         </div>
                     ))}
                 </div>
-            )}
-
-            {issues.length === 0 && (
-                <p className="text-sm text-emerald-300">
-                    Todos os jogadores estão em boas condições e nas posições corretas.
+            ) : (
+                <p className="text-xs text-emerald-300 mt-1">
+                    Time escalado corretamente. Boa sorte!
                 </p>
             )}
         </div>
