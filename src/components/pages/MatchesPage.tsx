@@ -50,6 +50,8 @@ function MatchesPage({ teamId, teams }: { teamId: number; teams: Team[] }) {
                     matchId={selectedMatch.id}
                     homeTeamName={homeTeam?.name || "Casa"}
                     awayTeamName={awayTeam?.name || "Fora"}
+                    homeTeamId={selectedMatch.homeTeamId!}
+                    awayTeamId={selectedMatch.awayTeamId!}
                 />
             </div>
         );

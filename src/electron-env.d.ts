@@ -19,7 +19,6 @@ import type {
   MonthlyWageData,
   TransferProposal,
 } from "./services/finance/WageCalculator";
-import type { MatchEvent } from "./domain/models";
 
 interface PlayerStatRow {
   id: number;
@@ -110,12 +109,29 @@ declare global {
           state: string;
           currentMinute: number;
           score: { home: number; away: number };
-          events: MatchEvent[];
+          events: MatchEventData[];
         } | null>;
         simulateMatchesOfDate: (date: string) => Promise<{
           matchesPlayed: number;
           results: Array<{ matchId: number; result: MatchResult }>;
         }>;
+
+        substitutePlayer: (
+          matchId: number,
+          isHome: boolean,
+          playerOutId: number,
+          playerInId: number
+        ) => Promise<{ success: boolean; message: string }>;
+        updateLiveTactics: (
+          matchId: number,
+          isHome: boolean,
+          tactics: Partial<TacticsConfig>
+        ) => Promise<{ success: boolean; message: string }>;
+        analyzeTactics: (matchId: number, isHome: boolean) => Promise<any>;
+        suggestTactics: (
+          matchId: number,
+          isHome: boolean
+        ) => Promise<Partial<TacticsConfig>>;
       };
 
       competition: {
