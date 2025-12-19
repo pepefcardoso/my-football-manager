@@ -35,6 +35,18 @@ export class FinanceService extends BaseService {
   }
 
   /**
+   * @param dateStr Data no formato "YYYY-MM-DD"
+   */
+  static isPayDay(dateStr: string): boolean {
+    const currentDate = new Date(dateStr);
+    const nextDay = new Date(currentDate);
+
+    nextDay.setDate(currentDate.getDate() + 1);
+
+    return nextDay.getMonth() !== currentDate.getMonth();
+  }
+
+  /**
    * @param input - Processing parameters (teamId, date, seasonId)
    * @returns Result with expense breakdown and new budget
    */
