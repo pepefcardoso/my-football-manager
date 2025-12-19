@@ -1,14 +1,6 @@
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { repositoryContainer } from "../repositories/RepositoryContainer";
 import { UnitOfWork } from "../repositories/UnitOfWork";
-import { GameEventBus } from "./events/GameEventBus";
-import {
-  GameEventType,
-  type MatchFinishedPayload,
-  type FinancialCrisisPayload,
-  type ContractExpiredPayload,
-  type TransferCompletedPayload,
-} from "./events/GameEventTypes";
 import { CalendarService } from "./CalendarService";
 import { ContractService } from "./ContractService";
 import { DailySimulationService } from "./DailySimulationService";
@@ -43,6 +35,8 @@ import { RevenueService } from "./finance/RevenueService";
 import { MatchTacticsManager } from "./match/MatchTacticsManager";
 import { MatchSubstitutionManager } from "./match/MatchSubstitutionManager";
 import { TransferValidator } from "./transfer/validators/TransferValidator";
+import { GameEventBus } from "../lib/GameEventBus";
+import { GameEventType, type ContractExpiredPayload, type FinancialCrisisPayload, type MatchFinishedPayload, type TransferCompletedPayload } from "../domain/GameEventTypes";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: IUnitOfWork;
