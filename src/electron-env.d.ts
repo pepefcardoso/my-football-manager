@@ -197,6 +197,37 @@ declare global {
           teamId: number,
           seasonId: number
         ) => Promise<MonthlyFinancialSummary[]>;
+        getDashboard: (
+          teamId: number,
+          seasonId: number
+        ) => Promise<{
+          currentBudget: number;
+          monthlyIncome: number;
+          monthlyExpenses: number;
+          monthlyCashflow: number;
+          salaryBill: {
+            annual: number;
+            monthly: number;
+            playerCount: number;
+          };
+          operationalCosts: {
+            annual: number;
+            monthly: number;
+          };
+          projectedAnnualRevenue: number;
+          ffpCompliance: boolean;
+          financialHealth: string;
+        } | null>;
+        getOperationalCosts: (
+          teamId: number,
+          matchesPlayed: number
+        ) => Promise<any>;
+        projectAnnualRevenue: (
+          teamId: number,
+          leaguePosition: number,
+          homeMatches: number
+        ) => Promise<any>;
+        checkFFPCompliance: (teamId: number, seasonId: number) => Promise<any>;
       };
 
       contract: {
