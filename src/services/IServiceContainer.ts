@@ -4,7 +4,6 @@ import type { DailySimulationService } from "./DailySimulationService";
 import type { FinanceService } from "./FinanceService";
 import type { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
 import type { FinancialPenaltyService } from "./finance/FinancialPenaltyService";
-import type { WageCalculator } from "./finance/WageCalculator";
 import type { InfrastructureService } from "./InfrastructureService";
 import type { MarketingService } from "./MarketingService";
 import type { MatchService } from "./MatchService";
@@ -36,7 +35,6 @@ export interface IServiceContainer {
   finance: FinanceService;
   financialHealth: FinancialHealthChecker;
   financialPenalty: FinancialPenaltyService;
-  wageCalculator: WageCalculator;
   infrastructure: InfrastructureService;
   marketing: MarketingService;
   match: MatchService;

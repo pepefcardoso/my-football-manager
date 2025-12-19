@@ -15,10 +15,6 @@ import type {
   MonthlyFinancialSummary,
   MatchEventData,
 } from "./domain/types";
-import type {
-  MonthlyWageData,
-  TransferProposal,
-} from "./services/finance/WageCalculator";
 
 interface PlayerStatRow {
   id: number;

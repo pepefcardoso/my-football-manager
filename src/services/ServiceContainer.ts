@@ -15,7 +15,6 @@ import { DailySimulationService } from "./DailySimulationService";
 import { FinanceService } from "./FinanceService";
 import { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
 import { FinancialPenaltyService } from "./finance/FinancialPenaltyService";
-import { WageCalculator } from "./finance/WageCalculator";
 import { InfrastructureService } from "./InfrastructureService";
 import type { IServiceContainer } from "./IServiceContainer";
 import { MarketingService } from "./MarketingService";
@@ -41,9 +40,9 @@ import { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
 import { EventService } from "./narrative/EventService";
 import { CPUSimulationService } from "./ai/CPUSimulationService";
 import { PlayerDevelopmentService } from "./PlayerDevelopmentService";
-import { EnhancedSalaryCalculatorService } from "./finance/EnhancedSalaryCalculatorService";
-import { EnhancedOperationalCostsService } from "./finance/EnhancedOperationalCostsService";
-import { EnhancedRevenueService } from "./finance/EnhancedRevenueService";
+import { EnhancedSalaryCalculatorService } from "./finance/SalaryCalculatorService";
+import { EnhancedOperationalCostsService } from "./finance/OperationalCostsService";
+import { EnhancedRevenueService } from "./finance/RevenueService";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: IUnitOfWork;
@@ -54,7 +53,6 @@ export class ServiceContainer implements IServiceContainer {
   public readonly finance: FinanceService;
   public readonly financialHealth: FinancialHealthChecker;
   public readonly financialPenalty: FinancialPenaltyService;
-  public readonly wageCalculator: WageCalculator;
   public readonly infrastructure: InfrastructureService;
   public readonly marketing: MarketingService;
   public readonly match: MatchService;
@@ -89,7 +87,6 @@ export class ServiceContainer implements IServiceContainer {
   ) {
     this.unitOfWork = unitOfWork || new UnitOfWork();
     this.eventBus = eventBus || new GameEventBus();
-    this.wageCalculator = new WageCalculator(repos);
     this.financialPenalty = new FinancialPenaltyService(repos);
     this.matchRevenue = new MatchRevenueCalculator(repos);
     this.matchResult = new MatchResultProcessor(repos);

@@ -63,16 +63,17 @@ describe("FinanceService - Validação de Fluxos Financeiros", () => {
         },
       ]);
 
-      vi.spyOn(
-        financeService["wageCalculator"] as any,
-        "calculateMonthlyWages"
-      ).mockResolvedValue({
-        playerWages: 200_000,
-        staffWages: 10_000,
-        total: 210_000,
-        playerCount: 1,
-        staffCount: 1,
-      });
+      // TODO
+      // vi.spyOn(
+      //   financeService["wageCalculator"] as any,
+      //   "calculateMonthlyWages"
+      // ).mockResolvedValue({
+      //   playerWages: 200_000,
+      //   staffWages: 10_000,
+      //   total: 210_000,
+      //   playerCount: 1,
+      //   staffCount: 1,
+      // });
 
       const result = await financeService.processMonthlyExpenses({
         teamId: TEAM_ID,
@@ -115,16 +116,17 @@ describe("FinanceService - Validação de Fluxos Financeiros", () => {
         "calculateMonthlyMaintenance"
       ).mockReturnValue(EXPECTED_MAINTENANCE);
 
-      vi.spyOn(
-        financeService["wageCalculator"] as any,
-        "calculateMonthlyWages"
-      ).mockResolvedValue({
-        playerWages: 250_000,
-        staffWages: 50_000,
-        total: EXPECTED_WAGES,
-        playerCount: 25,
-        staffCount: 5,
-      });
+      // TODO
+      // vi.spyOn(
+      //   financeService["wageCalculator"] as any,
+      //   "calculateMonthlyWages"
+      // ).mockResolvedValue({
+      //   playerWages: 250_000,
+      //   staffWages: 50_000,
+      //   total: EXPECTED_WAGES,
+      //   playerCount: 25,
+      //   staffCount: 5,
+      // });
 
       const result = await financeService.processMonthlyExpenses({
         teamId: TEAM_ID,
@@ -146,16 +148,17 @@ describe("FinanceService - Validação de Fluxos Financeiros", () => {
     });
 
     it("deve registrar transações financeiras corretamente", async () => {
-      vi.spyOn(
-        financeService["wageCalculator"] as any,
-        "calculateMonthlyWages"
-      ).mockResolvedValue({
-        playerWages: 200_000,
-        staffWages: 50_000,
-        total: 250_000,
-        playerCount: 20,
-        staffCount: 5,
-      });
+      // TODO
+      // vi.spyOn(
+      //   financeService["wageCalculator"] as any,
+      //   "calculateMonthlyWages"
+      // ).mockResolvedValue({
+      //   playerWages: 200_000,
+      //   staffWages: 50_000,
+      //   total: 250_000,
+      //   playerCount: 20,
+      //   staffCount: 5,
+      // });
 
       const result = await financeService.processMonthlyExpenses({
         teamId: TEAM_ID,
@@ -203,16 +206,17 @@ describe("FinanceService - Validação de Fluxos Financeiros", () => {
         stadiumQuality: 60,
       });
 
-      vi.spyOn(
-        financeService["wageCalculator"] as any,
-        "calculateMonthlyWages"
-      ).mockResolvedValue({
-        playerWages: LARGE_EXPENSE,
-        staffWages: 0,
-        total: LARGE_EXPENSE,
-        playerCount: 30,
-        staffCount: 0,
-      });
+      // TODO
+      // vi.spyOn(
+      //   financeService["wageCalculator"] as any,
+      //   "calculateMonthlyWages"
+      // ).mockResolvedValue({
+      //   playerWages: LARGE_EXPENSE,
+      //   staffWages: 0,
+      //   total: LARGE_EXPENSE,
+      //   playerCount: 30,
+      //   staffCount: 0,
+      // });
 
       const result = await financeService.processMonthlyExpenses({
         teamId: TEAM_ID,
@@ -408,16 +412,17 @@ describe("FinanceService - Validação de Fluxos Financeiros", () => {
         stadiumQuality: 60,
       });
 
-      vi.spyOn(
-        financeService["wageCalculator"] as any,
-        "calculateMonthlyWages"
-      ).mockResolvedValue({
-        playerWages: MONTHLY_EXPENSE,
-        staffWages: 0,
-        total: MONTHLY_EXPENSE,
-        playerCount: 30,
-        staffCount: 0,
-      });
+      // TODO
+      // vi.spyOn(
+      //   financeService["wageCalculator"] as any,
+      //   "calculateMonthlyWages"
+      // ).mockResolvedValue({
+      //   playerWages: MONTHLY_EXPENSE,
+      //   staffWages: 0,
+      //   total: MONTHLY_EXPENSE,
+      //   playerCount: 30,
+      //   staffCount: 0,
+      // });
 
       const expenseResult = await financeService.processMonthlyExpenses({
         teamId: TEAM_ID,
@@ -456,16 +461,17 @@ describe("FinanceService - Validação de Fluxos Financeiros", () => {
         stadiumQuality: 50,
       });
 
-      vi.spyOn(
-        financeService["wageCalculator"] as any,
-        "calculateMonthlyWages"
-      ).mockResolvedValue({
-        playerWages: 0,
-        staffWages: 0,
-        total: 0,
-        playerCount: 0,
-        staffCount: 0,
-      });
+      // TODO
+      // vi.spyOn(
+      //   financeService["wageCalculator"] as any,
+      //   "calculateMonthlyWages"
+      // ).mockResolvedValue({
+      //   playerWages: 0,
+      //   staffWages: 0,
+      //   total: 0,
+      //   playerCount: 0,
+      //   staffCount: 0,
+      // });
 
       const result = await financeService.processMonthlyExpenses({
         teamId: TEAM_ID,
@@ -491,16 +497,17 @@ describe("FinanceService - Validação de Fluxos Financeiros", () => {
         stadiumQuality: 100,
       });
 
-      vi.spyOn(
-        financeService["wageCalculator"] as any,
-        "calculateMonthlyWages"
-      ).mockResolvedValue({
-        playerWages: 100_000_000,
-        staffWages: 10_000_000,
-        total: 110_000_000,
-        playerCount: 50,
-        staffCount: 20,
-      });
+      // TODO
+      // vi.spyOn(
+      //   financeService["wageCalculator"] as any,
+      //   "calculateMonthlyWages"
+      // ).mockResolvedValue({
+      //   playerWages: 100_000_000,
+      //   staffWages: 10_000_000,
+      //   total: 110_000_000,
+      //   playerCount: 50,
+      //   staffCount: 20,
+      // });
 
       const result = await financeService.processMonthlyExpenses({
         teamId: TEAM_ID,
@@ -517,16 +524,17 @@ describe("FinanceService - Validação de Fluxos Financeiros", () => {
     });
 
     it("deve arredondar valores corretamente para evitar decimais", async () => {
-      vi.spyOn(
-        financeService["wageCalculator"] as any,
-        "calculateMonthlyWages"
-      ).mockResolvedValue({
-        playerWages: 123_456.789,
-        staffWages: 67_890.123,
-        total: 191_346.912,
-        playerCount: 25,
-        staffCount: 10,
-      });
+      // TODO
+      // vi.spyOn(
+      //   financeService["wageCalculator"] as any,
+      //   "calculateMonthlyWages"
+      // ).mockResolvedValue({
+      //   playerWages: 123_456.789,
+      //   staffWages: 67_890.123,
+      //   total: 191_346.912,
+      //   playerCount: 25,
+      //   staffCount: 10,
+      // });
 
       const result = await financeService.processMonthlyExpenses({
         teamId: TEAM_ID,

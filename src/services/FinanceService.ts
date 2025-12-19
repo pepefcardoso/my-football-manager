@@ -11,9 +11,9 @@ import type {
   FinancialHealthResult,
   TransferPermissionResult,
 } from "../domain/types";
-import { EnhancedSalaryCalculatorService } from "./finance/EnhancedSalaryCalculatorService";
-import { EnhancedOperationalCostsService } from "./finance/EnhancedOperationalCostsService";
-import { EnhancedRevenueService } from "./finance/EnhancedRevenueService";
+import { EnhancedSalaryCalculatorService } from "./finance/SalaryCalculatorService";
+import { EnhancedOperationalCostsService } from "./finance/OperationalCostsService";
+import { EnhancedRevenueService } from "./finance/RevenueService";
 import { FinancialBalance } from "../engine/FinancialBalanceConfig";
 import {
   FinancialReportFactory,
