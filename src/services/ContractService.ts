@@ -1,13 +1,10 @@
-import { eq, and } from "drizzle-orm";
-import { playerContracts } from "../db/schema";
-import { db } from "../lib/db";
 import { BaseService } from "./BaseService";
 import { Result } from "../domain/ServiceResults";
 import type { ServiceResult } from "../domain/ServiceResults";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { GameEventBus } from "./events/GameEventBus";
-import { GameEventType } from "./events/GameEventTypes";
 import { FinancialOperationValidator } from "../domain/validators/FinancialOperationValidator";
+import type { GameEventBus } from "../lib/GameEventBus";
+import { GameEventType } from "../domain/GameEventTypes";
 
 export interface WageBillDetails {
   playerWages: number;
@@ -110,26 +107,20 @@ export class ContractService extends BaseService {
       "renewPlayerContract",
       input,
       async ({ playerId, newWage, newEndDate }) => {
-        const currentContract = await db
-          .select()
-          .from(playerContracts)
-          .where(
-            and(
-              eq(playerContracts.playerId, playerId),
-              eq(playerContracts.status, "active")
-            )
-          )
-          .limit(1);
+        const currentContract = await this.repos.contracts.findActiveByPlayerId(
+          playerId
+        );
 
-        if (currentContract.length === 0)
+        if (!currentContract)
           throw new Error(
             `Nenhum contrato ativo encontrado para jogador ${playerId}`
           );
 
-        await db
-          .update(playerContracts)
-          .set({ wage: newWage, endDate: newEndDate })
-          .where(eq(playerContracts.id, currentContract[0].id));
+        await this.repos.contracts.updateTerms(
+          currentContract.id,
+          newWage,
+          newEndDate
+        );
       }
     );
   }
@@ -137,15 +128,9 @@ export class ContractService extends BaseService {
   private async calculatePlayerWages(
     teamId: number
   ): Promise<{ monthly: number; count: number }> {
-    const activeContracts = await db
-      .select()
-      .from(playerContracts)
-      .where(
-        and(
-          eq(playerContracts.teamId, teamId),
-          eq(playerContracts.status, "active")
-        )
-      );
+    const activeContracts = await this.repos.contracts.findActiveByTeamId(
+      teamId
+    );
 
     const annualTotal = activeContracts.reduce(
       (sum, contract) => sum + (contract.wage || 0),
@@ -174,21 +159,12 @@ export class ContractService extends BaseService {
   private async processExpiringPlayerContracts(
     currentDate: string
   ): Promise<number> {
-    const expiringContracts = await db
-      .select()
-      .from(playerContracts)
-      .where(
-        and(
-          eq(playerContracts.endDate, currentDate),
-          eq(playerContracts.status, "active")
-        )
-      );
+    const expiringContracts = await this.repos.contracts.findExpiring(
+      currentDate
+    );
 
     for (const contract of expiringContracts) {
-      await db
-        .update(playerContracts)
-        .set({ status: "expired" })
-        .where(eq(playerContracts.id, contract.id));
+      await this.repos.contracts.updateStatus(contract.id, "expired");
       await this.repos.players.update(contract.playerId, { teamId: null });
 
       await this.eventBus.publish(GameEventType.CONTRACT_EXPIRED, {

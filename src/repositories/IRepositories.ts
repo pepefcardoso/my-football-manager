@@ -10,6 +10,7 @@ import type {
 } from "../domain/models";
 import type { ClubInterestInsert } from "./ClubInterestRepository";
 import type { GameState } from "../domain/models";
+import type { ContractSelect } from "./ContractRepository";
 
 export interface PlayerCompetitionStats {
   id: number;
@@ -56,6 +57,14 @@ export interface IPlayerRepository {
       isInjured?: boolean;
     }>
   ): Promise<void>;
+}
+
+export interface IContractRepository {
+  findActiveByTeamId(teamId: number): Promise<ContractSelect[]>;
+  findExpiring(date: string): Promise<ContractSelect[]>;
+  findActiveByPlayerId(playerId: number): Promise<ContractSelect | undefined>;
+  updateStatus(contractId: number, status: string): Promise<void>;
+  updateTerms(contractId: number, wage: number, endDate: string): Promise<void>;
 }
 
 export interface ITeamRepository {
@@ -219,6 +228,7 @@ export interface IGameStateRepository {
 
 export interface IRepositoryContainer {
   players: IPlayerRepository;
+  contracts: IContractRepository;
   teams: ITeamRepository;
   staff: IStaffRepository;
   matches: IMatchRepository;

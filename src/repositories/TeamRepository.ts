@@ -1,27 +1,28 @@
 import { eq } from "drizzle-orm";
 import { teams } from "../db/schema";
 import { BaseRepository } from "./BaseRepository";
-import type { TeamAchievement } from "../domain/models";
+import type { Team, TeamAchievement } from "../domain/models";
 
 export type TeamSelect = typeof teams.$inferSelect;
 export type TeamInsert = typeof teams.$inferInsert;
 
 export class TeamRepository extends BaseRepository {
-  async findAll(): Promise<TeamSelect[]> {
-    return await this.db.select().from(teams);
+  async findAll(): Promise<Team[]> {
+    const result = await this.db.select().from(teams);
+    return result as unknown as Team[];
   }
 
-  async findById(id: number): Promise<TeamSelect | undefined> {
+  async findById(id: number): Promise<Team | undefined> {
     const result = await this.db.select().from(teams).where(eq(teams.id, id));
-    return result[0];
+    return result[0] as unknown as Team;
   }
 
-  async findHumanTeam(): Promise<TeamSelect | undefined> {
+  async findHumanTeam(): Promise<Team | undefined> {
     const result = await this.db
       .select()
       .from(teams)
       .where(eq(teams.isHuman, true));
-    return result[0];
+    return result[0] as unknown as Team;
   }
 
   async findByIdWithRelations(id: number) {
@@ -35,8 +36,11 @@ export class TeamRepository extends BaseRepository {
     });
   }
 
-  async update(id: number, data: Partial<TeamInsert>): Promise<void> {
-    await this.db.update(teams).set(data).where(eq(teams.id, id));
+  async update(id: number, data: Partial<Team>): Promise<void> {
+    await this.db
+      .update(teams)
+      .set(data as Partial<TeamInsert>)
+      .where(eq(teams.id, id));
   }
 
   async updateBudget(id: number, newBudget: number): Promise<void> {
@@ -47,8 +51,6 @@ export class TeamRepository extends BaseRepository {
   }
 
   /**
-   * Adiciona uma conquista (título ou posição relevante) ao histórico do clube.
-   * Recupera o histórico atual, adiciona o novo item e persiste.
    * * @param teamId ID do time
    * @param achievement Objeto contendo detalhes da conquista
    */

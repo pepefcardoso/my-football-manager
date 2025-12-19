@@ -3,6 +3,10 @@ import {
   PlayerRepository,
   playerRepository,
 } from "../repositories/PlayerRepository";
+import {
+  ContractRepository,
+  contractRepository,
+} from "../repositories/ContractRepository";
 import { TeamRepository, teamRepository } from "../repositories/TeamRepository";
 import {
   StaffRepository,
@@ -54,6 +58,7 @@ export class RepositoryFactory {
   static create(context: DbInstance | DbTransaction): IRepositoryContainer {
     return {
       players: new PlayerRepository(context),
+      contracts: new ContractRepository(context),
       teams: new TeamRepository(context),
       staff: new StaffRepository(context),
       matches: new MatchRepository(context),
@@ -72,6 +77,7 @@ export class RepositoryFactory {
 
 class ProductionRepositoryContainer implements IRepositoryContainer {
   public readonly players = playerRepository;
+  public readonly contracts = contractRepository;
   public readonly teams = teamRepository;
   public readonly staff = staffRepository;
   public readonly matches = matchRepository;
