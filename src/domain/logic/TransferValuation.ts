@@ -1,20 +1,80 @@
-import { Position, TransferStrategy } from "../../domain/enums";
-import type { Player } from "../../domain/models";
+import { Position, TransferStrategy } from "../enums";
+import type { Player } from "../models";
 import { GameBalance } from "../../engine/GameBalanceConfig";
+import {
+  FinancialBalance,
+  type LeagueTier,
+  type PlayerPosition,
+} from "../../engine/FinancialBalanceConfig";
 
-/**
- * Result of a transfer offer evaluation.
- */
+export interface WageBreakdown {
+  baseSalary: number;
+  grossSalary: number;
+  components: {
+    positionAdjustment: number;
+    ageAdjustment: number;
+    potentialBonus: number;
+    formAdjustment: number;
+    leagueMultiplier: number;
+  };
+}
+
 export interface EvaluationResult {
   decision: "accept" | "reject" | "counter" | "negotiate";
   counterOfferFee?: number;
   reason: string;
 }
 
-export class TransferValuationEngine {
-  /**
-   * Calculates the estimated market value of a player.
-   */
+export class TransferValuation {
+  static calculateEconomicWage(
+    player: Player,
+    leagueTier: LeagueTier
+  ): WageBreakdown {
+    const economics = FinancialBalance.LEAGUE_ECONOMICS[leagueTier];
+    const config = FinancialBalance.SALARY_CALCULATION;
+
+    const leagueMultiplier = economics.AVG_PLAYER_SALARY / 2_500_000;
+    const baseSalary = Math.round(
+      Math.pow(player.overall, config.BASE_FORMULA.EXPONENT) *
+        config.BASE_FORMULA.MULTIPLIER *
+        leagueMultiplier
+    );
+
+    const posMult =
+      config.POSITION_PREMIUMS[player.position as PlayerPosition] || 1.0;
+    const positionAdjusted = baseSalary * posMult;
+
+    const ageMult = this.getAgeMultiplier(player.age);
+    const ageAdjusted = positionAdjusted * ageMult;
+
+    const potentialBonus = this.calculatePotentialBonus(
+      player.age,
+      player.overall,
+      player.potential,
+      ageAdjusted
+    );
+
+    const formMult = this.getFormMultiplier(player.form);
+    const finalRawSalary = (ageAdjusted + potentialBonus) * formMult;
+
+    const grossSalary = Math.max(
+      economics.MIN_PLAYER_SALARY,
+      Math.min(economics.MAX_PLAYER_SALARY, Math.round(finalRawSalary))
+    );
+
+    return {
+      baseSalary,
+      grossSalary,
+      components: {
+        positionAdjustment: positionAdjusted - baseSalary,
+        ageAdjustment: ageAdjusted - positionAdjusted,
+        potentialBonus: potentialBonus,
+        formAdjustment: finalRawSalary - (ageAdjusted + potentialBonus),
+        leagueMultiplier,
+      },
+    };
+  }
+
   static calculateMarketValue(player: Player): number {
     const TRANSFER = GameBalance.TRANSFER;
 
@@ -45,10 +105,6 @@ export class TransferValuationEngine {
     return this.roundValue(value);
   }
 
-  /**
-   * Calculates the transfer fee a club would demand.
-   * This is Market Value + Contract Premium.
-   */
   static calculateTransferFee(
     player: Player,
     contractYearsLeft: number = 2
@@ -69,29 +125,6 @@ export class TransferValuationEngine {
     return this.roundValue(marketValue * contractMultiplier);
   }
 
-  /**
-   * Calculates a suggested annual wage for a player based on their value and age.
-   */
-  static calculateSuggestedWage(player: Player): number {
-    const marketValue = this.calculateMarketValue(player);
-    const TRANSFER = GameBalance.TRANSFER;
-
-    let ratio: number = TRANSFER.WAGE_RATIO_BASE;
-    if (player.overall > 90) ratio = TRANSFER.WAGE_RATIO_OVR_90;
-    else if (player.overall > 85) ratio = TRANSFER.WAGE_RATIO_OVR_85;
-    else if (player.overall > 80) ratio = TRANSFER.WAGE_RATIO_OVR_80;
-
-    let annualWage = marketValue * ratio;
-
-    if (annualWage < TRANSFER.WAGE_MINIMUM_FLOOR)
-      annualWage = TRANSFER.WAGE_MINIMUM_FLOOR;
-
-    return this.roundValue(annualWage, 100);
-  }
-
-  /**
-   * Evaluates an incoming transfer offer on behalf of the AI Team.
-   */
   static evaluateOffer(
     player: Player,
     offerFee: number,
@@ -171,9 +204,53 @@ export class TransferValuationEngine {
     };
   }
 
-  /**
-   * Helper to round financial values to look realistic
-   */
+  private static getAgeMultiplier(age: number): number {
+    const adjustments = FinancialBalance.SALARY_CALCULATION.AGE_ADJUSTMENTS;
+
+    if (age < 21) return adjustments.YOUTH_DISCOUNT;
+    if (age >= 24 && age <= 29) return adjustments.PRIME_MULTIPLIER;
+    if (age >= 30 && age <= 32) return adjustments.VETERAN_DISCOUNT;
+    if (age >= 33) return adjustments.DECLINING_DISCOUNT;
+
+    return (
+      adjustments.YOUTH_DISCOUNT +
+      ((adjustments.PRIME_MULTIPLIER - adjustments.YOUTH_DISCOUNT) *
+        (age - 21)) /
+        3
+    );
+  }
+
+  private static calculatePotentialBonus(
+    age: number,
+    overall: number,
+    potential: number,
+    currentSalary: number
+  ): number {
+    if (age >= 24) return 0;
+
+    const gap = potential - overall;
+    const threshold =
+      FinancialBalance.SALARY_CALCULATION.POTENTIAL_BONUS
+        .HIGH_POTENTIAL_THRESHOLD;
+
+    if (gap >= threshold) {
+      const multiplier =
+        FinancialBalance.SALARY_CALCULATION.POTENTIAL_BONUS.BONUS_MULTIPLIER;
+      return Math.round(currentSalary * (multiplier - 1.0));
+    }
+
+    return 0;
+  }
+
+  private static getFormMultiplier(form: number): number {
+    const impact = FinancialBalance.SALARY_CALCULATION.FORM_IMPACT;
+
+    if (form > 80) return impact.EXCELLENT_FORM;
+    if (form < 40) return impact.POOR_FORM;
+
+    return 1.0;
+  }
+
   private static roundValue(
     value: number,
     precision: number | null = null

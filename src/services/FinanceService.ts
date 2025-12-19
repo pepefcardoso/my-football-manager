@@ -3,17 +3,16 @@ import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import type { ServiceResult } from "./types/ServiceResults";
 import { Result } from "./types/ServiceResults";
-import { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
-import { GameEventBus } from "./events/GameEventBus";
+import type { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
 import type {
   ProcessExpensesInput,
   ProcessExpensesResult,
   FinancialHealthResult,
   TransferPermissionResult,
 } from "../domain/types";
-import { SalaryCalculatorService } from "./finance/SalaryCalculatorService";
-import { OperationalCostsService } from "./finance/OperationalCostsService";
-import { RevenueService } from "./finance/RevenueService";
+import type { SalaryCalculatorService } from "./finance/SalaryCalculatorService";
+import type { OperationalCostsService } from "./finance/OperationalCostsService";
+import type { RevenueService } from "./finance/RevenueService";
 import { FinancialBalance } from "../engine/FinancialBalanceConfig";
 import {
   FinancialReportFactory,
@@ -26,12 +25,18 @@ export class FinanceService extends BaseService {
   private operationalCosts: OperationalCostsService;
   private revenueService: RevenueService;
 
-  constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
+  constructor(
+    repositories: IRepositoryContainer,
+    healthChecker: FinancialHealthChecker,
+    salaryCalculator: SalaryCalculatorService,
+    operationalCosts: OperationalCostsService,
+    revenueService: RevenueService
+  ) {
     super(repositories, "FinanceService");
-    this.healthChecker = new FinancialHealthChecker(repositories, eventBus);
-    this.salaryCalculator = new SalaryCalculatorService(repositories);
-    this.operationalCosts = new OperationalCostsService(repositories);
-    this.revenueService = new RevenueService(repositories);
+    this.healthChecker = healthChecker;
+    this.salaryCalculator = salaryCalculator;
+    this.operationalCosts = operationalCosts;
+    this.revenueService = revenueService;
   }
 
   /**
@@ -360,34 +365,10 @@ export class FinanceService extends BaseService {
     return this.repos.financial.findByTeamAndSeason(teamId, seasonId);
   }
 
-  /**
-   * @param teamId - Team ID
-   * @param seasonId - Season ID
-   * @returns Complete financial overview
-   */
   async getFinancialDashboard(
     teamId: number,
     seasonId: number
-  ): Promise<
-    ServiceResult<{
-      currentBudget: number;
-      monthlyIncome: number;
-      monthlyExpenses: number;
-      monthlyCashflow: number;
-      salaryBill: {
-        annual: number;
-        monthly: number;
-        playerCount: number;
-      };
-      operationalCosts: {
-        annual: number;
-        monthly: number;
-      };
-      projectedAnnualRevenue: number;
-      ffpCompliance: boolean;
-      financialHealth: string;
-    }>
-  > {
+  ): Promise<ServiceResult<any>> {
     return this.execute(
       "getFinancialDashboard",
       { teamId, seasonId },

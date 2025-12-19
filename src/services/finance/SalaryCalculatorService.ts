@@ -9,6 +9,7 @@ import {
   type PlayerPosition,
   getTotalSalaryCost,
 } from "../../engine/FinancialBalanceConfig";
+import { TransferValuation } from "../../domain/logic/TransferValuation";
 
 export interface SalaryCalculationResult {
   grossAnnualSalary: number;
@@ -34,12 +35,6 @@ export class SalaryCalculatorService extends BaseService {
     super(repositories, "SalaryCalculatorService");
   }
 
-  /**
-   * @param playerId - The player's ID
-   * @param teamId - The hiring team's ID
-   * @param isFreeTransfer - Whether this is a free transfer (affects signing bonus)
-   * @returns Detailed salary calculation
-   */
   async calculatePlayerSalary(
     playerId: number,
     teamId: number,
@@ -60,35 +55,12 @@ export class SalaryCalculatorService extends BaseService {
         }
 
         const leagueTier = this.determineLeagueTier(team);
-        const leagueEconomics = FinancialBalance.LEAGUE_ECONOMICS[leagueTier];
 
-        const baseSalary = this.calculateBaseSalary(
-          player.overall,
-          leagueEconomics.AVG_PLAYER_SALARY
+        const valuation = TransferValuation.calculateEconomicWage(
+          player,
+          leagueTier
         );
-        
-        const positionMultiplier = this.getPositionMultiplier(
-          player.position as PlayerPosition
-        );
-        const positionAdjusted = baseSalary * positionMultiplier;
-
-        const ageMultiplier = this.getAgeMultiplier(player.age);
-        const ageAdjusted = positionAdjusted * ageMultiplier;
-
-        const potentialBonus = this.calculatePotentialBonus(
-          player.age,
-          player.overall,
-          player.potential,
-          ageAdjusted
-        );
-
-        const formMultiplier = this.getFormMultiplier(player.form);
-        const formAdjusted = (ageAdjusted + potentialBonus) * formMultiplier;
-
-        const grossAnnualSalary = Math.max(
-          leagueEconomics.MIN_PLAYER_SALARY,
-          Math.min(leagueEconomics.MAX_PLAYER_SALARY, Math.round(formAdjusted))
-        );
+        const grossAnnualSalary = valuation.grossSalary;
 
         const incomeTaxRate = FinancialBalance.TAXATION.INCOME_TAX_RATE;
         const netAnnualSalary = Math.round(
@@ -114,12 +86,6 @@ export class SalaryCalculatorService extends BaseService {
             grossAnnualSalary
           );
 
-        this.logger.info(
-          `Salary calculated for ${player.firstName} ${player.lastName}: ` +
-            `€${grossAnnualSalary.toLocaleString()} gross/year ` +
-            `(€${netAnnualSalary.toLocaleString()} net)`
-        );
-
         return {
           grossAnnualSalary,
           netAnnualSalary,
@@ -130,78 +96,16 @@ export class SalaryCalculatorService extends BaseService {
           agentFee,
           performanceBonusPotential,
           breakdown: {
-            baseSalary,
-            positionAdjustment: positionAdjusted - baseSalary,
-            ageAdjustment: ageAdjusted - positionAdjusted,
-            potentialBonus,
-            formAdjustment: formAdjusted - (ageAdjusted + potentialBonus),
-            leagueMultiplier: leagueEconomics.AVG_PLAYER_SALARY / 1_000_000,
+            baseSalary: valuation.baseSalary,
+            positionAdjustment: valuation.components.positionAdjustment,
+            ageAdjustment: valuation.components.ageAdjustment,
+            potentialBonus: valuation.components.potentialBonus,
+            formAdjustment: valuation.components.formAdjustment,
+            leagueMultiplier: valuation.components.leagueMultiplier,
           },
         };
       }
     );
-  }
-
-  private calculateBaseSalary(overall: number, leagueAverage: number): number {
-    const config = FinancialBalance.SALARY_CALCULATION.BASE_FORMULA;
-    const leagueMultiplier = leagueAverage / 2_500_000;
-
-    return Math.round(
-      Math.pow(overall, config.EXPONENT) * config.MULTIPLIER * leagueMultiplier
-    );
-  }
-
-  private getPositionMultiplier(position: PlayerPosition): number {
-    return (
-      FinancialBalance.SALARY_CALCULATION.POSITION_PREMIUMS[position] || 1.0
-    );
-  }
-
-  private getAgeMultiplier(age: number): number {
-    const adjustments = FinancialBalance.SALARY_CALCULATION.AGE_ADJUSTMENTS;
-
-    if (age < 21) return adjustments.YOUTH_DISCOUNT;
-    if (age >= 24 && age <= 29) return adjustments.PRIME_MULTIPLIER;
-    if (age >= 30 && age <= 32) return adjustments.VETERAN_DISCOUNT;
-    if (age >= 33) return adjustments.DECLINING_DISCOUNT;
-
-    return (
-      adjustments.YOUTH_DISCOUNT +
-      ((adjustments.PRIME_MULTIPLIER - adjustments.YOUTH_DISCOUNT) *
-        (age - 21)) /
-        3
-    );
-  }
-
-  private calculatePotentialBonus(
-    age: number,
-    overall: number,
-    potential: number,
-    currentSalary: number
-  ): number {
-    if (age >= 24) return 0;
-
-    const potentialGap = potential - overall;
-    const threshold =
-      FinancialBalance.SALARY_CALCULATION.POTENTIAL_BONUS
-        .HIGH_POTENTIAL_THRESHOLD;
-
-    if (potentialGap >= threshold) {
-      const multiplier =
-        FinancialBalance.SALARY_CALCULATION.POTENTIAL_BONUS.BONUS_MULTIPLIER;
-      return Math.round(currentSalary * (multiplier - 1.0));
-    }
-
-    return 0;
-  }
-
-  private getFormMultiplier(form: number): number {
-    const impact = FinancialBalance.SALARY_CALCULATION.FORM_IMPACT;
-
-    if (form > 80) return impact.EXCELLENT_FORM;
-    if (form < 40) return impact.POOR_FORM;
-
-    return 1.0;
   }
 
   private calculateSigningBonus(

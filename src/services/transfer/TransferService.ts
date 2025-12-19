@@ -1,4 +1,4 @@
-import { BaseService } from "../BaseService";
+
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { TransferProposalInsert } from "../../repositories/TransferProposalRepository";
 import { GameEventBus } from "../events/GameEventBus";
@@ -15,6 +15,7 @@ import {
   TransferValidator,
   type TransferValidationContext,
 } from "./validators/TransferValidator";
+import { BaseService } from "../BaseService";
 
 export interface CreateProposalInput {
   playerId: number;
@@ -44,11 +45,12 @@ export class TransferService extends BaseService {
 
   constructor(
     repositories: IRepositoryContainer,
-    eventBus: GameEventBus
+    eventBus: GameEventBus,
+    transferValidator: TransferValidator
   ) {
     super(repositories, "TransferService");
     this.eventBus = eventBus;
-    this.transferValidator = new TransferValidator(repositories);
+    this.transferValidator = transferValidator;
   }
 
   async createProposal(

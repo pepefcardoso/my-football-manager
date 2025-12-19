@@ -6,8 +6,6 @@ import { BaseService } from "./BaseService";
 import { Result } from "./types/ServiceResults";
 import type { ServiceResult } from "./types/ServiceResults";
 import { MatchResultProcessor } from "./match/MatchResultProcessor";
-import { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
-import { MatchFinancialsProcessor } from "./match/MatchFinancialsProcessor";
 import { GameEventBus } from "./events/GameEventBus";
 import { GameEventType } from "./events/GameEventTypes";
 import { MatchDataValidator } from "./validators/MatchDataValidator";
@@ -19,26 +17,31 @@ import {
   MatchTacticsManager,
   type UpdateLiveTacticsRequest,
 } from "./match/MatchTacticsManager";
+import type { FinanceService } from "./FinanceService";
 
 export class MatchService extends BaseService {
   private engines: Map<number, MatchEngine> = new Map();
   private eventBus: GameEventBus;
 
   private resultProcessor: MatchResultProcessor;
-  private revenueCalculator: MatchRevenueCalculator;
-  private financialsProcessor: MatchFinancialsProcessor;
   private substitutionManager: MatchSubstitutionManager;
   private tacticsManager: MatchTacticsManager;
+  private financeService: FinanceService;
 
-  constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
+  constructor(
+    repositories: IRepositoryContainer,
+    eventBus: GameEventBus,
+    financeService: FinanceService,
+    resultProcessor: MatchResultProcessor,
+    substitutionManager: MatchSubstitutionManager,
+    tacticsManager: MatchTacticsManager
+  ) {
     super(repositories, "MatchService");
     this.eventBus = eventBus;
-
-    this.resultProcessor = new MatchResultProcessor(repositories);
-    this.revenueCalculator = new MatchRevenueCalculator(repositories);
-    this.financialsProcessor = new MatchFinancialsProcessor(repositories);
-    this.substitutionManager = new MatchSubstitutionManager(repositories);
-    this.tacticsManager = new MatchTacticsManager(repositories);
+    this.financeService = financeService;
+    this.resultProcessor = resultProcessor;
+    this.substitutionManager = substitutionManager;
+    this.tacticsManager = tacticsManager;
   }
 
   async initializeMatch(matchId: number): Promise<ServiceResult<void>> {
@@ -477,41 +480,29 @@ export class MatchService extends BaseService {
     const match = await this.repos.matches.findById(matchId);
     if (!match) return;
 
-    const homeTeam = await this.repos.teams.findById(match.homeTeamId!);
-    if (!homeTeam) return;
+    let ticketRevenue = 0;
+    let attendance = 0;
 
-    const revenueResult = await this.revenueCalculator.calculateRevenue({
-      matchId,
-      homeTeam,
-      competitionId: match.competitionId,
-      round: match.round,
-    });
-    const { ticketRevenue, attendance } = Result.unwrapOr(revenueResult, {
-      ticketRevenue: 0,
-      attendance: 0,
-    });
+    if (match.homeTeamId) {
+      const revenueResult = await this.financeService.processMatchdayRevenue(
+        match.homeTeamId,
+        matchId,
+        0,
+        1.0
+      );
+
+      if (Result.isSuccess(revenueResult)) {
+        ticketRevenue = revenueResult.data;
+        const team = await this.repos.teams.findById(match.homeTeamId);
+        if (team) {
+          attendance = Math.round((team.stadiumCapacity || 10000) * 0.7);
+        }
+      }
+    }
 
     await this.resultProcessor.processResult(
       matchId,
       result,
-      ticketRevenue,
-      attendance
-    );
-
-    if (match.competitionId && match.seasonId) {
-      await this.resultProcessor.updateStandings(
-        match.competitionId,
-        match.seasonId,
-        match.homeTeamId!,
-        match.awayTeamId!,
-        result.homeScore,
-        result.awayScore
-      );
-    }
-
-    await this.financialsProcessor.processFinancials(
-      match,
-      homeTeam,
       ticketRevenue,
       attendance
     );

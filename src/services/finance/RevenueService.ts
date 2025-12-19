@@ -57,9 +57,9 @@ export interface AnnualRevenueProjection {
   revenuePerPlayer: number;
 }
 
-export class EnhancedRevenueService extends BaseService {
+export class RevenueService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    super(repositories, "EnhancedRevenueService");
+    super(repositories, "RevenueService");
   }
 
   /**

@@ -3,9 +3,9 @@ import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { ServiceResult } from "../types/ServiceResults";
 import { Result } from "../types/ServiceResults";
 import {
-  TransferValuationEngine,
+  TransferValuation,
   type EvaluationResult,
-} from "../transfer/TransferValuationEngine";
+} from "../../domain/logic/TransferValuation";
 import { InterestLevel } from "../../domain/enums";
 import { RandomEngine } from "../../engine/RandomEngine";
 import type { Player } from "../../domain/models";
@@ -90,7 +90,7 @@ export class AITransferDecisionMaker extends BaseService {
           : currentYear + 2;
         const yearsLeft = Math.max(1, contractEndYear - currentYear);
 
-        const evaluation = TransferValuationEngine.evaluateOffer(
+        const evaluation = TransferValuation.evaluateOffer(
           player,
           proposal.fee,
           sellingTeam.transferStrategy,
@@ -185,9 +185,9 @@ export class AITransferDecisionMaker extends BaseService {
           const targetPlayerId = targetPlayer.id;
 
           const estimatedFee =
-            TransferValuationEngine.calculateTransferFee(targetPlayer);
+            TransferValuation.calculateTransferFee(targetPlayer);
           const estimatedWage =
-            TransferValuationEngine.calculateSuggestedWage(targetPlayer);
+            TransferValuation.calculateSuggestedWage(targetPlayer);
 
           const canAffordResult =
             await this.squadAnalysisService.canAffordPlayer(

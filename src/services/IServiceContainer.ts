@@ -16,9 +16,7 @@ import type { StaffService } from "./StaffService";
 import type { StatsService } from "./StatsService";
 import type { CupProgressionManager } from "./match/CupProgressionManager";
 import type { MatchFanSatisfactionProcessor } from "./match/MatchFanSatisfactionProcessor";
-import type { MatchFinancialsProcessor } from "./match/MatchFinancialsProcessor";
 import type { MatchResultProcessor } from "./match/MatchResultProcessor";
-import type { MatchRevenueCalculator } from "./match/MatchRevenueCalculator";
 import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 import type { TransferWindowManager } from "./transfer/TransferWindowManager";
 import type { TransferService } from "./transfer/TransferService";
@@ -26,6 +24,8 @@ import type { SquadAnalysisService } from "./ai/SquadAnalysisService";
 import type { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
 import type { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
 import type { EventService } from "./narrative/EventService";
+import type { MatchTacticsManager } from "./match/MatchTacticsManager";
+import type { MatchSubstitutionManager } from "./match/MatchSubstitutionManager";
 
 export interface IServiceContainer {
   unitOfWork: IUnitOfWork;
@@ -40,9 +40,7 @@ export interface IServiceContainer {
   match: MatchService;
   cupProgression: CupProgressionManager;
   matchFanSatisfaction: MatchFanSatisfactionProcessor;
-  matchFinancials: MatchFinancialsProcessor;
   matchResult: MatchResultProcessor;
-  matchRevenue: MatchRevenueCalculator;
   player: PlayerService;
   scouting: ScoutingService;
   season: SeasonService;
@@ -56,4 +54,6 @@ export interface IServiceContainer {
   aiTransferDecisionMaker: AITransferDecisionMaker;
   dailyTransferProcessor: DailyTransferProcessor;
   eventService: EventService;
+  matchTactics: MatchTacticsManager;
+  matchSubstitution: MatchSubstitutionManager;
 }
