@@ -258,6 +258,58 @@ contextBridge.exposeInMainWorld("electronAPI", {
         teamId,
         leaguePosition,
       }),
+
+    compareWithLeague: (teamId: number) =>
+      ipcRenderer.invoke("infrastructure:compareWithLeague", teamId),
+
+    getBenchmarks: (teamId: number) =>
+      ipcRenderer.invoke("infrastructure:getBenchmarks", teamId),
+
+    getTopRivals: (teamId: number, limit?: number) =>
+      ipcRenderer.invoke("infrastructure:getTopRivals", { teamId, limit }),
+
+    getEvolutionData: (teamId: number, startDate?: string, endDate?: string) =>
+      ipcRenderer.invoke("infrastructure:getEvolutionData", {
+        teamId,
+        startDate,
+        endDate,
+      }),
+
+    getChartData: (
+      teamId: number,
+      metric: "capacity" | "quality" | "fanBase" | "utilization",
+      startDate?: string,
+      endDate?: string
+    ) =>
+      ipcRenderer.invoke("infrastructure:getChartData", {
+        teamId,
+        metric,
+        startDate,
+        endDate,
+      }),
+
+    getFFPReport: (teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("infrastructure:getFFPReport", { teamId, seasonId }),
+
+    getInvestmentAllowance: (teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("infrastructure:getInvestmentAllowance", {
+        teamId,
+        seasonId,
+      }),
+
+    analyzeInvestmentImpact: (
+      teamId: number,
+      seasonId: number,
+      proposedCost: number
+    ) =>
+      ipcRenderer.invoke("infrastructure:analyzeInvestmentImpact", {
+        teamId,
+        seasonId,
+        proposedCost,
+      }),
+
+    getValuation: (teamId: number) =>
+      ipcRenderer.invoke("infrastructure:getValuation", teamId),
   },
 
   scouting: {

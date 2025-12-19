@@ -10,6 +10,7 @@ import type {
 import type { OperationalCostsService } from "./finance/OperationalCostsService";
 import type { RevenueService } from "./finance/RevenueService";
 import type { ContractService } from "./ContractService";
+import type { InfrastructureService } from "./InfrastructureService";
 import { FinancialBalance } from "../engine/FinancialBalanceConfig";
 import {
   FinancialReportFactory,
@@ -20,25 +21,26 @@ export class FinanceService extends BaseService {
   private operationalCosts: OperationalCostsService;
   private revenueService: RevenueService;
   private contractService: ContractService;
+  private infrastructureService: InfrastructureService;
 
   constructor(
     repositories: IRepositoryContainer,
     operationalCosts: OperationalCostsService,
     revenueService: RevenueService,
-    contractService: ContractService
+    contractService: ContractService,
+    infrastructureService: InfrastructureService
   ) {
     super(repositories, "FinanceService");
     this.operationalCosts = operationalCosts;
     this.revenueService = revenueService;
     this.contractService = contractService;
+    this.infrastructureService = infrastructureService;
   }
 
   static isPayDay(dateStr: string): boolean {
     const currentDate = new Date(dateStr);
     const nextDay = new Date(currentDate);
-
     nextDay.setDate(currentDate.getDate() + 1);
-
     return nextDay.getMonth() !== currentDate.getMonth();
   }
 
@@ -83,8 +85,38 @@ export class FinanceService extends BaseService {
         const operational = operationalResult.data;
         const monthlyOperational = operational.grandTotal.monthlyCost;
 
+        const infrastructureResult =
+          await this.infrastructureService.getInfrastructureStatus(teamId);
+
+        let monthlyInfrastructureMaintenance = 0;
+
+        if (Result.isSuccess(infrastructureResult)) {
+          const infrastructure = infrastructureResult.data;
+          monthlyInfrastructureMaintenance = infrastructure.totalMonthlyCost;
+
+          this.logger.info(
+            `Infrastructure maintenance: €${monthlyInfrastructureMaintenance.toLocaleString()}/month`
+          );
+
+          if (monthlyInfrastructureMaintenance > 0) {
+            await this.repos.financial.addRecord({
+              teamId,
+              seasonId,
+              date: currentDate,
+              type: "expense",
+              category: FinancialCategory.INFRASTRUCTURE,
+              amount: monthlyInfrastructureMaintenance,
+              description: `Monthly Infrastructure Maintenance (Stadium: ${infrastructure.stadium.quality}, Training: ${infrastructure.trainingCenter.quality}, Youth: ${infrastructure.youthAcademy.quality})`,
+            });
+          }
+        }
+
         const totalExpense =
-          monthlyPlayerWages + monthlyStaffWages + monthlyOperational;
+          monthlyPlayerWages +
+          monthlyStaffWages +
+          monthlyOperational +
+          monthlyInfrastructureMaintenance;
+
         const currentBudget = team.budget || 0;
         const newBudget = currentBudget - totalExpense;
 
@@ -282,9 +314,22 @@ export class FinanceService extends BaseService {
 
         const annualOperational = operationalResult.data.grandTotal.annualCost;
 
+        const infrastructureResult =
+          await this.infrastructureService.getInfrastructureStatus(teamId);
+
+        let annualInfrastructure = 0;
+        if (Result.isSuccess(infrastructureResult)) {
+          annualInfrastructure = infrastructureResult.data.totalAnnualCost;
+        }
+
         const salaryToRevenueRatio =
           annualRevenue > 0 ? annualWages / annualRevenue : 1.0;
-        const annualLoss = annualWages + annualOperational - annualRevenue;
+
+        const annualLoss =
+          annualWages +
+          annualOperational +
+          annualInfrastructure -
+          annualRevenue;
 
         const ffpConfig = FinancialBalance.FINANCIAL_FAIR_PLAY;
         const violations: string[] = [];
@@ -352,13 +397,19 @@ export class FinanceService extends BaseService {
           throw new Error(`Team ${teamId} not found`);
         }
 
-        const [wageBillResult, operationalResult, revenueResult, ffpResult] =
-          await Promise.all([
-            this.contractService.calculateMonthlyWageBill(teamId),
-            this.operationalCosts.calculateOperationalCosts(teamId, 2),
-            this.revenueService.projectAnnualRevenue(teamId, 10, 19),
-            this.checkFFPCompliance(teamId, seasonId),
-          ]);
+        const [
+          wageBillResult,
+          operationalResult,
+          revenueResult,
+          ffpResult,
+          infrastructureResult,
+        ] = await Promise.all([
+          this.contractService.calculateMonthlyWageBill(teamId),
+          this.operationalCosts.calculateOperationalCosts(teamId, 2),
+          this.revenueService.projectAnnualRevenue(teamId, 10, 19),
+          this.checkFFPCompliance(teamId, seasonId),
+          this.infrastructureService.getInfrastructureStatus(teamId),
+        ]);
 
         const wageBill = Result.isSuccess(wageBillResult)
           ? wageBillResult.data
@@ -382,9 +433,15 @@ export class FinanceService extends BaseService {
           ? ffpResult.data.compliant
           : false;
 
+        const infrastructure = Result.isSuccess(infrastructureResult)
+          ? infrastructureResult.data
+          : { totalMonthlyCost: 0, totalAnnualCost: 0 };
+
         const monthlyIncome = Math.round(revenue / 12);
         const monthlyExpenses =
-          wageBill.total + operational.grandTotal.monthlyCost;
+          wageBill.total +
+          operational.grandTotal.monthlyCost +
+          infrastructure.totalMonthlyCost;
 
         const financialHealth =
           team.budget >= 0 && ffp
@@ -406,6 +463,10 @@ export class FinanceService extends BaseService {
           operationalCosts: {
             annual: operational.grandTotal.annualCost,
             monthly: operational.grandTotal.monthlyCost,
+          },
+          infrastructureCosts: {
+            annual: infrastructure.totalAnnualCost,
+            monthly: infrastructure.totalMonthlyCost,
           },
           projectedAnnualRevenue: revenue,
           ffpCompliance: ffp,

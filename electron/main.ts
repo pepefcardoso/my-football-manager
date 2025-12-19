@@ -844,6 +844,129 @@ function registerIpcHandlers() {
   );
 
   ipcMain.handle(
+    "infrastructure:compareWithLeague",
+    async (_, teamId: number) => {
+      const result =
+        await serviceContainer.competitiveAnalysis.compareWithLeague(teamId);
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle("infrastructure:getBenchmarks", async (_, teamId: number) => {
+    const result = await serviceContainer.competitiveAnalysis.getBenchmarks(
+      teamId
+    );
+    return Result.unwrapOr(result, []);
+  });
+
+  ipcMain.handle(
+    "infrastructure:getTopRivals",
+    async (_, { teamId, limit }: { teamId: number; limit?: number }) => {
+      const result = await serviceContainer.competitiveAnalysis.getTopRivals(
+        teamId,
+        limit
+      );
+      return Result.unwrapOr(result, []);
+    }
+  );
+
+  ipcMain.handle(
+    "infrastructure:getEvolutionData",
+    async (
+      _,
+      {
+        teamId,
+        startDate,
+        endDate,
+      }: { teamId: number; startDate?: string; endDate?: string }
+    ) => {
+      const result =
+        await serviceContainer.infrastructureHistory.getEvolutionData(
+          teamId,
+          startDate,
+          endDate
+        );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle(
+    "infrastructure:getChartData",
+    async (
+      _,
+      {
+        teamId,
+        metric,
+        startDate,
+        endDate,
+      }: {
+        teamId: number;
+        metric: "capacity" | "quality" | "fanBase" | "utilization";
+        startDate?: string;
+        endDate?: string;
+      }
+    ) => {
+      const result = await serviceContainer.infrastructureHistory.getChartData(
+        teamId,
+        metric,
+        startDate,
+        endDate
+      );
+      return Result.unwrapOr(result, []);
+    }
+  );
+
+  ipcMain.handle(
+    "infrastructure:getFFPReport",
+    async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
+      const result =
+        await serviceContainer.ffpDepreciation.getFFPDepreciationReport(
+          teamId,
+          seasonId
+        );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle(
+    "infrastructure:getInvestmentAllowance",
+    async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
+      const result =
+        await serviceContainer.ffpDepreciation.getInvestmentAllowance(
+          teamId,
+          seasonId
+        );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle(
+    "infrastructure:analyzeInvestmentImpact",
+    async (
+      _,
+      {
+        teamId,
+        seasonId,
+        proposedCost,
+      }: { teamId: number; seasonId: number; proposedCost: number }
+    ) => {
+      const result =
+        await serviceContainer.ffpDepreciation.analyzeInvestmentImpact(
+          teamId,
+          seasonId,
+          proposedCost
+        );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle("infrastructure:getValuation", async (_, teamId: number) => {
+    const result =
+      await serviceContainer.ffpDepreciation.getInfrastructureValuation(teamId);
+    return Result.unwrapOr(result, null);
+  });
+
+  ipcMain.handle(
     "scouting:getScoutedPlayer",
     async (_, { playerId, teamId }) => {
       const result = await serviceContainer.scouting.getScoutedPlayer(

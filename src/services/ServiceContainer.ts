@@ -1,4 +1,3 @@
-import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { repositoryContainer } from "../repositories/RepositoryContainer";
 import { UnitOfWork } from "../repositories/UnitOfWork";
 import { CalendarService } from "./CalendarService";
@@ -40,9 +39,15 @@ import {
   type FinancialCrisisPayload,
   type MatchFinishedPayload,
   type TransferCompletedPayload,
+  type StadiumCapacityPressuredPayload,
+  type InfrastructureDegradedPayload,
 } from "../domain/GameEventTypes";
 import { TransferValidator } from "../domain/validators/TransferValidator";
 import { YouthAcademyService } from "./YouthAcademyService";
+import { CompetitiveAnalysisService } from "./CompetitiveAnalysisService";
+import { InfrastructureHistoryService } from "./InfrastructureHistoryService";
+import { FFPDepreciationService } from "./FFPDepreciationService";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: IUnitOfWork;
@@ -76,6 +81,9 @@ export class ServiceContainer implements IServiceContainer {
   public readonly operationalCosts: OperationalCostsService;
   public readonly revenueService: RevenueService;
   public readonly youthAcademy: YouthAcademyService;
+  public readonly competitiveAnalysis: CompetitiveAnalysisService;
+  public readonly infrastructureHistory: InfrastructureHistoryService;
+  public readonly ffpDepreciation: FFPDepreciationService;
 
   constructor(
     repos: IRepositoryContainer,
@@ -92,7 +100,6 @@ export class ServiceContainer implements IServiceContainer {
     this.contract = new ContractService(repos, this.eventBus);
     this.financialHealth = new FinancialHealthChecker(repos, this.eventBus);
     this.calendar = new CalendarService(repos);
-    this.infrastructure = new InfrastructureService(repos);
     this.marketing = new MarketingService(repos);
     this.player = new PlayerService(repos);
     this.scouting = new ScoutingService(repos);
@@ -110,11 +117,18 @@ export class ServiceContainer implements IServiceContainer {
     this.operationalCosts = new OperationalCostsService(repos);
     this.revenueService = new RevenueService(repos);
 
+    this.competitiveAnalysis = new CompetitiveAnalysisService(repos);
+    this.infrastructureHistory = new InfrastructureHistoryService(repos);
+    this.ffpDepreciation = new FFPDepreciationService(repos);
+
+    this.infrastructure = new InfrastructureService(repos, this.eventBus);
+
     this.finance = new FinanceService(
       repos,
       this.operationalCosts,
       this.revenueService,
-      this.contract
+      this.contract,
+      this.infrastructure
     );
 
     this.seasonTransition = new SeasonTransitionManager(
@@ -208,6 +222,38 @@ export class ServiceContainer implements IServiceContainer {
         console.log(
           `[EVENTO] Transferência Finalizada: Jogador ${payload.playerId} de ${payload.fromTeamId} para ${payload.toTeamId} por ${payload.fee}`
         );
+      }
+    );
+
+    // **NOVOS EVENTOS**
+    this.eventBus.subscribe(
+      GameEventType.STADIUM_CAPACITY_PRESSURED,
+      async (payload: StadiumCapacityPressuredPayload) => {
+        console.log(
+          `🚨 [CAPACITY ALERT] Team ${payload.teamId}: Stadium at ${(
+            payload.utilizationRate * 100
+          ).toFixed(1)}% capacity. ` +
+            `Lost revenue: €${payload.lostRevenue.toLocaleString()}/season. ` +
+            `Recommended expansion: ${
+              payload.recommendedExpansion
+            } seats (€${payload.expansionCost.toLocaleString()})`
+        );
+
+        // TODO: Create scheduled event or notification for user
+      }
+    );
+
+    this.eventBus.subscribe(
+      GameEventType.INFRASTRUCTURE_DEGRADED,
+      async (payload: InfrastructureDegradedPayload) => {
+        console.log(
+          `⚠️ [DEGRADATION ALERT] Team ${payload.teamId}: ${payload.facilityType} quality dropped to ${payload.currentQuality} ` +
+            `(below minimum ${
+              payload.minimumQuality
+            }). Annual maintenance: €${payload.maintenanceCost.toLocaleString()}`
+        );
+
+        // TODO: Create scheduled event or notification for user
       }
     );
   }

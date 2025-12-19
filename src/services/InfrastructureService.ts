@@ -17,10 +17,15 @@ import type {
   FanBaseProjection,
   CapacityAnalysis,
 } from "../domain/types/InfrastructureTypes";
+import type { GameEventBus } from "../lib/GameEventBus";
+import { GameEventType } from "../domain/GameEventTypes";
 
 export class InfrastructureService extends BaseService {
-  constructor(repositories: IRepositoryContainer) {
+  private eventBus: GameEventBus;
+
+  constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
     super(repositories, "InfrastructureService");
+    this.eventBus = eventBus;
   }
 
   async getInfrastructureStatus(
@@ -39,7 +44,6 @@ export class InfrastructureService extends BaseService {
       const stadiumQuality = team.stadiumQuality || 50;
       const fanSatisfaction = team.fanSatisfaction || 50;
 
-      // TODO Estimate average attendance (simplified - in real system, get from match history)
       const averageAttendance = Math.round(
         stadiumCapacity * (0.3 + (fanSatisfaction / 100) * 0.7)
       );
@@ -51,12 +55,37 @@ export class InfrastructureService extends BaseService {
           stadiumCapacity
         );
 
+      if (capacityPressure.isPressured) {
+        const expansionCost = InfrastructureCalculator.calculateExpansionCost(
+          stadiumCapacity,
+          InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK,
+          stadiumQuality
+        );
+
+        await this.eventBus.publish(GameEventType.STADIUM_CAPACITY_PRESSURED, {
+          teamId,
+          currentCapacity: stadiumCapacity,
+          averageAttendance,
+          utilizationRate,
+          lostRevenue: Math.round(capacityPressure.revenueLoss * 19 * 50),
+          recommendedExpansion:
+            InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK,
+          expansionCost,
+        });
+
+        this.logger.warn(
+          `🚨 Stadium capacity pressured for team ${teamId}: ${(
+            utilizationRate * 100
+          ).toFixed(1)}% utilization`
+        );
+      }
+
       const stadiumMaintenance =
         InfrastructureCalculator.calculateAnnualMaintenance(
           "stadium",
           stadiumCapacity,
           stadiumQuality,
-          { matchesPlayed: 19 } // TODO REAL VALUES
+          { matchesPlayed: 19 }
         );
 
       const stadiumExpansionCost =
@@ -105,11 +134,24 @@ export class InfrastructureService extends BaseService {
           youthQuality
         );
 
+      await this.checkInfrastructureDegradation(
+        teamId,
+        {
+          stadium: stadiumQuality,
+          training: trainingQuality,
+          youth: youthQuality,
+        },
+        {
+          stadium: stadiumMaintenance,
+          training: trainingMaintenance,
+          youth: youthMaintenance,
+        }
+      );
+
       const totalAnnualCost =
         stadiumMaintenance + trainingMaintenance + youthMaintenance;
       const totalMonthlyCost = Math.round(totalAnnualCost / 12);
 
-      // TODO REALISTIC FANBASE FOR EACH TEAM
       const currentFanBase = team.fanBase || stadiumCapacity * 2.5;
       const projectedFanBase = InfrastructureCalculator.projectFanBaseGrowth(
         currentFanBase,
@@ -188,6 +230,56 @@ export class InfrastructureService extends BaseService {
     });
   }
 
+  private async checkInfrastructureDegradation(
+    teamId: number,
+    qualities: { stadium: number; training: number; youth: number },
+    maintenanceCosts: { stadium: number; training: number; youth: number }
+  ): Promise<void> {
+    const minQuality = 30;
+
+    if (qualities.stadium < minQuality) {
+      await this.eventBus.publish(GameEventType.INFRASTRUCTURE_DEGRADED, {
+        teamId,
+        facilityType: "stadium",
+        currentQuality: qualities.stadium,
+        minimumQuality: minQuality,
+        maintenanceCost: maintenanceCosts.stadium,
+      });
+
+      this.logger.warn(
+        `⚠️ Stadium quality degraded for team ${teamId}: ${qualities.stadium}/100`
+      );
+    }
+
+    if (qualities.training < minQuality) {
+      await this.eventBus.publish(GameEventType.INFRASTRUCTURE_DEGRADED, {
+        teamId,
+        facilityType: "training",
+        currentQuality: qualities.training,
+        minimumQuality: minQuality,
+        maintenanceCost: maintenanceCosts.training,
+      });
+
+      this.logger.warn(
+        `⚠️ Training center quality degraded for team ${teamId}: ${qualities.training}/100`
+      );
+    }
+
+    if (qualities.youth < minQuality) {
+      await this.eventBus.publish(GameEventType.INFRASTRUCTURE_DEGRADED, {
+        teamId,
+        facilityType: "youth",
+        currentQuality: qualities.youth,
+        minimumQuality: minQuality,
+        maintenanceCost: maintenanceCosts.youth,
+      });
+
+      this.logger.warn(
+        `⚠️ Youth academy quality degraded for team ${teamId}: ${qualities.youth}/100`
+      );
+    }
+  }
+
   async expandStadium(
     teamId: number,
     seasonId: number
@@ -248,7 +340,6 @@ export class InfrastructureService extends BaseService {
           description: `Expansão do Estádio (+${InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK} lugares)`,
         });
 
-        // TODO Update fan base (expansion increases potential)
         const newFanBase = Math.round(
           (team.fanBase || currentCapacity * 2.5) * 1.05
         );
@@ -391,9 +482,6 @@ export class InfrastructureService extends BaseService {
     );
   }
 
-  /**
-   * Get upgrade cost preview
-   */
   async getUpgradeCost(
     teamId: number,
     facilityType: FacilityType,
@@ -445,7 +533,6 @@ export class InfrastructureService extends BaseService {
       const currentCapacity = team.stadiumCapacity || 10000;
       const fanSatisfaction = team.fanSatisfaction || 50;
 
-      // TODO Simplified attendance calculation
       const averageAttendance = Math.round(
         currentCapacity * (0.3 + (fanSatisfaction / 100) * 0.7)
       );
@@ -477,7 +564,7 @@ export class InfrastructureService extends BaseService {
       const breakEvenDate = currentDate.toISOString().split("T")[0];
 
       const lostRevenue = capacityPressure.isPressured
-        ? (utilizationRate - 0.9) * currentCapacity * 50 * 19 // TODO REAL VALUES
+        ? (utilizationRate - 0.9) * currentCapacity * 50 * 19
         : 0;
 
       return {
@@ -500,9 +587,6 @@ export class InfrastructureService extends BaseService {
     });
   }
 
-  /**
-   * Project fan base growth
-   */
   async projectFanBase(
     teamId: number,
     leaguePosition: number

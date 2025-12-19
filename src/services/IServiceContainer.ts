@@ -28,6 +28,9 @@ import type { ValuationService } from "./finance/ValuationService";
 import type { OperationalCostsService } from "./finance/OperationalCostsService";
 import type { RevenueService } from "./finance/RevenueService";
 import type { YouthAcademyService } from "./YouthAcademyService";
+import type { CompetitiveAnalysisService } from "./CompetitiveAnalysisService";
+import type { InfrastructureHistoryService } from "./InfrastructureHistoryService";
+import type { FFPDepreciationService } from "./FFPDepreciationService";
 
 export interface IServiceContainer {
   unitOfWork: IUnitOfWork;
@@ -60,4 +63,7 @@ export interface IServiceContainer {
   operationalCosts: OperationalCostsService;
   revenueService: RevenueService;
   youthAcademy: YouthAcademyService;
+  competitiveAnalysis: CompetitiveAnalysisService;
+  infrastructureHistory: InfrastructureHistoryService;
+  ffpDepreciation: FFPDepreciationService;
 }

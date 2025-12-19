@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { InfrastructureService } from "../services/InfrastructureService";
+import { InfrastructureService } from "../../src/services/InfrastructureService";
 import {
   InfrastructureCalculator,
   InfrastructureEconomics,
-} from "../engine/InfrastructureEconomics";
-import { InfrastructureValidator } from "../domain/validators/InfrastructureValidator";
-import { Result } from "../domain/ServiceResults";
-import type { IRepositoryContainer } from "../repositories/IRepositories";
-import type { Team } from "../domain/models";
+} from "../../src/engine/InfrastructureEconomics";
+import { InfrastructureValidator } from "../../src/domain/validators/InfrastructureValidator";
+import { Result } from "../../src/domain/ServiceResults";
+import type { IRepositoryContainer } from "../../src/repositories/IRepositories";
+import type { Team } from "../../src/domain/models";
 
 describe("InfrastructureService", () => {
   let service: InfrastructureService;
@@ -53,7 +53,7 @@ describe("InfrastructureService", () => {
       );
 
       expect(cost).toBeGreaterThan(0);
-      expect(cost).toBe(Math.round(cost)); // Should be integer
+      expect(cost).toBe(Math.round(cost));
     });
 
     it("should calculate higher cost for larger stadiums", () => {
@@ -80,7 +80,7 @@ describe("InfrastructureService", () => {
         InfrastructureCalculator.calculateQualityUpgradeCost("stadium", 80);
 
       expect(highQualityCost).toBeGreaterThan(lowQualityCost);
-      expect(highQualityCost / lowQualityCost).toBeGreaterThan(2); // Exponential growth
+      expect(highQualityCost / lowQualityCost).toBeGreaterThan(2);
     });
 
     it("should calculate annual maintenance correctly", () => {
@@ -93,7 +93,6 @@ describe("InfrastructureService", () => {
 
       expect(maintenance).toBeGreaterThan(0);
 
-      // Should be reasonable (not astronomical)
       expect(maintenance).toBeLessThan(5000000);
     });
 
@@ -104,12 +103,11 @@ describe("InfrastructureService", () => {
         15000,
         70,
         80,
-        1 // Champion
+        1
       );
 
       expect(projectedFanBase).toBeGreaterThan(currentFanBase);
 
-      // Growth should be reasonable (not 10x in one year)
       expect(projectedFanBase / currentFanBase).toBeLessThan(1.3);
     });
 
@@ -119,8 +117,8 @@ describe("InfrastructureService", () => {
         currentFanBase,
         15000,
         50,
-        30, // Low satisfaction
-        18 // Relegation zone
+        30,
+        18
       );
 
       expect(projectedFanBase).toBeLessThan(currentFanBase);
@@ -128,7 +126,7 @@ describe("InfrastructureService", () => {
 
     it("should detect capacity pressure correctly", () => {
       const result = InfrastructureCalculator.calculateCapacityPressure(
-        14500, // 96.67% utilization
+        14500,
         15000
       );
 
@@ -139,7 +137,7 @@ describe("InfrastructureService", () => {
 
     it("should not flag pressure for lower utilization", () => {
       const result = InfrastructureCalculator.calculateCapacityPressure(
-        12000, // 80% utilization
+        12000,
         15000
       );
 
@@ -183,7 +181,6 @@ describe("InfrastructureService", () => {
 
       const result = InfrastructureValidator.validateUpgrade(context);
 
-      // Should have warnings about low reserve
       expect(result.warnings.length).toBeGreaterThan(0);
       expect(
         result.warnings.some((w) => w.includes("meses de custos operacionais"))
@@ -196,7 +193,7 @@ describe("InfrastructureService", () => {
         facilityType: "stadium" as const,
         upgradeType: "expand_stadium" as const,
         currentBudget: 10000000,
-        currentValue: 74500, // Near max
+        currentValue: 74500,
         upgradeCost: 1000000,
         seasonId: 1,
       };
@@ -216,7 +213,7 @@ describe("InfrastructureService", () => {
         facilityType: "training" as const,
         upgradeType: "upgrade_training_quality" as const,
         currentBudget: 5000000,
-        currentValue: 100, // Already max
+        currentValue: 100,
         upgradeCost: 500000,
         seasonId: 1,
       };
@@ -231,7 +228,7 @@ describe("InfrastructureService", () => {
       const result = InfrastructureValidator.validateExpansion(
         15000,
         5000000,
-        14200, // 94.67% utilization
+        14200,
         1000000
       );
 
@@ -244,7 +241,7 @@ describe("InfrastructureService", () => {
       const result = InfrastructureValidator.validateExpansion(
         20000,
         5000000,
-        12000, // 60% utilization
+        12000,
         1000000
       );
 
@@ -298,7 +295,7 @@ describe("InfrastructureService", () => {
     it("should reject expansion with insufficient budget", async () => {
       mockRepos.teams.findById = vi.fn().mockResolvedValue({
         ...mockTeam,
-        budget: 100000, // Too low
+        budget: 100000,
       });
 
       const result = await service.expandStadium(1, 1);
@@ -341,7 +338,7 @@ describe("InfrastructureService", () => {
     });
 
     it("should project fan base with growth factors", async () => {
-      const result = await service.projectFanBase(1, 3); // Top 3 finish
+      const result = await service.projectFanBase(1, 3);
 
       expect(Result.isSuccess(result)).toBe(true);
 
@@ -371,11 +368,9 @@ describe("InfrastructureService", () => {
         80
       );
 
-      // Small stadium: ~€500k-1M per year
       expect(smallStadium).toBeGreaterThan(200000);
       expect(smallStadium).toBeLessThan(2000000);
 
-      // Large stadium: ~€2-5M per year
       expect(largeStadium).toBeGreaterThan(1000000);
       expect(largeStadium).toBeLessThan(10000000);
     });
@@ -387,18 +382,16 @@ describe("InfrastructureService", () => {
         60
       );
 
-      // Should be €500k-2M for mid-tier expansion
       expect(tier2Cost).toBeGreaterThan(400000);
       expect(tier2Cost).toBeLessThan(3000000);
     });
 
     it("should enforce FFP-compliant spending limits", () => {
-      const annualRevenue = 20000000; // €20M
+      const annualRevenue = 20000000;
       const maxInfraSpend =
         annualRevenue *
         InfrastructureEconomics.VALIDATION.MAX_ANNUAL_INFRASTRUCTURE_SPEND;
 
-      // Max should be 25% of revenue = €5M
       expect(maxInfraSpend).toBe(5000000);
     });
   });
