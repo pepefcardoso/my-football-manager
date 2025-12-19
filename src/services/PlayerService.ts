@@ -2,7 +2,7 @@ import { AttributeCalculator } from "../engine/AttributeCalculator";
 import { Position } from "../domain/enums";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
-import type { ServiceResult } from "./types/ServiceResults";
+import type { ServiceResult } from "../domain/ServiceResults";
 import type { Player } from "../domain/models";
 
 export interface UpdatePlayerConditionInput {

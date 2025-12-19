@@ -1,6 +1,6 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import type { ServiceResult } from "../types/ServiceResults";
+import type { ServiceResult } from "../../domain/ServiceResults";
 import type { TacticsConfig } from "../../domain/models";
 
 export interface UpdateLiveTacticsRequest {

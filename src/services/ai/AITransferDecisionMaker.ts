@@ -1,7 +1,7 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import type { ServiceResult } from "../types/ServiceResults";
-import { Result } from "../types/ServiceResults";
+import type { ServiceResult } from "../../domain/ServiceResults";
+import { Result } from "../../domain/ServiceResults";
 import {
   TransferValuation,
   type EvaluationResult,

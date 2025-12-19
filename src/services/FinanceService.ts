@@ -1,8 +1,8 @@
 import { FinancialCategory } from "../domain/enums";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
-import type { ServiceResult } from "./types/ServiceResults";
-import { Result } from "./types/ServiceResults";
+import type { ServiceResult } from "../domain/ServiceResults";
+import { Result } from "../domain/ServiceResults";
 import type { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
 import type {
   ProcessExpensesInput,

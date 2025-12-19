@@ -1,9 +1,5 @@
+import type { EnginePlayer, EnginePosition, EngineTeam } from "../domain/EngineTypes";
 import type { TeamStrength } from "../domain/types";
-import type {
-  EngineTeam,
-  EnginePosition,
-  EnginePlayer,
-} from "./types/EngineTypes";
 import { GameBalance } from "./GameBalanceConfig";
 
 export class TeamStrengthCalculator {

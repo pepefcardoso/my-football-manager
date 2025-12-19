@@ -1,10 +1,11 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import type { ServiceResult } from "../types/ServiceResults";
-import { Result } from "../types/ServiceResults";
 import { Position } from "../../domain/enums";
 import type { Player } from "../../domain/models";
 import { getBalanceValue } from "../../engine/GameBalanceConfig";
+import { TeamStrengthCalculator } from "../../engine/TeamStrengthCalculator";
+import { DomainToEngineAdapter } from "../../engine/adapters/DomainToEngineAdapter";
+import { Result, type ServiceResult } from "../../domain/ServiceResults";
 
 interface PlayerWithContractInfo extends Player {
   salary: number | undefined;
@@ -49,8 +50,6 @@ export class SquadAnalysisService extends BaseService {
   }
 
   /**
-   * Analisa o elenco completo de um time e identifica necessidades.
-   *
    * @param teamId - ID do time a ser analisado
    * @returns Análise completa do elenco com necessidades priorizadas
    */
@@ -74,7 +73,22 @@ export class SquadAnalysisService extends BaseService {
 
       const averageAge = this.calculateAverageAge(players);
       const averageOverall = this.calculateAverageOverall(players);
-      const teamStrength = this.calculateTeamStrength(players);
+
+      const topPlayers = [...players]
+        .sort((a, b) => b.overall - a.overall)
+        .slice(0, BALANCE_CONFIG.TOP_PLAYERS_COUNT);
+
+      const enginePlayers = topPlayers.map((p) =>
+        DomainToEngineAdapter.toEnginePlayer(p)
+      );
+
+      const strengthResult = TeamStrengthCalculator.calculate({
+        id: teamId.toString(),
+        tacticalBonus: 0,
+        players: enginePlayers,
+      });
+
+      const teamStrength = strengthResult.overall;
 
       const wageRoomAvailable = await this.calculateWageRoom(teamId);
 
@@ -89,7 +103,7 @@ export class SquadAnalysisService extends BaseService {
       const surplus = this.identifySurplus(positionCounts);
 
       this.logger.info(
-        `✅ Análise concluída: ${needs.length} necessidade(s), ${surplus.length} excesso(s)`
+        `✅ Análise concluída: ${needs.length} necessidade(s), ${surplus.length} excesso(s). Força calculada (Engine): ${teamStrength}`
       );
 
       return {
@@ -108,8 +122,6 @@ export class SquadAnalysisService extends BaseService {
   }
 
   /**
-   * Avalia se um jogador específico serve para preencher uma necessidade do time.
-   *
    * @param playerId - ID do jogador candidato
    * @param teamId - ID do time que possui a necessidade
    * @returns Avaliação de fit do jogador para as necessidades do time
@@ -174,9 +186,6 @@ export class SquadAnalysisService extends BaseService {
   }
 
   /**
-   * Identifica jogadores do próprio elenco que estão em posições excedentes.
-   * Útil para a IA decidir quem vender.
-   *
    * @param teamId - ID do time
    * @returns Lista de jogadores que podem ser vendidos
    */
@@ -232,8 +241,6 @@ export class SquadAnalysisService extends BaseService {
   }
 
   /**
-   * Verifica se há orçamento e espaço salarial para uma contratação.
-   *
    * @param teamId - ID do time
    * @param estimatedFee - Valor estimado da transferência
    * @param estimatedWage - Salário anual estimado
@@ -362,20 +369,7 @@ export class SquadAnalysisService extends BaseService {
     return Math.round(sum / players.length);
   }
 
-  private calculateTeamStrength(players: Player[]): number {
-    const top11 = [...players]
-      .sort((a, b) => b.overall - a.overall)
-      .slice(0, BALANCE_CONFIG.TOP_PLAYERS_COUNT);
-
-    if (top11.length === 0) return 0;
-
-    const sum = top11.reduce((acc, p) => acc + p.overall, 0);
-    return Math.round(sum / top11.length);
-  }
-
   /**
-   * DOCUMENTAÇÃO: Calcula o "espaço salarial" disponível para contratações.
-   * Assume que o limite mensal de salários é MAX_WAGE_RATIO do orçamento total do clube.
    * @param teamId ID do time
    * @returns O valor em moeda do espaço salarial mensal restante.
    */
@@ -700,8 +694,6 @@ export class SquadAnalysisService extends BaseService {
   }
 
   /**
-   * DOCUMENTAÇÃO: Verifica se o contrato de um jogador está a expirar (6 meses ou menos).
-   * Utilizado pela IA para decidir quem vender antes de sair de graça.
    * @param player O objeto Player a ser verificado.
    * @returns true se o contrato estiver expirando, false caso contrário.
    */

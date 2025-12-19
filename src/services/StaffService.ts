@@ -3,7 +3,7 @@ import type { TeamStaffImpact } from "../domain/types";
 import type { Staff } from "../domain/models";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
-import type { ServiceResult } from "./types/ServiceResults";
+import type { ServiceResult } from "../domain/ServiceResults";
 import { getBalanceValue } from "../engine/GameBalanceConfig";
 
 const STAFF_CONFIG = getBalanceValue("STAFF");

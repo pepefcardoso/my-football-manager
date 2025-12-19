@@ -1,8 +1,8 @@
 import { BaseService } from "./BaseService";
 import { CalendarService } from "./CalendarService";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { Result } from "./types/ServiceResults";
-import type { ServiceResult } from "./types/ServiceResults";
+import { Result } from "../domain/ServiceResults";
+import type { ServiceResult } from "../domain/ServiceResults";
 import type { SeasonSelect } from "../repositories/SeasonRepository";
 import type { Team, CompetitionStanding } from "../domain/models";
 

@@ -5,7 +5,7 @@ import type {
   PlayerCompetitionStats,
 } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
-import type { ServiceResult } from "./types/ServiceResults";
+import type { ServiceResult } from "../domain/ServiceResults";
 import { getBalanceValue } from "../engine/GameBalanceConfig";
 
 const MATCH_CONFIG = getBalanceValue("MATCH");

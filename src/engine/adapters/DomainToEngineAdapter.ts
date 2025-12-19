@@ -5,7 +5,7 @@ import type {
   EngineAttributes,
   EnginePosition,
   EngineCondition,
-} from "../types/EngineTypes";
+} from "../../domain/EngineTypes";
 
 export class DomainToEngineAdapter {
   /**

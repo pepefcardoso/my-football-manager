@@ -1,5 +1,5 @@
 import { BaseService } from "./BaseService";
-import type { ServiceResult } from "./types/ServiceResults";
+import type { ServiceResult } from "../domain/ServiceResults";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { RandomEngine } from "../engine/RandomEngine";
 import { InjuryEngine } from "../engine/InjuryEngine";

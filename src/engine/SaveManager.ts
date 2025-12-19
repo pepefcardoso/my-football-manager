@@ -1,7 +1,7 @@
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { Logger } from "../lib/Logger";
-import { Result } from "../services/types/ServiceResults";
-import type { ServiceResult } from "../services/types/ServiceResults";
+import { Result } from "../domain/ServiceResults";
+import type { ServiceResult } from "../domain/ServiceResults";
 import type {
   GameSave,
   CreateSaveOptions,

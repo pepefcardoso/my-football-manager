@@ -1,6 +1,6 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import { Result, type ServiceResult } from "../types/ServiceResults";
+import { Result, type ServiceResult } from "../../domain/ServiceResults";
 import { RandomEngine } from "../../engine/RandomEngine";
 import type {
   NarrativeEvent,

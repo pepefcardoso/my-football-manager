@@ -1,11 +1,15 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import type { ServiceResult } from "../types/ServiceResults";
 import type { MatchResult } from "../../domain/types";
+import type { StatsService } from "../StatsService";
+import type { ServiceResult } from "../../domain/ServiceResults";
 
 export class MatchResultProcessor extends BaseService {
-  constructor(repositories: IRepositoryContainer) {
+  private statsService: StatsService;
+
+  constructor(repositories: IRepositoryContainer, statsService: StatsService) {
     super(repositories, "MatchResultProcessor");
+    this.statsService = statsService;
   }
 
   async processResult(
@@ -25,6 +29,16 @@ export class MatchResultProcessor extends BaseService {
           attendance,
           ticketRevenue
         );
+
+        const match = await this.repos.matches.findById(matchId);
+        if (match && match.competitionId && match.seasonId) {
+          await this.statsService.processMatchStats(
+            matchId,
+            match.competitionId,
+            match.seasonId,
+            result
+          );
+        }
 
         await this.saveMatchEvents(matchId, result);
         await this.updatePlayerConditions(result);

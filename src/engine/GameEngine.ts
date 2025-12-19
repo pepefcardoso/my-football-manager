@@ -3,7 +3,7 @@ import type { MatchResult, GameEvent } from "../domain/types";
 import { FinanceService } from "../services/FinanceService";
 import { ServiceContainer } from "../services/ServiceContainer";
 import { Logger } from "../lib/Logger";
-import { Result, type ServiceResult } from "../services/types/ServiceResults";
+import { Result, type ServiceResult } from "../domain/ServiceResults";
 import { TimeEngine } from "./TimeEngine";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import type { GameSave, SaveValidationResult } from "../domain/GameSaveTypes";

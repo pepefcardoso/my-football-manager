@@ -88,9 +88,9 @@ export class ServiceContainer implements IServiceContainer {
     this.unitOfWork = unitOfWork || new UnitOfWork();
     this.eventBus = eventBus || new GameEventBus();
     this.financialPenalty = new FinancialPenaltyService(repos);
-    this.matchResult = new MatchResultProcessor(repos);
-    this.cupProgression = new CupProgressionManager(repos);
     this.stats = new StatsService(repos);
+    this.matchResult = new MatchResultProcessor(repos, this.stats);
+    this.cupProgression = new CupProgressionManager(repos);
     this.contract = new ContractService(repos, this.eventBus);
     this.financialHealth = new FinancialHealthChecker(repos, this.eventBus);
     this.calendar = new CalendarService(repos);

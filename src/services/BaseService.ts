@@ -1,7 +1,7 @@
 import { Logger } from "../lib/Logger";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
-import { Result, ServiceErrorType } from "./types/ServiceResults";
-import type { ServiceResult } from "./types/ServiceResults";
+import { Result, ServiceErrorType } from "../domain/ServiceResults";
+import type { ServiceResult } from "../domain/ServiceResults";
 
 export interface ServiceConfig {
   enableValidation?: boolean;
