@@ -1,6 +1,6 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import { FinancialThresholds } from "../config/ServiceConstants";
+import { FinancialBalance } from "../../engine/FinancialBalanceConfig";
 import { Result, type ServiceResult } from "../types/ServiceResults";
 import { GameEventBus } from "../events/GameEventBus";
 import { GameEventType } from "../events/GameEventTypes";
@@ -32,7 +32,7 @@ export class FinancialHealthChecker extends BaseService {
       if (currentBudget < 0) {
         const debtAmount = Math.abs(currentBudget);
         severity =
-          debtAmount > FinancialThresholds.CRITICAL_DEBT
+          debtAmount > FinancialBalance.FINANCE.CRITICAL_DEBT
             ? "critical"
             : "warning";
 

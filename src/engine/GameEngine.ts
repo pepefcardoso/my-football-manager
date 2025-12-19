@@ -197,7 +197,7 @@ export class GameEngine {
           }
         }
 
-        const eventResult = await txServices.eventService.processDailyEvents(
+        const eventResult = await txServices.narrativeService.processDailyEvents(
           teamId,
           newDateStr
         );

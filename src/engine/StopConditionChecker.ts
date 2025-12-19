@@ -1,6 +1,6 @@
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { TransferStatus } from "../domain/enums";
-import { FinancialThresholds } from "../services/config/ServiceConstants";
+import { FinancialBalance } from "./FinancialBalanceConfig";
 
 export interface StopCondition {
   shouldStop: boolean;
@@ -94,7 +94,7 @@ export class StopConditionChecker {
   private async checkFinancialCrisis(teamId: number): Promise<StopCondition> {
     const team = await this.repos.teams.findById(teamId);
 
-    if (team && team.budget < -FinancialThresholds.CRITICAL_DEBT) {
+    if (team && team.budget < -FinancialBalance.FINANCE.CRITICAL_DEBT) {
       return {
         shouldStop: true,
         reason: "financial_crisis",

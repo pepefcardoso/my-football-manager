@@ -7,7 +7,7 @@ import type { ServiceResult } from "./types/ServiceResults";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { GameEventBus } from "./events/GameEventBus";
 import { GameEventType } from "./events/GameEventTypes";
-import { FinancialOperationValidator } from "./validators/FinancialOperationValidator";
+import { FinancialOperationValidator } from "../domain/validators/FinancialOperationValidator";
 
 export interface WageBillDetails {
   playerWages: number;

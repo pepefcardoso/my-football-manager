@@ -22,7 +22,7 @@ import type { TransferService } from "./transfer/TransferService";
 import type { SquadAnalysisService } from "./ai/SquadAnalysisService";
 import type { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
 import type { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
-import type { EventService } from "./narrative/EventService";
+import type { NarrativeService } from "./narrative/NarrativeService";
 import type { MatchTacticsManager } from "./match/MatchTacticsManager";
 import type { MatchSubstitutionManager } from "./match/MatchSubstitutionManager";
 
@@ -51,7 +51,7 @@ export interface IServiceContainer {
   squadAnalysis: SquadAnalysisService;
   aiTransferDecisionMaker: AITransferDecisionMaker;
   dailyTransferProcessor: DailyTransferProcessor;
-  eventService: EventService;
+  narrativeService: NarrativeService;
   matchTactics: MatchTacticsManager;
   matchSubstitution: MatchSubstitutionManager;
 }

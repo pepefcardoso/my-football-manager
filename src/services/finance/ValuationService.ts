@@ -30,9 +30,9 @@ export interface SalaryCalculationResult {
   };
 }
 
-export class SalaryCalculatorService extends BaseService {
+export class ValuationService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    super(repositories, "SalaryCalculatorService");
+    super(repositories, "ValuationService");
   }
 
   async calculatePlayerSalary(
@@ -145,7 +145,6 @@ export class SalaryCalculatorService extends BaseService {
     annualSalary: number
   ): number {
     const bonuses = FinancialBalance.CONTRACT_ECONOMICS.PERFORMANCE_BONUSES;
-
     let potential = 0;
 
     if (position === "FW") {
@@ -160,71 +159,62 @@ export class SalaryCalculatorService extends BaseService {
     }
 
     potential += bonuses.WIN_BONUS * 20;
-
     return Math.round(potential);
   }
 
   private determineLeagueTier(team: Team): LeagueTier {
     const reputation = team.reputation || 0;
-
     if (reputation >= 7000) return "TIER_1";
     if (reputation >= 4000) return "TIER_2";
     return "TIER_3";
   }
 
-  async calculateTeamWageBill(teamId: number): Promise<
+  async estimateSquadMarketWageValue(teamId: number): Promise<
     ServiceResult<{
       totalGrossAnnual: number;
-      totalNetAnnual: number;
       totalEmployerCost: number;
       averageSalary: number;
-      highestEarner: number;
       playerCount: number;
     }>
   > {
-    return this.execute("calculateTeamWageBill", teamId, async (teamId) => {
-      const players = await this.repos.players.findByTeamId(teamId);
+    return this.execute(
+      "estimateSquadMarketWageValue",
+      teamId,
+      async (teamId) => {
+        const players = await this.repos.players.findByTeamId(teamId);
 
-      if (players.length === 0) {
+        if (players.length === 0) {
+          return {
+            totalGrossAnnual: 0,
+            totalEmployerCost: 0,
+            averageSalary: 0,
+            playerCount: 0,
+          };
+        }
+
+        let totalGross = 0;
+        let totalCost = 0;
+
+        for (const player of players) {
+          const salaryResult = await this.calculatePlayerSalary(
+            player.id,
+            teamId,
+            false
+          );
+
+          if (Result.isSuccess(salaryResult)) {
+            totalGross += salaryResult.data.grossAnnualSalary;
+            totalCost += salaryResult.data.employerTotalCost;
+          }
+        }
+
         return {
-          totalGrossAnnual: 0,
-          totalNetAnnual: 0,
-          totalEmployerCost: 0,
-          averageSalary: 0,
-          highestEarner: 0,
-          playerCount: 0,
+          totalGrossAnnual: totalGross,
+          totalEmployerCost: totalCost,
+          averageSalary: Math.round(totalGross / players.length),
+          playerCount: players.length,
         };
       }
-
-      let totalGross = 0;
-      let totalNet = 0;
-      let totalCost = 0;
-      let highest = 0;
-
-      for (const player of players) {
-        const salaryResult = await this.calculatePlayerSalary(
-          player.id,
-          teamId,
-          false
-        );
-
-        if (Result.isSuccess(salaryResult)) {
-          const salary = salaryResult.data;
-          totalGross += salary.grossAnnualSalary;
-          totalNet += salary.netAnnualSalary;
-          totalCost += salary.employerTotalCost;
-          highest = Math.max(highest, salary.grossAnnualSalary);
-        }
-      }
-
-      return {
-        totalGrossAnnual: totalGross,
-        totalNetAnnual: totalNet,
-        totalEmployerCost: totalCost,
-        averageSalary: Math.round(totalGross / players.length),
-        highestEarner: highest,
-        playerCount: players.length,
-      };
-    });
+    );
   }
 }

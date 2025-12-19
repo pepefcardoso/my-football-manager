@@ -11,11 +11,11 @@ import { GameEventType } from "../events/GameEventTypes";
 import type { GameEventBus } from "../events/GameEventBus";
 import { FinancialCategory } from "../../domain/enums";
 
-export class EventService extends BaseService {
+export class NarrativeService extends BaseService {
   private eventBus: GameEventBus;
 
   constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
-    super(repositories, "EventService");
+    super(repositories, "NarrativeService");
     this.eventBus = eventBus;
   }
 

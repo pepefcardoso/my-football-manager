@@ -1,4 +1,4 @@
-import { MatchRevenueConfig } from "../../config/ServiceConstants";
+import { GameBalance } from "../../../engine/GameBalanceConfig";
 import type {
   IRevenueCalculationStrategy,
   RevenueContext,
@@ -9,12 +9,14 @@ export abstract class BaseRevenueStrategy
   implements IRevenueCalculationStrategy
 {
   public calculateRevenue(context: RevenueContext): RevenueResult {
+    const REVENUE_CONFIG = GameBalance.MATCH.REVENUE;
+
     const matchImportance = this.calculateImportance(context);
 
     const satisfactionMultiplier = Math.max(
-      MatchRevenueConfig.MIN_SATISFACTION_MULTIPLIER,
+      REVENUE_CONFIG.MIN_SATISFACTION_MULTIPLIER,
       Math.min(
-        MatchRevenueConfig.MAX_SATISFACTION_MULTIPLIER,
+        REVENUE_CONFIG.MAX_SATISFACTION_MULTIPLIER,
         context.fanSatisfaction / 100
       )
     );
@@ -23,8 +25,8 @@ export abstract class BaseRevenueStrategy
     const expectedAttendance = baseAttendance * matchImportance;
 
     const randomFactor =
-      MatchRevenueConfig.ATTENDANCE_RANDOM_FACTOR_BASE +
-      Math.random() * MatchRevenueConfig.ATTENDANCE_RANDOM_VARIANCE;
+      REVENUE_CONFIG.ATTENDANCE_RANDOM_FACTOR_BASE +
+      Math.random() * REVENUE_CONFIG.ATTENDANCE_RANDOM_VARIANCE;
 
     const attendance = Math.round(
       Math.min(context.stadiumCapacity, expectedAttendance * randomFactor)

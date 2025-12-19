@@ -8,7 +8,7 @@ import {
   type LeagueTier,
 } from "../../engine/FinancialBalanceConfig";
 import { RevenueStrategyFactory } from "../strategies/revenue/RevenueStrategyFactory";
-import { MatchRevenueConfig } from "../config/ServiceConstants";
+import { GameBalance } from "../../engine/GameBalanceConfig";
 
 export interface MatchdayRevenueBreakdown {
   tickets: {
@@ -93,7 +93,7 @@ export class RevenueService extends BaseService {
         const strategyResult = strategy.calculateRevenue({
           stadiumCapacity: capacity,
           fanSatisfaction: fanSatisfaction,
-          ticketPrice: MatchRevenueConfig.BASE_TICKET_PRICE,
+          ticketPrice: GameBalance.MATCH.REVENUE.BASE_TICKET_PRICE,
           competitionTier: tierNumber,
           round: 10,
         });

@@ -34,10 +34,10 @@ import { TransferService } from "./transfer/TransferService";
 import { SquadAnalysisService } from "./ai/SquadAnalysisService";
 import { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
 import { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
-import { EventService } from "./narrative/EventService";
+import { NarrativeService } from "./narrative/NarrativeService";
 import { CPUSimulationService } from "./ai/CPUSimulationService";
 import { PlayerDevelopmentService } from "./PlayerDevelopmentService";
-import { SalaryCalculatorService } from "./finance/SalaryCalculatorService";
+import { ValuationService } from "./finance/ValuationService";
 import { OperationalCostsService } from "./finance/OperationalCostsService";
 import { RevenueService } from "./finance/RevenueService";
 import { MatchTacticsManager } from "./match/MatchTacticsManager";
@@ -70,10 +70,10 @@ export class ServiceContainer implements IServiceContainer {
   public readonly squadAnalysis: SquadAnalysisService;
   public readonly aiTransferDecisionMaker: AITransferDecisionMaker;
   public readonly dailyTransferProcessor: DailyTransferProcessor;
-  public readonly eventService: EventService;
+  public readonly narrativeService: NarrativeService;
   public readonly cpuSimulation: CPUSimulationService;
   public readonly playerDevelopment: PlayerDevelopmentService;
-  public readonly salaryCalculator: SalaryCalculatorService;
+  public readonly valuationService: ValuationService;
   public readonly operationalCosts: OperationalCostsService;
   public readonly revenueService: RevenueService;
   public readonly matchSubstitution: MatchSubstitutionManager;
@@ -105,7 +105,7 @@ export class ServiceContainer implements IServiceContainer {
       this.playerDevelopment
     );
     this.season = new SeasonService(repos);
-    this.salaryCalculator = new SalaryCalculatorService(repos);
+    this.valuationService = new ValuationService(repos);
     this.operationalCosts = new OperationalCostsService(repos);
     this.revenueService = new RevenueService(repos);
     this.matchTactics = new MatchTacticsManager(repos);
@@ -113,10 +113,12 @@ export class ServiceContainer implements IServiceContainer {
     this.finance = new FinanceService(
       repos,
       this.financialHealth,
-      this.salaryCalculator,
+      this.valuationService,
       this.operationalCosts,
-      this.revenueService
+      this.revenueService,
+      this.contract
     );
+
     this.promotionRelegation = new PromotionRelegationService(repos);
     this.seasonTransition = new SeasonTransitionManager(
       repos,
@@ -125,11 +127,13 @@ export class ServiceContainer implements IServiceContainer {
     );
     this.transferWindow = new TransferWindowManager(repos);
     this.transferValidator = new TransferValidator(repos);
+
     this.transfer = new TransferService(
       repos,
       this.eventBus,
       this.transferValidator
     );
+
     this.squadAnalysis = new SquadAnalysisService(repos);
     this.aiTransferDecisionMaker = new AITransferDecisionMaker(
       repos,
@@ -143,12 +147,13 @@ export class ServiceContainer implements IServiceContainer {
       this.aiTransferDecisionMaker,
       this.transfer
     );
-    this.eventService = new EventService(repos, this.eventBus);
+    this.narrativeService = new NarrativeService(repos, this.eventBus);
     this.cpuSimulation = new CPUSimulationService(
       repos,
       this.dailySimulation,
       this.staff
     );
+
     this.match = new MatchService(
       repos,
       this.eventBus,
@@ -157,6 +162,7 @@ export class ServiceContainer implements IServiceContainer {
       this.matchSubstitution,
       this.matchTactics
     );
+
     if (!unitOfWork && !eventBus) {
       this.setupSubscriptions();
     }

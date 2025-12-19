@@ -10,38 +10,36 @@ import type {
   FinancialHealthResult,
   TransferPermissionResult,
 } from "../domain/types";
-import type { SalaryCalculatorService } from "./finance/SalaryCalculatorService";
+import type { ValuationService } from "./finance/ValuationService";
 import type { OperationalCostsService } from "./finance/OperationalCostsService";
 import type { RevenueService } from "./finance/RevenueService";
+import type { ContractService } from "./ContractService";
 import { FinancialBalance } from "../engine/FinancialBalanceConfig";
-import {
-  FinancialReportFactory,
-  type MonthlyFinancialSummary,
-} from "./factories/ReportFactory";
+import { FinancialReportFactory, type MonthlyFinancialSummary } from "../domain/factories/ReportFactory";
 
 export class FinanceService extends BaseService {
   private healthChecker: FinancialHealthChecker;
-  private salaryCalculator: SalaryCalculatorService;
+  private valuationService: ValuationService;
   private operationalCosts: OperationalCostsService;
   private revenueService: RevenueService;
+  private contractService: ContractService;
 
   constructor(
     repositories: IRepositoryContainer,
     healthChecker: FinancialHealthChecker,
-    salaryCalculator: SalaryCalculatorService,
+    valuationService: ValuationService,
     operationalCosts: OperationalCostsService,
-    revenueService: RevenueService
+    revenueService: RevenueService,
+    contractService: ContractService
   ) {
     super(repositories, "FinanceService");
     this.healthChecker = healthChecker;
-    this.salaryCalculator = salaryCalculator;
+    this.valuationService = valuationService;
     this.operationalCosts = operationalCosts;
     this.revenueService = revenueService;
+    this.contractService = contractService;
   }
 
-  /**
-   * @param dateStr Data no formato "YYYY-MM-DD"
-   */
   static isPayDay(dateStr: string): boolean {
     const currentDate = new Date(dateStr);
     const nextDay = new Date(currentDate);
@@ -51,10 +49,6 @@ export class FinanceService extends BaseService {
     return nextDay.getMonth() !== currentDate.getMonth();
   }
 
-  /**
-   * @param input - Processing parameters (teamId, date, seasonId)
-   * @returns Result with expense breakdown and new budget
-   */
   async processMonthlyExpenses(
     input: ProcessExpensesInput
   ): Promise<ServiceResult<ProcessExpensesResult>> {
@@ -72,7 +66,8 @@ export class FinanceService extends BaseService {
         );
 
         const wageBillResult =
-          await this.salaryCalculator.calculateTeamWageBill(teamId);
+          await this.contractService.calculateMonthlyWageBill(teamId);
+
         if (Result.isFailure(wageBillResult)) {
           throw new Error(
             `Failed to calculate wages: ${wageBillResult.error.message}`
@@ -80,7 +75,8 @@ export class FinanceService extends BaseService {
         }
 
         const wageBill = wageBillResult.data;
-        const monthlyPlayerWages = Math.round(wageBill.totalEmployerCost / 12);
+        const monthlyPlayerWages = wageBill.playerWages;
+        const monthlyStaffWages = wageBill.staffWages;
 
         const operationalResult =
           await this.operationalCosts.calculateOperationalCosts(teamId, 2);
@@ -94,7 +90,8 @@ export class FinanceService extends BaseService {
         const operational = operationalResult.data;
         const monthlyOperational = operational.grandTotal.monthlyCost;
 
-        const totalExpense = monthlyPlayerWages + monthlyOperational;
+        const totalExpense =
+          monthlyPlayerWages + monthlyStaffWages + monthlyOperational;
         const currentBudget = team.budget || 0;
         const newBudget = currentBudget - totalExpense;
 
@@ -107,6 +104,18 @@ export class FinanceService extends BaseService {
             category: FinancialCategory.SALARY,
             amount: monthlyPlayerWages,
             description: `Monthly Payroll - ${wageBill.playerCount} players (incl. taxes)`,
+          });
+        }
+
+        if (monthlyStaffWages > 0) {
+          await this.repos.financial.addRecord({
+            teamId,
+            seasonId,
+            date: currentDate,
+            type: "expense",
+            category: FinancialCategory.STAFF_SALARY,
+            amount: monthlyStaffWages,
+            description: `Monthly Payroll - ${wageBill.staffCount} staff members`,
           });
         }
 
@@ -129,7 +138,7 @@ export class FinanceService extends BaseService {
             seasonId,
             date: currentDate,
             type: "expense",
-            category: "administrative" as any,
+            category: FinancialCategory.INFRASTRUCTURE,
             amount: Math.round(operational.administrative.totalAnnual / 12),
             description: "Administrative Costs (staff, legal, IT, insurance)",
           });
@@ -148,20 +157,13 @@ export class FinanceService extends BaseService {
           totalExpense,
           newBudget,
           playerWages: monthlyPlayerWages,
-          staffWages: Math.round(operational.administrative.staff / 12),
+          staffWages: monthlyStaffWages,
           message,
         };
       }
     );
   }
 
-  /**
-   * @param teamId - Home team ID
-   * @param matchId - Match ID
-   * @param attendance - Actual attendance
-   * @param matchImportance - Match importance multiplier
-   * @returns Revenue generated
-   */
   async processMatchdayRevenue(
     teamId: number,
     matchId: number,
@@ -231,11 +233,6 @@ export class FinanceService extends BaseService {
     );
   }
 
-  /**
-   * @param teamId - Team ID
-   * @param seasonId - Current season ID
-   * @returns FFP compliance status
-   */
   async checkFFPCompliance(
     teamId: number,
     seasonId: number
@@ -272,14 +269,14 @@ export class FinanceService extends BaseService {
         const annualRevenue = revenueResult.data.grandTotal;
 
         const wageBillResult =
-          await this.salaryCalculator.calculateTeamWageBill(teamId);
+          await this.contractService.calculateMonthlyWageBill(teamId);
         if (Result.isFailure(wageBillResult)) {
           throw new Error(
             `Failed to calculate wages: ${wageBillResult.error.message}`
           );
         }
 
-        const annualWages = wageBillResult.data.totalEmployerCost;
+        const annualWages = wageBillResult.data.total * 12;
 
         const operationalResult =
           await this.operationalCosts.calculateOperationalCosts(teamId, 19);
@@ -380,7 +377,7 @@ export class FinanceService extends BaseService {
 
         const [wageBillResult, operationalResult, revenueResult, ffpResult] =
           await Promise.all([
-            this.salaryCalculator.calculateTeamWageBill(teamId),
+            this.contractService.calculateMonthlyWageBill(teamId),
             this.operationalCosts.calculateOperationalCosts(teamId, 2),
             this.revenueService.projectAnnualRevenue(teamId, 10, 19),
             this.checkFFPCompliance(teamId, seasonId),
@@ -388,7 +385,13 @@ export class FinanceService extends BaseService {
 
         const wageBill = Result.isSuccess(wageBillResult)
           ? wageBillResult.data
-          : { totalEmployerCost: 0, playerCount: 0 };
+          : {
+              total: 0,
+              playerCount: 0,
+              playerWages: 0,
+              staffWages: 0,
+              staffCount: 0,
+            };
 
         const operational = Result.isSuccess(operationalResult)
           ? operationalResult.data
@@ -404,8 +407,7 @@ export class FinanceService extends BaseService {
 
         const monthlyIncome = Math.round(revenue / 12);
         const monthlyExpenses =
-          Math.round(wageBill.totalEmployerCost / 12) +
-          operational.grandTotal.monthlyCost;
+          wageBill.total + operational.grandTotal.monthlyCost;
 
         const financialHealth =
           team.budget >= 0 && ffp
@@ -420,8 +422,8 @@ export class FinanceService extends BaseService {
           monthlyExpenses,
           monthlyCashflow: monthlyIncome - monthlyExpenses,
           salaryBill: {
-            annual: wageBill.totalEmployerCost,
-            monthly: Math.round(wageBill.totalEmployerCost / 12),
+            annual: wageBill.total * 12,
+            monthly: wageBill.total,
             playerCount: wageBill.playerCount,
           },
           operationalCosts: {
@@ -433,6 +435,18 @@ export class FinanceService extends BaseService {
           financialHealth,
         };
       }
+    );
+  }
+
+  async calculatePlayerSalary(
+    playerId: number,
+    teamId: number,
+    isFreeTransfer: boolean
+  ) {
+    return this.valuationService.calculatePlayerSalary(
+      playerId,
+      teamId,
+      isFreeTransfer
     );
   }
 }

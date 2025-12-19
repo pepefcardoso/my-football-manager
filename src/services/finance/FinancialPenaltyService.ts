@@ -1,7 +1,7 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import { PenaltyWeights } from "../config/ServiceConstants";
-import type { FinancialHealthResult } from "../FinanceService";
+import { FinancialBalance } from "../../engine/FinancialBalanceConfig";
+import type { FinancialHealthResult } from "../../domain/types";
 
 export class FinancialPenaltyService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -14,11 +14,12 @@ export class FinancialPenaltyService extends BaseService {
     currentSatisfaction: number
   ): Promise<string[]> {
     const penaltiesApplied: string[] = [];
+    const PENALTIES = FinancialBalance.PENALTY_WEIGHTS;
 
     const moralPenalty =
       severity === "critical"
-        ? PenaltyWeights.MORAL_CRITICAL
-        : PenaltyWeights.MORAL_WARNING;
+        ? PENALTIES.MORAL_CRITICAL
+        : PENALTIES.MORAL_WARNING;
 
     await this.applyMoralPenalty(teamId, moralPenalty);
     penaltiesApplied.push(
@@ -27,8 +28,8 @@ export class FinancialPenaltyService extends BaseService {
 
     const fanPenalty =
       severity === "critical"
-        ? PenaltyWeights.SATISFACTION_PENALTY_CRITICAL
-        : PenaltyWeights.SATISFACTION_PENALTY_WARNING;
+        ? PENALTIES.SATISFACTION_PENALTY_CRITICAL
+        : PENALTIES.SATISFACTION_PENALTY_WARNING;
 
     await this.applyFanSatisfactionPenalty(
       teamId,
@@ -43,7 +44,7 @@ export class FinancialPenaltyService extends BaseService {
       const pointsDeducted = await this.applyPointsDeduction(teamId);
       if (pointsDeducted) {
         penaltiesApplied.push(
-          `Punição na Liga: Perda de ${PenaltyWeights.POINTS_DEDUCTION} pontos.`
+          `Punição na Liga: Perda de ${PENALTIES.POINTS_DEDUCTION} pontos.`
         );
       }
     }
@@ -99,7 +100,8 @@ export class FinancialPenaltyService extends BaseService {
         {
           points: Math.max(
             0,
-            (teamStanding.points ?? 0) - PenaltyWeights.POINTS_DEDUCTION
+            (teamStanding.points ?? 0) -
+              FinancialBalance.PENALTY_WEIGHTS.POINTS_DEDUCTION
           ),
         }
       );
