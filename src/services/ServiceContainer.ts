@@ -28,7 +28,6 @@ import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 import { StaffService } from "./StaffService";
 import { StatsService } from "./StatsService";
 import { CupProgressionManager } from "./match/CupProgressionManager";
-import { MatchFanSatisfactionProcessor } from "./match/MatchFanSatisfactionProcessor";
 import { MatchResultProcessor } from "./match/MatchResultProcessor";
 import { TransferWindowManager } from "./transfer/TransferWindowManager";
 import { TransferService } from "./transfer/TransferService";
@@ -58,7 +57,6 @@ export class ServiceContainer implements IServiceContainer {
   public readonly marketing: MarketingService;
   public readonly match: MatchService;
   public readonly cupProgression: CupProgressionManager;
-  public readonly matchFanSatisfaction: MatchFanSatisfactionProcessor;
   public readonly matchResult: MatchResultProcessor;
   public readonly player: PlayerService;
   public readonly scouting: ScoutingService;
@@ -91,7 +89,6 @@ export class ServiceContainer implements IServiceContainer {
     this.eventBus = eventBus || new GameEventBus();
     this.financialPenalty = new FinancialPenaltyService(repos);
     this.matchResult = new MatchResultProcessor(repos);
-    this.matchFanSatisfaction = new MatchFanSatisfactionProcessor(repos);
     this.cupProgression = new CupProgressionManager(repos);
     this.stats = new StatsService(repos);
     this.contract = new ContractService(repos, this.eventBus);
@@ -180,7 +177,7 @@ export class ServiceContainer implements IServiceContainer {
           );
         }
 
-        await this.matchFanSatisfaction.updateSatisfactionForMatch(
+        await this.marketing.processMatchResult(
           payload.matchId,
           payload.homeScore,
           payload.awayScore

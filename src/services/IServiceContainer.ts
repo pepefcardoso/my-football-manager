@@ -15,7 +15,6 @@ import type { SeasonTransitionManager } from "./season/SeasonTransitionManager";
 import type { StaffService } from "./StaffService";
 import type { StatsService } from "./StatsService";
 import type { CupProgressionManager } from "./match/CupProgressionManager";
-import type { MatchFanSatisfactionProcessor } from "./match/MatchFanSatisfactionProcessor";
 import type { MatchResultProcessor } from "./match/MatchResultProcessor";
 import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 import type { TransferWindowManager } from "./transfer/TransferWindowManager";
@@ -39,7 +38,6 @@ export interface IServiceContainer {
   marketing: MarketingService;
   match: MatchService;
   cupProgression: CupProgressionManager;
-  matchFanSatisfaction: MatchFanSatisfactionProcessor;
   matchResult: MatchResultProcessor;
   player: PlayerService;
   scouting: ScoutingService;

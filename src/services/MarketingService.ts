@@ -12,6 +12,54 @@ export class MarketingService extends BaseService {
     super(repositories, "MarketingService");
   }
 
+  async processMatchResult(
+    matchId: number,
+    homeScore: number,
+    awayScore: number
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "processMatchResult",
+      { matchId, homeScore, awayScore },
+      async ({ matchId, homeScore, awayScore }) => {
+        const match = await this.repos.matches.findById(matchId);
+        if (!match || !match.homeTeamId || !match.awayTeamId) return;
+
+        const homeTeam = await this.repos.teams.findById(match.homeTeamId);
+        const awayTeam = await this.repos.teams.findById(match.awayTeamId);
+
+        if (!homeTeam || !awayTeam) return;
+
+        const homeResult =
+          homeScore > awayScore
+            ? "win"
+            : homeScore === awayScore
+            ? "draw"
+            : "loss";
+        const awayResult =
+          awayScore > homeScore
+            ? "win"
+            : awayScore === homeScore
+            ? "draw"
+            : "loss";
+
+        await this.updateFanSatisfactionAfterMatch(
+          homeTeam.id,
+          homeResult,
+          true,
+          awayTeam.reputation,
+          TICKET_PRICING.BASE_FAIR_PRICE
+        );
+
+        await this.updateFanSatisfactionAfterMatch(
+          awayTeam.id,
+          awayResult,
+          false,
+          homeTeam.reputation
+        );
+      }
+    );
+  }
+
   async updateFanSatisfactionAfterMatch(
     teamId: number,
     result: "win" | "draw" | "loss",
