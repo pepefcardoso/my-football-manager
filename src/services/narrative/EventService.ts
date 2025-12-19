@@ -9,6 +9,7 @@ import type {
 import { EventLibrary } from "../../domain/events/EventLibrary";
 import { GameEventType } from "../events/GameEventTypes";
 import type { GameEventBus } from "../events/GameEventBus";
+import { FinancialCategory } from "../../domain/enums";
 
 export class EventService extends BaseService {
   private eventBus: GameEventBus;
@@ -81,7 +82,7 @@ export class EventService extends BaseService {
       "generateDailyEvent",
       { teamId, currentDate },
       async () => {
-        const EVENT_CHANCE = 15;
+        const EVENT_CHANCE = 20;
 
         if (!RandomEngine.chance(EVENT_CHANCE)) {
           return null;
@@ -153,6 +154,22 @@ export class EventService extends BaseService {
       });
     }
 
+    if (context.teamReputation > 3000) {
+      possibleEvents.push({
+        id: `sponsor_visit_${Date.now()}`,
+        title: "Visita de Patrocinadores",
+        description:
+          "Um grupo de patrocinadores visitará o clube amanhã. Como devemos recebê-los?",
+        category: "sponsor",
+        importance: "low",
+        date: context.currentDate,
+        options: [
+          { id: "sponsor_gala", label: "Organizar Jantar de Gala (-€50k)" },
+          { id: "sponsor_training", label: "Convidar para ver o Treino" },
+        ],
+      });
+    }
+
     if (context.fanSatisfaction < 30) {
       possibleEvents.push({
         id: `fan_protest_${Date.now()}`,
@@ -161,6 +178,10 @@ export class EventService extends BaseService {
         category: "fan",
         importance: "critical",
         date: context.currentDate,
+        options: [
+          { id: "calm_fans", label: "Conversar com Líderes" },
+          { id: "ignore_fans", label: "Ignorar" },
+        ],
       });
     }
 
@@ -184,6 +205,11 @@ export class EventService extends BaseService {
 
         const team = await this.repos.teams.findById(teamId);
         if (!team) throw new Error("Time não encontrado.");
+
+        const gameState = await this.repos.gameState.findCurrent();
+        const currentDate =
+          gameState?.currentDate || new Date().toISOString().split("T")[0];
+        const currentSeasonId = gameState?.currentSeasonId || 1;
 
         let effectMessage = "Nenhum efeito imediato.";
 
@@ -242,8 +268,8 @@ export class EventService extends BaseService {
             amount: injection,
             category: "sponsors",
             type: "income",
-            seasonId: 1,
-            date: new Date().toISOString().split("T")[0],
+            seasonId: currentSeasonId,
+            date: currentDate,
             description: "Injeção de Capital (Novos Donos)",
           });
           effectMessage =
@@ -267,10 +293,40 @@ export class EventService extends BaseService {
                 (team.youthAcademyQuality || 0) + 5
               ),
             });
+            await this.repos.financial.addRecord({
+              teamId,
+              seasonId: currentSeasonId,
+              amount: investCost,
+              type: "expense",
+              category: FinancialCategory.INFRASTRUCTURE,
+              date: currentDate,
+              description: "Investimento Extra na Academia de Jovens",
+            });
             effectMessage =
               "Investimento realizado na base (+5 Qualidade Base, -€2M).";
           } else {
             effectMessage = "Saldo insuficiente para o investimento.";
+          }
+        } else if (optionId === "sponsor_gala") {
+          const cost = 50000;
+          if (team.budget >= cost) {
+            await this.repos.teams.updateBudget(teamId, team.budget - cost);
+            await this.repos.financial.addRecord({
+              teamId,
+              seasonId: currentSeasonId,
+              amount: cost,
+              type: "expense",
+              category: FinancialCategory.SPONSORS,
+              date: currentDate,
+              description: "Jantar de Gala para Patrocinadores",
+            });
+            await this.repos.teams.update(teamId, {
+              reputation: (team.reputation || 0) + 5,
+            });
+            effectMessage =
+              "Os patrocinadores ficaram impressionados (+Reputação).";
+          } else {
+            effectMessage = "Sem verba para o jantar.";
           }
         } else if (optionId === "save") {
           effectMessage = "Dinheiro mantido em caixa.";

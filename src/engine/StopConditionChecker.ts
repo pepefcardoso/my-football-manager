@@ -22,7 +22,10 @@ export class StopConditionChecker {
       );
       if (hasMatch.shouldStop) return hasMatch;
 
-      const hasProposals = await this.checkPendingProposals(playerTeamId);
+      const hasProposals = await this.checkPendingProposals(
+        playerTeamId,
+        currentDate
+      );
       if (hasProposals.shouldStop) return hasProposals;
 
       const hasCrisis = await this.checkFinancialCrisis(playerTeamId);
@@ -55,22 +58,33 @@ export class StopConditionChecker {
     return { shouldStop: false };
   }
 
-  private async checkPendingProposals(teamId: number): Promise<StopCondition> {
+  private async checkPendingProposals(
+    teamId: number,
+    currentDate: string
+  ): Promise<StopCondition> {
     const proposals = await this.repos.transferProposals.findReceivedByTeam(
       teamId
     );
 
-    const pending = proposals.find(
-      (p) =>
+    const activeAttentionNeeded = proposals.find((p) => {
+      const isActive =
         p.status === TransferStatus.PENDING ||
-        p.status === TransferStatus.NEGOTIATING
-    );
+        p.status === TransferStatus.NEGOTIATING;
 
-    if (pending) {
+      if (!isActive) return false;
+
+      const isNew = p.createdAt.startsWith(currentDate);
+
+      const isDeadline = p.responseDeadline.startsWith(currentDate);
+
+      return isNew || isDeadline;
+    });
+
+    if (activeAttentionNeeded) {
       return {
         shouldStop: true,
         reason: "transfer_proposal",
-        metadata: { proposalId: pending.id },
+        metadata: { proposalId: activeAttentionNeeded.id },
       };
     }
 

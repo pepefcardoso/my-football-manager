@@ -2,13 +2,10 @@ import { RandomEngine } from "../../engine/RandomEngine";
 import type { NarrativeEvent, EventTriggerContext } from "../narrative";
 
 export class EventLibrary {
-  /**
-   * Gera um evento de Crise de Balneário se a moral estiver baixa.
-   */
   static getDressingRoomCrisis(
     context: EventTriggerContext
   ): NarrativeEvent | null {
-    if (context.averageMorale > 45) return null;
+    if (context.averageMorale > 60) return null;
 
     if (!RandomEngine.chance(30)) return null;
 
@@ -40,9 +37,6 @@ export class EventLibrary {
     };
   }
 
-  /**
-   * Gera um evento de Entrevista Pós-Jogo ou Coletiva de Imprensa.
-   */
   static getMediaInterview(
     context: EventTriggerContext
   ): NarrativeEvent | null {
@@ -76,9 +70,6 @@ export class EventLibrary {
     };
   }
 
-  /**
-   * Gera um evento raro de Venda do Clube (Takeover).
-   */
   static getClubTakeover(context: EventTriggerContext): NarrativeEvent | null {
     const isRareChance = RandomEngine.chance(0.5);
     const isDebtTrigger = context.budget < -5_000_000 && RandomEngine.chance(5);
