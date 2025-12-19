@@ -222,18 +222,42 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   infrastructure: {
-    upgradeInfrastructure: (type: string, teamId: number, seasonId: number) =>
-      ipcRenderer.invoke("infrastructure:upgradeInfrastructure", {
-        type,
+    getStatus: (teamId: number) =>
+      ipcRenderer.invoke("infrastructure:getStatus", teamId),
+
+    expandStadium: (teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("infrastructure:expandStadium", { teamId, seasonId }),
+
+    upgradeFacility: (
+      teamId: number,
+      seasonId: number,
+      facilityType: "stadium" | "training" | "youth"
+    ) =>
+      ipcRenderer.invoke("infrastructure:upgradeFacility", {
         teamId,
         seasonId,
+        facilityType,
       }),
-    getInfrastructureStatus: (teamId: number) =>
-      ipcRenderer.invoke("infrastructure:getInfrastructureStatus", teamId),
-    getUpgradeCost: (teamId: number, type: string) =>
-      ipcRenderer.invoke("infrastructure:getUpgradeCost", { teamId, type }),
-    getExpansionCost: () =>
-      ipcRenderer.invoke("infrastructure:getExpansionCost"),
+
+    getUpgradeCost: (
+      teamId: number,
+      facilityType: "stadium" | "training" | "youth",
+      upgradeType: "expand" | "quality"
+    ) =>
+      ipcRenderer.invoke("infrastructure:getUpgradeCost", {
+        teamId,
+        facilityType,
+        upgradeType,
+      }),
+
+    analyzeCapacity: (teamId: number) =>
+      ipcRenderer.invoke("infrastructure:analyzeCapacity", teamId),
+
+    projectFanBase: (teamId: number, leaguePosition: number) =>
+      ipcRenderer.invoke("infrastructure:projectFanBase", {
+        teamId,
+        leaguePosition,
+      }),
   },
 
   scouting: {

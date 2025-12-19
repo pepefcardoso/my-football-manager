@@ -245,24 +245,66 @@ declare global {
         ) => Promise<boolean>;
       };
 
+// infrastructure: {
+//     getStatus: (teamId: number) =>
+//       ipcRenderer.invoke("infrastructure:getStatus", teamId),
+
+//     expandStadium: (teamId: number, seasonId: number) =>
+//       ipcRenderer.invoke("infrastructure:expandStadium", { teamId, seasonId }),
+
+//     upgradeFacility: (
+//       teamId: number,
+//       seasonId: number,
+//       facilityType: "stadium" | "training" | "youth"
+//     ) =>
+//       ipcRenderer.invoke("infrastructure:upgradeFacility", {
+//         teamId,
+//         seasonId,
+//         facilityType,
+//       }),
+
+//     getUpgradeCost: (
+//       teamId: number,
+//       facilityType: "stadium" | "training" | "youth",
+//       upgradeType: "expand" | "quality"
+//     ) =>
+//       ipcRenderer.invoke("infrastructure:getUpgradeCost", {
+//         teamId,
+//         facilityType,
+//         upgradeType,
+//       }),
+
+//     analyzeCapacity: (teamId: number) =>
+//       ipcRenderer.invoke("infrastructure:analyzeCapacity", teamId),
+
+//     projectFanBase: (teamId: number, leaguePosition: number) =>
+//       ipcRenderer.invoke("infrastructure:projectFanBase", {
+//         teamId,
+//         leaguePosition,
+//       }),
+//   },
+
       infrastructure: {
-        upgradeInfrastructure: (
-          type:
-            | "expand_stadium"
-            | "upgrade_stadium"
-            | "upgrade_training"
-            | "upgrade_youth",
+        getStatus: (teamId: number) => Promise<InfrastructureStatus | null>;
+        expandStadium: (
           teamId: number,
           seasonId: number
         ) => Promise<{ success: boolean; message: string }>;
-        getInfrastructureStatus: (
-          teamId: number
-        ) => Promise<InfrastructureStatus | null>;
+        upgradeFacility: (
+          teamId: number,
+          seasonId: number,
+          facilityType: "stadium" | "training" | "youth"
+        ) => Promise<{ success: boolean; message: string }>;
         getUpgradeCost: (
           teamId: number,
-          type: "stadium" | "training" | "youth"
+          facilityType: "stadium" | "training" | "youth",
+          upgradeType: "expand" | "quality"
         ) => Promise<number | null>;
-        getExpansionCost: () => Promise<number>;
+        analyzeCapacity: (teamId: number) => Promise<CapacityAnalysis | null>;
+        projectFanBase: (
+          teamId: number,
+          leaguePosition: number
+        ) => Promise<number | null>;
       };
 
       scouting: {

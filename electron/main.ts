@@ -713,68 +713,135 @@ function registerIpcHandlers() {
     }
   );
 
+  ipcMain.handle("infrastructure:getStatus", async (_, teamId: number) => {
+    const result =
+      await serviceContainer.infrastructure.getInfrastructureStatus(teamId);
+    return Result.unwrapOr(result, null);
+  });
+
   ipcMain.handle(
-    "infrastructure:upgradeInfrastructure",
-    async (_event, { type, teamId, seasonId }) => {
-      let result;
-      if (type === "expand_stadium") {
-        result = await serviceContainer.infrastructure.expandStadium(
+    "infrastructure:expandStadium",
+    async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
+      try {
+        const result = await serviceContainer.infrastructure.expandStadium(
           teamId,
           seasonId
         );
-      } else if (type === "upgrade_stadium") {
-        result = await serviceContainer.infrastructure.upgradeFacility(
-          teamId,
-          seasonId,
-          "stadium"
-        );
-      } else if (type === "upgrade_training") {
-        result = await serviceContainer.infrastructure.upgradeFacility(
-          teamId,
-          seasonId,
-          "training"
-        );
-      } else if (type === "upgrade_youth") {
-        result = await serviceContainer.infrastructure.upgradeFacility(
-          teamId,
-          seasonId,
-          "youth"
-        );
-      } else {
-        return { success: false, message: "Tipo de operação inválido" };
-      }
 
-      if (Result.isSuccess(result)) {
-        return { success: true, message: "Upgrade realizado com sucesso!" };
+        if (Result.isSuccess(result)) {
+          return {
+            success: true,
+            data: result.data,
+            message: result.data.message,
+            warnings: result.data.warnings,
+          };
+        }
+
+        return {
+          success: false,
+          message: result.error.message,
+        };
+      } catch (error) {
+        logger.error("Erro ao expandir estádio:", error);
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : "Erro desconhecido",
+        };
       }
-      return { success: false, message: result.error.message };
     }
   );
 
   ipcMain.handle(
-    "infrastructure:getInfrastructureStatus",
-    async (_, teamId: number) => {
-      const result =
-        await serviceContainer.infrastructure.getInfrastructureStatus(teamId);
-      return Result.unwrapOr(result, null);
+    "infrastructure:upgradeFacility",
+    async (
+      _,
+      {
+        teamId,
+        seasonId,
+        facilityType,
+      }: {
+        teamId: number;
+        seasonId: number;
+        facilityType: "stadium" | "training" | "youth";
+      }
+    ) => {
+      try {
+        const result =
+          await serviceContainer.infrastructure.upgradeFacilityQuality(
+            teamId,
+            seasonId,
+            facilityType
+          );
+
+        if (Result.isSuccess(result)) {
+          return {
+            success: true,
+            data: result.data,
+            message: result.data.message,
+            warnings: result.data.warnings,
+          };
+        }
+
+        return {
+          success: false,
+          message: result.error.message,
+        };
+      } catch (error) {
+        logger.error(`Erro ao atualizar ${facilityType}:`, error);
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : "Erro desconhecido",
+        };
+      }
     }
   );
 
   ipcMain.handle(
     "infrastructure:getUpgradeCost",
-    async (_, { teamId, type }) => {
+    async (
+      _,
+      {
+        teamId,
+        facilityType,
+        upgradeType,
+      }: {
+        teamId: number;
+        facilityType: "stadium" | "training" | "youth";
+        upgradeType: "expand" | "quality";
+      }
+    ) => {
       const result = await serviceContainer.infrastructure.getUpgradeCost(
         teamId,
-        type
+        facilityType,
+        upgradeType
       );
       return Result.unwrapOr(result, null);
     }
   );
 
-  ipcMain.handle("infrastructure:getExpansionCost", async () => {
-    const result = await serviceContainer.infrastructure.getExpansionCost();
-    return Result.unwrapOr(result, 0);
-  });
+  ipcMain.handle(
+    "infrastructure:analyzeCapacity",
+    async (_, teamId: number) => {
+      const result = await serviceContainer.infrastructure.analyzeCapacity(
+        teamId
+      );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle(
+    "infrastructure:projectFanBase",
+    async (
+      _,
+      { teamId, leaguePosition }: { teamId: number; leaguePosition: number }
+    ) => {
+      const result = await serviceContainer.infrastructure.projectFanBase(
+        teamId,
+        leaguePosition
+      );
+      return Result.unwrapOr(result, null);
+    }
+  );
 
   ipcMain.handle(
     "scouting:getScoutedPlayer",
