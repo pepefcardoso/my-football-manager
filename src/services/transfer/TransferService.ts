@@ -14,7 +14,7 @@ import { getBalanceValue } from "../../engine/GameBalanceConfig";
 import {
   TransferValidator,
   type TransferValidationContext,
-} from "./validators/TransferValidator";
+} from "../../domain/validators/TransferValidator";
 import { BaseService } from "../BaseService";
 
 export interface CreateProposalInput {

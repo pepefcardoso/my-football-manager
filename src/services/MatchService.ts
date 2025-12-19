@@ -5,10 +5,6 @@ import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import { Result } from "../domain/ServiceResults";
 import type { ServiceResult } from "../domain/ServiceResults";
-import { MatchResultProcessor } from "./match/MatchResultProcessor";
-import { GameEventBus } from "./events/GameEventBus";
-import { GameEventType } from "./events/GameEventTypes";
-import { MatchDataValidator } from "./validators/MatchDataValidator";
 import {
   MatchSubstitutionManager,
   type SubstitutionRequest,
@@ -18,12 +14,14 @@ import {
   type UpdateLiveTacticsRequest,
 } from "./match/MatchTacticsManager";
 import type { FinanceService } from "./FinanceService";
+import type { GameEventBus } from "../lib/GameEventBus";
+import { MatchDataValidator } from "../domain/validators/MatchDataValidator";
+import { GameEventType } from "../domain/GameEventTypes";
 
 export class MatchService extends BaseService {
   private engines: Map<number, MatchEngine> = new Map();
   private eventBus: GameEventBus;
 
-  private resultProcessor: MatchResultProcessor;
   private substitutionManager: MatchSubstitutionManager;
   private tacticsManager: MatchTacticsManager;
   private financeService: FinanceService;
@@ -32,14 +30,12 @@ export class MatchService extends BaseService {
     repositories: IRepositoryContainer,
     eventBus: GameEventBus,
     financeService: FinanceService,
-    resultProcessor: MatchResultProcessor,
     substitutionManager: MatchSubstitutionManager,
     tacticsManager: MatchTacticsManager
   ) {
     super(repositories, "MatchService");
     this.eventBus = eventBus;
     this.financeService = financeService;
-    this.resultProcessor = resultProcessor;
     this.substitutionManager = substitutionManager;
     this.tacticsManager = tacticsManager;
   }
@@ -500,11 +496,12 @@ export class MatchService extends BaseService {
       }
     }
 
-    await this.resultProcessor.processResult(
+    await this.repos.matches.updateMatchResult(
       matchId,
-      result,
-      ticketRevenue,
-      attendance
+      result.homeScore,
+      result.awayScore,
+      attendance,
+      ticketRevenue
     );
 
     await this.eventBus.publish(GameEventType.MATCH_FINISHED, {
@@ -518,6 +515,7 @@ export class MatchService extends BaseService {
       round: match.round || undefined,
       ticketRevenue,
       attendance,
+      matchResult: result,
     });
   }
 }

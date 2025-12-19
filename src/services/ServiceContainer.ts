@@ -14,7 +14,6 @@ import { MatchService } from "./MatchService";
 import { PlayerService } from "./PlayerService";
 import { ScoutingService } from "./ScoutingService";
 import { SeasonService } from "./SeasonService";
-import { PromotionRelegationService } from "./season/PromotionRelegationService";
 import { SeasonTransitionManager } from "./season/SeasonTransitionManager";
 import type { IUnitOfWork } from "../repositories/IUnitOfWork";
 import { StaffService } from "./StaffService";
@@ -34,9 +33,15 @@ import { OperationalCostsService } from "./finance/OperationalCostsService";
 import { RevenueService } from "./finance/RevenueService";
 import { MatchTacticsManager } from "./match/MatchTacticsManager";
 import { MatchSubstitutionManager } from "./match/MatchSubstitutionManager";
-import { TransferValidator } from "./transfer/validators/TransferValidator";
 import { GameEventBus } from "../lib/GameEventBus";
-import { GameEventType, type ContractExpiredPayload, type FinancialCrisisPayload, type MatchFinishedPayload, type TransferCompletedPayload } from "../domain/GameEventTypes";
+import {
+  GameEventType,
+  type ContractExpiredPayload,
+  type FinancialCrisisPayload,
+  type MatchFinishedPayload,
+  type TransferCompletedPayload,
+} from "../domain/GameEventTypes";
+import { TransferValidator } from "../domain/validators/TransferValidator";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: IUnitOfWork;
@@ -55,7 +60,6 @@ export class ServiceContainer implements IServiceContainer {
   public readonly player: PlayerService;
   public readonly scouting: ScoutingService;
   public readonly season: SeasonService;
-  public readonly promotionRelegation: PromotionRelegationService;
   public readonly seasonTransition: SeasonTransitionManager;
   public readonly staff: StaffService;
   public readonly stats: StatsService;
@@ -113,12 +117,7 @@ export class ServiceContainer implements IServiceContainer {
       this.contract
     );
 
-    this.promotionRelegation = new PromotionRelegationService(repos);
-    this.seasonTransition = new SeasonTransitionManager(
-      repos,
-      this.promotionRelegation,
-      this.season
-    );
+    this.seasonTransition = new SeasonTransitionManager(repos, this.season);
     this.transferWindow = new TransferWindowManager(repos);
     this.transferValidator = new TransferValidator(repos);
 
@@ -152,7 +151,6 @@ export class ServiceContainer implements IServiceContainer {
       repos,
       this.eventBus,
       this.finance,
-      this.matchResult,
       this.matchSubstitution,
       this.matchTactics
     );
@@ -166,16 +164,7 @@ export class ServiceContainer implements IServiceContainer {
     this.eventBus.subscribe(
       GameEventType.MATCH_FINISHED,
       async (payload: MatchFinishedPayload) => {
-        if (payload.competitionId && payload.seasonId) {
-          await this.matchResult.updateStandings(
-            payload.competitionId,
-            payload.seasonId,
-            payload.homeTeamId,
-            payload.awayTeamId,
-            payload.homeScore,
-            payload.awayScore
-          );
-        }
+        await this.matchResult.handleMatchFinished(payload);
 
         await this.marketing.processMatchResult(
           payload.matchId,

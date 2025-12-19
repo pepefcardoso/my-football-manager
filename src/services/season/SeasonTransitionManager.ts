@@ -2,31 +2,28 @@ import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import { Result } from "../../domain/ServiceResults";
 import type { ServiceResult } from "../../domain/ServiceResults";
-import type {
-  PromotionRelegationService,
-  PromotionRelegationResult,
-} from "./PromotionRelegationService";
 import type { SeasonService, SeasonSummary } from "../SeasonService";
+import { getBalanceValue } from "../../engine/GameBalanceConfig";
+
+interface PromotionRelegationResult {
+  championName: string;
+  promotedTeams: number[];
+  relegatedTeams: number[];
+}
+
+const SLOTS = getBalanceValue("SEASON").PROMOTION_RELEGATION_SLOTS;
 
 export class SeasonTransitionManager extends BaseService {
-  private promotionRelegationService: PromotionRelegationService;
   private seasonService: SeasonService;
 
   constructor(
     repositories: IRepositoryContainer,
-    promotionRelegationService: PromotionRelegationService,
     seasonService: SeasonService
   ) {
     super(repositories, "SeasonTransitionManager");
-    this.promotionRelegationService = promotionRelegationService;
     this.seasonService = seasonService;
   }
 
-  /**
-   * Orquestra todo o processo de transição de temporada.
-   * Calcula resultados, aplica efeitos nos times/jogadores e inicia o novo ano.
-   * * @param currentSeasonId ID da temporada que está encerrando
-   */
   async processEndOfSeason(
     currentSeasonId: number
   ): Promise<ServiceResult<SeasonSummary>> {
@@ -44,16 +41,10 @@ export class SeasonTransitionManager extends BaseService {
           throw new Error("Nenhuma temporada ativa encontrada para finalizar.");
         }
 
-        const outcomeResult =
-          await this.promotionRelegationService.calculateOutcome(
-            currentSeasonId
-          );
+        const outcome = await this.calculatePromotionRelegation(
+          currentSeasonId
+        );
 
-        if (Result.isFailure(outcomeResult)) {
-          throw new Error(outcomeResult.error.message);
-        }
-
-        const outcome = outcomeResult.data;
         this.logOutcome(outcome);
 
         await this.applyPromotionRelegationEffects(outcome);
@@ -82,9 +73,47 @@ export class SeasonTransitionManager extends BaseService {
     );
   }
 
-  /**
-   * Atualiza reputação e orçamento baseando-se no sucesso/fracasso esportivo.
-   */
+  private async calculatePromotionRelegation(
+    seasonId: number
+  ): Promise<PromotionRelegationResult> {
+    const competitions = await this.repos.competitions.findAll();
+
+    const tier1 = competitions.find((c) => c.tier === 1 && c.type === "league");
+    const tier2 = competitions.find((c) => c.tier === 2 && c.type === "league");
+
+    let championName = "Desconhecido";
+    let relegated: number[] = [];
+    let promoted: number[] = [];
+
+    if (tier1) {
+      const standingsT1 = await this.repos.competitions.getStandings(
+        tier1.id,
+        seasonId
+      );
+
+      if (standingsT1.length > 0) {
+        championName = standingsT1[0].team?.name || "Desconhecido";
+        const numberToSwap = SLOTS;
+        relegated = standingsT1.slice(-numberToSwap).map((s) => s.teamId!);
+      }
+    }
+
+    if (tier2) {
+      const standingsT2 = await this.repos.competitions.getStandings(
+        tier2.id,
+        seasonId
+      );
+      const numberToSwap = SLOTS;
+      promoted = standingsT2.slice(0, numberToSwap).map((s) => s.teamId!);
+    }
+
+    return {
+      championName,
+      promotedTeams: promoted,
+      relegatedTeams: relegated,
+    };
+  }
+
   private async applyPromotionRelegationEffects(
     outcome: PromotionRelegationResult
   ): Promise<void> {
@@ -121,9 +150,6 @@ export class SeasonTransitionManager extends BaseService {
     }
   }
 
-  /**
-   * Processa o envelhecimento de todos os jogadores e aposentadorias.
-   */
   private async processSquadUpdates(): Promise<void> {
     this.logger.info("🔄 Processando envelhecimento e renovação de elencos...");
 
@@ -140,13 +166,10 @@ export class SeasonTransitionManager extends BaseService {
         const retirementAge = 39;
 
         if (newAge >= retirementAge) {
-          // Aposenta o jogador (remove do time, remove contrato)
-          // Em uma implementação futura, isso poderia mover para uma tabela de "Lendas"
           await this.repos.players.update(player.id, {
             teamId: null,
             moral: 0,
           });
-          // Opcional: Remover contrato ativo se existir (depende da implementação do repo)
           retiredCount++;
         } else {
           let physicalChange = 0;
@@ -178,10 +201,6 @@ export class SeasonTransitionManager extends BaseService {
     );
   }
 
-  /**
-   * Remove dados que não são mais necessários para a nova temporada
-   * para manter a performance do banco de dados.
-   */
   private async cleanupInactiveData(): Promise<void> {
     this.logger.info("🧹 Executando limpeza de dados inativos...");
 

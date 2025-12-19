@@ -1,3 +1,5 @@
+import type { MatchResult } from "./types";
+
 export enum GameEventType {
   MATCH_FINISHED = "MATCH_FINISHED",
   CONTRACT_EXPIRED = "CONTRACT_EXPIRED",
@@ -18,6 +20,7 @@ export interface MatchFinishedPayload {
   ticketRevenue: number;
   attendance: number;
   round?: number;
+  matchResult: MatchResult;
 }
 
 export interface ContractExpiredPayload {

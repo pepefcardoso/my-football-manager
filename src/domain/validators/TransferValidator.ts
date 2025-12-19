@@ -1,16 +1,13 @@
-import { BaseService } from "../../BaseService";
-import type { IRepositoryContainer } from "../../../repositories/IRepositories";
-import { Result } from "../../../domain/ServiceResults";
-import type { ServiceResult } from "../../../domain/ServiceResults";
-import type { ValidationResult } from "../../BaseService";
-import { getBalanceValue } from "../../../engine/GameBalanceConfig";
+import { BaseService } from "../../services/BaseService";
+import type { IRepositoryContainer } from "../../repositories/IRepositories";
+import { Result } from "../ServiceResults";
+import type { ServiceResult } from "../ServiceResults";
+import type { ValidationResult } from "../../services/BaseService";
+import { getBalanceValue } from "../../engine/GameBalanceConfig";
 
 const CONTRACT_CONFIG = getBalanceValue("CONTRACT");
 const TRANSFER_VALIDATION_CONFIG = getBalanceValue("TRANSFER").VALIDATION;
 
-/**
- * Contexto completo necessário para validar uma transferência
- */
 export interface TransferValidationContext {
   playerId: number;
   fromTeamId: number;
@@ -23,32 +20,18 @@ export interface TransferValidationContext {
   seasonId: number;
 }
 
-/**
- * Resultado detalhado da validação
- */
 export interface TransferValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
 }
 
-/**
- * TransferValidator
- *
- * Responsabilidade: Centralizar todas as validações de regras de negócio
- * relacionadas a transferências e contratos.
- *
- * Princípio: Single Responsibility - apenas validar, não executar.
- */
 export class TransferValidator extends BaseService {
   constructor(repositories: IRepositoryContainer) {
     super(repositories, "TransferValidator");
   }
 
   /**
-   * Valida se uma transferência pode ser executada.
-   * Executa todas as validações necessárias e retorna um resultado consolidado.
-   *
    * @param context - Contexto completo da transferência
    * @returns ServiceResult contendo o resultado da validação
    */
@@ -121,9 +104,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida se o jogador já foi transferido nesta janela de transferências.
-   * Regra: Um jogador não pode ser transferido mais de uma vez na mesma temporada.
-   *
    * @param playerId - ID do jogador
    * @param seasonId - ID da temporada
    * @returns ValidationResult
@@ -174,8 +154,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida se o time comprador possui orçamento suficiente para a transferência.
-   *
    * @param teamId - ID do time comprador
    * @param fee - Valor da transferência
    * @returns ValidationResult
@@ -218,9 +196,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida se o jogador realmente pertence ao time vendedor.
-   * Caso fromTeamId seja 0, valida se o jogador é um agente livre.
-   *
    * @param playerId - ID do jogador
    * @param fromTeamId - ID do time vendedor (0 = agente livre)
    * @returns ValidationResult
@@ -264,8 +239,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida as regras de contrato (duração mínima/máxima).
-   *
    * @param contractLength - Duração do contrato em anos
    * @param transferType - Tipo de transferência (transfer ou loan)
    * @returns ValidationResult
@@ -310,9 +283,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida se o salário oferecido é adequado para o jogador.
-   * Baseado no Overall e na reputação do jogador.
-   *
    * @param playerId - ID do jogador
    * @param wageOffer - Salário anual oferecido
    * @returns ValidationResult
@@ -360,9 +330,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida se o time comprador não excederá o limite de elenco.
-   * Esta é uma validação de aviso, não bloqueante.
-   *
    * @param teamId - ID do time comprador
    * @returns ValidationResult
    */
@@ -387,8 +354,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida se o time está sob Transfer Ban (sanção financeira).
-   *
    * @param teamId - ID do time
    * @returns ValidationResult
    */
@@ -416,8 +381,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida apenas o valor financeiro da transferência (valor mínimo/máximo).
-   *
    * @param fee - Valor da transferência
    * @returns ValidationResult
    */
@@ -456,9 +419,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida se uma proposta já existe e está ativa.
-   * Evita duplicação de propostas.
-   *
    * @param playerId - ID do jogador
    * @param fromTeamId - ID do time vendedor
    * @param toTeamId - ID do time comprador
@@ -490,9 +450,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida se o jogador pode ser emprestado.
-   * Jogadores em empréstimo não podem ser emprestados novamente.
-   *
    * @param playerId - ID do jogador
    * @returns ValidationResult
    */
@@ -519,9 +476,6 @@ export class TransferValidator extends BaseService {
   }
 
   /**
-   * Valida todas as regras de uma vez e retorna um resumo consolidado.
-   * Método auxiliar para validação rápida.
-   *
    * @param context - Contexto da transferência
    * @returns ServiceResult com o resultado consolidado
    */
