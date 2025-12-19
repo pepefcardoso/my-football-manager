@@ -10,7 +10,7 @@ import type {
 } from "../domain/models";
 import type { ClubInterestInsert } from "./ClubInterestRepository";
 import type { GameState } from "../domain/models";
-import type { ContractSelect } from "./ContractRepository";
+import type { ContractInsert, ContractSelect } from "./ContractRepository";
 
 export interface PlayerCompetitionStats {
   id: number;
@@ -65,6 +65,7 @@ export interface IContractRepository {
   findActiveByPlayerId(playerId: number): Promise<ContractSelect | undefined>;
   updateStatus(contractId: number, status: string): Promise<void>;
   updateTerms(contractId: number, wage: number, endDate: string): Promise<void>;
+  create(data: ContractInsert): Promise<number>;
 }
 
 export interface ITeamRepository {

@@ -80,6 +80,12 @@ declare global {
         ) => Promise<boolean>;
       };
 
+      youth: {
+        getPlayers: (teamId: number) => Promise<Player[]>;
+        promote: (playerId: number, teamId: number) => Promise<boolean>;
+        release: (playerId: number, teamId: number) => Promise<boolean>;
+      };
+
       staff: {
         getStaff: (teamId: number) => Promise<Staff[]>;
         getFreeAgents: () => Promise<Staff[]>;

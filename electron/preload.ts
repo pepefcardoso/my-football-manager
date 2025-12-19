@@ -20,6 +20,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
       }),
   },
 
+  youth: {
+    getPlayers: (teamId: number) =>
+      ipcRenderer.invoke("youth:getPlayers", teamId),
+    promote: (playerId: number, teamId: number) =>
+      ipcRenderer.invoke("youth:promote", { playerId, teamId }),
+    release: (playerId: number, teamId: number) =>
+      ipcRenderer.invoke("youth:release", { playerId, teamId }),
+  },
+
   staff: {
     getStaff: (teamId: number) => ipcRenderer.invoke("staff:getStaff", teamId),
     getFreeAgents: () => ipcRenderer.invoke("staff:getFreeAgents"),

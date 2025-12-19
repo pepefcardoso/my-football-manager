@@ -18,6 +18,7 @@ import StandingsPage from "./components/pages/StandingsPage";
 import TransferMarketPage from "./components/pages/TransferMarketPage";
 import { TransferNotification } from "./components/common/TransferNotification";
 import { EventModal } from "./components/features/events/EventModal";
+import YouthAcademyPage from "./components/pages/YouthAcademyPage";
 
 const logger = new Logger("App");
 
@@ -151,7 +152,7 @@ function App() {
           {activePage === "squad" && <SquadPage teamId={userTeam.id} />}
           {activePage === "staff" && <StaffPage teamId={userTeam.id} />}
           {activePage === "matches" && <MatchesPage teamId={userTeam.id} teams={teams} />}
-          {activePage === "youth" && <PlaceholderPage title="Categorias de Base" />}
+          {activePage === "youth" && <YouthAcademyPage teamId={userTeam.id} />}
           {activePage === "scouting" && <ScoutingPage teamId={userTeam.id} />}
           {activePage === "transfer" && <TransferMarketPage teamId={userTeam.id} />}
           {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}

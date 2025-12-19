@@ -42,6 +42,7 @@ import {
   type TransferCompletedPayload,
 } from "../domain/GameEventTypes";
 import { TransferValidator } from "../domain/validators/TransferValidator";
+import { YouthAcademyService } from "./YouthAcademyService";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: IUnitOfWork;
@@ -74,6 +75,7 @@ export class ServiceContainer implements IServiceContainer {
   public readonly valuationService: ValuationService;
   public readonly operationalCosts: OperationalCostsService;
   public readonly revenueService: RevenueService;
+  public readonly youthAcademy: YouthAcademyService;
 
   constructor(
     repos: IRepositoryContainer,
@@ -152,6 +154,8 @@ export class ServiceContainer implements IServiceContainer {
       matchSubstitution,
       matchTactics
     );
+
+    this.youthAcademy = new YouthAcademyService(repos);
 
     if (!unitOfWork && !eventBus) {
       this.setupSubscriptions();

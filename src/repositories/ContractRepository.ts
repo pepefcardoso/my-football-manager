@@ -3,6 +3,7 @@ import { playerContracts } from "../db/schema";
 import { BaseRepository } from "./BaseRepository";
 
 export type ContractSelect = typeof playerContracts.$inferSelect;
+export type ContractInsert = typeof playerContracts.$inferInsert;
 
 export class ContractRepository extends BaseRepository {
   async findActiveByTeamId(teamId: number): Promise<ContractSelect[]> {
@@ -62,6 +63,14 @@ export class ContractRepository extends BaseRepository {
       .update(playerContracts)
       .set({ wage, endDate })
       .where(eq(playerContracts.id, contractId));
+  }
+
+  async create(data: ContractInsert): Promise<number> {
+    const result = await this.db
+      .insert(playerContracts)
+      .values(data)
+      .returning({ id: playerContracts.id });
+    return result[0].id;
   }
 }
 

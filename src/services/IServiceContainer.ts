@@ -27,6 +27,7 @@ import type { PlayerDevelopmentService } from "./PlayerDevelopmentService";
 import type { ValuationService } from "./finance/ValuationService";
 import type { OperationalCostsService } from "./finance/OperationalCostsService";
 import type { RevenueService } from "./finance/RevenueService";
+import type { YouthAcademyService } from "./YouthAcademyService";
 
 export interface IServiceContainer {
   unitOfWork: IUnitOfWork;
@@ -58,4 +59,5 @@ export interface IServiceContainer {
   valuationService: ValuationService;
   operationalCosts: OperationalCostsService;
   revenueService: RevenueService;
+  youthAcademy: YouthAcademyService;
 }

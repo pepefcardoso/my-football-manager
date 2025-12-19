@@ -125,6 +125,29 @@ function registerIpcHandlers() {
     }
   );
 
+  ipcMain.handle("youth:getPlayers", async (_, teamId: number) => {
+    const result = await serviceContainer.youthAcademy.getAcademyPlayers(
+      teamId
+    );
+    return Result.unwrapOr(result, []);
+  });
+
+  ipcMain.handle("youth:promote", async (_, { playerId, teamId }) => {
+    const result = await serviceContainer.youthAcademy.promotePlayer(
+      playerId,
+      teamId
+    );
+    return Result.isSuccess(result);
+  });
+
+  ipcMain.handle("youth:release", async (_, { playerId, teamId }) => {
+    const result = await serviceContainer.youthAcademy.releasePlayer(
+      playerId,
+      teamId
+    );
+    return Result.isSuccess(result);
+  });
+
   ipcMain.handle("staff:getStaff", async (_, teamId: number) => {
     const result = await serviceContainer.staff.getStaffByTeam(teamId);
     return Result.unwrapOr(result, []);
