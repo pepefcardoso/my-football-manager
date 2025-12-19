@@ -4,9 +4,6 @@ export interface SimpleMatchResult {
   winnerId: number | null;
 }
 
-/**
- * Simula um placar rápido baseado na reputação dos times
- */
 export function quickSimulateMatch(
   homeRep: number,
   awayRep: number
