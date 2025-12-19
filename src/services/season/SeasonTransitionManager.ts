@@ -4,6 +4,7 @@ import { Result } from "../../domain/ServiceResults";
 import type { ServiceResult } from "../../domain/ServiceResults";
 import type { SeasonService, SeasonSummary } from "../SeasonService";
 import { getBalanceValue } from "../../engine/GameBalanceConfig";
+import type { YouthAcademyService } from "../YouthAcademyService";
 
 interface PromotionRelegationResult {
   championName: string;
@@ -15,13 +16,16 @@ const SLOTS = getBalanceValue("SEASON").PROMOTION_RELEGATION_SLOTS;
 
 export class SeasonTransitionManager extends BaseService {
   private seasonService: SeasonService;
+  private youthAcademyService: YouthAcademyService;
 
   constructor(
     repositories: IRepositoryContainer,
-    seasonService: SeasonService
+    seasonService: SeasonService,
+    youthAcademyService: YouthAcademyService
   ) {
     super(repositories, "SeasonTransitionManager");
     this.seasonService = seasonService;
+    this.youthAcademyService = youthAcademyService;
   }
 
   async processEndOfSeason(
@@ -51,6 +55,8 @@ export class SeasonTransitionManager extends BaseService {
 
         await this.processSquadUpdates();
 
+        await this.processYouthIntake();
+
         await this.cleanupInactiveData();
 
         const nextSeasonResult = await this.seasonService.startNewSeason(
@@ -70,6 +76,31 @@ export class SeasonTransitionManager extends BaseService {
           relegatedTeams: outcome.relegatedTeams,
         };
       }
+    );
+  }
+
+  private async processYouthIntake(): Promise<void> {
+    this.logger.info("👶 Iniciando processo de Youth Intake anual...");
+
+    const allTeams = await this.repos.teams.findAll();
+    let totalGenerated = 0;
+
+    for (const team of allTeams) {
+      try {
+        const intakeResult = await this.youthAcademyService.generateYouthIntake(
+          team.id
+        );
+
+        if (Result.isSuccess(intakeResult)) {
+          totalGenerated += intakeResult.data.length;
+        }
+      } catch (error) {
+        this.logger.error(`Erro ao gerar intake para time ${team.id}:`, error);
+      }
+    }
+
+    this.logger.info(
+      `✅ Youth Intake concluído. ${totalGenerated} novas promessas geradas.`
     );
   }
 

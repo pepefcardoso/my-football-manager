@@ -98,6 +98,9 @@ export class ServiceContainer implements IServiceContainer {
     this.scouting = new ScoutingService(repos);
     this.staff = new StaffService(repos);
     this.playerDevelopment = new PlayerDevelopmentService(repos);
+
+    this.youthAcademy = new YouthAcademyService(repos);
+
     this.dailySimulation = new DailySimulationService(
       repos,
       this.playerDevelopment
@@ -114,7 +117,12 @@ export class ServiceContainer implements IServiceContainer {
       this.contract
     );
 
-    this.seasonTransition = new SeasonTransitionManager(repos, this.season);
+    this.seasonTransition = new SeasonTransitionManager(
+      repos,
+      this.season,
+      this.youthAcademy
+    );
+
     this.transferWindow = new TransferWindowManager(repos);
 
     const transferValidator = new TransferValidator(repos);
@@ -154,8 +162,6 @@ export class ServiceContainer implements IServiceContainer {
       matchSubstitution,
       matchTactics
     );
-
-    this.youthAcademy = new YouthAcademyService(repos);
 
     if (!unitOfWork && !eventBus) {
       this.setupSubscriptions();
