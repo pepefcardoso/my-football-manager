@@ -6,12 +6,12 @@ import { existsSync, mkdirSync } from "node:fs";
 import { db } from "../src/lib/db";
 import { Logger } from "../src/lib/Logger";
 import { serviceContainer } from "../src/services/ServiceContainer";
-import { Result } from "../src/services/types/ServiceResults";
-import { GameEventType } from "../src/services/events/GameEventTypes";
 import { GameEngine } from "../src/engine/GameEngine";
 import { repositoryContainer } from "../src/repositories/RepositoryContainer";
 import { gameState, teams } from "../src/db/schema";
 import { eq } from "drizzle-orm";
+import { GameEventType } from "../src/domain/GameEventTypes";
+import { Result } from "../src/domain/ServiceResults";
 
 app.name = "Football Manager 2D";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -564,12 +564,16 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("finance:checkFinancialHealth", async (_, teamId: number) => {
-    const result = await serviceContainer.finance.checkFinancialHealth(teamId);
+    const result = await serviceContainer.financialHealth.checkFinancialHealth(
+      teamId
+    );
     return Result.unwrapOr(result, null);
   });
 
   ipcMain.handle("finance:canMakeTransfers", async (_, teamId: number) => {
-    const result = await serviceContainer.finance.canMakeTransfers(teamId);
+    const result = await serviceContainer.financialHealth.canMakeTransfers(
+      teamId
+    );
     return Result.unwrapOr(result, {
       allowed: false,
       reason: "Erro desconhecido",
@@ -579,7 +583,7 @@ function registerIpcHandlers() {
   ipcMain.handle(
     "finance:getFinancialRecords",
     async (_, { teamId, seasonId }) => {
-      return await serviceContainer.finance.getFinancialRecords(
+      return await repositoryContainer.financial.findByTeamAndSeason(
         teamId,
         seasonId
       );
@@ -587,7 +591,9 @@ function registerIpcHandlers() {
   );
 
   ipcMain.handle("finance:getFinancialHealth", async (_, teamId: number) => {
-    const result = await serviceContainer.finance.checkFinancialHealth(teamId);
+    const result = await serviceContainer.financialHealth.checkFinancialHealth(
+      teamId
+    );
     return Result.unwrapOr(result, null);
   });
 
@@ -614,7 +620,7 @@ function registerIpcHandlers() {
     "finance:calculatePlayerSalary",
     async (_, { playerId, teamId, isFreeTransfer }) => {
       const result =
-        await serviceContainer.salaryCalculator.calculatePlayerSalary(
+        await serviceContainer.valuationService.calculatePlayerSalary(
           playerId,
           teamId,
           isFreeTransfer
@@ -624,8 +630,9 @@ function registerIpcHandlers() {
   );
 
   ipcMain.handle("finance:getTeamWageBill", async (_, teamId) => {
-    const result =
-      await serviceContainer.salaryCalculator.calculateTeamWageBill(teamId);
+    const result = await serviceContainer.contract.calculateMonthlyWageBill(
+      teamId
+    );
     return Result.unwrapOr(result, null);
   });
 
@@ -870,11 +877,12 @@ function registerIpcHandlers() {
   ipcMain.handle(
     "game:respondToEvent",
     async (_, { eventId, optionId, teamId }) => {
-      const result = await serviceContainer.eventService.processEventResponse(
-        eventId,
-        optionId,
-        teamId
-      );
+      const result =
+        await serviceContainer.narrativeService.processEventResponse(
+          eventId,
+          optionId,
+          teamId
+        );
       if (Result.isSuccess(result)) {
         return { success: true, message: result.data };
       }

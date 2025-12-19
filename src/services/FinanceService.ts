@@ -3,38 +3,31 @@ import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import type { ServiceResult } from "../domain/ServiceResults";
 import { Result } from "../domain/ServiceResults";
-import type { FinancialHealthChecker } from "./finance/FinancialHealthChecker";
 import type {
   ProcessExpensesInput,
   ProcessExpensesResult,
-  FinancialHealthResult,
-  TransferPermissionResult,
 } from "../domain/types";
-import type { ValuationService } from "./finance/ValuationService";
 import type { OperationalCostsService } from "./finance/OperationalCostsService";
 import type { RevenueService } from "./finance/RevenueService";
 import type { ContractService } from "./ContractService";
 import { FinancialBalance } from "../engine/FinancialBalanceConfig";
-import { FinancialReportFactory, type MonthlyFinancialSummary } from "../domain/factories/ReportFactory";
+import {
+  FinancialReportFactory,
+  type MonthlyFinancialSummary,
+} from "../domain/factories/ReportFactory";
 
 export class FinanceService extends BaseService {
-  private healthChecker: FinancialHealthChecker;
-  private valuationService: ValuationService;
   private operationalCosts: OperationalCostsService;
   private revenueService: RevenueService;
   private contractService: ContractService;
 
   constructor(
     repositories: IRepositoryContainer,
-    healthChecker: FinancialHealthChecker,
-    valuationService: ValuationService,
     operationalCosts: OperationalCostsService,
     revenueService: RevenueService,
     contractService: ContractService
   ) {
     super(repositories, "FinanceService");
-    this.healthChecker = healthChecker;
-    this.valuationService = valuationService;
     this.operationalCosts = operationalCosts;
     this.revenueService = revenueService;
     this.contractService = contractService;
@@ -346,22 +339,6 @@ export class FinanceService extends BaseService {
     });
   }
 
-  async checkFinancialHealth(
-    teamId: number
-  ): Promise<ServiceResult<FinancialHealthResult>> {
-    return this.healthChecker.checkFinancialHealth(teamId);
-  }
-
-  async canMakeTransfers(
-    teamId: number
-  ): Promise<ServiceResult<TransferPermissionResult>> {
-    return this.healthChecker.canMakeTransfers(teamId);
-  }
-
-  async getFinancialRecords(teamId: number, seasonId: number) {
-    return this.repos.financial.findByTeamAndSeason(teamId, seasonId);
-  }
-
   async getFinancialDashboard(
     teamId: number,
     seasonId: number
@@ -435,18 +412,6 @@ export class FinanceService extends BaseService {
           financialHealth,
         };
       }
-    );
-  }
-
-  async calculatePlayerSalary(
-    playerId: number,
-    teamId: number,
-    isFreeTransfer: boolean
-  ) {
-    return this.valuationService.calculatePlayerSalary(
-      playerId,
-      teamId,
-      isFreeTransfer
     );
   }
 }

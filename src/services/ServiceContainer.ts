@@ -74,9 +74,6 @@ export class ServiceContainer implements IServiceContainer {
   public readonly valuationService: ValuationService;
   public readonly operationalCosts: OperationalCostsService;
   public readonly revenueService: RevenueService;
-  public readonly matchSubstitution: MatchSubstitutionManager;
-  public readonly matchTactics: MatchTacticsManager;
-  public readonly transferValidator: TransferValidator;
 
   constructor(
     repos: IRepositoryContainer,
@@ -85,6 +82,7 @@ export class ServiceContainer implements IServiceContainer {
   ) {
     this.unitOfWork = unitOfWork || new UnitOfWork();
     this.eventBus = eventBus || new GameEventBus();
+
     this.financialPenalty = new FinancialPenaltyService(repos);
     this.stats = new StatsService(repos);
     this.matchResult = new MatchResultProcessor(repos, this.stats);
@@ -106,12 +104,9 @@ export class ServiceContainer implements IServiceContainer {
     this.valuationService = new ValuationService(repos);
     this.operationalCosts = new OperationalCostsService(repos);
     this.revenueService = new RevenueService(repos);
-    this.matchTactics = new MatchTacticsManager(repos);
-    this.matchSubstitution = new MatchSubstitutionManager(repos);
+
     this.finance = new FinanceService(
       repos,
-      this.financialHealth,
-      this.valuationService,
       this.operationalCosts,
       this.revenueService,
       this.contract
@@ -119,12 +114,12 @@ export class ServiceContainer implements IServiceContainer {
 
     this.seasonTransition = new SeasonTransitionManager(repos, this.season);
     this.transferWindow = new TransferWindowManager(repos);
-    this.transferValidator = new TransferValidator(repos);
 
+    const transferValidator = new TransferValidator(repos);
     this.transfer = new TransferService(
       repos,
       this.eventBus,
-      this.transferValidator
+      transferValidator
     );
 
     this.squadAnalysis = new SquadAnalysisService(repos);
@@ -147,12 +142,15 @@ export class ServiceContainer implements IServiceContainer {
       this.staff
     );
 
+    const matchTactics = new MatchTacticsManager(repos);
+    const matchSubstitution = new MatchSubstitutionManager(repos);
+
     this.match = new MatchService(
       repos,
       this.eventBus,
       this.finance,
-      this.matchSubstitution,
-      this.matchTactics
+      matchSubstitution,
+      matchTactics
     );
 
     if (!unitOfWork && !eventBus) {

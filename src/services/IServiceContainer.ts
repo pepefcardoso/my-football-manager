@@ -22,8 +22,11 @@ import type { SquadAnalysisService } from "./ai/SquadAnalysisService";
 import type { AITransferDecisionMaker } from "./ai/AITransferDecisionMaker";
 import type { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
 import type { NarrativeService } from "./narrative/NarrativeService";
-import type { MatchTacticsManager } from "./match/MatchTacticsManager";
-import type { MatchSubstitutionManager } from "./match/MatchSubstitutionManager";
+import type { CPUSimulationService } from "./ai/CPUSimulationService";
+import type { PlayerDevelopmentService } from "./PlayerDevelopmentService";
+import type { ValuationService } from "./finance/ValuationService";
+import type { OperationalCostsService } from "./finance/OperationalCostsService";
+import type { RevenueService } from "./finance/RevenueService";
 
 export interface IServiceContainer {
   unitOfWork: IUnitOfWork;
@@ -50,6 +53,9 @@ export interface IServiceContainer {
   aiTransferDecisionMaker: AITransferDecisionMaker;
   dailyTransferProcessor: DailyTransferProcessor;
   narrativeService: NarrativeService;
-  matchTactics: MatchTacticsManager;
-  matchSubstitution: MatchSubstitutionManager;
+  cpuSimulation: CPUSimulationService;
+  playerDevelopment: PlayerDevelopmentService;
+  valuationService: ValuationService;
+  operationalCosts: OperationalCostsService;
+  revenueService: RevenueService;
 }
