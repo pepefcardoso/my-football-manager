@@ -7,6 +7,8 @@ import {
   FinancialBalance,
   type LeagueTier,
 } from "../../engine/FinancialBalanceConfig";
+import { RevenueStrategyFactory } from "../strategies/revenue/RevenueStrategyFactory";
+import { MatchRevenueConfig } from "../config/ServiceConstants";
 
 export interface MatchdayRevenueBreakdown {
   tickets: {
@@ -74,7 +76,7 @@ export class EnhancedRevenueService extends BaseService {
     return this.execute(
       "calculateMatchdayRevenue",
       { teamId, matchImportance, weatherCondition },
-      async ({ teamId, matchImportance, weatherCondition }) => {
+      async ({ teamId, matchImportance }) => {
         const team = await this.repos.teams.findById(teamId);
         if (!team) {
           throw new Error(`Team ${teamId} not found`);
@@ -83,24 +85,36 @@ export class EnhancedRevenueService extends BaseService {
         const leagueTier = this.determineLeagueTier(team);
         const capacity = team.stadiumCapacity || 10000;
         const fanSatisfaction = team.fanSatisfaction || 50;
-        const fanBase = team.fanBase || 10000;
 
-        const attendance = this.calculateAttendance(
-          capacity,
-          fanSatisfaction,
-          fanBase,
-          matchImportance,
-          weatherCondition
+        const strategy = RevenueStrategyFactory.getStrategy(undefined);
+
+        const tierNumber = this.mapTierToNumber(leagueTier);
+
+        const strategyResult = strategy.calculateRevenue({
+          stadiumCapacity: capacity,
+          fanSatisfaction: fanSatisfaction,
+          ticketPrice: MatchRevenueConfig.BASE_TICKET_PRICE,
+          competitionTier: tierNumber,
+          round: 10,
+        });
+
+        const baseAttendance = strategyResult.attendance;
+
+        const weatherPenalty = weatherCondition === "poor" ? 0.85 : 1.0;
+        const projectedAttendance = Math.round(
+          baseAttendance * weatherPenalty * matchImportance
         );
 
+        const finalAttendance = Math.min(capacity, projectedAttendance);
+
         const tickets = this.calculateTicketRevenue(
-          attendance,
+          finalAttendance,
           capacity,
           leagueTier
         );
 
         const commercial = this.calculateMatchdayCommercialRevenue(
-          attendance,
+          finalAttendance,
           team.reputation || 0
         );
 
@@ -108,14 +122,17 @@ export class EnhancedRevenueService extends BaseService {
 
         this.logger.debug(
           `Matchday revenue for ${team.shortName}: ` +
-            `€${totalRevenue.toLocaleString()} (${attendance.toLocaleString()} fans)`
+            `€${totalRevenue.toLocaleString()} (${finalAttendance.toLocaleString()} fans)`
         );
 
         return {
           tickets,
           commercial,
           totalRevenue,
-          revenuePerFan: Math.round(totalRevenue / attendance),
+          revenuePerFan:
+            finalAttendance > 0
+              ? Math.round(totalRevenue / finalAttendance)
+              : 0,
         };
       }
     );
@@ -187,28 +204,6 @@ export class EnhancedRevenueService extends BaseService {
     );
   }
 
-  private calculateAttendance(
-    capacity: number,
-    fanSatisfaction: number,
-    fanBase: number,
-    matchImportance: number,
-    weatherCondition: "good" | "poor"
-  ): number {
-    const satisfactionFactor = fanSatisfaction / 100;
-    const baseAttendance = capacity * satisfactionFactor;
-
-    const importanceAdjusted = baseAttendance * matchImportance;
-
-    const weatherPenalty = weatherCondition === "poor" ? 0.85 : 1.0;
-    const weatherAdjusted = importanceAdjusted * weatherPenalty;
-
-    const maxPossible = Math.min(capacity, fanBase * 0.8);
-
-    const randomFactor = 0.9 + Math.random() * 0.2;
-
-    return Math.round(Math.min(maxPossible, weatherAdjusted * randomFactor));
-  }
-
   private calculateTicketRevenue(
     attendance: number,
     capacity: number,
@@ -228,7 +223,7 @@ export class EnhancedRevenueService extends BaseService {
       vipCapacity,
       Math.round(attendance * config.VIP_CAPACITY_PERCENTAGE)
     );
-    const standardAttendance = attendance - vipAttendance;
+    const standardAttendance = Math.max(0, attendance - vipAttendance);
 
     const vipPrice = standardPrice * config.VIP_TICKET_MULTIPLIER;
 
@@ -241,7 +236,8 @@ export class EnhancedRevenueService extends BaseService {
       totalRevenue: Math.round(standardRevenue + vipRevenue),
       attendance,
       capacity,
-      utilizationRate: Math.round((attendance / capacity) * 100),
+      utilizationRate:
+        capacity > 0 ? Math.round((attendance / capacity) * 100) : 0,
     };
   }
 
@@ -277,32 +273,24 @@ export class EnhancedRevenueService extends BaseService {
     homeMatches: number,
     leagueTier: LeagueTier
   ): Promise<AnnualRevenueProjection["matchday"]> {
-    const capacity = team.stadiumCapacity || 10000;
-    const fanSatisfaction = team.fanSatisfaction || 50;
-    const fanBase = team.fanBase || 10000;
-
-    const averageAttendance = this.calculateAttendance(
-      capacity,
-      fanSatisfaction,
-      fanBase,
-      1.0,
-      "good"
-    );
-
     const singleMatchResult = await this.calculateMatchdayRevenue(
       team.id,
       1.0,
       "good"
     );
 
-    const averageMatchRevenue = Result.isSuccess(singleMatchResult)
+    const averageRevenue = Result.isSuccess(singleMatchResult)
       ? singleMatchResult.data.totalRevenue
+      : 0;
+
+    const averageAttendance = Result.isSuccess(singleMatchResult)
+      ? singleMatchResult.data.tickets.attendance
       : 0;
 
     return {
       homeMatches,
       averageAttendance,
-      totalRevenue: Math.round(averageMatchRevenue * homeMatches),
+      totalRevenue: Math.round(averageRevenue * homeMatches),
     };
   }
 
@@ -417,5 +405,11 @@ export class EnhancedRevenueService extends BaseService {
     if (reputation >= 7000) return "TIER_1";
     if (reputation >= 4000) return "TIER_2";
     return "TIER_3";
+  }
+
+  private mapTierToNumber(tier: LeagueTier): number {
+    if (tier === "TIER_1") return 1;
+    if (tier === "TIER_2") return 2;
+    return 3;
   }
 }

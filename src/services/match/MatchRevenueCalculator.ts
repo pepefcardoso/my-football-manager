@@ -37,12 +37,14 @@ export class MatchRevenueCalculator extends BaseService {
 
         const strategy = RevenueStrategyFactory.getStrategy(competition);
 
+        const matchRound = round || 1;
+
         const result = strategy.calculateRevenue({
           stadiumCapacity: homeTeam.stadiumCapacity ?? 10000,
           fanSatisfaction: homeTeam.fanSatisfaction ?? 50,
           ticketPrice: MatchRevenueConfig.BASE_TICKET_PRICE,
           competitionTier: competition?.tier ?? 1,
-          round: round || undefined,
+          round: matchRound,
         });
 
         this.logger.debug(

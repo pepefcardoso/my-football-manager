@@ -28,7 +28,7 @@ import {
   random,
 } from "./seeds/generators";
 import { quickSimulateMatch } from "./seeds/match-simulator";
-import { CompetitionScheduler } from "../services/CompetitionScheduler";
+import { CompetitionScheduler } from "../domain/logic/CompetitionScheduler";
 import { eq } from "drizzle-orm";
 import {
   Position,

@@ -1,6 +1,5 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
-import type { IUnitOfWork } from "../../repositories/IUnitOfWork";
 import type { TransferProposalInsert } from "../../repositories/TransferProposalRepository";
 import { GameEventBus } from "../events/GameEventBus";
 import { GameEventType } from "../events/GameEventTypes";
@@ -40,17 +39,14 @@ export interface RespondProposalInput {
 const TRANSFER_CONFIG = getBalanceValue("TRANSFER");
 
 export class TransferService extends BaseService {
-  private unitOfWork: IUnitOfWork; // TODO REMOVER
   private eventBus: GameEventBus;
   private transferValidator: TransferValidator;
 
   constructor(
     repositories: IRepositoryContainer,
-    unitOfWork: IUnitOfWork,
     eventBus: GameEventBus
   ) {
     super(repositories, "TransferService");
-    this.unitOfWork = unitOfWork;
     this.eventBus = eventBus;
     this.transferValidator = new TransferValidator(repositories);
   }

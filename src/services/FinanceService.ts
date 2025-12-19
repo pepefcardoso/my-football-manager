@@ -11,9 +11,9 @@ import type {
   FinancialHealthResult,
   TransferPermissionResult,
 } from "../domain/types";
-import { EnhancedSalaryCalculatorService } from "./finance/SalaryCalculatorService";
-import { EnhancedOperationalCostsService } from "./finance/OperationalCostsService";
-import { EnhancedRevenueService } from "./finance/RevenueService";
+import { SalaryCalculatorService } from "./finance/SalaryCalculatorService";
+import { OperationalCostsService } from "./finance/OperationalCostsService";
+import { RevenueService } from "./finance/RevenueService";
 import { FinancialBalance } from "../engine/FinancialBalanceConfig";
 import {
   FinancialReportFactory,
@@ -22,16 +22,16 @@ import {
 
 export class FinanceService extends BaseService {
   private healthChecker: FinancialHealthChecker;
-  private salaryCalculator: EnhancedSalaryCalculatorService;
-  private operationalCosts: EnhancedOperationalCostsService;
-  private revenueService: EnhancedRevenueService;
+  private salaryCalculator: SalaryCalculatorService;
+  private operationalCosts: OperationalCostsService;
+  private revenueService: RevenueService;
 
   constructor(repositories: IRepositoryContainer, eventBus: GameEventBus) {
-    super(repositories, "EnhancedFinanceService");
+    super(repositories, "FinanceService");
     this.healthChecker = new FinancialHealthChecker(repositories, eventBus);
-    this.salaryCalculator = new EnhancedSalaryCalculatorService(repositories);
-    this.operationalCosts = new EnhancedOperationalCostsService(repositories);
-    this.revenueService = new EnhancedRevenueService(repositories);
+    this.salaryCalculator = new SalaryCalculatorService(repositories);
+    this.operationalCosts = new OperationalCostsService(repositories);
+    this.revenueService = new RevenueService(repositories);
   }
 
   /**

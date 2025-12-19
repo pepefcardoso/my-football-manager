@@ -5,13 +5,11 @@ import { Result } from "../types/ServiceResults";
 import { TrainingFocus } from "../../domain/enums";
 import type { DailySimulationService } from "../DailySimulationService";
 import type { StaffService } from "../StaffService";
-import type { IUnitOfWork } from "../../repositories/IUnitOfWork";
 import type { TeamStaffImpact } from "../../domain/types";
 
 export class CPUSimulationService extends BaseService {
   constructor(
     repositories: IRepositoryContainer,
-    unitOfWork: IUnitOfWork, // TODO REMOVER
     private dailySimulation: DailySimulationService,
     private staffService: StaffService
   ) {

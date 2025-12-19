@@ -1,5 +1,5 @@
-import type { Match } from "../domain/models";
-import { RandomEngine } from "../engine/RandomEngine";
+import { RandomEngine } from "../../engine/RandomEngine";
+import type { Match } from "../models";
 
 export interface MatchPair {
   homeTeamId: number;
@@ -27,10 +27,6 @@ export interface GroupStanding {
 }
 
 export class CompetitionScheduler {
-  /**
-   * Algoritmo Round-Robin (Todos contra todos)
-   * Usa o método do "Círculo" para rotacionar os times.
-   */
   static generateLeagueFixtures(
     teamIds: number[],
     doubleRound: boolean = true
@@ -83,9 +79,6 @@ export class CompetitionScheduler {
     return fixtures;
   }
 
-  /**
-   * Gera confrontos de Mata-mata (Sorteio Simples)
-   */
   static generateKnockoutPairings(
     teamIds: number[],
     roundNumber: number
@@ -148,9 +141,6 @@ export class CompetitionScheduler {
     return { groups, fixtures };
   }
 
-  /**
-   * Gera nomes dos grupos (A, B, C, D, etc.)
-   */
   private static generateGroupNames(count: number): string[] {
     const names: string[] = [];
     for (let i = 0; i < count; i++) {
@@ -159,9 +149,6 @@ export class CompetitionScheduler {
     return names;
   }
 
-  /**
-   * Gera confrontos round-robin para um grupo específico
-   */
   private static generateRoundRobinForGroup(
     teamIds: number[],
     groupName: string,

@@ -29,9 +29,9 @@ export interface SalaryCalculationResult {
   };
 }
 
-export class EnhancedSalaryCalculatorService extends BaseService {
+export class SalaryCalculatorService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    super(repositories, "EnhancedSalaryCalculatorService");
+    super(repositories, "SalaryCalculatorService");
   }
 
   /**

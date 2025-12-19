@@ -1,9 +1,9 @@
 import { BaseService } from "./BaseService";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import type { ServiceResult } from "./types/ServiceResults";
-import { CompetitionScheduler, type MatchPair } from "./CompetitionScheduler";
 import type { Competition } from "../domain/models";
 import { getBalanceValue } from "../engine/GameBalanceConfig";
+import { CompetitionScheduler, type MatchPair } from "../domain/logic/CompetitionScheduler";
 
 export interface ScheduledMatch {
   competitionId: number;

@@ -48,9 +48,9 @@ export interface OperationalCostsBreakdown {
   };
 }
 
-export class EnhancedOperationalCostsService extends BaseService {
+export class OperationalCostsService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
-    super(repositories, "EnhancedOperationalCostsService");
+    super(repositories, "OperationalCostsService");
   }
 
   /**

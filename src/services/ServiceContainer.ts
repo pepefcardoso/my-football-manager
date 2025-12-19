@@ -40,9 +40,9 @@ import { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
 import { EventService } from "./narrative/EventService";
 import { CPUSimulationService } from "./ai/CPUSimulationService";
 import { PlayerDevelopmentService } from "./PlayerDevelopmentService";
-import { EnhancedSalaryCalculatorService } from "./finance/SalaryCalculatorService";
-import { EnhancedOperationalCostsService } from "./finance/OperationalCostsService";
-import { EnhancedRevenueService } from "./finance/RevenueService";
+import { SalaryCalculatorService } from "./finance/SalaryCalculatorService";
+import { OperationalCostsService } from "./finance/OperationalCostsService";
+import { RevenueService } from "./finance/RevenueService";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: IUnitOfWork;
@@ -76,9 +76,9 @@ export class ServiceContainer implements IServiceContainer {
   public readonly eventService: EventService;
   public readonly cpuSimulation: CPUSimulationService;
   public readonly playerDevelopment: PlayerDevelopmentService;
-  public readonly salaryCalculator: EnhancedSalaryCalculatorService;
-  public readonly operationalCosts: EnhancedOperationalCostsService;
-  public readonly revenueService: EnhancedRevenueService;
+  public readonly salaryCalculator: SalaryCalculatorService;
+  public readonly operationalCosts: OperationalCostsService;
+  public readonly revenueService: RevenueService;
 
   constructor(
     repos: IRepositoryContainer,
@@ -117,7 +117,7 @@ export class ServiceContainer implements IServiceContainer {
       this.season
     );
     this.transferWindow = new TransferWindowManager(repos);
-    this.transfer = new TransferService(repos, this.unitOfWork, this.eventBus);
+    this.transfer = new TransferService(repos, this.eventBus);
     this.squadAnalysis = new SquadAnalysisService(repos);
     this.aiTransferDecisionMaker = new AITransferDecisionMaker(
       repos,
@@ -134,13 +134,12 @@ export class ServiceContainer implements IServiceContainer {
     this.eventService = new EventService(repos, this.eventBus);
     this.cpuSimulation = new CPUSimulationService(
       repos,
-      this.unitOfWork,
       this.dailySimulation,
       this.staff
     );
-    this.salaryCalculator = new EnhancedSalaryCalculatorService(repos);
-    this.operationalCosts = new EnhancedOperationalCostsService(repos);
-    this.revenueService = new EnhancedRevenueService(repos);
+    this.salaryCalculator = new SalaryCalculatorService(repos);
+    this.operationalCosts = new OperationalCostsService(repos);
+    this.revenueService = new RevenueService(repos);
     if (!unitOfWork && !eventBus) {
       this.setupSubscriptions();
     }

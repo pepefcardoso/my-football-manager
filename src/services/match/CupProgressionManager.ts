@@ -1,8 +1,8 @@
 import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { ServiceResult } from "../types/ServiceResults";
-import { CompetitionScheduler } from "../CompetitionScheduler";
 import { getBalanceValue } from "../../engine/GameBalanceConfig";
+import { CompetitionScheduler } from "../../domain/logic/CompetitionScheduler";
 
 const MATCH_CONFIG = getBalanceValue("MATCH");
 
