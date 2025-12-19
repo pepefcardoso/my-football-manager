@@ -1,0 +1,304 @@
+export const FinancialBalance = {
+  LEAGUE_ECONOMICS: {
+    TIER_1: {
+      AVG_PLAYER_SALARY: 2_500_000,
+      MIN_PLAYER_SALARY: 150_000,
+      MAX_PLAYER_SALARY: 25_000_000,
+      AVG_TRANSFER_FEE: 15_000_000,
+      TV_RIGHTS_BASE: 50_000_000,
+      PRIZE_MONEY_MULTIPLIER: 1.0,
+    },
+    TIER_2: {
+      AVG_PLAYER_SALARY: 500_000,
+      MIN_PLAYER_SALARY: 50_000,
+      MAX_PLAYER_SALARY: 3_000_000,
+      AVG_TRANSFER_FEE: 3_000_000,
+      TV_RIGHTS_BASE: 5_000_000,
+      PRIZE_MONEY_MULTIPLIER: 0.3,
+    },
+    TIER_3: {
+      AVG_PLAYER_SALARY: 100_000,
+      MIN_PLAYER_SALARY: 24_000,
+      MAX_PLAYER_SALARY: 500_000,
+      AVG_TRANSFER_FEE: 500_000,
+      TV_RIGHTS_BASE: 500_000,
+      PRIZE_MONEY_MULTIPLIER: 0.1,
+    },
+  },
+
+  SALARY_CALCULATION: {
+    BASE_FORMULA: {
+      EXPONENT: 2.8,
+      MULTIPLIER: 1000,
+    },
+    POSITION_PREMIUMS: {
+      GK: 0.85,
+      DF: 0.9,
+      MF: 1.0,
+      FW: 1.15,
+    },
+    AGE_ADJUSTMENTS: {
+      YOUTH_DISCOUNT: 0.6,
+      PRIME_MULTIPLIER: 1.0,
+      VETERAN_DISCOUNT: 0.85,
+      DECLINING_DISCOUNT: 0.6,
+    },
+    POTENTIAL_BONUS: {
+      HIGH_POTENTIAL_THRESHOLD: 10,
+      BONUS_MULTIPLIER: 1.25,
+    },
+    FORM_IMPACT: {
+      EXCELLENT_FORM: 1.1,
+      POOR_FORM: 0.95,
+    },
+  },
+
+  CONTRACT_ECONOMICS: {
+    SIGNING_BONUS: {
+      FREE_TRANSFER_MULTIPLIER: 1.5,
+      NORMAL_TRANSFER_MULTIPLIER: 0.3,
+      MINIMUM: 50_000,
+    },
+    AGENT_FEES: {
+      STANDARD_RATE: 0.05,
+      FREE_TRANSFER_RATE: 0.1,
+      MINIMUM: 25_000,
+      MAXIMUM_PERCENTAGE: 0.15,
+    },
+    PERFORMANCE_BONUSES: {
+      GOALS_BONUS_FW: 25_000,
+      GOALS_BONUS_MF: 35_000,
+      CLEAN_SHEET_BONUS: 15_000,
+      APPEARANCE_BONUS: 5_000,
+      WIN_BONUS: 10_000,
+      TROPHY_BONUS_MULTIPLIER: 2.0,
+    },
+    RELEASE_CLAUSE: {
+      MINIMUM_MULTIPLIER: 2.0,
+      RECOMMENDED_MULTIPLIER: 3.5,
+    },
+  },
+
+  TRANSFER_MARKET: {
+    BASE_VALUE_OVR_50: 100_000,
+    GROWTH_EXPONENT: 1.18,
+
+    AGE_IMPACT: {
+      WONDERKID: 2.5,
+      YOUNG_TALENT: 1.8,
+      PRIME: 1.0,
+      EXPERIENCED: 0.75,
+      VETERAN: 0.45,
+      DECLINING: 0.2,
+    },
+
+    CONTRACT_LENGTH_IMPACT: {
+      EXPIRING_6_MONTHS: 0.3,
+      ONE_YEAR: 0.5,
+      TWO_YEARS: 0.85,
+      THREE_PLUS_YEARS: 1.2,
+    },
+
+    FORM_IMPACT: {
+      OUTSTANDING: 1.25,
+      AVERAGE: 1.0,
+      POOR: 0.8,
+    },
+
+    INJURY_PENALTY: {
+      MINOR: 0.95,
+      MODERATE: 0.75,
+      SEVERE: 0.4,
+      CHRONIC: 0.25,
+    },
+  },
+
+  OPERATIONAL_COSTS: {
+    STADIUM_MAINTENANCE: {
+      BASE_COST_PER_SEAT: 8,
+      QUALITY_MULTIPLIER: 0.015,
+      AGE_PENALTY_MULTIPLIER: 0.02,
+      CLEANING_COST_PER_MATCH: 3,
+      UTILITIES_FIXED_ANNUAL: 250_000,
+      UTILITIES_VARIABLE_PER_SEAT: 5,
+      SECURITY_BASE: 500_000,
+      SECURITY_PER_10K_CAPACITY: 50_000,
+    },
+
+    TRAINING_FACILITIES: {
+      BASE_MAINTENANCE_ANNUAL: 300_000,
+      QUALITY_COST_MULTIPLIER: 8_000,
+      EQUIPMENT_REPLACEMENT_ANNUAL: 150_000,
+      GROUNDSKEEPING_ANNUAL: 200_000,
+    },
+
+    YOUTH_ACADEMY: {
+      BASE_COST_ANNUAL: 250_000,
+      COST_PER_YOUTH_PLAYER: 25_000,
+      COACHING_STAFF_MULTIPLIER: 1.5,
+      FACILITIES_MAINTENANCE: 100_000,
+    },
+
+    ADMINISTRATIVE: {
+      BASE_STAFF_COST: 2_000_000,
+      LEGAL_COMPLIANCE: 300_000,
+      IT_SYSTEMS: 150_000,
+      INSURANCE_PERCENTAGE: 0.02,
+    },
+
+    MEDICAL: {
+      BASE_MEDICAL_STAFF: 500_000,
+      PHYSIOTHERAPY_ANNUAL: 200_000,
+      EQUIPMENT_SUPPLIES: 100_000,
+      COST_PER_PLAYER_ANNUAL: 15_000,
+      INJURY_TREATMENT_MULTIPLIER: 2.5,
+    },
+  },
+
+  /**
+   * Revenue streams
+   */
+  REVENUE_STREAMS: {
+    MATCHDAY_REVENUE: {
+      TIER_1_TICKET_PRICE: 65,
+      TIER_2_TICKET_PRICE: 28,
+      TIER_3_TICKET_PRICE: 15,
+      VIP_TICKET_MULTIPLIER: 8.0,
+      VIP_CAPACITY_PERCENTAGE: 0.08,
+      MERCHANDISE_PER_FAN: 12,
+      FOOD_BEVERAGE_PER_FAN: 8,
+      PARKING_REVENUE_PERCENTAGE: 0.15,
+      PARKING_FEE: 10,
+    },
+
+    BROADCASTING: {
+      TIER_1_ANNUAL_BASE: 75_000_000,
+      TIER_2_ANNUAL_BASE: 8_000_000,
+      TIER_3_ANNUAL_BASE: 500_000,
+      PERFORMANCE_BONUS_PER_WIN: 100_000,
+      INTERNATIONAL_COVERAGE_BONUS: 0.25,
+    },
+
+    COMMERCIAL: {
+      SHIRT_SPONSOR_TIER_1: 15_000_000,
+      SHIRT_SPONSOR_TIER_2: 2_000_000,
+      SHIRT_SPONSOR_TIER_3: 250_000,
+      KIT_MANUFACTURER_ROYALTY: 0.12,
+      STADIUM_NAMING_RIGHTS_MULTIPLIER: 1.5,
+      REGIONAL_SPONSORS_BASE: 500_000,
+      SOCIAL_MEDIA_REVENUE_PER_10K_FOLLOWERS: 5_000,
+    },
+
+    PRIZE_MONEY: {
+      LEAGUE_WINNER_TIER_1: 5_000_000,
+      LEAGUE_WINNER_TIER_2: 500_000,
+      PER_POSITION_BONUS: 200_000,
+      CUP_WINNER: 3_000_000,
+      CONTINENTAL_GROUP_STAGE: 15_000_000,
+      CONTINENTAL_KNOCKOUT_PER_ROUND: 10_000_000,
+      CONTINENTAL_WINNER: 100_000_000,
+    },
+  },
+
+  FINANCIAL_FAIR_PLAY: {
+    MAX_SALARY_TO_REVENUE_RATIO: 0.7,
+    MAX_AGENT_FEE_TO_TRANSFER_RATIO: 0.1,
+    MAX_ANNUAL_LOSS_ALLOWED: 30_000_000,
+    EQUITY_INJECTION_LIMIT_ANNUAL: 10_000_000,
+    BREAK_EVEN_ASSESSMENT_PERIOD_YEARS: 3,
+
+    PENALTIES: {
+      MINOR_VIOLATION_FINE: 5_000_000,
+      MODERATE_TRANSFER_BAN_WINDOWS: 2,
+      SEVERE_POINTS_DEDUCTION: 15,
+      CRITICAL_RELEGATION_THREAT: true,
+    },
+  },
+
+  ECONOMIC_FACTORS: {
+    INFLATION_RATE_ANNUAL: 0.03,
+    REPUTATION_FINANCIAL_BONUS: {
+      ELITE_CLUB: 1.5,
+      BIG_CLUB: 1.25,
+      ESTABLISHED: 1.0,
+      SMALL_CLUB: 0.85,
+      MINNOW: 0.65,
+    },
+    FANBASE_MULTIPLIER: {
+      PER_10K_FANS: 0.005,
+      MAX_MULTIPLIER: 2.0,
+    },
+    GEOGRAPHIC_MODIFIERS: {
+      MAJOR_MARKET: 1.2,
+      REGIONAL_MARKET: 1.0,
+      SMALL_MARKET: 0.85,
+    },
+  },
+
+  TAXATION: {
+    INCOME_TAX_RATE: 0.45,
+    CORPORATE_TAX_RATE: 0.19,
+    VAT_RATE: 0.2,
+    PAYROLL_TAX_EMPLOYER: 0.138,
+    STAMP_DUTY_TRANSFER: 0.05,
+  },
+
+  CRISIS_THRESHOLDS: {
+    CRITICAL_DEBT_RATIO: 2.0,
+    WARNING_DEBT_RATIO: 1.0,
+    CASH_RESERVE_MONTHS: 3,
+    INSOLVENCY_THRESHOLD: -50_000_000,
+
+    AUTOMATIC_ACTIONS: {
+      ASSET_FREEZE_THRESHOLD: -25_000_000,
+      FORCED_SALES_THRESHOLD: -40_000_000,
+      ADMINISTRATION_THRESHOLD: -50_000_000,
+    },
+  },
+} as const;
+
+export type LeagueTier = "TIER_1" | "TIER_2" | "TIER_3";
+export type PlayerPosition = "GK" | "DF" | "MF" | "FW";
+export type AgeCategory =
+  | "WONDERKID"
+  | "YOUNG_TALENT"
+  | "PRIME"
+  | "EXPERIENCED"
+  | "VETERAN"
+  | "DECLINING";
+export type ContractLength =
+  | "EXPIRING_6_MONTHS"
+  | "ONE_YEAR"
+  | "TWO_YEARS"
+  | "THREE_PLUS_YEARS";
+export type InjurySeverity = "MINOR" | "MODERATE" | "SEVERE" | "CHRONIC";
+export type ClubReputation =
+  | "ELITE_CLUB"
+  | "BIG_CLUB"
+  | "ESTABLISHED"
+  | "SMALL_CLUB"
+  | "MINNOW";
+
+type DeepReadonly<T> = {
+  readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+};
+
+export type FinancialBalanceConfig = DeepReadonly<typeof FinancialBalance>;
+
+export const getLeagueEconomics = (tier: 1 | 2 | 3) => {
+  const tierKey = `TIER_${tier}` as LeagueTier;
+  return FinancialBalance.LEAGUE_ECONOMICS[tierKey];
+};
+
+export const applyInflation = (
+  baseValue: number,
+  yearsElapsed: number
+): number => {
+  const rate = FinancialBalance.ECONOMIC_FACTORS.INFLATION_RATE_ANNUAL;
+  return Math.round(baseValue * Math.pow(1 + rate, yearsElapsed));
+};
+
+export const getTotalSalaryCost = (grossSalary: number): number => {
+  const employerTax = FinancialBalance.TAXATION.PAYROLL_TAX_EMPLOYER;
+  return Math.round(grossSalary * (1 + employerTax));
+};

@@ -41,6 +41,9 @@ import { DailyTransferProcessor } from "./ai/DailyTransferProcessor";
 import { EventService } from "./narrative/EventService";
 import { CPUSimulationService } from "./ai/CPUSimulationService";
 import { PlayerDevelopmentService } from "./PlayerDevelopmentService";
+import { EnhancedSalaryCalculatorService } from "./finance/EnhancedSalaryCalculatorService";
+import { EnhancedOperationalCostsService } from "./finance/EnhancedOperationalCostsService";
+import { EnhancedRevenueService } from "./finance/EnhancedRevenueService";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: IUnitOfWork;
@@ -75,6 +78,9 @@ export class ServiceContainer implements IServiceContainer {
   public readonly eventService: EventService;
   public readonly cpuSimulation: CPUSimulationService;
   public readonly playerDevelopment: PlayerDevelopmentService;
+  public readonly salaryCalculator: EnhancedSalaryCalculatorService;
+  public readonly operationalCosts: EnhancedOperationalCostsService;
+  public readonly revenueService: EnhancedRevenueService;
 
   constructor(
     repos: IRepositoryContainer,
@@ -135,6 +141,9 @@ export class ServiceContainer implements IServiceContainer {
       this.dailySimulation,
       this.staff
     );
+    this.salaryCalculator = new EnhancedSalaryCalculatorService(repos);
+    this.operationalCosts = new EnhancedOperationalCostsService(repos);
+    this.revenueService = new EnhancedRevenueService(repos);
     if (!unitOfWork && !eventBus) {
       this.setupSubscriptions();
     }

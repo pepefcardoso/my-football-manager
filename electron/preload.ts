@@ -164,6 +164,37 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("finance:getFinancialHealth", teamId),
     getMonthlyReport: (teamId: number, seasonId: number) =>
       ipcRenderer.invoke("finance:getMonthlyReport", { teamId, seasonId }),
+    getDashboard: (teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("finance:getDashboard", { teamId, seasonId }),
+    calculatePlayerSalary: (
+      playerId: number,
+      teamId: number,
+      isFreeTransfer: boolean
+    ) =>
+      ipcRenderer.invoke("finance:calculatePlayerSalary", {
+        playerId,
+        teamId,
+        isFreeTransfer,
+      }),
+    getTeamWageBill: (teamId: number) =>
+      ipcRenderer.invoke("finance:getTeamWageBill", teamId),
+    getOperationalCosts: (teamId: number, matchesPlayed: number) =>
+      ipcRenderer.invoke("finance:getOperationalCosts", {
+        teamId,
+        matchesPlayed,
+      }),
+    projectAnnualRevenue: (
+      teamId: number,
+      leaguePosition: number,
+      homeMatches: number
+    ) =>
+      ipcRenderer.invoke("finance:projectAnnualRevenue", {
+        teamId,
+        leaguePosition,
+        homeMatches,
+      }),
+    checkFFPCompliance: (teamId: number, seasonId: number) =>
+      ipcRenderer.invoke("finance:checkFFPCompliance", { teamId, seasonId }),
   },
 
   contract: {

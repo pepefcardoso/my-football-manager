@@ -602,6 +602,68 @@ function registerIpcHandlers() {
     }
   );
 
+  ipcMain.handle("finance:getDashboard", async (_, { teamId, seasonId }) => {
+    const result = await serviceContainer.finance.getFinancialDashboard(
+      teamId,
+      seasonId
+    );
+    return Result.unwrapOr(result, null);
+  });
+
+  ipcMain.handle(
+    "finance:calculatePlayerSalary",
+    async (_, { playerId, teamId, isFreeTransfer }) => {
+      const result =
+        await serviceContainer.salaryCalculator.calculatePlayerSalary(
+          playerId,
+          teamId,
+          isFreeTransfer
+        );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle("finance:getTeamWageBill", async (_, teamId) => {
+    const result =
+      await serviceContainer.salaryCalculator.calculateTeamWageBill(teamId);
+    return Result.unwrapOr(result, null);
+  });
+
+  ipcMain.handle(
+    "finance:getOperationalCosts",
+    async (_, { teamId, matchesPlayed }) => {
+      const result =
+        await serviceContainer.operationalCosts.calculateOperationalCosts(
+          teamId,
+          matchesPlayed
+        );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle(
+    "finance:projectAnnualRevenue",
+    async (_, { teamId, leaguePosition, homeMatches }) => {
+      const result = await serviceContainer.revenueService.projectAnnualRevenue(
+        teamId,
+        leaguePosition,
+        homeMatches
+      );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
+  ipcMain.handle(
+    "finance:checkFFPCompliance",
+    async (_, { teamId, seasonId }) => {
+      const result = await serviceContainer.finance.checkFFPCompliance(
+        teamId,
+        seasonId
+      );
+      return Result.unwrapOr(result, null);
+    }
+  );
+
   ipcMain.handle("contract:getWageBill", async (_, teamId: number) => {
     const result = await serviceContainer.contract.calculateMonthlyWageBill(
       teamId
