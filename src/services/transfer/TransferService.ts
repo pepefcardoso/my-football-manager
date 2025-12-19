@@ -1,8 +1,6 @@
 
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { TransferProposalInsert } from "../../repositories/TransferProposalRepository";
-import { GameEventBus } from "../events/GameEventBus";
-import { GameEventType } from "../events/GameEventTypes";
 import { Result } from "../../domain/ServiceResults";
 import type { ServiceResult } from "../../domain/ServiceResults";
 import {
@@ -16,6 +14,8 @@ import {
   type TransferValidationContext,
 } from "../../domain/validators/TransferValidator";
 import { BaseService } from "../BaseService";
+import type { GameEventBus } from "../../lib/GameEventBus";
+import { GameEventType } from "../../domain/GameEventTypes";
 
 export interface CreateProposalInput {
   playerId: number;

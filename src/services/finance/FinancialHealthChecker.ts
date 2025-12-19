@@ -2,12 +2,12 @@ import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import { FinancialBalance } from "../../engine/FinancialBalanceConfig";
 import { Result, type ServiceResult } from "../../domain/ServiceResults";
-import { GameEventBus } from "../events/GameEventBus";
-import { GameEventType } from "../events/GameEventTypes";
 import type {
   FinancialHealthResult,
   TransferPermissionResult,
 } from "../../domain/types";
+import type { GameEventBus } from "../../lib/GameEventBus";
+import { GameEventType } from "../../domain/GameEventTypes";
 
 export class FinancialHealthChecker extends BaseService {
   private eventBus: GameEventBus;

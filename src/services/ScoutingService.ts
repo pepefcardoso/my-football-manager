@@ -2,13 +2,9 @@ import { RandomEngine } from "../engine/RandomEngine";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
 import type { ServiceResult } from "../domain/ServiceResults";
-import {
-  ScoutingReportFactory,
-  type ScoutedPlayerView,
-  type MaskedAttribute,
-} from "./factories/ReportFactory";
 import { getBalanceValue } from "../engine/GameBalanceConfig";
 import { StaffRole } from "../domain/enums";
+import { ScoutingReportFactory, type ScoutedPlayerView, type MaskedAttribute } from "../domain/factories/ReportFactory";
 
 const SCOUTING_CONFIG = getBalanceValue("SCOUTING");
 const PROGRESS_CONFIG = SCOUTING_CONFIG.PROGRESS;
@@ -21,9 +17,6 @@ export class ScoutingService extends BaseService {
   }
 
   /**
-   * Retorna a visão que um time tem de um jogador específico.
-   * Os atributos podem estar mascarados (faixa de valores) dependendo do nível de conhecimento (progress).
-   * Se o jogador pertence ao time observador, os atributos são exatos (100% progress).
    * * @param playerId - O ID do jogador a ser visualizado.
    * @param viewerTeamId - O ID do time que está visualizando.
    * @returns Objeto ScoutedPlayerView com atributos mascarados ou null se jogador não existir.
@@ -61,7 +54,6 @@ export class ScoutingService extends BaseService {
   }
 
   /**
-   * Retorna a lista de todos os relatórios de observação ativos de um time.
    * * @param teamId - O ID do time.
    * @returns Lista de relatórios de scouting.
    */
@@ -73,8 +65,6 @@ export class ScoutingService extends BaseService {
   }
 
   /**
-   * Designa um olheiro para observar um jogador específico.
-   * Cria um novo relatório ou atualiza um existente iniciando a observação.
    * * @param scoutId - O ID do olheiro (Staff).
    * @param playerId - O ID do jogador alvo.
    * @returns ServiceResult void.
@@ -119,9 +109,7 @@ export class ScoutingService extends BaseService {
   }
 
   /**
-   * Processa a evolução diária dos relatórios de scouting.
-   * Aumenta a porcentagem de conhecimento sobre os jogadores observados baseados na habilidade do olheiro.
-   * * @param currentDate - Data atual da simulação.
+   * @param currentDate - Data atual da simulação.
    * @returns ServiceResult void.
    */
   async processDailyScouting(
@@ -165,8 +153,6 @@ export class ScoutingService extends BaseService {
   }
 
   /**
-   * Calcula a precisão geral do departamento de scouting de um time.
-   * Baseado na média e qualidade dos olheiros contratados.
    * * @param teamId - O ID do time.
    * @returns Um valor de incerteza (quanto menor, melhor).
    */

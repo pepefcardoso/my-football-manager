@@ -1,13 +1,13 @@
-import { Logger } from "../../lib/Logger";
-import {
+import { Logger } from "./Logger";
+import type {
+  ContractExpiredPayload,
+  FinancialCrisisPayload,
   GameEventType,
-  type MatchFinishedPayload,
-  type ContractExpiredPayload,
-  type FinancialCrisisPayload,
-  type TransferCompletedPayload,
-  type ProposalReceivedPayload,
-  type ScheduledEventPayload,
-} from "./GameEventTypes";
+  MatchFinishedPayload,
+  ProposalReceivedPayload,
+  ScheduledEventPayload,
+  TransferCompletedPayload,
+} from "../domain/GameEventTypes";
 
 type EventHandler<T> = (payload: T) => Promise<void> | void;
 

@@ -7,8 +7,8 @@ import {
   FinancialBalance,
   type LeagueTier,
 } from "../../engine/FinancialBalanceConfig";
-import { RevenueStrategyFactory } from "../strategies/revenue/RevenueStrategyFactory";
 import { GameBalance } from "../../engine/GameBalanceConfig";
+import { RevenueStrategyFactory } from "../../domain/logic/revenue/RevenueStrategyFactory";
 
 export interface MatchdayRevenueBreakdown {
   tickets: {

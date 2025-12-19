@@ -7,9 +7,9 @@ import type {
   EventTriggerContext,
 } from "../../domain/narrative";
 import { EventLibrary } from "../../domain/events/EventLibrary";
-import { GameEventType } from "../events/GameEventTypes";
-import type { GameEventBus } from "../events/GameEventBus";
 import { FinancialCategory } from "../../domain/enums";
+import type { GameEventBus } from "../../lib/GameEventBus";
+import { GameEventType } from "../../domain/GameEventTypes";
 
 export class NarrativeService extends BaseService {
   private eventBus: GameEventBus;
