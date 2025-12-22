@@ -6,6 +6,7 @@ import type {
   TrainingCenterBenefits,
   YouthAcademyBenefits,
 } from "../domain/types/InfrastructureTypes";
+import { RandomEngine } from "./RandomEngine";
 
 const CONFIG = {
   LEVELS: {
@@ -175,5 +176,27 @@ export class InfrastructureEconomics {
       default:
         return "N/A";
     }
+  }
+
+  static calculateAnnualDegradation(currentLevel: number): number {
+    if (currentLevel <= 0) return 0;
+
+    if (currentLevel >= 90) {
+      return RandomEngine.getInt(5, 7);
+    }
+
+    if (currentLevel >= 70) {
+      return RandomEngine.getInt(3, 5);
+    }
+
+    if (currentLevel >= 30) {
+      return RandomEngine.getInt(2, 3);
+    }
+
+    return 1;
+  }
+
+  static validateDowngrade(currentLevel: number, amount: number): boolean {
+    return currentLevel - amount >= 0;
   }
 }

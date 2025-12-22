@@ -340,4 +340,55 @@ export class InfrastructureService extends BaseService {
     };
     return names[type] || type;
   }
+
+  async downgradeFacility(
+    teamId: number,
+    facilityType: FacilityType,
+    amount: number = 1
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "downgradeFacility",
+      { teamId, facilityType, amount },
+      async ({ teamId, facilityType, amount }) => {
+        const team = await this.repos.teams.findById(teamId);
+        if (!team) throw new Error("Time não encontrado.");
+
+        if (
+          team.activeConstruction &&
+          team.activeConstruction.facilityType === facilityType
+        ) {
+          throw new Error(
+            "Não é possível fazer downgrade enquanto há uma obra em andamento nesta instalação."
+          );
+        }
+
+        const currentLevel = this.getCurrentLevel(team, facilityType);
+
+        if (!InfrastructureEconomics.validateDowngrade(currentLevel, amount)) {
+          throw new Error("Nível da instalação não pode ser negativo.");
+        }
+
+        const newLevel = currentLevel - amount;
+        const updateData: Partial<Team> = {};
+        this.mapFacilityToColumnUpdate(updateData, facilityType, newLevel);
+
+        await this.repos.teams.update(teamId, updateData);
+
+        this.logger.info(
+          `📉 Downgrade realizado: ${facilityType} do time ${teamId} reduzido para nível ${newLevel}.`
+        );
+
+        await this.eventBus.publish(GameEventType.INFRASTRUCTURE_DEGRADED, {
+          teamId,
+          facilityType,
+          currentQuality: newLevel,
+          minimumQuality: 0,
+          maintenanceCost: InfrastructureEconomics.getMaintenanceCost(
+            facilityType,
+            newLevel
+          ),
+        });
+      }
+    );
+  }
 }

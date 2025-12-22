@@ -5,6 +5,8 @@ import type { ServiceResult } from "../../domain/ServiceResults";
 import type { SeasonService, SeasonSummary } from "../SeasonService";
 import { getBalanceValue } from "../../engine/GameBalanceConfig";
 import type { YouthAcademyService } from "../YouthAcademyService";
+import { InfrastructureEconomics } from "../../engine/InfrastructureEconomics";
+import type { FacilityType } from "../../domain/types/InfrastructureTypes";
 
 interface PromotionRelegationResult {
   championName: string;
@@ -53,6 +55,8 @@ export class SeasonTransitionManager extends BaseService {
 
         await this.applyPromotionRelegationEffects(outcome);
 
+        await this.processInfrastructureDegradation();
+
         await this.processSquadUpdates();
 
         await this.processYouthIntake();
@@ -76,6 +80,81 @@ export class SeasonTransitionManager extends BaseService {
           relegatedTeams: outcome.relegatedTeams,
         };
       }
+    );
+  }
+
+  private async processInfrastructureDegradation(): Promise<void> {
+    this.logger.info("🏗️ Processando degradação anual de infraestrutura...");
+
+    const allTeams = await this.repos.teams.findAll();
+    const facilityTypes: FacilityType[] = [
+      "stadium_quality",
+      "training_center_quality",
+      "youth_academy_quality",
+      "medical_center_quality",
+      "administrative_center_quality",
+    ];
+
+    let totalDegradedLevels = 0;
+
+    for (const team of allTeams) {
+      const updates: any = {};
+      let changed = false;
+
+      const levels: Record<FacilityType, number> = {
+        stadium_capacity: team.stadiumCapacity,
+        stadium_quality: team.stadiumQuality,
+        training_center_quality: team.trainingCenterQuality,
+        youth_academy_quality: team.youthAcademyQuality,
+        medical_center_quality: team.medicalCenterQuality,
+        administrative_center_quality: team.administrativeCenterQuality,
+      };
+
+      for (const type of facilityTypes) {
+        const currentLevel = levels[type];
+        if (currentLevel > 0) {
+          const loss =
+            InfrastructureEconomics.calculateAnnualDegradation(currentLevel);
+          const newLevel = Math.max(0, currentLevel - loss);
+
+          if (newLevel !== currentLevel) {
+            switch (type) {
+              case "stadium_quality":
+                updates.stadiumQuality = newLevel;
+                break;
+              case "training_center_quality":
+                updates.trainingCenterQuality = newLevel;
+                break;
+              case "youth_academy_quality":
+                updates.youthAcademyQuality = newLevel;
+                break;
+              case "medical_center_quality":
+                updates.medicalCenterQuality = newLevel;
+                break;
+              case "administrative_center_quality":
+                updates.administrativeCenterQuality = newLevel;
+                break;
+            }
+            changed = true;
+            totalDegradedLevels += loss;
+          }
+        }
+      }
+
+      if (changed) {
+        await this.repos.teams.update(team.id, updates);
+        // Opcional: Enviar notificação para o jogador humano se for o time dele
+        if (team.isHuman) {
+          // TODO: Criar evento de notificação de degradação
+          this.logger.info(
+            `Time humano ${team.name} sofreu degradação nas instalações.`
+          );
+        }
+      }
+    }
+
+    this.logger.info(
+      `✅ Degradação concluída. Total de níveis perdidos na liga: ${totalDegradedLevels}`
     );
   }
 

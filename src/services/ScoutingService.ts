@@ -4,7 +4,12 @@ import { BaseService } from "./BaseService";
 import type { ServiceResult } from "../domain/ServiceResults";
 import { getBalanceValue } from "../engine/GameBalanceConfig";
 import { StaffRole } from "../domain/enums";
-import { ScoutingReportFactory, type ScoutedPlayerView, type MaskedAttribute } from "../domain/factories/ReportFactory";
+import {
+  ScoutingReportFactory,
+  type ScoutedPlayerView,
+  type MaskedAttribute,
+} from "../domain/factories/ReportFactory";
+import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
 
 const SCOUTING_CONFIG = getBalanceValue("SCOUTING");
 const PROGRESS_CONFIG = SCOUTING_CONFIG.PROGRESS;
@@ -108,10 +113,6 @@ export class ScoutingService extends BaseService {
     );
   }
 
-  /**
-   * @param currentDate - Data atual da simulação.
-   * @returns ServiceResult void.
-   */
   async processDailyScouting(
     currentDate: string
   ): Promise<ServiceResult<void>> {
@@ -124,23 +125,39 @@ export class ScoutingService extends BaseService {
         const activeReports = await this.repos.scouting.findActiveReports();
         let updatesCount = 0;
 
+        const teamCache = new Map<number, number>();
+
         for (const report of activeReports) {
           if (!report.scoutId || (report.progress || 0) >= 100) continue;
+          if (!report.teamId) continue;
 
           const scout = await this.repos.staff.findById(report.scoutId);
           if (!scout) continue;
 
-          const dailyProgress =
+          let adminQuality = teamCache.get(report.teamId);
+          if (adminQuality === undefined) {
+            const team = await this.repos.teams.findById(report.teamId);
+            adminQuality = team ? team.administrativeCenterQuality || 0 : 0;
+            teamCache.set(report.teamId, adminQuality);
+          }
+
+          const adminBenefits =
+            InfrastructureEconomics.getAdminBenefits(adminQuality);
+          const adminBonusMultiplier = 1 + adminBenefits.scoutingEfficiency;
+
+          const baseProgress =
             Math.round(scout.overall / PROGRESS_CONFIG.SCOUT_OVERALL_DIVISOR) +
             RandomEngine.getInt(
               PROGRESS_CONFIG.DAILY_RANDOM_MIN,
               PROGRESS_CONFIG.DAILY_RANDOM_MAX
             );
 
+          const finalProgress = Math.round(baseProgress * adminBonusMultiplier);
+
           await this.repos.scouting.upsert({
             ...report,
             date: currentDate,
-            progress: dailyProgress,
+            progress: finalProgress,
           });
           updatesCount++;
         }
