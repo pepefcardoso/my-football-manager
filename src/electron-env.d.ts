@@ -228,7 +228,6 @@ declare global {
             monthly: number;
           };
           projectedAnnualRevenue: number;
-          ffpCompliance: boolean;
           financialHealth: string;
         } | null>;
         getOperationalCosts: (
@@ -240,7 +239,6 @@ declare global {
           leaguePosition: number,
           homeMatches: number
         ) => Promise<any>;
-        checkFFPCompliance: (teamId: number, seasonId: number) => Promise<any>;
         calculatePlayerSalary: (
           playerId: number,
           teamId: number,
@@ -279,8 +277,6 @@ declare global {
           teamId: number,
           leaguePosition: number
         ) => Promise<number | null>;
-
-        // Novos métodos adicionados
         compareWithLeague: (teamId: number) => Promise<any | null>;
         getBenchmarks: (teamId: number) => Promise<any[]>;
         getTopRivals: (teamId: number, limit?: number) => Promise<any[]>;
@@ -295,16 +291,6 @@ declare global {
           startDate?: string,
           endDate?: string
         ) => Promise<ChartDataPoint[]>;
-        getFFPReport: (teamId: number, seasonId: number) => Promise<any | null>;
-        getInvestmentAllowance: (
-          teamId: number,
-          seasonId: number
-        ) => Promise<any | null>;
-        analyzeInvestmentImpact: (
-          teamId: number,
-          seasonId: number,
-          proposedCost: number
-        ) => Promise<any | null>;
         getValuation: (teamId: number) => Promise<any | null>;
       };
 

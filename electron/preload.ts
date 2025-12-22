@@ -202,8 +202,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
         leaguePosition,
         homeMatches,
       }),
-    checkFFPCompliance: (teamId: number, seasonId: number) =>
-      ipcRenderer.invoke("finance:checkFFPCompliance", { teamId, seasonId }),
   },
 
   contract: {
@@ -287,29 +285,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
         startDate,
         endDate,
       }),
-
-    getFFPReport: (teamId: number, seasonId: number) =>
-      ipcRenderer.invoke("infrastructure:getFFPReport", { teamId, seasonId }),
-
-    getInvestmentAllowance: (teamId: number, seasonId: number) =>
-      ipcRenderer.invoke("infrastructure:getInvestmentAllowance", {
-        teamId,
-        seasonId,
-      }),
-
-    analyzeInvestmentImpact: (
-      teamId: number,
-      seasonId: number,
-      proposedCost: number
-    ) =>
-      ipcRenderer.invoke("infrastructure:analyzeInvestmentImpact", {
-        teamId,
-        seasonId,
-        proposedCost,
-      }),
-
-    getValuation: (teamId: number) =>
-      ipcRenderer.invoke("infrastructure:getValuation", teamId),
   },
 
   scouting: {

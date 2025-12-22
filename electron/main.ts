@@ -683,17 +683,6 @@ function registerIpcHandlers() {
     }
   );
 
-  ipcMain.handle(
-    "finance:checkFFPCompliance",
-    async (_, { teamId, seasonId }) => {
-      const result = await serviceContainer.finance.checkFFPCompliance(
-        teamId,
-        seasonId
-      );
-      return Result.unwrapOr(result, null);
-    }
-  );
-
   ipcMain.handle("contract:getWageBill", async (_, teamId: number) => {
     const result = await serviceContainer.contract.calculateMonthlyWageBill(
       teamId
@@ -915,56 +904,6 @@ function registerIpcHandlers() {
       return Result.unwrapOr(result, []);
     }
   );
-
-  ipcMain.handle(
-    "infrastructure:getFFPReport",
-    async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
-      const result =
-        await serviceContainer.ffpDepreciation.getFFPDepreciationReport(
-          teamId,
-          seasonId
-        );
-      return Result.unwrapOr(result, null);
-    }
-  );
-
-  ipcMain.handle(
-    "infrastructure:getInvestmentAllowance",
-    async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
-      const result =
-        await serviceContainer.ffpDepreciation.getInvestmentAllowance(
-          teamId,
-          seasonId
-        );
-      return Result.unwrapOr(result, null);
-    }
-  );
-
-  ipcMain.handle(
-    "infrastructure:analyzeInvestmentImpact",
-    async (
-      _,
-      {
-        teamId,
-        seasonId,
-        proposedCost,
-      }: { teamId: number; seasonId: number; proposedCost: number }
-    ) => {
-      const result =
-        await serviceContainer.ffpDepreciation.analyzeInvestmentImpact(
-          teamId,
-          seasonId,
-          proposedCost
-        );
-      return Result.unwrapOr(result, null);
-    }
-  );
-
-  ipcMain.handle("infrastructure:getValuation", async (_, teamId: number) => {
-    const result =
-      await serviceContainer.ffpDepreciation.getInfrastructureValuation(teamId);
-    return Result.unwrapOr(result, null);
-  });
 
   ipcMain.handle(
     "scouting:getScoutedPlayer",

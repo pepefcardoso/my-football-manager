@@ -4,11 +4,10 @@ import { FinancialDashboard } from "../features/finance/FinancialDashBoard";
 import { FinancialTransactions } from "../features/finance/FinancialTransactions";
 import { OperationalCostsPanel } from "../features/finance/OperationalCostsPanel";
 import { RevenueProjectionPanel } from "../features/finance/RevenueProjectionPanel";
-import { FFPCompliancePanel } from "../features/finance/FFPCompliancePanel";
 
 const logger = new Logger("FinancesPage");
 
-type FinanceTab = "dashboard" | "transactions" | "operations" | "revenue" | "ffp";
+type FinanceTab = "dashboard" | "transactions" | "operations" | "revenue";
 
 interface FinancesPageProps {
     teamId: number;
@@ -53,8 +52,6 @@ function FinancesPage({ teamId }: FinancesPageProps) {
                 return <OperationalCostsPanel teamId={teamId} />;
             case "revenue":
                 return <RevenueProjectionPanel teamId={teamId} />;
-            case "ffp":
-                return <FFPCompliancePanel teamId={teamId} seasonId={seasonId} />;
             default:
                 return null;
         }
@@ -105,15 +102,6 @@ function FinancesPage({ teamId }: FinancesPageProps) {
                         }`}
                 >
                     💰 Revenue
-                </button>
-                <button
-                    onClick={() => setActiveTab("ffp")}
-                    className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${activeTab === "ffp"
-                            ? "border-emerald-500 text-emerald-400"
-                            : "border-transparent text-slate-400 hover:text-white"
-                        }`}
-                >
-                    ⚖️ FFP Compliance
                 </button>
             </div>
 

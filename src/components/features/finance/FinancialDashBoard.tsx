@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { formatCurrency } from "../../../utils/formatters";
 import { Logger } from "../../../lib/Logger";
 import StatCard from "../../common/StatCard";
-import Badge from "../../common/Badge";
 
 const logger = new Logger("FinancialDashboard");
 
@@ -21,7 +20,6 @@ interface DashboardData {
         monthly: number;
     };
     projectedAnnualRevenue: number;
-    ffpCompliance: boolean;
     financialHealth: string;
 }
 
@@ -114,12 +112,6 @@ export function FinancialDashboard({ teamId, seasonId }: FinancialDashboardProps
                                 {data.financialHealth}
                             </span>
                         </div>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-xs text-slate-500 mb-1">FFP Compliance</p>
-                        <Badge variant={data.ffpCompliance ? "success" : "danger"}>
-                            {data.ffpCompliance ? "Compliant" : "Violation"}
-                        </Badge>
                     </div>
                 </div>
             </div>

@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { FinanceService } from "../../src/services/FinanceService";
 import { createRepositoryContainer } from "../../src/repositories/RepositoryContainer";
-import { GameEventBus } from "../../src/services/events/GameEventBus";
-import { Result } from "../../src/services/types/ServiceResults";
 import { FinancialCategory } from "../../src/domain/enums";
+import { GameEventBus } from "../../src/lib/GameEventBus";
 
 vi.mock("../../src/lib/db", () => {
   return {

@@ -11,7 +11,6 @@ import type { OperationalCostsService } from "./finance/OperationalCostsService"
 import type { RevenueService } from "./finance/RevenueService";
 import type { ContractService } from "./ContractService";
 import type { InfrastructureService } from "./InfrastructureService";
-import { FinancialBalance } from "../engine/FinancialBalanceConfig";
 import {
   FinancialReportFactory,
   type MonthlyFinancialSummary,
@@ -258,119 +257,6 @@ export class FinanceService extends BaseService {
     );
   }
 
-  async checkFFPCompliance(
-    teamId: number,
-    seasonId: number
-  ): Promise<
-    ServiceResult<{
-      compliant: boolean;
-      violations: string[];
-      salaryToRevenueRatio: number;
-      annualLoss: number;
-      maxAllowedLoss: number;
-    }>
-  > {
-    return this.execute(
-      "checkFFPCompliance",
-      { teamId, seasonId },
-      async ({ teamId, seasonId }) => {
-        const team = await this.repos.teams.findById(teamId);
-        if (!team) {
-          throw new Error(`Team ${teamId} not found`);
-        }
-
-        const revenueResult = await this.revenueService.projectAnnualRevenue(
-          teamId,
-          10,
-          19
-        );
-
-        if (Result.isFailure(revenueResult)) {
-          throw new Error(
-            `Failed to project revenue: ${revenueResult.error.message}`
-          );
-        }
-
-        const annualRevenue = revenueResult.data.grandTotal;
-
-        const wageBillResult =
-          await this.contractService.calculateMonthlyWageBill(teamId);
-        if (Result.isFailure(wageBillResult)) {
-          throw new Error(
-            `Failed to calculate wages: ${wageBillResult.error.message}`
-          );
-        }
-
-        const annualWages = wageBillResult.data.total * 12;
-
-        const operationalResult =
-          await this.operationalCosts.calculateOperationalCosts(teamId, 19);
-
-        if (Result.isFailure(operationalResult)) {
-          throw new Error(
-            `Failed to calculate operational costs: ${operationalResult.error.message}`
-          );
-        }
-
-        const annualOperational = operationalResult.data.grandTotal.annualCost;
-
-        const infrastructureResult =
-          await this.infrastructureService.getInfrastructureStatus(teamId);
-
-        let annualInfrastructure = 0;
-        if (Result.isSuccess(infrastructureResult)) {
-          annualInfrastructure = infrastructureResult.data.totalAnnualCost;
-        }
-
-        const salaryToRevenueRatio =
-          annualRevenue > 0 ? annualWages / annualRevenue : 1.0;
-
-        const annualLoss =
-          annualWages +
-          annualOperational +
-          annualInfrastructure -
-          annualRevenue;
-
-        const ffpConfig = FinancialBalance.FINANCIAL_FAIR_PLAY;
-        const violations: string[] = [];
-
-        if (salaryToRevenueRatio > ffpConfig.MAX_SALARY_TO_REVENUE_RATIO) {
-          violations.push(
-            `Salary to revenue ratio (${(salaryToRevenueRatio * 100).toFixed(
-              1
-            )}%) ` +
-              `exceeds ${ffpConfig.MAX_SALARY_TO_REVENUE_RATIO * 100}% limit`
-          );
-        }
-
-        if (annualLoss > ffpConfig.MAX_ANNUAL_LOSS_ALLOWED) {
-          violations.push(
-            `Annual loss (€${annualLoss.toLocaleString()}) exceeds ` +
-              `€${ffpConfig.MAX_ANNUAL_LOSS_ALLOWED.toLocaleString()} limit`
-          );
-        }
-
-        const compliant = violations.length === 0;
-
-        if (!compliant) {
-          this.logger.warn(
-            `FFP violations detected for ${team.shortName}: ${violations.join(
-              "; "
-            )}`
-          );
-        }
-
-        return {
-          compliant,
-          violations,
-          salaryToRevenueRatio,
-          annualLoss,
-          maxAllowedLoss: ffpConfig.MAX_ANNUAL_LOSS_ALLOWED,
-        };
-      }
-    );
-  }
-
   async getMonthlyReport(
     teamId: number,
     seasonId: number
@@ -401,13 +287,11 @@ export class FinanceService extends BaseService {
           wageBillResult,
           operationalResult,
           revenueResult,
-          ffpResult,
           infrastructureResult,
         ] = await Promise.all([
           this.contractService.calculateMonthlyWageBill(teamId),
           this.operationalCosts.calculateOperationalCosts(teamId, 2),
           this.revenueService.projectAnnualRevenue(teamId, 10, 19),
-          this.checkFFPCompliance(teamId, seasonId),
           this.infrastructureService.getInfrastructureStatus(teamId),
         ]);
 
@@ -429,10 +313,6 @@ export class FinanceService extends BaseService {
           ? revenueResult.data.grandTotal
           : 0;
 
-        const ffp = Result.isSuccess(ffpResult)
-          ? ffpResult.data.compliant
-          : false;
-
         const infrastructure = Result.isSuccess(infrastructureResult)
           ? infrastructureResult.data
           : { totalMonthlyCost: 0, totalAnnualCost: 0 };
@@ -444,7 +324,7 @@ export class FinanceService extends BaseService {
           infrastructure.totalMonthlyCost;
 
         const financialHealth =
-          team.budget >= 0 && ffp
+          team.budget >= 0
             ? "Healthy"
             : team.budget < 0 && team.budget > -5_000_000
             ? "Warning"
@@ -469,7 +349,6 @@ export class FinanceService extends BaseService {
             monthly: infrastructure.totalMonthlyCost,
           },
           projectedAnnualRevenue: revenue,
-          ffpCompliance: ffp,
           financialHealth,
         };
       }

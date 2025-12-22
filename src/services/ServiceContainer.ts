@@ -46,7 +46,6 @@ import { TransferValidator } from "../domain/validators/TransferValidator";
 import { YouthAcademyService } from "./YouthAcademyService";
 import { CompetitiveAnalysisService } from "./CompetitiveAnalysisService";
 import { InfrastructureHistoryService } from "./InfrastructureHistoryService";
-import { FFPDepreciationService } from "./FFPDepreciationService";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 
 export class ServiceContainer implements IServiceContainer {
@@ -83,7 +82,6 @@ export class ServiceContainer implements IServiceContainer {
   public readonly youthAcademy: YouthAcademyService;
   public readonly competitiveAnalysis: CompetitiveAnalysisService;
   public readonly infrastructureHistory: InfrastructureHistoryService;
-  public readonly ffpDepreciation: FFPDepreciationService;
 
   constructor(
     repos: IRepositoryContainer,
@@ -119,7 +117,6 @@ export class ServiceContainer implements IServiceContainer {
 
     this.competitiveAnalysis = new CompetitiveAnalysisService(repos);
     this.infrastructureHistory = new InfrastructureHistoryService(repos);
-    this.ffpDepreciation = new FFPDepreciationService(repos);
 
     this.infrastructure = new InfrastructureService(repos, this.eventBus);
 

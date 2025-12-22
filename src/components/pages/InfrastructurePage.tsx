@@ -69,10 +69,9 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [status, setStatus] = useState<InfrastructureStatus | null>(null);
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<"overview" | "competitive" | "history" | "ffp">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "competitive" | "history">("overview");
     const [rivalComparison, setRivalComparison] = useState<any>(null);
     const [chartData, setChartData] = useState<any[]>([]);
-    const [ffpReport, setFFPReport] = useState<any>(null);
 
     const refreshData = useCallback(async () => {
         try {
@@ -114,21 +113,10 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
         }
     }, [teamId]);
 
-    const loadFFPData = useCallback(async () => {
-        if (!gameState?.currentSeasonId) return;
-        try {
-            const report = await window.electronAPI.infrastructure.getFFPReport(teamId, gameState.currentSeasonId);
-            setFFPReport(report);
-        } catch (error) {
-            console.error("Erro ao carregar FFP:", error);
-        }
-    }, [teamId, gameState?.currentSeasonId]);
-
     useEffect(() => {
         if (activeTab === "competitive") loadCompetitiveData();
         if (activeTab === "history") loadHistoryData();
-        if (activeTab === "ffp") loadFFPData();
-    }, [activeTab, loadCompetitiveData, loadHistoryData, loadFFPData]);
+    }, [activeTab, loadCompetitiveData, loadHistoryData]);
 
     const handleUpgrade = async (facilityType: "stadium" | "training" | "youth", upgradeType: "expand" | "quality") => {
         if (!gameState?.currentSeasonId || !team) return;
@@ -187,7 +175,7 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
 
             <div className="mb-6 border-b border-slate-800">
                 <div className="flex gap-4">
-                    {["overview", "competitive", "history", "ffp"].map((tab) => (
+                    {["overview", "competitive", "history"].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
@@ -199,7 +187,6 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
                             {tab === "overview" && "Visão Geral"}
                             {tab === "competitive" && "Comparação"}
                             {tab === "history" && "Histórico"}
-                            {tab === "ffp" && "FFP"}
                         </button>
                     ))}
                 </div>
@@ -363,59 +350,6 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
                             <div className="text-center text-slate-400 py-8">Sem dados históricos disponíveis</div>
                         )}
                     </div>
-                </div>
-            )}
-
-            {activeTab === "ffp" && (
-                <div className="space-y-6">
-                    {ffpReport ? (
-                        <>
-                            <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                                <h3 className="text-xl font-semibold text-white mb-4">📋 Relatório FFP</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <div className="text-sm text-slate-400">Status de Conformidade</div>
-                                        <div className={`text-lg font-bold ${ffpReport.complianceStatus.compliant ? 'text-emerald-400' : 'text-red-400'}`}>
-                                            {ffpReport.complianceStatus.compliant ? "✅ Conforme" : "❌ Não Conforme"}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="text-sm text-slate-400">Limite de Investimento</div>
-                                        <div className="text-lg font-bold text-white">{formatCurrency(ffpReport.complianceStatus.investmentCap)}</div>
-                                        <div className="text-xs text-slate-500">Gasto: {formatCurrency(ffpReport.complianceStatus.currentInvestment)}</div>
-                                    </div>
-                                </div>
-                                {ffpReport.complianceStatus.violations.length > 0 && (
-                                    <div className="mt-4 p-3 bg-red-500/10 border border-red-500/50 rounded">
-                                        <div className="text-sm text-red-400 font-medium mb-2">Violações:</div>
-                                        {ffpReport.complianceStatus.violations.map((v: string, idx: number) => (
-                                            <div key={idx} className="text-xs text-red-300">{v}</div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                                <h3 className="text-xl font-semibold text-white mb-4">💰 Depreciação de Ativos</h3>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-400">Valor Contábil Total</span>
-                                        <span className="text-white font-bold">{formatCurrency(ffpReport.totalBookValue)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-400">Depreciação Anual</span>
-                                        <span className="text-white font-bold">{formatCurrency(ffpReport.totalAnnualDepreciation)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-400">Despesas Ajustadas FFP</span>
-                                        <span className="text-white font-bold">{formatCurrency(ffpReport.ffpAdjustedExpenses)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-center text-slate-400 py-8">Carregando relatório FFP...</div>
-                    )}
                 </div>
             )}
         </div>
