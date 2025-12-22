@@ -36,6 +36,8 @@ export interface TrendAnalysis {
 
 export interface InfrastructureMilestone {
   date: string;
+  teamId: number;
+  seasonId: number;
   type: "expansion" | "upgrade" | "milestone";
   facilityType: "stadium" | "training" | "youth";
   description: string;

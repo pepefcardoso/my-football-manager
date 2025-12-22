@@ -174,19 +174,28 @@ export class InfrastructureCalculator {
     facilityType: "stadium" | "training" | "youth",
     currentQuality: number
   ): number {
-    const configs = {
-      stadium: InfrastructureEconomics.STADIUM.QUALITY,
-      training: InfrastructureEconomics.TRAINING_CENTER.UPGRADE,
-      youth: InfrastructureEconomics.YOUTH_ACADEMY.UPGRADE,
-    };
+    let baseCost = 0;
+    let levelIncrement = 0;
+    let multiplier = 1;
 
-    const config = configs[facilityType];
-    const baseCost =
-      "COST_PER_LEVEL" in config ? config.COST_PER_LEVEL : config.BASE_COST;
+    if (facilityType === "stadium") {
+      const config = InfrastructureEconomics.STADIUM.QUALITY;
+      baseCost = config.COST_PER_LEVEL;
+      levelIncrement = config.LEVEL_INCREMENT;
+      multiplier = config.COST_MULTIPLIER_FORMULA(currentQuality);
+    } else if (facilityType === "training") {
+      const config = InfrastructureEconomics.TRAINING_CENTER.UPGRADE;
+      baseCost = config.COST_PER_LEVEL;
+      levelIncrement = config.LEVEL_INCREMENT;
+      multiplier = config.COST_MULTIPLIER_FORMULA(currentQuality);
+    } else {
+      const config = InfrastructureEconomics.YOUTH_ACADEMY.UPGRADE;
+      baseCost = config.COST_PER_LEVEL;
+      levelIncrement = config.LEVEL_INCREMENT;
+      multiplier = config.COST_MULTIPLIER_FORMULA(currentQuality);
+    }
 
-    const multiplier = config.COST_MULTIPLIER_FORMULA(currentQuality);
-
-    return Math.round(baseCost * config.LEVEL_INCREMENT * multiplier);
+    return Math.round(baseCost * levelIncrement * multiplier);
   }
 
   static calculateAnnualMaintenance(

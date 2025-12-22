@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface InfrastructureStatus {
@@ -74,11 +74,7 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
     const [chartData, setChartData] = useState<any[]>([]);
     const [ffpReport, setFFPReport] = useState<any>(null);
 
-    useEffect(() => {
-        refreshData();
-    }, [teamId]);
-
-    const refreshData = async () => {
+    const refreshData = useCallback(async () => {
         try {
             const [teamData, state, infrastructureStatus] = await Promise.all([
                 window.electronAPI.team.getTeams().then((teams: any[]) =>
@@ -94,27 +90,31 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
         } catch (error) {
             console.error("Erro ao carregar dados:", error);
         }
-    };
+    }, [teamId]);
 
-    const loadCompetitiveData = async () => {
+    useEffect(() => {
+        refreshData();
+    }, [refreshData]);
+
+    const loadCompetitiveData = useCallback(async () => {
         try {
             const comparison = await window.electronAPI.infrastructure.compareWithLeague(teamId);
             setRivalComparison(comparison);
         } catch (error) {
             console.error("Erro ao carregar comparação:", error);
         }
-    };
+    }, [teamId]);
 
-    const loadHistoryData = async () => {
+    const loadHistoryData = useCallback(async () => {
         try {
             const data = await window.electronAPI.infrastructure.getChartData(teamId, "capacity");
             setChartData(data || []);
         } catch (error) {
             console.error("Erro ao carregar histórico:", error);
         }
-    };
+    }, [teamId]);
 
-    const loadFFPData = async () => {
+    const loadFFPData = useCallback(async () => {
         if (!gameState?.currentSeasonId) return;
         try {
             const report = await window.electronAPI.infrastructure.getFFPReport(teamId, gameState.currentSeasonId);
@@ -122,13 +122,13 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
         } catch (error) {
             console.error("Erro ao carregar FFP:", error);
         }
-    };
+    }, [teamId, gameState?.currentSeasonId]);
 
     useEffect(() => {
         if (activeTab === "competitive") loadCompetitiveData();
         if (activeTab === "history") loadHistoryData();
         if (activeTab === "ffp") loadFFPData();
-    }, [activeTab]);
+    }, [activeTab, loadCompetitiveData, loadHistoryData, loadFFPData]);
 
     const handleUpgrade = async (facilityType: "stadium" | "training" | "youth", upgradeType: "expand" | "quality") => {
         if (!gameState?.currentSeasonId || !team) return;
@@ -192,8 +192,8 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
                             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab
-                                    ? "border-emerald-500 text-emerald-400"
-                                    : "border-transparent text-slate-400 hover:text-white"
+                                ? "border-emerald-500 text-emerald-400"
+                                : "border-transparent text-slate-400 hover:text-white"
                                 }`}
                         >
                             {tab === "overview" && "Visão Geral"}

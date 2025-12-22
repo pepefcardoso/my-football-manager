@@ -15,6 +15,10 @@ import type {
   MonthlyFinancialSummary,
   MatchEventData,
 } from "./domain/types";
+import type {
+  InfrastructureEvolutionData,
+  ChartDataPoint,
+} from "./domain/types/InfrastructureHistoryTypes";
 
 interface PlayerStatRow {
   id: number;
@@ -127,13 +131,13 @@ declare global {
         updateLiveTactics: (
           matchId: number,
           isHome: boolean,
-          tactics: Partial<TacticsConfig>
+          tactics: Partial<any>
         ) => Promise<{ success: boolean; message: string }>;
         analyzeTactics: (matchId: number, isHome: boolean) => Promise<any>;
         suggestTactics: (
           matchId: number,
           isHome: boolean
-        ) => Promise<Partial<TacticsConfig>>;
+        ) => Promise<Partial<any>>;
         savePreMatchTactics: (
           matchId: number,
           homeLineup: any,
@@ -168,12 +172,12 @@ declare global {
           date: string;
           messages: string[];
           stopReason?: string;
-          narrativeEvent?: NarrativeEvent | null;
+          narrativeEvent?: any | null;
           seasonRollover?: any;
         }>;
         updateTrainingFocus: (focus: string) => Promise<boolean>;
         saveGame: () => Promise<boolean>;
-        listSaves: () => Promise<GameSaveMetadata[]>;
+        listSaves: () => Promise<any[]>;
         loadGame: (
           filename: string
         ) => Promise<{ success: boolean; message: string }>;
@@ -187,6 +191,9 @@ declare global {
           optionId: string;
           teamId: number;
         }) => Promise<{ success: boolean; message: string }>;
+        startAutoSimulation: () => Promise<boolean>;
+        stopAutoSimulation: () => Promise<boolean>;
+        onDailyUpdate: (callback: (data: any) => void) => void;
       };
 
       finance: {
@@ -234,55 +241,22 @@ declare global {
           homeMatches: number
         ) => Promise<any>;
         checkFFPCompliance: (teamId: number, seasonId: number) => Promise<any>;
+        calculatePlayerSalary: (
+          playerId: number,
+          teamId: number,
+          isFreeTransfer: boolean
+        ) => Promise<any>;
+        getTeamWageBill: (teamId: number) => Promise<any>;
       };
 
       contract: {
-        getWageBill: (teamId: number) => Promise<MonthlyWageData | null>;
+        getWageBill: (teamId: number) => Promise<any | null>;
         renewPlayerContract: (
           playerId: number,
           newWage: number,
           newEndDate: string
         ) => Promise<boolean>;
       };
-
-// infrastructure: {
-//     getStatus: (teamId: number) =>
-//       ipcRenderer.invoke("infrastructure:getStatus", teamId),
-
-//     expandStadium: (teamId: number, seasonId: number) =>
-//       ipcRenderer.invoke("infrastructure:expandStadium", { teamId, seasonId }),
-
-//     upgradeFacility: (
-//       teamId: number,
-//       seasonId: number,
-//       facilityType: "stadium" | "training" | "youth"
-//     ) =>
-//       ipcRenderer.invoke("infrastructure:upgradeFacility", {
-//         teamId,
-//         seasonId,
-//         facilityType,
-//       }),
-
-//     getUpgradeCost: (
-//       teamId: number,
-//       facilityType: "stadium" | "training" | "youth",
-//       upgradeType: "expand" | "quality"
-//     ) =>
-//       ipcRenderer.invoke("infrastructure:getUpgradeCost", {
-//         teamId,
-//         facilityType,
-//         upgradeType,
-//       }),
-
-//     analyzeCapacity: (teamId: number) =>
-//       ipcRenderer.invoke("infrastructure:analyzeCapacity", teamId),
-
-//     projectFanBase: (teamId: number, leaguePosition: number) =>
-//       ipcRenderer.invoke("infrastructure:projectFanBase", {
-//         teamId,
-//         leaguePosition,
-//       }),
-//   },
 
       infrastructure: {
         getStatus: (teamId: number) => Promise<InfrastructureStatus | null>;
@@ -300,11 +274,38 @@ declare global {
           facilityType: "stadium" | "training" | "youth",
           upgradeType: "expand" | "quality"
         ) => Promise<number | null>;
-        analyzeCapacity: (teamId: number) => Promise<CapacityAnalysis | null>;
+        analyzeCapacity: (teamId: number) => Promise<any | null>;
         projectFanBase: (
           teamId: number,
           leaguePosition: number
         ) => Promise<number | null>;
+
+        // Novos métodos adicionados
+        compareWithLeague: (teamId: number) => Promise<any | null>;
+        getBenchmarks: (teamId: number) => Promise<any[]>;
+        getTopRivals: (teamId: number, limit?: number) => Promise<any[]>;
+        getEvolutionData: (
+          teamId: number,
+          startDate?: string,
+          endDate?: string
+        ) => Promise<InfrastructureEvolutionData | null>;
+        getChartData: (
+          teamId: number,
+          metric: "capacity" | "quality" | "fanBase" | "utilization",
+          startDate?: string,
+          endDate?: string
+        ) => Promise<ChartDataPoint[]>;
+        getFFPReport: (teamId: number, seasonId: number) => Promise<any | null>;
+        getInvestmentAllowance: (
+          teamId: number,
+          seasonId: number
+        ) => Promise<any | null>;
+        analyzeInvestmentImpact: (
+          teamId: number,
+          seasonId: number,
+          proposedCost: number
+        ) => Promise<any | null>;
+        getValuation: (teamId: number) => Promise<any | null>;
       };
 
       scouting: {
@@ -318,8 +319,8 @@ declare global {
       };
 
       transfer: {
-        getReceivedProposals: (teamId: number) => Promise<TransferProposal[]>;
-        getSentProposals: (teamId: number) => Promise<TransferProposal[]>;
+        getReceivedProposals: (teamId: number) => Promise<any[]>;
+        getSentProposals: (teamId: number) => Promise<any[]>;
         createProposal: (
           input: any
         ) => Promise<{ success: boolean; data?: number; message: string }>;

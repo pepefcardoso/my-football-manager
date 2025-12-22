@@ -35,9 +35,8 @@ export class InfrastructureHistoryService extends BaseService {
         );
         const utilizationRate = averageAttendance / stadiumCapacity;
 
-        // TODO Calcular custo mensal (simplificado - idealmente pegar do InfrastructureService)
         const monthlyMaintenanceCost =
-          (stadiumCapacity * 10 + // Stadium
+          (stadiumCapacity * 10 +
             (team.trainingCenterQuality || 50) * 1000 +
             (team.youthAcademyQuality || 50) * 800) /
           12;
@@ -60,7 +59,9 @@ export class InfrastructureHistoryService extends BaseService {
         // await this.repos.infrastructureSnapshots.create(snapshot);
 
         this.logger.debug(
-          `📸 Infrastructure snapshot captured for team ${teamId} on ${currentDate}`
+          `📸 Infrastructure snapshot captured for team ${teamId} on ${currentDate}. Data: ${JSON.stringify(
+            snapshot
+          )}`
         );
       }
     );
@@ -100,7 +101,9 @@ export class InfrastructureHistoryService extends BaseService {
         // TODO: Insert into infrastructureMilestones table
         // await this.repos.infrastructureMilestones.create(milestone);
 
-        this.logger.info(`🎯 Milestone recorded: ${description}`);
+        this.logger.info(
+          `🎯 Milestone recorded: ${description} (${JSON.stringify(milestone)})`
+        );
       }
     );
   }
@@ -114,6 +117,10 @@ export class InfrastructureHistoryService extends BaseService {
       "getEvolutionData",
       { teamId, startDate, endDate },
       async ({ teamId, startDate, endDate }) => {
+        this.logger.debug(
+          `Fetching evolution data for range: ${startDate} - ${endDate}`
+        );
+
         // TODO: Query snapshots from database with date filters
         // const snapshots = await this.repos.infrastructureSnapshots.findByTeamAndDateRange(
         //   teamId,

@@ -3,6 +3,7 @@ import {
   InfrastructureEconomics,
   InfrastructureCalculator,
 } from "../engine/InfrastructureEconomics";
+import { FinancialBalance } from "../engine/FinancialBalanceConfig"; //
 import { InfrastructureValidator } from "../domain/validators/InfrastructureValidator";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
@@ -174,7 +175,7 @@ export class InfrastructureService extends BaseService {
           averageAttendance,
           revenuePerMatch: Math.round(
             averageAttendance *
-              InfrastructureEconomics.REVENUE_STREAMS.MATCHDAY_REVENUE
+              FinancialBalance.REVENUE_STREAMS.MATCHDAY_REVENUE
                 .TIER_2_TICKET_PRICE
           ),
           annualMaintenanceCost: stadiumMaintenance,

@@ -95,6 +95,10 @@ export class FFPDepreciationService extends BaseService {
         // TODO: Query all active assets for team
         // const assets = await this.repos.depreciableAssets.findByTeam(teamId);
 
+        this.logger.debug(
+          `Processing annual depreciation for team ${teamId} on ${currentDate}`
+        );
+
         // MOCK: Empty array for now
         const assets: DepreciableAsset[] = [];
 
@@ -346,6 +350,8 @@ export class FFPDepreciationService extends BaseService {
       async (teamId) => {
         // TODO: Query assets
         // const assets = await this.repos.depreciableAssets.findByTeam(teamId);
+        this.logger.debug(`Calculating valuation for team ${teamId}`);
+
         const assets: DepreciableAsset[] = [];
 
         const bookValue = assets.reduce(
