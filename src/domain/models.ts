@@ -10,6 +10,46 @@ import type {
   WeatherCondition,
 } from "./enums";
 
+export interface ActiveConstruction {
+  facilityType: "stadium" | "training" | "medical" | "youth" | "admin";
+  targetLevel?: number;
+  targetCapacity?: number;
+  cost: number;
+  startDate: string;
+  endDate: string;
+}
+
+export interface Team {
+  id: number;
+  name: string;
+  shortName: string;
+  primaryColor: string;
+  secondaryColor: string;
+  reputation: number;
+  budget: number;
+  isHuman: boolean;
+  stadiumCapacity: number;
+  stadiumQuality: number;
+  trainingCenterQuality: number;
+  youthAcademyQuality: number;
+  medicalCenterQuality: number;
+  administrativeCenterQuality: number;
+  activeConstruction: ActiveConstruction | null;
+  fanSatisfaction: number;
+  fanBase: number;
+  headCoachId: number | null;
+  footballDirectorId: number | null;
+  executiveDirectorId: number | null;
+  transferBudget: number;
+  transferStrategy: TransferStrategy | string;
+  history: TeamAchievement[];
+  defaultFormation: Formation;
+  defaultGameStyle: TacticsConfig["style"];
+  defaultMarking: TacticsConfig["marking"];
+  defaultMentality: TacticsConfig["mentality"];
+  defaultPassingDirectness: TacticsConfig["passingDirectness"];
+}
+
 export interface Player {
   id: number;
   teamId: number | null;
@@ -64,34 +104,6 @@ export interface Staff {
   salary: number;
   contractEnd: string | null;
   specialization: string | null;
-}
-
-export interface Team {
-  id: number;
-  name: string;
-  shortName: string;
-  primaryColor: string;
-  secondaryColor: string;
-  reputation: number;
-  budget: number;
-  isHuman: boolean;
-  stadiumCapacity: number;
-  stadiumQuality: number;
-  trainingCenterQuality: number;
-  youthAcademyQuality: number;
-  fanSatisfaction: number;
-  fanBase: number;
-  headCoachId: number | null;
-  footballDirectorId: number | null;
-  executiveDirectorId: number | null;
-  transferBudget: number;
-  transferStrategy: TransferStrategy | string;
-  history: TeamAchievement[];
-  defaultFormation: Formation;
-    defaultGameStyle: TacticsConfig["style"];
-    defaultMarking: TacticsConfig["marking"];
-    defaultMentality: TacticsConfig["mentality"];
-    defaultPassingDirectness: TacticsConfig["passingDirectness"];
 }
 
 export interface Competition {

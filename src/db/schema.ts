@@ -8,6 +8,15 @@ import {
 import { relations } from "drizzle-orm";
 import type { TeamAchievement } from "../domain/models";
 
+export interface ActiveConstruction {
+  facilityType: "stadium" | "training" | "medical" | "youth" | "admin";
+  targetLevel?: number;
+  targetCapacity?: number;
+  cost: number;
+  startDate: string;
+  endDate: string;
+}
+
 export const teams = sqliteTable("teams", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -18,11 +27,18 @@ export const teams = sqliteTable("teams", {
   budget: real("budget").default(0).notNull(),
   isHuman: integer("is_human", { mode: "boolean" }).default(false).notNull(),
   stadiumCapacity: integer("stadium_capacity").default(10000).notNull(),
-  stadiumQuality: integer("stadium_quality").default(50).notNull(),
+  stadiumQuality: integer("stadium_quality").default(20).notNull(),
   trainingCenterQuality: integer("training_center_quality")
-    .default(50)
+    .default(20)
     .notNull(),
-  youthAcademyQuality: integer("youth_academy_quality").default(50).notNull(),
+  youthAcademyQuality: integer("youth_academy_quality").default(20).notNull(),
+  medicalCenterQuality: integer("medical_center_quality").default(20).notNull(),
+  administrativeCenterQuality: integer("administrative_center_quality")
+    .default(20)
+    .notNull(),
+  activeConstruction: text("active_construction", { mode: "json" })
+    .$type<ActiveConstruction | null>()
+    .default(null),
   fanSatisfaction: integer("fan_satisfaction").default(50).notNull(),
   fanBase: integer("fan_base").default(10000).notNull(),
   headCoachId: integer("head_coach_id"),

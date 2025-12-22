@@ -1,22 +1,23 @@
-export type FacilityType = "stadium" | "training" | "youth";
+export type FacilityType =
+  | "stadium"
+  | "training"
+  | "youth"
+  | "medical"
+  | "admin";
 
 export type UpgradeType =
   | "expand_stadium"
   | "upgrade_stadium_quality"
   | "upgrade_training_quality"
-  | "upgrade_youth_quality";
+  | "upgrade_youth_quality"
+  | "upgrade_medical_quality"
+  | "upgrade_admin_quality";
 
 export interface InfrastructureStatus {
   stadium: {
     capacity: number;
     quality: number;
-    utilizationRate: number;
-    averageAttendance: number;
-    revenuePerMatch: number;
-    annualMaintenanceCost: number;
     monthlyMaintenanceCost: number;
-    isPressured: boolean;
-    expansionRecommended: boolean;
     nextExpansionCost: number;
     nextQualityUpgradeCost: number;
   };
@@ -27,7 +28,6 @@ export interface InfrastructureStatus {
     fitnessBonus: number;
     recoverySpeedMultiplier: number;
     developmentBonus: number;
-    annualMaintenanceCost: number;
     monthlyMaintenanceCost: number;
     nextUpgradeCost: number;
     upgradeRecommended: boolean;
@@ -40,27 +40,44 @@ export interface InfrastructureStatus {
     potentialBoost: number;
     developmentRate: number;
     currentYouthPlayers: number;
-    annualMaintenanceCost: number;
     monthlyMaintenanceCost: number;
     nextUpgradeCost: number;
     upgradeRecommended: boolean;
   };
+
+  medicalCenter: {
+    quality: number;
+    injuryPreventionBonus: number;
+    recoverySpeedBonus: number;
+    monthlyMaintenanceCost: number;
+    nextUpgradeCost: number;
+    upgradeRecommended: boolean;
+  };
+
+  administrativeCenter: {
+    quality: number;
+    marketingBonus: number;
+    scoutingSpeedBonus: number;
+    monthlyMaintenanceCost: number;
+    nextUpgradeCost: number;
+    upgradeRecommended: boolean;
+  };
+
+  activeConstruction: {
+    isBusy: boolean;
+    facilityType?: FacilityType;
+    targetLevel?: number;
+    targetCapacity?: number;
+    daysRemaining?: number;
+    endDate?: string;
+  } | null;
 
   totalAnnualCost: number;
   totalMonthlyCost: number;
 
   fanBase: {
     current: number;
-    projected: number;
-    growthRate: number;
     capacityRatio: number;
-  };
-
-  financialHealth: {
-    canAffordUpgrades: boolean;
-    recommendedReserve: number;
-    availableBudget: number;
-    infrastructureBudgetCap: number;
   };
 }
 
@@ -71,9 +88,10 @@ export interface UpgradeResult {
   costPaid: number;
   newValue: number;
   previousValue: number;
-  remainingBudget: number;
   message: string;
   warnings?: string[];
+  constructionStarted?: boolean;
+  daysToComplete?: number;
 }
 
 export interface UpgradeValidationContext {
@@ -86,6 +104,7 @@ export interface UpgradeValidationContext {
   seasonId: number;
   annualRevenue?: number;
   monthlyOperatingCosts?: number;
+  hasActiveConstruction?: boolean;
 }
 
 export interface UpgradeValidationResult {
@@ -95,78 +114,4 @@ export interface UpgradeValidationResult {
   withinLimits: boolean;
   errors: string[];
   warnings: string[];
-  recommendations: string[];
-}
-
-export interface FanBaseProjection {
-  currentFanBase: number;
-  projectedFanBase: number;
-  growthRate: number;
-  factors: {
-    organicGrowth: number;
-    successBonus: number;
-    satisfactionImpact: number;
-    stadiumQualityBonus: number;
-  };
-  recommendations: string[];
-}
-
-export interface CapacityAnalysis {
-  currentCapacity: number;
-  averageAttendance: number;
-  utilizationRate: number;
-  isPressured: boolean;
-  lostRevenue: number;
-  satisfactionImpact: number;
-  recommendedExpansion: number;
-  expansionCost: number;
-  projectedROI: {
-    annualRevenueIncrease: number;
-    paybackMonths: number;
-    breakEvenDate: string;
-  };
-}
-
-export interface InvestmentAnalysis {
-  facilityType: FacilityType;
-  investmentCost: number;
-  annualBenefit: number;
-  paybackPeriod: number;
-  netPresentValue: number;
-  internalRateOfReturn: number;
-  recommendation:
-    | "highly_recommended"
-    | "recommended"
-    | "neutral"
-    | "not_recommended";
-  reasoning: string[];
-}
-
-export interface MonthlyInfrastructureReport {
-  reportDate: string;
-  facilities: {
-    stadium: {
-      capacity: number;
-      quality: number;
-      attendance: number;
-      revenue: number;
-      maintenanceCost: number;
-    };
-    training: {
-      quality: number;
-      maintenanceCost: number;
-      injuries: number;
-      injuryReduction: number;
-    };
-    youth: {
-      quality: number;
-      maintenanceCost: number;
-      activeYouthPlayers: number;
-    };
-  };
-  totalCosts: number;
-  totalRevenue: number;
-  netImpact: number;
-  alerts: string[];
-  recommendations: string[];
 }
