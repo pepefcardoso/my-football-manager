@@ -4,6 +4,7 @@ import { type ServiceResult } from "../domain/ServiceResults";
 import type { Player } from "../domain/models";
 import { Position } from "../domain/enums";
 import { RandomEngine } from "../engine/RandomEngine";
+import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
 
 export class YouthAcademyService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -97,9 +98,16 @@ export class YouthAcademyService extends BaseService {
       const team = await this.repos.teams.findById(teamId);
       if (!team) throw new Error("Time não encontrado");
 
-      const quality = team.youthAcademyQuality || 50;
+      const quality = team.youthAcademyQuality || 0;
+
+      const benefits = InfrastructureEconomics.getYouthBenefits(quality);
+
       const quantity = RandomEngine.getInt(3, 6);
       const createdPlayers: Player[] = [];
+
+      this.logger.info(
+        `Gerando ${quantity} jovens para time ${teamId}. Qualidade Base: ${quality}`
+      );
 
       for (let i = 0; i < quantity; i++) {
         const position = RandomEngine.pickOne(Object.values(Position));
@@ -107,26 +115,26 @@ export class YouthAcademyService extends BaseService {
 
         const baseOvr = Math.max(
           35,
-          Math.min(60, Math.round(quality * 0.6 + RandomEngine.getInt(-10, 10)))
-        );
-
-        const potential = Math.min(
-          99,
-          Math.max(
-            baseOvr + 10,
-            Math.round(quality * 0.9 + RandomEngine.getInt(-5, 15))
+          Math.min(
+            65,
+            Math.round(35 + quality * 0.25 + RandomEngine.getInt(-5, 5))
           )
         );
+
+        const minPot = baseOvr + 10 + benefits.minPotentialBonus;
+        const maxPot = baseOvr + 35 + benefits.maxPotentialBonus;
+
+        const potential = Math.min(99, RandomEngine.getInt(minPot, maxPot));
 
         const stats = this.generateBaseStats(position, baseOvr);
 
         const playerData: any = {
           teamId,
-          firstName: `Jovem`, // TODO Ideal: usar gerador de nomes
+          firstName: `Jovem`,
           lastName: `Promessa ${RandomEngine.getInt(100, 999)}`,
           age,
           position,
-          nationality: "BRA", // TODO Ideal: vir do país do time
+          nationality: "BRA",
           overall: baseOvr,
           potential,
           isYouth: true,
@@ -143,7 +151,7 @@ export class YouthAcademyService extends BaseService {
           teamId,
           wage: 100,
           startDate: new Date().toISOString(),
-          endDate: new Date(new Date().getFullYear() + 2, 11, 31).toISOString(),
+          endDate: new Date(new Date().getFullYear() + 3, 11, 31).toISOString(),
           type: "youth",
           status: "active",
         } as any);

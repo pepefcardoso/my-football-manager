@@ -1,10 +1,19 @@
 export type FacilityType =
   | "stadium_capacity"
   | "stadium_quality"
-  | "training"
-  | "medical"
-  | "youth"
-  | "admin";
+  | "training_center_quality"
+  | "youth_academy_quality"
+  | "medical_center_quality"
+  | "administrative_center_quality";
+
+export interface TeamInfrastructure {
+  stadiumCapacity: number;
+  stadiumQuality: number;
+  trainingCenterQuality: number;
+  youthAcademyQuality: number;
+  medicalCenterQuality: number;
+  administrativeCenterQuality: number;
+}
 
 export interface ActiveConstruction {
   facilityType: FacilityType;
@@ -14,6 +23,35 @@ export interface ActiveConstruction {
   startDate: string;
   endDate: string;
   daysRemaining: number;
+}
+
+export interface MedicalCenterBenefits {
+  injuryChanceReduction: number;
+  recoverySpeedBonus: number;
+  description: string;
+}
+
+export interface AdminCenterBenefits {
+  sponsorshipBonus: number;
+  scoutingEfficiency: number;
+  description: string;
+}
+
+export interface TrainingCenterBenefits {
+  xpMultiplier: number;
+  description: string;
+}
+
+export interface YouthAcademyBenefits {
+  minPotentialBonus: number;
+  maxPotentialBonus: number;
+  description: string;
+}
+
+export interface StadiumBenefits {
+  ticketPriceBonus: number;
+  attendanceBonus: number;
+  description: string;
 }
 
 export interface FacilityStatus {
@@ -36,12 +74,4 @@ export interface InfrastructureOverview {
   facilities: Record<FacilityType, FacilityStatus>;
   activeConstruction: ActiveConstruction | null;
   totalMaintenanceCost: number;
-  projectedMaintenanceAfterUpgrade?: number;
-}
-
-export interface UpgradeValidationResult {
-  allowed: boolean;
-  reason?: string;
-  cost: number;
-  newBudget: number;
 }

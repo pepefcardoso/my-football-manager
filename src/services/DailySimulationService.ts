@@ -7,11 +7,12 @@ import { PhysiologyEngine } from "../engine/PhysiologyEngine";
 import type { Player } from "../domain/models";
 import { TrainingFocus } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
-import { getBalanceValue } from "../engine/GameBalanceConfig";
 import type { PlayerDevelopmentService } from "./PlayerDevelopmentService";
-
-const TRAINING_CONFIG = getBalanceValue("TRAINING");
-const MORAL_CONFIG = TRAINING_CONFIG.MORAL;
+import type {
+  MedicalCenterBenefits,
+  TrainingCenterBenefits,
+} from "../domain/types/InfrastructureTypes";
+import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
 
 export interface PlayerTrainingUpdate {
   id: number;
@@ -61,32 +62,38 @@ export class DailySimulationService extends BaseService {
       "processTeamDailyLoop",
       { teamId, trainingFocus, staffImpact },
       async ({ teamId, trainingFocus, staffImpact }) => {
+        const team = await this.repos.teams.findById(teamId);
+        if (!team) throw new Error("Time não encontrado");
+
+        const medicalLevel = team.medicalCenterQuality || 0;
+        const medicalBenefits =
+          InfrastructureEconomics.getMedicalBenefits(medicalLevel);
+
+        const trainingLevel = team.trainingCenterQuality || 0;
+        const trainingBenefits =
+          InfrastructureEconomics.getTrainingBenefits(trainingLevel);
+
         this.logger.info(
-          `🏋️ Iniciando treino diário para time ${teamId}. Foco: ${trainingFocus.toUpperCase()}`
+          `🏋️ Treino Diário | Foco: ${trainingFocus} | Medical Lv: ${medicalLevel} | Training Lv: ${trainingLevel}`
         );
-        this.logger.debug("Impacto do Staff aplicado:", staffImpact);
 
         const logs: string[] = [];
         const playerUpdates: PlayerTrainingUpdate[] = [];
 
-        logs.push(`Treino do dia: ${this.translateFocus(trainingFocus)}`);
-
         const players = await this.repos.players.findByTeamId(teamId);
-        this.logger.info(`Processando ${players.length} jogadores...`);
 
         for (const player of players) {
           if (player.isInjured) {
             const update = await this.processInjuredPlayer(
               player,
-              staffImpact.injuryRecoveryMultiplier
+              staffImpact.injuryRecoveryMultiplier,
+              medicalBenefits.recoverySpeedBonus
             );
             playerUpdates.push(update);
 
             if (update.injuryDays === 0 && player.injuryDaysRemaining > 0) {
-              const msg = `🚑 ${player.firstName} ${player.lastName} recuperou-se da lesão.`;
-              logs.push(msg);
-              this.logger.info(
-                `[Recuperação] Jogador ${player.id} está recuperado.`
+              logs.push(
+                `🚑 ${player.firstName} ${player.lastName} recuperou-se da lesão.`
               );
             }
             continue;
@@ -96,6 +103,8 @@ export class DailySimulationService extends BaseService {
             player,
             trainingFocus,
             staffImpact,
+            medicalBenefits,
+            trainingBenefits,
             logs
           );
           playerUpdates.push(update);
@@ -105,10 +114,6 @@ export class DailySimulationService extends BaseService {
           await this.repos.players.updateDailyStatsBatch(playerUpdates);
         }
 
-        this.logger.info(
-          `Treino finalizado. ${playerUpdates.length} jogadores processados e atualizados.`
-        );
-
         return { playerUpdates, logs };
       }
     );
@@ -116,15 +121,16 @@ export class DailySimulationService extends BaseService {
 
   private async processInjuredPlayer(
     player: Player,
-    injuryRecoveryMultiplier: number
+    injuryRecoveryMultiplier: number,
+    facilitySpeedBonus: number
   ): Promise<PlayerTrainingUpdate> {
     const { daysRemaining, isHealed } = PhysiologyEngine.processInjuryHealing(
       player,
-      injuryRecoveryMultiplier
+      injuryRecoveryMultiplier,
+      facilitySpeedBonus
     );
 
     const newEnergy = Math.min(100, player.energy + 5);
-
     return {
       id: player.id,
       energy: newEnergy,
@@ -140,12 +146,15 @@ export class DailySimulationService extends BaseService {
     player: Player,
     trainingFocus: TrainingFocus,
     staffImpact: TeamStaffImpact,
+    medicalBenefits: MedicalCenterBenefits,
+    trainingBenefits: TrainingCenterBenefits,
     logs: string[]
   ): Promise<PlayerTrainingUpdate> {
     const newEnergy = PhysiologyEngine.calculateEnergyRecovery(
       player,
       trainingFocus,
-      staffImpact.energyRecoveryBonus
+      staffImpact.energyRecoveryBonus,
+      medicalBenefits.recoverySpeedBonus
     );
 
     const newFitness = PhysiologyEngine.calculateFitnessChange(
@@ -157,7 +166,8 @@ export class DailySimulationService extends BaseService {
     const injuryRisk = PhysiologyEngine.calculateInjuryRisk(
       player,
       trainingFocus,
-      staffImpact.energyRecoveryBonus
+      staffImpact.energyRecoveryBonus,
+      medicalBenefits.injuryChanceReduction
     );
 
     const isInjured = RandomEngine.chance(injuryRisk);
@@ -168,10 +178,8 @@ export class DailySimulationService extends BaseService {
         "light",
         staffImpact.injuryRecoveryMultiplier
       );
-      const msg = `🩹 ${player.firstName} ${player.lastName} sentiu uma lesão no treino (${injuryDays} dias).`;
-      logs.push(msg);
-      this.logger.warn(
-        `[Lesão] Jogador ${player.id} lesionado por ${injuryDays} dias.`
+      logs.push(
+        `🩹 ${player.firstName} ${player.lastName} sentiu uma lesão (${injuryDays} dias).`
       );
     }
 
@@ -181,7 +189,8 @@ export class DailySimulationService extends BaseService {
     if (!isInjured) {
       const growthResult = await this.developmentService.processAttributeGrowth(
         player,
-        trainingFocus
+        trainingFocus,
+        trainingBenefits.xpMultiplier
       );
 
       if (growthResult.attributesChanged) {
@@ -190,12 +199,7 @@ export class DailySimulationService extends BaseService {
         logs.push(...growthResult.logs);
       }
     }
-
-    let newMoral = player.moral;
-    if (player.moral > MORAL_CONFIG.NEUTRAL_THRESHOLD)
-      newMoral -= MORAL_CONFIG.NATURAL_DECAY_RATE;
-    if (player.moral < MORAL_CONFIG.NEUTRAL_THRESHOLD)
-      newMoral += MORAL_CONFIG.NATURAL_RECOVERY_RATE;
+    const newMoral = player.moral;
 
     return {
       id: player.id,
@@ -207,15 +211,5 @@ export class DailySimulationService extends BaseService {
       injuryDays: injuryDays,
       ...updatedStats,
     };
-  }
-
-  private translateFocus(focus: TrainingFocus): string {
-    const map = {
-      [TrainingFocus.REST]: "Descanso e Recuperação",
-      [TrainingFocus.PHYSICAL]: "Condicionamento Físico",
-      [TrainingFocus.TACTICAL]: "Tático e Posicionamento",
-      [TrainingFocus.TECHNICAL]: "Técnico e Fundamentos",
-    };
-    return map[focus] || focus;
   }
 }

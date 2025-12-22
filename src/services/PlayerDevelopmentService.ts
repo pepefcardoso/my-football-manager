@@ -22,7 +22,8 @@ export class PlayerDevelopmentService extends BaseService {
 
   async processAttributeGrowth(
     player: Player,
-    trainingFocus: TrainingFocus
+    trainingFocus: TrainingFocus,
+    xpMultiplier: number = 1.0
   ): Promise<AttributeGrowthResult> {
     const logs: string[] = [];
     let attributesChanged = false;
@@ -38,14 +39,16 @@ export class PlayerDevelopmentService extends BaseService {
     };
 
     if (trainingFocus !== TrainingFocus.REST) {
-      const growthChance =
+      const baseChance =
         player.age < 21
           ? GROWTH_CONFIG.CHANCE_YOUTH_UNDER_21
           : player.age < 25
           ? GROWTH_CONFIG.CHANCE_YOUNG_21_TO_25
           : GROWTH_CONFIG.CHANCE_PRIME_OVER_25;
 
-      if (RandomEngine.chance(growthChance)) {
+      const finalChance = baseChance * xpMultiplier;
+
+      if (RandomEngine.chance(finalChance)) {
         if (trainingFocus === TrainingFocus.TECHNICAL) {
           const attr = RandomEngine.pickOne([
             "passing",

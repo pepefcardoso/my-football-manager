@@ -8,8 +8,10 @@ import type {
   ActiveConstruction,
   FacilityStatus,
   InfrastructureOverview,
+  TeamInfrastructure,
 } from "../domain/types/InfrastructureTypes";
-import type { GameEventBus } from "../lib/GameEventBus";
+import { GameEventBus } from "../lib/GameEventBus";
+import { GameEventType } from "../domain/GameEventTypes";
 import type { Team } from "../domain/models";
 
 export class InfrastructureService extends BaseService {
@@ -28,13 +30,14 @@ export class InfrastructureService extends BaseService {
       if (!team) throw new Error("Time não encontrado.");
 
       const facilities: Record<string, FacilityStatus> = {};
+
       const types: FacilityType[] = [
         "stadium_capacity",
         "stadium_quality",
-        "training",
-        "medical",
-        "youth",
-        "admin",
+        "training_center_quality",
+        "medical_center_quality",
+        "youth_academy_quality",
+        "administrative_center_quality",
       ];
 
       let totalMaintenanceCost = 0;
@@ -82,21 +85,6 @@ export class InfrastructureService extends BaseService {
         };
       }
 
-      let projectedMaintenance = totalMaintenanceCost;
-      if (team.activeConstruction) {
-        const type = team.activeConstruction.facilityType as FacilityType;
-        const currentMaint = InfrastructureEconomics.getMaintenanceCost(
-          type,
-          team.activeConstruction.startLevel
-        );
-        const targetMaint = InfrastructureEconomics.getMaintenanceCost(
-          type,
-          team.activeConstruction.targetLevel!
-        );
-        projectedMaintenance =
-          totalMaintenanceCost - currentMaint + targetMaint;
-      }
-
       return {
         teamId,
         budget: team.budget,
@@ -104,7 +92,6 @@ export class InfrastructureService extends BaseService {
         activeConstruction:
           team.activeConstruction as ActiveConstruction | null,
         totalMaintenanceCost,
-        projectedMaintenanceAfterUpgrade: projectedMaintenance,
       };
     });
   }
@@ -123,7 +110,9 @@ export class InfrastructureService extends BaseService {
 
         if (team.activeConstruction) {
           throw new Error(
-            "Já existe uma obra em andamento. Aguarde a conclusão."
+            `Já existe uma obra em andamento (${this.getFacilityName(
+              team.activeConstruction.facilityType as FacilityType
+            )}). Aguarde a conclusão.`
           );
         }
 
@@ -131,7 +120,7 @@ export class InfrastructureService extends BaseService {
         const maxLevel = InfrastructureEconomics.getMaxLevel(facilityType);
 
         if (currentLevel >= maxLevel) {
-          throw new Error("Instalação já está no nível máximo.");
+          throw new Error("Esta instalação já está no nível máximo.");
         }
 
         const actualAmount = facilityType === "stadium_capacity" ? amount : 1;
@@ -143,30 +132,36 @@ export class InfrastructureService extends BaseService {
           actualAmount
         );
 
-        if (team.budget < cost) {
-          throw new Error(
-            `Saldo insuficiente. Necessário: €${cost.toLocaleString()}`
-          );
-        }
-
         const duration = InfrastructureEconomics.getConstructionDuration(
           facilityType,
           currentLevel,
           actualAmount
         );
 
+        if (team.budget < cost) {
+          throw new Error(
+            `Saldo insuficiente. Necessário: €${cost.toLocaleString(
+              "pt-PT"
+            )} | Atual: €${team.budget.toLocaleString("pt-PT")}`
+          );
+        }
+
         const gameState = await this.repos.gameState.findCurrent();
-        const startDate = new Date(gameState?.currentDate || new Date());
+        const currentDateStr =
+          gameState?.currentDate || new Date().toISOString().split("T")[0];
+
+        const startDate = new Date(currentDateStr);
         const endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + duration);
+        const endDateStr = endDate.toISOString().split("T")[0];
 
         const constructionData: ActiveConstruction = {
           facilityType,
           startLevel: currentLevel,
           targetLevel: targetLevel,
           cost,
-          startDate: startDate.toISOString().split("T")[0],
-          endDate: endDate.toISOString().split("T")[0],
+          startDate: currentDateStr,
+          endDate: endDateStr,
           daysRemaining: duration,
         };
 
@@ -178,17 +173,17 @@ export class InfrastructureService extends BaseService {
         await this.repos.financial.addRecord({
           teamId,
           seasonId: gameState?.currentSeasonId || 1,
-          date: constructionData.startDate,
+          date: currentDateStr,
           type: "expense",
           category: FinancialCategory.INFRASTRUCTURE,
           amount: cost,
-          description: `Início de obra: ${this.getFacilityName(
+          description: `Investimento: ${this.getFacilityName(
             facilityType
           )} (Nível ${targetLevel})`,
         });
 
         this.logger.info(
-          `🔨 Obra iniciada: ${constructionData.facilityType} para time ${teamId}. Término: ${constructionData.endDate}`
+          `🔨 Obra iniciada: ${constructionData.facilityType} (Nível ${targetLevel}) para time ${teamId}. Custo: €${cost}`
         );
       }
     );
@@ -209,10 +204,7 @@ export class InfrastructureService extends BaseService {
         const today = new Date(currentDateStr);
         const end = new Date(construction.endDate);
 
-        const diffTime = end.getTime() - today.getTime();
-        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (daysRemaining > 0) {
+        if (today.getTime() < end.getTime()) {
           return false;
         }
 
@@ -224,26 +216,29 @@ export class InfrastructureService extends BaseService {
           activeConstruction: null,
         };
 
-        this.applyLevelUpdate(
+        this.mapFacilityToColumnUpdate(
           updateData,
           construction.facilityType,
-          construction.targetLevel!
+          construction.targetLevel
         );
 
         await this.repos.teams.update(teamId, updateData);
 
-        // TODO: Enviar notificação/evento para o usuário (via EventBus)
-        // await this.eventBus.publish(GameEventType.INFRASTRUCTURE_COMPLETED, { ... });
+        await this.eventBus.publish(GameEventType.INFRASTRUCTURE_COMPLETED, {
+          teamId,
+          facilityType: construction.facilityType,
+          newLevel: construction.targetLevel,
+          description: `A obra no(a) ${this.getFacilityName(
+            construction.facilityType
+          )} foi concluída!`,
+          completionDate: currentDateStr,
+        });
 
         return true;
       }
     );
   }
 
-  /**
-   * Chamado no dia 1 de cada mês.
-   * Cobra a manutenção de todas as instalações.
-   */
   async applyMonthlyMaintenance(
     teamId: number,
     currentDate: string,
@@ -256,10 +251,10 @@ export class InfrastructureService extends BaseService {
       const types: FacilityType[] = [
         "stadium_capacity",
         "stadium_quality",
-        "training",
-        "medical",
-        "youth",
-        "admin",
+        "training_center_quality",
+        "medical_center_quality",
+        "youth_academy_quality",
+        "administrative_center_quality",
       ];
 
       let totalCost = 0;
@@ -278,7 +273,7 @@ export class InfrastructureService extends BaseService {
           type: "expense",
           category: FinancialCategory.STADIUM_MAINTENANCE,
           amount: totalCost,
-          description: "Manutenção Mensal de Infraestrutura",
+          description: "Manutenção Mensal de Infraestrutura Completa",
         });
       }
 
@@ -286,75 +281,28 @@ export class InfrastructureService extends BaseService {
     });
   }
 
-  async applySeasonDegradation(
-    teamId: number
-  ): Promise<ServiceResult<string[]>> {
-    return this.execute("applySeasonDegradation", teamId, async (teamId) => {
-      const team = await this.repos.teams.findById(teamId);
-      if (!team) return [];
-
-      const logs: string[] = [];
-      const updateData: Partial<Team> = {};
-
-      const degrade = (
-        type: FacilityType,
-        currentLevel: number,
-        label: string
-      ) => {
-        if (type === "stadium_capacity") return;
-
-        let loss = 0;
-        if (currentLevel >= 90) loss = 5 + Math.floor(Math.random() * 3);
-        else if (currentLevel >= 70) loss = 3 + Math.floor(Math.random() * 2);
-        else if (currentLevel >= 30) loss = 1 + Math.floor(Math.random() * 2);
-
-        if (loss > 0) {
-          const newLevel = Math.max(0, currentLevel - loss);
-          this.applyLevelUpdate(updateData, type, newLevel);
-          logs.push(
-            `${label}: desgaste de equipamentos reduziu qualidade em -${loss} (Novo: ${newLevel})`
-          );
-        }
-      };
-
-      degrade("stadium_quality", team.stadiumQuality, "Estádio (Qualidade)");
-      degrade("training", team.trainingCenterQuality, "Centro de Treinamento");
-      degrade("medical", team.medicalCenterQuality, "Centro Médico");
-      degrade("youth", team.youthAcademyQuality, "Academia de Base");
-      degrade(
-        "admin",
-        team.administrativeCenterQuality,
-        "Centro Administrativo"
-      );
-
-      if (Object.keys(updateData).length > 0) {
-        await this.repos.teams.update(teamId, updateData);
-      }
-
-      return logs;
-    });
-  }
-
   private getCurrentLevel(team: Team, type: FacilityType): number {
+    const t = team as unknown as TeamInfrastructure;
+
     switch (type) {
       case "stadium_capacity":
-        return team.stadiumCapacity;
+        return t.stadiumCapacity;
       case "stadium_quality":
-        return team.stadiumQuality;
-      case "training":
-        return team.trainingCenterQuality;
-      case "medical":
-        return team.medicalCenterQuality;
-      case "youth":
-        return team.youthAcademyQuality;
-      case "admin":
-        return team.administrativeCenterQuality;
+        return t.stadiumQuality;
+      case "training_center_quality":
+        return t.trainingCenterQuality;
+      case "medical_center_quality":
+        return t.medicalCenterQuality;
+      case "youth_academy_quality":
+        return t.youthAcademyQuality;
+      case "administrative_center_quality":
+        return t.administrativeCenterQuality;
       default:
         return 0;
     }
   }
 
-  private applyLevelUpdate(
+  private mapFacilityToColumnUpdate(
     data: Partial<Team>,
     type: FacilityType,
     newLevel: number
@@ -366,16 +314,16 @@ export class InfrastructureService extends BaseService {
       case "stadium_quality":
         data.stadiumQuality = newLevel;
         break;
-      case "training":
+      case "training_center_quality":
         data.trainingCenterQuality = newLevel;
         break;
-      case "medical":
+      case "medical_center_quality":
         data.medicalCenterQuality = newLevel;
         break;
-      case "youth":
+      case "youth_academy_quality":
         data.youthAcademyQuality = newLevel;
         break;
-      case "admin":
+      case "administrative_center_quality":
         data.administrativeCenterQuality = newLevel;
         break;
     }
@@ -385,11 +333,11 @@ export class InfrastructureService extends BaseService {
     const names: Record<FacilityType, string> = {
       stadium_capacity: "Expansão do Estádio",
       stadium_quality: "Melhoria do Estádio",
-      training: "Centro de Treinamento",
-      medical: "Centro Médico",
-      youth: "Academia de Base",
-      admin: "Centro Administrativo",
+      training_center_quality: "Centro de Treinamento",
+      medical_center_quality: "Centro Médico",
+      youth_academy_quality: "Academia de Base",
+      administrative_center_quality: "Centro Administrativo",
     };
-    return names[type];
+    return names[type] || type;
   }
 }

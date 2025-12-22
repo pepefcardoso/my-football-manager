@@ -9,6 +9,7 @@ import {
 } from "../../engine/FinancialBalanceConfig";
 import { GameBalance } from "../../engine/GameBalanceConfig";
 import { RevenueStrategyFactory } from "../../domain/logic/revenue/RevenueStrategyFactory";
+import { InfrastructureEconomics } from "../../engine/InfrastructureEconomics";
 
 export interface MatchdayRevenueBreakdown {
   tickets: {
@@ -325,27 +326,37 @@ export class RevenueService extends BaseService {
     const config = FinancialBalance.REVENUE_STREAMS.COMMERCIAL;
     const reputation = team.reputation || 0;
 
+    const adminLevel = team.administrativeCenterQuality || 0;
+    const adminBenefits = InfrastructureEconomics.getAdminBenefits(adminLevel);
+
     const reputationMultiplier = 1.0 + reputation / 10000;
+
+    const finalMultiplier =
+      reputationMultiplier * (1 + adminBenefits.sponsorshipBonus);
 
     const shirtSponsor = Math.round(
       (leagueTier === "TIER_1"
         ? config.SHIRT_SPONSOR_TIER_1
         : leagueTier === "TIER_2"
         ? config.SHIRT_SPONSOR_TIER_2
-        : config.SHIRT_SPONSOR_TIER_3) * reputationMultiplier
+        : config.SHIRT_SPONSOR_TIER_3) * finalMultiplier
     );
 
     const stadiumNaming = Math.round(
       shirtSponsor * config.STADIUM_NAMING_RIGHTS_MULTIPLIER
     );
 
+    const merchandisingMultiplier = 1.0 + adminBenefits.sponsorshipBonus * 0.2;
+
     const estimatedMerchandiseSales = (team.fanBase || 10000) * 25;
     const kitManufacturer = Math.round(
-      estimatedMerchandiseSales * config.KIT_MANUFACTURER_ROYALTY
+      estimatedMerchandiseSales *
+        config.KIT_MANUFACTURER_ROYALTY *
+        merchandisingMultiplier
     );
 
     const regionalSponsors = Math.round(
-      config.REGIONAL_SPONSORS_BASE * reputationMultiplier
+      config.REGIONAL_SPONSORS_BASE * finalMultiplier
     );
 
     const estimatedFollowers = (team.fanBase || 10000) * 2;

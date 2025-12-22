@@ -9,6 +9,7 @@ import type {
   TransferCompletedPayload,
   StadiumCapacityPressuredPayload,
   InfrastructureDegradedPayload,
+  InfrastructureCompletedPayload,
 } from "../domain/GameEventTypes";
 
 type EventHandler<T> = (payload: T) => Promise<void> | void;
@@ -52,6 +53,10 @@ export class GameEventBus {
   public subscribe(
     eventType: GameEventType.INFRASTRUCTURE_DEGRADED,
     handler: EventHandler<InfrastructureDegradedPayload>
+  ): void;
+   public subscribe(
+    eventType: GameEventType.INFRASTRUCTURE_COMPLETED,
+    handler: EventHandler<InfrastructureCompletedPayload>
   ): void;
 
   public subscribe<T>(
@@ -110,6 +115,10 @@ export class GameEventBus {
   public async publish(
     eventType: GameEventType.INFRASTRUCTURE_DEGRADED,
     payload: InfrastructureDegradedPayload
+  ): Promise<void>;
+  public async publish(
+    eventType: GameEventType.INFRASTRUCTURE_COMPLETED,
+    payload: InfrastructureCompletedPayload
   ): Promise<void>;
 
   public async publish<T>(eventType: GameEventType, payload: T): Promise<void> {

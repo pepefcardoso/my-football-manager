@@ -9,7 +9,8 @@ export class PhysiologyEngine {
   static calculateEnergyRecovery(
     player: Player,
     trainingFocus: TrainingFocus,
-    staffEnergyBonus: number
+    staffEnergyBonus: number,
+    facilityRecoveryBonus: number = 0
   ): number {
     let baseDelta = 0;
 
@@ -28,49 +29,28 @@ export class PhysiologyEngine {
         break;
     }
 
-    const bonusDelta = staffEnergyBonus;
+    const totalBonus =
+      staffEnergyBonus +
+      (baseDelta > 0 ? baseDelta * facilityRecoveryBonus : 0);
 
-    return Math.max(0, Math.min(100, player.energy + baseDelta + bonusDelta));
-  }
-
-  static calculateFitnessChange(
-    player: Player,
-    trainingFocus: TrainingFocus,
-    staffEnergyBonus: number
-  ): number {
-    let baseDelta = 0;
-
-    switch (trainingFocus) {
-      case TrainingFocus.REST:
-        baseDelta = TRAINING_CONFIG.FITNESS_CHANGE.REST;
-        break;
-      case TrainingFocus.PHYSICAL:
-        baseDelta = TRAINING_CONFIG.FITNESS_CHANGE.PHYSICAL_BASE;
-        break;
-      case TrainingFocus.TACTICAL:
-        baseDelta = TRAINING_CONFIG.FITNESS_CHANGE.TACTICAL;
-        break;
-      case TrainingFocus.TECHNICAL:
-        baseDelta = TRAINING_CONFIG.FITNESS_CHANGE.TECHNICAL;
-        break;
-    }
-
-    const bonusDelta =
-      staffEnergyBonus * TRAINING_CONFIG.STAFF_BONUS_TO_FITNESS_MULTIPLIER;
-
-    return Math.max(0, Math.min(100, player.fitness + baseDelta + bonusDelta));
+    return Math.max(0, Math.min(100, player.energy + baseDelta + totalBonus));
   }
 
   static processInjuryHealing(
     player: Player,
-    injuryRecoveryMultiplier: number
+    injuryRecoveryMultiplier: number,
+    facilitySpeedBonus: number = 0
   ): { isHealed: boolean; daysRemaining: number } {
     if (!player.isInjured) return { isHealed: false, daysRemaining: 0 };
 
     let reduction = 1;
+    const bonusChance = 1.0 - injuryRecoveryMultiplier + facilitySpeedBonus;
 
-    const bonusChance = 1.0 - injuryRecoveryMultiplier;
     if (Math.random() < bonusChance) {
+      reduction += 1;
+    }
+
+    if (facilitySpeedBonus > 0.4 && Math.random() < 0.2) {
       reduction += 1;
     }
 
@@ -85,7 +65,8 @@ export class PhysiologyEngine {
   static calculateInjuryRisk(
     player: Player,
     trainingFocus: TrainingFocus,
-    staffEnergyBonus: number
+    staffEnergyBonus: number,
+    facilityPreventionBonus: number = 0
   ): number {
     if (trainingFocus === TrainingFocus.REST) {
       return 0;
@@ -101,6 +82,34 @@ export class PhysiologyEngine {
     const mitigation =
       staffEnergyBonus / INJURY_CONFIG.STAFF_MITIGATION_DIVISOR;
 
-    return Math.max(0, risk - mitigation);
+    risk = Math.max(0, risk - mitigation);
+    risk = risk * (1 - facilityPreventionBonus);
+
+    return risk;
+  }
+
+  static calculateFitnessChange(
+    player: Player,
+    trainingFocus: TrainingFocus,
+    staffEnergyBonus: number
+  ): number {
+    let baseDelta = 0;
+    switch (trainingFocus) {
+      case TrainingFocus.REST:
+        baseDelta = TRAINING_CONFIG.FITNESS_CHANGE.REST;
+        break;
+      case TrainingFocus.PHYSICAL:
+        baseDelta = TRAINING_CONFIG.FITNESS_CHANGE.PHYSICAL_BASE;
+        break;
+      case TrainingFocus.TACTICAL:
+        baseDelta = TRAINING_CONFIG.FITNESS_CHANGE.TACTICAL;
+        break;
+      case TrainingFocus.TECHNICAL:
+        baseDelta = TRAINING_CONFIG.FITNESS_CHANGE.TECHNICAL;
+        break;
+    }
+    const bonusDelta =
+      staffEnergyBonus * TRAINING_CONFIG.STAFF_BONUS_TO_FITNESS_MULTIPLIER;
+    return Math.max(0, Math.min(100, player.fitness + baseDelta + bonusDelta));
   }
 }

@@ -7,6 +7,7 @@ export enum GameEventType {
   SCHEDULED_EVENT_TRIGGERED = "SCHEDULED_EVENT_TRIGGERED",
   STADIUM_CAPACITY_PRESSURED = "STADIUM_CAPACITY_PRESSURED",
   INFRASTRUCTURE_DEGRADED = "INFRASTRUCTURE_DEGRADED",
+  INFRASTRUCTURE_COMPLETED = "INFRASTRUCTURE_COMPLETED",
 }
 
 export interface MatchFinishedPayload {
@@ -77,4 +78,12 @@ export interface InfrastructureDegradedPayload {
   currentQuality: number;
   minimumQuality: number;
   maintenanceCost: number;
+}
+
+export interface InfrastructureCompletedPayload {
+  teamId: number;
+  facilityType: string;
+  newLevel: number;
+  description: string;
+  completionDate: string;
 }
