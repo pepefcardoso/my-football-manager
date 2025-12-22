@@ -702,27 +702,33 @@ function registerIpcHandlers() {
     }
   );
 
+  // No electron/main.ts
+
+  // ... (handlers anteriores, ex: contract)
+
+  // --- INFRASTRUCTURE HANDLERS ATUALIZADOS ---
+
   ipcMain.handle("infrastructure:getStatus", async (_, teamId: number) => {
     const result =
       await serviceContainer.infrastructure.getInfrastructureStatus(teamId);
     return Result.unwrapOr(result, null);
   });
 
+  // Substitui expandStadium e upgradeFacility por um método unificado
   ipcMain.handle(
-    "infrastructure:expandStadium",
-    async (_, { teamId, seasonId }: { teamId: number; seasonId: number }) => {
+    "infrastructure:startUpgrade",
+    async (_, { teamId, facilityType, amount }) => {
       try {
-        const result = await serviceContainer.infrastructure.expandStadium(
+        const result = await serviceContainer.infrastructure.startUpgrade(
           teamId,
-          seasonId
+          facilityType,
+          amount || 1 // Default para 1 se não for passado
         );
 
         if (Result.isSuccess(result)) {
           return {
             success: true,
-            data: result.data,
-            message: result.data.message,
-            warnings: result.data.warnings,
+            message: "Obra iniciada com sucesso!",
           };
         }
 
@@ -731,7 +737,7 @@ function registerIpcHandlers() {
           message: result.error.message,
         };
       } catch (error) {
-        logger.error("Erro ao expandir estádio:", error);
+        logger.error(`Erro ao iniciar upgrade de ${facilityType}:`, error);
         return {
           success: false,
           message: error instanceof Error ? error.message : "Erro desconhecido",
@@ -741,33 +747,19 @@ function registerIpcHandlers() {
   );
 
   ipcMain.handle(
-    "infrastructure:upgradeFacility",
-    async (
-      _,
-      {
-        teamId,
-        seasonId,
-        facilityType,
-      }: {
-        teamId: number;
-        seasonId: number;
-        facilityType: "stadium" | "training" | "youth";
-      }
-    ) => {
+    "infrastructure:downgradeFacility",
+    async (_, { teamId, facilityType, amount }) => {
       try {
-        const result =
-          await serviceContainer.infrastructure.upgradeFacilityQuality(
-            teamId,
-            seasonId,
-            facilityType
-          );
+        const result = await serviceContainer.infrastructure.downgradeFacility(
+          teamId,
+          facilityType,
+          amount || 1
+        );
 
         if (Result.isSuccess(result)) {
           return {
             success: true,
-            data: result.data,
-            message: result.data.message,
-            warnings: result.data.warnings,
+            message: "Instalação reduzida com sucesso.",
           };
         }
 
@@ -776,59 +768,12 @@ function registerIpcHandlers() {
           message: result.error.message,
         };
       } catch (error) {
-        logger.error(`Erro ao atualizar ${facilityType}:`, error);
+        logger.error(`Erro ao realizar downgrade de ${facilityType}:`, error);
         return {
           success: false,
           message: error instanceof Error ? error.message : "Erro desconhecido",
         };
       }
-    }
-  );
-
-  ipcMain.handle(
-    "infrastructure:getUpgradeCost",
-    async (
-      _,
-      {
-        teamId,
-        facilityType,
-        upgradeType,
-      }: {
-        teamId: number;
-        facilityType: "stadium" | "training" | "youth";
-        upgradeType: "expand" | "quality";
-      }
-    ) => {
-      const result = await serviceContainer.infrastructure.getUpgradeCost(
-        teamId,
-        facilityType,
-        upgradeType
-      );
-      return Result.unwrapOr(result, null);
-    }
-  );
-
-  ipcMain.handle(
-    "infrastructure:analyzeCapacity",
-    async (_, teamId: number) => {
-      const result = await serviceContainer.infrastructure.analyzeCapacity(
-        teamId
-      );
-      return Result.unwrapOr(result, null);
-    }
-  );
-
-  ipcMain.handle(
-    "infrastructure:projectFanBase",
-    async (
-      _,
-      { teamId, leaguePosition }: { teamId: number; leaguePosition: number }
-    ) => {
-      const result = await serviceContainer.infrastructure.projectFanBase(
-        teamId,
-        leaguePosition
-      );
-      return Result.unwrapOr(result, null);
     }
   );
 

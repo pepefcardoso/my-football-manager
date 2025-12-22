@@ -86,15 +86,23 @@ export class RevenueService extends BaseService {
         const leagueTier = this.determineLeagueTier(team);
         const capacity = team.stadiumCapacity || 10000;
         const fanSatisfaction = team.fanSatisfaction || 50;
+        const stadiumQuality = team.stadiumQuality || 20;
 
         const strategy = RevenueStrategyFactory.getStrategy(undefined);
 
         const tierNumber = this.mapTierToNumber(leagueTier);
 
+        const stadiumBenefits =
+          InfrastructureEconomics.getStadiumQualityBenefits(stadiumQuality);
+
+        const baseTicketPrice = GameBalance.MATCH.REVENUE.BASE_TICKET_PRICE;
+        const adjustedTicketPrice =
+          baseTicketPrice * (1 + stadiumBenefits.ticketPriceBonus);
+
         const strategyResult = strategy.calculateRevenue({
           stadiumCapacity: capacity,
           fanSatisfaction: fanSatisfaction,
-          ticketPrice: GameBalance.MATCH.REVENUE.BASE_TICKET_PRICE,
+          ticketPrice: adjustedTicketPrice,
           competitionTier: tierNumber,
           round: 10,
         });

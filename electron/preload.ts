@@ -223,38 +223,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
     getStatus: (teamId: number) =>
       ipcRenderer.invoke("infrastructure:getStatus", teamId),
 
-    expandStadium: (teamId: number, seasonId: number) =>
-      ipcRenderer.invoke("infrastructure:expandStadium", { teamId, seasonId }),
-
-    upgradeFacility: (
-      teamId: number,
-      seasonId: number,
-      facilityType: "stadium" | "training" | "youth"
-    ) =>
-      ipcRenderer.invoke("infrastructure:upgradeFacility", {
-        teamId,
-        seasonId,
-        facilityType,
-      }),
-
-    getUpgradeCost: (
-      teamId: number,
-      facilityType: "stadium" | "training" | "youth",
-      upgradeType: "expand" | "quality"
-    ) =>
-      ipcRenderer.invoke("infrastructure:getUpgradeCost", {
+    startUpgrade: (teamId: number, facilityType: string, amount: number = 1) =>
+      ipcRenderer.invoke("infrastructure:startUpgrade", {
         teamId,
         facilityType,
-        upgradeType,
+        amount,
       }),
 
-    analyzeCapacity: (teamId: number) =>
-      ipcRenderer.invoke("infrastructure:analyzeCapacity", teamId),
-
-    projectFanBase: (teamId: number, leaguePosition: number) =>
-      ipcRenderer.invoke("infrastructure:projectFanBase", {
+    downgradeFacility: (
+      teamId: number,
+      facilityType: string,
+      amount: number = 1
+    ) =>
+      ipcRenderer.invoke("infrastructure:downgradeFacility", {
         teamId,
-        leaguePosition,
+        facilityType,
+        amount,
       }),
 
     compareWithLeague: (teamId: number) =>

@@ -1,57 +1,52 @@
 import { useEffect, useState, useCallback } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import {
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    Legend
+} from "recharts";
+import { FacilityCard } from "../features/infrastructure/FacilityCard";
 
-interface InfrastructureStatus {
-    stadium: {
-        capacity: number;
-        quality: number;
-        utilizationRate: number;
-        averageAttendance: number;
-        revenuePerMatch: number;
-        annualMaintenanceCost: number;
-        monthlyMaintenanceCost: number;
-        isPressured: boolean;
-        expansionRecommended: boolean;
-        nextExpansionCost: number;
-        nextQualityUpgradeCost: number;
-    };
-    trainingCenter: {
-        quality: number;
-        injuryReductionRate: number;
-        fitnessBonus: number;
-        recoverySpeedMultiplier: number;
-        developmentBonus: number;
-        annualMaintenanceCost: number;
-        monthlyMaintenanceCost: number;
-        nextUpgradeCost: number;
-        upgradeRecommended: boolean;
-    };
-    youthAcademy: {
-        quality: number;
-        intakeQualityBonus: number;
-        intakeQuantityBonus: number;
-        potentialBoost: number;
-        developmentRate: number;
-        currentYouthPlayers: number;
-        annualMaintenanceCost: number;
-        monthlyMaintenanceCost: number;
-        nextUpgradeCost: number;
-        upgradeRecommended: boolean;
-    };
-    totalAnnualCost: number;
-    totalMonthlyCost: number;
-    fanBase: {
-        current: number;
-        projected: number;
-        growthRate: number;
-        capacityRatio: number;
-    };
-    financialHealth: {
-        canAffordUpgrades: boolean;
-        recommendedReserve: number;
-        availableBudget: number;
-        infrastructureBudgetCap: number;
-    };
+type FacilityType =
+    | "stadium_capacity"
+    | "stadium_quality"
+    | "training_center_quality"
+    | "youth_academy_quality"
+    | "medical_center_quality"
+    | "administrative_center_quality";
+
+interface FacilityStatus {
+    type: FacilityType;
+    name: string;
+    currentLevel: number;
+    nextLevel: number;
+    upgradeCost: number;
+    monthlyMaintenance: number;
+    constructionDuration: number;
+    isMaxLevel: boolean;
+    isUpgrading: boolean;
+    currentBenefit: string;
+    nextBenefit: string;
+}
+
+interface ActiveConstruction {
+    facilityType: FacilityType;
+    startLevel: number;
+    targetLevel: number;
+    cost: number;
+    daysRemaining: number;
+}
+
+interface InfrastructureOverview {
+    teamId: number;
+    budget: number;
+    facilities: Record<FacilityType, FacilityStatus>;
+    activeConstruction: ActiveConstruction | null;
+    totalMaintenanceCost: number;
 }
 
 interface Team {
@@ -60,34 +55,45 @@ interface Team {
     budget: number;
 }
 
-interface GameState {
-    currentSeasonId: number;
-}
+const getFacilityIcon = (type: FacilityType): string => {
+    switch (type) {
+        case "stadium_capacity": return "🏟️";
+        case "stadium_quality": return "✨";
+        case "training_center_quality": return "🏋️";
+        case "youth_academy_quality": return "🎓";
+        case "medical_center_quality": return "🏥";
+        case "administrative_center_quality": return "🏢";
+        default: return "🏗️";
+    }
+};
+
+const formatMoney = (value: number) => `€${value.toLocaleString('pt-PT')}`;
 
 function InfrastructurePage({ teamId }: { teamId: number }) {
     const [team, setTeam] = useState<Team | null>(null);
-    const [gameState, setGameState] = useState<GameState | null>(null);
-    const [status, setStatus] = useState<InfrastructureStatus | null>(null);
+    const [status, setStatus] = useState<InfrastructureOverview | null>(null);
     const [loading, setLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<"overview" | "competitive" | "history">("overview");
     const [rivalComparison, setRivalComparison] = useState<any>(null);
     const [chartData, setChartData] = useState<any[]>([]);
 
     const refreshData = useCallback(async () => {
+        setLoading(true);
         try {
-            const [teamData, state, infrastructureStatus] = await Promise.all([
+            const [teamData, infrastructureStatus] = await Promise.all([
                 window.electronAPI.team.getTeams().then((teams: any[]) =>
                     teams.find((t) => t.id === teamId)
                 ),
-                window.electronAPI.game.getGameState(),
                 window.electronAPI.infrastructure.getStatus(teamId),
             ]);
 
             setTeam(teamData || null);
-            setGameState(state);
-            setStatus(infrastructureStatus);
+            setStatus(infrastructureStatus as InfrastructureOverview);
         } catch (error) {
-            console.error("Erro ao carregar dados:", error);
+            console.error("Erro ao carregar dados de infraestrutura:", error);
+        } finally {
+            setLoading(false);
         }
     }, [teamId]);
 
@@ -95,98 +101,132 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
         refreshData();
     }, [refreshData]);
 
-    const loadCompetitiveData = useCallback(async () => {
-        try {
-            const comparison = await window.electronAPI.infrastructure.compareWithLeague(teamId);
-            setRivalComparison(comparison);
-        } catch (error) {
-            console.error("Erro ao carregar comparação:", error);
-        }
-    }, [teamId]);
-
-    const loadHistoryData = useCallback(async () => {
-        try {
-            const data = await window.electronAPI.infrastructure.getChartData(teamId, "capacity");
-            setChartData(data || []);
-        } catch (error) {
-            console.error("Erro ao carregar histórico:", error);
-        }
-    }, [teamId]);
-
     useEffect(() => {
-        if (activeTab === "competitive") loadCompetitiveData();
-        if (activeTab === "history") loadHistoryData();
-    }, [activeTab, loadCompetitiveData, loadHistoryData]);
-
-    const handleUpgrade = async (facilityType: "stadium" | "training" | "youth", upgradeType: "expand" | "quality") => {
-        if (!gameState?.currentSeasonId || !team) return;
-        setLoading(true);
-
-        try {
-            let result;
-            if (upgradeType === "expand" && facilityType === "stadium") {
-                result = await window.electronAPI.infrastructure.expandStadium(teamId, gameState.currentSeasonId);
-            } else {
-                result = await window.electronAPI.infrastructure.upgradeFacility(teamId, gameState.currentSeasonId, facilityType);
+        const loadTabData = async () => {
+            if (activeTab === "competitive" && !rivalComparison) {
+                const comparison = await window.electronAPI.infrastructure.compareWithLeague(teamId);
+                setRivalComparison(comparison);
             }
+            if (activeTab === "history" && chartData.length === 0) {
+                const data = await window.electronAPI.infrastructure.getChartData(teamId, "capacity");
+                setChartData(data || []);
+            }
+        };
+        loadTabData();
+    }, [activeTab, teamId, rivalComparison, chartData.length]);
+
+    const handleUpgrade = async (facilityType: FacilityType) => {
+        if (!team) return;
+
+        const amount = facilityType === "stadium_capacity" ? 1000 : 1;
+
+        setActionLoading(true);
+        try {
+            const result = await window.electronAPI.infrastructure.startUpgrade(teamId, facilityType, amount);
 
             if (result.success) {
-                alert(`✅ ${result.message}`);
                 await refreshData();
             } else {
                 alert(`❌ ${result.message}`);
             }
         } catch (error) {
-            console.error("Erro ao realizar upgrade:", error);
-            alert("Erro ao processar upgrade");
+            console.error("Erro no upgrade:", error);
+            alert("Erro ao processar a melhoria.");
         } finally {
-            setLoading(false);
+            setActionLoading(false);
         }
     };
 
-    if (!team || !status) {
+    const handleDowngrade = async (facilityType: FacilityType) => {
+        if (facilityType === "stadium_capacity") return;
+
+        setActionLoading(true);
+        try {
+            const result = await window.electronAPI.infrastructure.downgradeFacility(teamId, facilityType, 1);
+            if (result.success) {
+                await refreshData();
+            } else {
+                alert(`❌ ${result.message}`);
+            }
+        } catch (error) {
+            console.error("Erro no downgrade:", error);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    if (loading && !status) {
         return (
-            <div className="p-8 text-white">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-8 bg-slate-800 rounded w-1/4"></div>
-                    <div className="h-4 bg-slate-800 rounded w-1/2"></div>
-                </div>
+            <div className="p-8 flex justify-center items-center h-full">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
             </div>
         );
     }
 
-    const formatCurrency = (value: number) => `€${value.toLocaleString()}`;
-    const utilizationPercentage = Math.round(status.stadium.utilizationRate * 100);
+    if (!team || !status) {
+        return <div className="p-8 text-red-400">Falha ao carregar dados de infraestrutura.</div>;
+    }
+
+    const facilityKeys: FacilityType[] = [
+        "stadium_capacity",
+        "stadium_quality",
+        "training_center_quality",
+        "youth_academy_quality",
+        "medical_center_quality",
+        "administrative_center_quality"
+    ];
 
     return (
-        <div className="p-8 pb-20 animate-in fade-in duration-500">
-            <header className="mb-6 flex justify-between items-start">
+        <div className="p-8 pb-20 animate-in fade-in duration-500 space-y-6">
+            <header className="flex justify-between items-start bg-slate-900/50 p-6 rounded-xl border border-slate-800">
                 <div>
                     <h2 className="text-3xl font-light text-white mb-1">Infraestrutura</h2>
-                    <p className="text-slate-400 text-sm">Gestão de Instalações e Crescimento</p>
+                    <p className="text-slate-400 text-sm">Gestão Patrimonial e Desenvolvimento</p>
                 </div>
                 <div className="text-right">
                     <div className="text-sm text-slate-400 mb-1">Orçamento Disponível</div>
-                    <div className={`text-2xl font-bold ${team.budget < 0 ? 'text-red-500' : 'text-emerald-400'}`}>
-                        {formatCurrency(team.budget)}
+                    <div className={`text-3xl font-bold ${team.budget < 0 ? 'text-red-500' : 'text-emerald-400'}`}>
+                        {formatMoney(team.budget)}
                     </div>
                 </div>
             </header>
 
-            <div className="mb-6 border-b border-slate-800">
-                <div className="flex gap-4">
-                    {["overview", "competitive", "history"].map((tab) => (
+            {status.activeConstruction && (
+                <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg flex items-center justify-between animate-pulse">
+                    <div className="flex items-center gap-3">
+                        <span className="text-2xl">🏗️</span>
+                        <div>
+                            <h4 className="text-blue-200 font-bold">Obra em Andamento</h4>
+                            <p className="text-blue-300/70 text-sm">
+                                Atualizando {status.facilities[status.activeConstruction.facilityType]?.name}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-2xl font-mono font-bold text-white">
+                            {status.activeConstruction.daysRemaining} dias
+                        </div>
+                        <div className="text-xs text-blue-300">restantes</div>
+                    </div>
+                </div>
+            )}
+
+            <div className="border-b border-slate-800">
+                <div className="flex gap-1">
+                    {[
+                        { id: "overview", label: "Visão Geral" },
+                        { id: "competitive", label: "Comparação da Liga" },
+                        { id: "history", label: "Histórico" }
+                    ].map((tab) => (
                         <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab as any)}
-                            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab
-                                ? "border-emerald-500 text-emerald-400"
-                                : "border-transparent text-slate-400 hover:text-white"
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id
+                                ? "border-emerald-500 text-emerald-400 bg-slate-900/50"
+                                : "border-transparent text-slate-400 hover:text-white hover:bg-slate-900/30"
                                 }`}
                         >
-                            {tab === "overview" && "Visão Geral"}
-                            {tab === "competitive" && "Comparação"}
-                            {tab === "history" && "Histórico"}
+                            {tab.label}
                         </button>
                     ))}
                 </div>
@@ -194,160 +234,155 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
 
             {activeTab === "overview" && (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                            <div className="text-sm text-slate-400 mb-1">Torcida Atual</div>
-                            <div className="text-2xl font-bold text-white">{status.fanBase.current.toLocaleString()}</div>
-                            <div className={`text-xs mt-1 ${status.fanBase.growthRate > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {status.fanBase.growthRate > 0 ? '↗' : '↘'} {(status.fanBase.growthRate * 100).toFixed(1)}% projetado
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+                            <div className="text-sm text-slate-400 mb-1">Custo Mensal Total</div>
+                            <div className="text-2xl font-bold text-red-400">
+                                {formatMoney(status.totalMaintenanceCost)}
                             </div>
+                            <div className="text-xs text-slate-500 mt-1">Manutenção de Instalações</div>
                         </div>
-                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                            <div className="text-sm text-slate-400 mb-1">Ocupação do Estádio</div>
-                            <div className="text-2xl font-bold text-white">{utilizationPercentage}%</div>
-                            <div className="text-xs text-slate-500 mt-1">
-                                {status.stadium.averageAttendance.toLocaleString()} / {status.stadium.capacity.toLocaleString()}
+                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+                            <div className="text-sm text-slate-400 mb-1">Capacidade Total</div>
+                            <div className="text-2xl font-bold text-white">
+                                {status.facilities.stadium_capacity.currentLevel.toLocaleString()}
                             </div>
+                            <div className="text-xs text-slate-500 mt-1">Lugares Disponíveis</div>
                         </div>
-                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                            <div className="text-sm text-slate-400 mb-1">Receita por Jogo</div>
-                            <div className="text-2xl font-bold text-emerald-400">{formatCurrency(status.stadium.revenuePerMatch)}</div>
-                        </div>
-                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                            <div className="text-sm text-slate-400 mb-1">Custos Mensais</div>
-                            <div className="text-2xl font-bold text-red-400">{formatCurrency(status.totalMonthlyCost)}</div>
+                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+                            <div className="text-sm text-slate-400 mb-1">Qualidade Média</div>
+                            <div className="text-2xl font-bold text-emerald-400">
+                                {Math.round(
+                                    (status.facilities.training_center_quality.currentLevel +
+                                        status.facilities.youth_academy_quality.currentLevel +
+                                        status.facilities.medical_center_quality.currentLevel) / 3
+                                )}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1">Nível Global (0-100)</div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="text-xl font-semibold text-white mb-2">🏟️ Estádio</h3>
-                                    <div className="text-sm text-slate-400">
-                                        <p>Capacidade: {status.stadium.capacity.toLocaleString()}</p>
-                                        <p>Qualidade: {status.stadium.quality}/100</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <button
-                                    onClick={() => handleUpgrade("stadium", "expand")}
-                                    disabled={loading || team.budget < status.stadium.nextExpansionCost}
-                                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-sm"
-                                >
-                                    Expandir (+1000) - {formatCurrency(status.stadium.nextExpansionCost)}
-                                </button>
-                                <button
-                                    onClick={() => handleUpgrade("stadium", "quality")}
-                                    disabled={loading || team.budget < status.stadium.nextQualityUpgradeCost}
-                                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded text-sm"
-                                >
-                                    Melhorar (+5) - {formatCurrency(status.stadium.nextQualityUpgradeCost)}
-                                </button>
-                            </div>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {facilityKeys.map((key) => {
+                            const facility = status.facilities[key];
+                            if (!facility) return null;
 
-                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="text-xl font-semibold text-white mb-2">🏋️ Centro de Treinamento</h3>
-                                    <div className="text-sm text-slate-400">
-                                        <p>Qualidade: {status.trainingCenter.quality}/100</p>
-                                        <p className="text-emerald-400">-{(status.trainingCenter.injuryReductionRate * 100).toFixed(0)}% Lesões</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => handleUpgrade("training", "quality")}
-                                disabled={loading || team.budget < status.trainingCenter.nextUpgradeCost}
-                                className="w-full py-2 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white rounded text-sm"
-                            >
-                                Melhorar (+5) - {formatCurrency(status.trainingCenter.nextUpgradeCost)}
-                            </button>
-                        </div>
-
-                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="text-xl font-semibold text-white mb-2">🎓 Academia de Base</h3>
-                                    <div className="text-sm text-slate-400">
-                                        <p>Qualidade: {status.youthAcademy.quality}/100</p>
-                                        <p className="text-blue-400">+{status.youthAcademy.intakeQualityBonus} Qualidade Jovens</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => handleUpgrade("youth", "quality")}
-                                disabled={loading || team.budget < status.youthAcademy.nextUpgradeCost}
-                                className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-sm"
-                            >
-                                Melhorar (+5) - {formatCurrency(status.youthAcademy.nextUpgradeCost)}
-                            </button>
-                        </div>
+                            return (
+                                <FacilityCard
+                                    key={key}
+                                    title={facility.name}
+                                    icon={getFacilityIcon(key)}
+                                    level={facility.currentLevel}
+                                    description={facility.currentBenefit}
+                                    bonusText={`Prox: ${facility.nextBenefit}`}
+                                    upgradeCost={facility.upgradeCost}
+                                    isMaxLevel={facility.isMaxLevel}
+                                    isLoading={actionLoading || facility.isUpgrading}
+                                    canAfford={team.budget >= facility.upgradeCost}
+                                    onUpgrade={() => handleUpgrade(key)}
+                                    onDowngrade={() => handleDowngrade(key)}
+                                />
+                            );
+                        })}
                     </div>
                 </div>
             )}
 
             {activeTab === "competitive" && (
-                <div className="space-y-6">
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                     {rivalComparison ? (
                         <>
                             <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                                <h3 className="text-xl font-semibold text-white mb-4">🏆 Classificação da Liga</h3>
-                                <div className="mb-4">
-                                    <div className="text-3xl font-bold text-emerald-400">#{rivalComparison.userTeam.ranking}</div>
-                                    <div className="text-sm text-slate-400">de {rivalComparison.rivals.length + 1} times</div>
-                                    <div className="text-sm text-slate-500 mt-2">
-                                        Score de Infraestrutura: {rivalComparison.userTeam.overallInfrastructureScore}/100
+                                <h3 className="text-xl font-semibold text-white mb-4">🏆 Ranking de Infraestrutura</h3>
+                                <div className="mb-6">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-4xl font-bold text-emerald-400">#{rivalComparison.userTeam.ranking}</span>
+                                        <span className="text-slate-400">de {rivalComparison.rivals.length + 1} clubes</span>
                                     </div>
+                                    <p className="text-slate-500 mt-2">
+                                        Seu Score Geral: <span className="text-white font-bold">{rivalComparison.userTeam.overallInfrastructureScore}/100</span>
+                                    </p>
                                 </div>
+
+                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Insights da Diretoria</h4>
                                 <div className="space-y-2">
                                     {rivalComparison.insights.map((insight: string, idx: number) => (
-                                        <div key={idx} className="text-sm text-slate-300 p-2 bg-slate-950 rounded">{insight}</div>
+                                        <div key={idx} className="text-sm text-slate-300 p-3 bg-slate-950/50 border border-slate-800 rounded flex items-center gap-3">
+                                            <span className="text-emerald-500">💡</span>
+                                            {insight}
+                                        </div>
                                     ))}
                                 </div>
                             </div>
 
                             <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                                <h3 className="text-xl font-semibold text-white mb-4">📊 Médias da Liga</h3>
-                                <div className="grid grid-cols-2 gap-4">
+                                <h3 className="text-xl font-semibold text-white mb-6">📊 Comparativo Direto</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                     <div>
-                                        <div className="text-sm text-slate-400">Capacidade Média</div>
-                                        <div className="text-lg font-bold text-white">{rivalComparison.leagueAverage.stadiumCapacity.toLocaleString()}</div>
-                                        <div className="text-xs text-slate-500">Você: {status.stadium.capacity.toLocaleString()}</div>
+                                        <div className="text-xs text-slate-500 uppercase">Média Capacidade</div>
+                                        <div className="text-xl font-bold text-white mt-1">
+                                            {rivalComparison.leagueAverage.stadiumCapacity.toLocaleString()}
+                                        </div>
+                                        <div className={`text-xs mt-1 ${status.facilities.stadium_capacity.currentLevel > rivalComparison.leagueAverage.stadiumCapacity ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            Você: {status.facilities.stadium_capacity.currentLevel.toLocaleString()}
+                                        </div>
                                     </div>
                                     <div>
-                                        <div className="text-sm text-slate-400">Qualidade CT Média</div>
-                                        <div className="text-lg font-bold text-white">{rivalComparison.leagueAverage.trainingQuality}</div>
-                                        <div className="text-xs text-slate-500">Você: {status.trainingCenter.quality}</div>
+                                        <div className="text-xs text-slate-500 uppercase">Qualidade CT</div>
+                                        <div className="text-xl font-bold text-white mt-1">
+                                            {rivalComparison.leagueAverage.trainingQuality.toFixed(1)}
+                                        </div>
+                                        <div className="text-xs text-slate-400 mt-1">
+                                            Você: {status.facilities.training_center_quality.currentLevel}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </>
                     ) : (
-                        <div className="text-center text-slate-400 py-8">Carregando dados...</div>
+                        <div className="flex justify-center p-12">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                        </div>
                     )}
                 </div>
             )}
 
             {activeTab === "history" && (
-                <div className="space-y-6">
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                     <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                        <h3 className="text-xl font-semibold text-white mb-4">📈 Evolução da Capacidade</h3>
+                        <h3 className="text-xl font-semibold text-white mb-6">📈 Evolução Patrimonial</h3>
                         {chartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                    <XAxis dataKey="date" stroke="#94a3b8" />
-                                    <YAxis stroke="#94a3b8" />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} name="Capacidade" />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            <div className="h-[400px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                        <XAxis
+                                            dataKey="date"
+                                            stroke="#64748b"
+                                            tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { month: 'short' })}
+                                        />
+                                        <YAxis stroke="#64748b" />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff' }}
+                                            itemStyle={{ color: '#10b981' }}
+                                        />
+                                        <Legend />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="value"
+                                            stroke="#10b981"
+                                            strokeWidth={3}
+                                            dot={{ r: 4, fill: '#10b981' }}
+                                            activeDot={{ r: 6 }}
+                                            name="Capacidade do Estádio"
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
                         ) : (
-                            <div className="text-center text-slate-400 py-8">Sem dados históricos disponíveis</div>
+                            <div className="text-center text-slate-500 py-12 bg-slate-950/30 rounded-lg">
+                                Sem dados históricos suficientes para gerar o gráfico.
+                            </div>
                         )}
                     </div>
                 </div>

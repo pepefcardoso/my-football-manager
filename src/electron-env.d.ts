@@ -258,25 +258,19 @@ declare global {
 
       infrastructure: {
         getStatus: (teamId: number) => Promise<InfrastructureStatus | null>;
-        expandStadium: (
+
+        startUpgrade: (
           teamId: number,
-          seasonId: number
+          facilityType: string,
+          amount?: number
         ) => Promise<{ success: boolean; message: string }>;
-        upgradeFacility: (
+
+        downgradeFacility: (
           teamId: number,
-          seasonId: number,
-          facilityType: "stadium" | "training" | "youth"
+          facilityType: string,
+          amount?: number
         ) => Promise<{ success: boolean; message: string }>;
-        getUpgradeCost: (
-          teamId: number,
-          facilityType: "stadium" | "training" | "youth",
-          upgradeType: "expand" | "quality"
-        ) => Promise<number | null>;
-        analyzeCapacity: (teamId: number) => Promise<any | null>;
-        projectFanBase: (
-          teamId: number,
-          leaguePosition: number
-        ) => Promise<number | null>;
+
         compareWithLeague: (teamId: number) => Promise<any | null>;
         getBenchmarks: (teamId: number) => Promise<any[]>;
         getTopRivals: (teamId: number, limit?: number) => Promise<any[]>;
@@ -291,7 +285,6 @@ declare global {
           startDate?: string,
           endDate?: string
         ) => Promise<ChartDataPoint[]>;
-        getValuation: (teamId: number) => Promise<any | null>;
       };
 
       scouting: {
