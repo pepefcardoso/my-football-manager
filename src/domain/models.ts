@@ -9,15 +9,7 @@ import type {
   TransferType,
   WeatherCondition,
 } from "./enums";
-
-export interface ActiveConstruction {
-  facilityType: "stadium" | "training" | "medical" | "youth" | "admin";
-  targetLevel?: number;
-  targetCapacity?: number;
-  cost: number;
-  startDate: string;
-  endDate: string;
-}
+import type { ActiveConstruction } from "./types/InfrastructureTypes";
 
 export interface Team {
   id: number;

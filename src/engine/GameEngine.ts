@@ -152,6 +152,49 @@ export class GameEngine {
         const newDateStr = this.timeEngine.advanceDay();
         updates.date = newDateStr;
 
+        const constructionFinished =
+          await txServices.infrastructure.processDailyConstruction(
+            teamId,
+            newDateStr
+          );
+        if (
+          Result.isSuccess(constructionFinished) &&
+          constructionFinished.data
+        ) {
+          updates.logs.push("🏗️ Obra de infraestrutura concluída com sucesso!");
+          updates.news.push({
+            type: "news",
+            title: "Obras Concluídas",
+            description:
+              "As melhorias nas instalações do clube foram finalizadas.",
+            importance: "high",
+            date: newDateStr,
+            relatedEntityId: teamId,
+          });
+        }
+
+        const dateObj = new Date(newDateStr);
+        if (dateObj.getDate() === 1) {
+          const maintResult =
+            await txServices.infrastructure.applyMonthlyMaintenance(
+              teamId,
+              newDateStr,
+              seasonId
+            );
+
+          if (Result.isSuccess(maintResult) && maintResult.data > 0) {
+            updates.financialChanges.push({
+              type: "expense",
+              amount: maintResult.data,
+              category: "stadium_maintenance",
+              description: "Manutenção Mensal de Infraestrutura",
+            });
+            updates.logs.push(
+              `💸 Manutenção de infraestrutura paga: €${maintResult.data.toLocaleString()}`
+            );
+          }
+        }
+
         const currentFocus =
           (this.gameState!.trainingFocus as TrainingFocus) ||
           TrainingFocus.TECHNICAL;
@@ -197,10 +240,11 @@ export class GameEngine {
           }
         }
 
-        const eventResult = await txServices.narrativeService.processDailyEvents(
-          teamId,
-          newDateStr
-        );
+        const eventResult =
+          await txServices.narrativeService.processDailyEvents(
+            teamId,
+            newDateStr
+          );
         if (Result.isSuccess(eventResult) && eventResult.data) {
           updates.narrativeEvent = eventResult.data;
           updates.logs.push(`🔔 Novo evento: ${eventResult.data.title}`);

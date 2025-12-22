@@ -1,195 +1,118 @@
 import type { FacilityType } from "../domain/types/InfrastructureTypes";
 
-export const InfrastructureEconomics = {
+const CONFIG = {
   LEVELS: {
     MIN: 0,
     MAX: 100,
-    STEP: 1,
+    STADIUM_CAPACITY_MAX: 105000,
   },
 
-  STADIUM: {
-    EXPANSION: {
-      BLOCK_SIZE: 1000,
-      BASE_COST_PER_SEAT: 800,
-      COST_GROWTH_FACTOR: 1.1,
-      MAX_CAPACITY: 105000,
-      BASE_DAYS_TO_BUILD: 30,
-    },
-    QUALITY: {
-      BASE_COST: 500_000,
-      GROWTH_FACTOR: 1.05,
-      MAINTENANCE_PER_LEVEL: 2_000,
-      BASE_DAYS_TO_BUILD: 10,
-    },
-    MAINTENANCE: {
-      COST_PER_SEAT: 2,
-    },
+  BASE_COSTS: {
+    stadium_capacity: 1000,
+    stadium_quality: 500_000,
+    training: 250_000,
+    medical: 200_000,
+    youth: 150_000,
+    admin: 100_000,
   },
 
-  FACILITIES: {
-    TRAINING: {
-      NAME: "Centro de Treinamento",
-      BASE_UPGRADE_COST: 200_000,
-      GROWTH_FACTOR: 1.08,
-      MAINTENANCE_PER_LEVEL: 5_000,
-      BASE_DAYS_TO_BUILD: 14,
-    },
-    YOUTH: {
-      NAME: "Academia de Base",
-      BASE_UPGRADE_COST: 150_000,
-      GROWTH_FACTOR: 1.07,
-      MAINTENANCE_PER_LEVEL: 4_000,
-      BASE_DAYS_TO_BUILD: 20,
-    },
-    MEDICAL: {
-      NAME: "Centro Médico",
-      BASE_UPGRADE_COST: 250_000,
-      GROWTH_FACTOR: 1.09,
-      MAINTENANCE_PER_LEVEL: 6_000,
-      BASE_DAYS_TO_BUILD: 15,
-    },
-    ADMIN: {
-      NAME: "Centro Administrativo",
-      BASE_UPGRADE_COST: 100_000,
-      GROWTH_FACTOR: 1.06,
-      MAINTENANCE_PER_LEVEL: 3_000,
-      BASE_DAYS_TO_BUILD: 10,
-    },
+  GROWTH_FACTORS: {
+    stadium_capacity: 1.0,
+    stadium_quality: 1.05,
+    training: 1.08,
+    medical: 1.07,
+    youth: 1.06,
+    admin: 1.05,
   },
 
-  BENEFITS: {
-    TRAINING: {
-      XP_MULTIPLIER: (level: number) => 1 + level * 0.01,
-      INJURY_REDUCTION: (level: number) => level * 0.003,
-    },
-    MEDICAL: {
-      INJURY_PREVENTION: (level: number) => level * 0.005,
-      RECOVERY_SPEED: (level: number) => 1 + level * 0.02,
-    },
-    ADMIN: {
-      MARKETING_BONUS: (level: number) => 1 + level * 0.015,
-      SCOUTING_SPEED: (level: number) => 1 + level * 0.01,
-    },
-    YOUTH: {
-      MIN_POTENTIAL: (level: number) => 40 + Math.floor(level * 0.3),
-      MAX_POTENTIAL: (level: number) => 60 + Math.floor(level * 0.4),
-    },
+  MAINTENANCE_RATES: {
+    stadium_capacity: 2,
+    stadium_quality: 1_000,
+    training: 5_000,
+    medical: 4_000,
+    youth: 3_000,
+    admin: 2_000,
+  },
+
+  CONSTRUCTION_TIME: {
+    BASE_DAYS: 14,
+    LEVEL_MULTIPLIER: 0.2,
+    STADIUM_SEAT_BATCH: 1000,
+    STADIUM_DAYS_PER_BATCH: 7,
   },
 };
 
-export class InfrastructureCalculator {
-  static calculateUpgradeCost(
+export class InfrastructureEconomics {
+  /**
+   * @param type Tipo da instalação
+   * @param currentLevel Nível atual (ou capacidade atual)
+   * @param amount Quantidade a aumentar (padrão 1, usado para assentos do estádio)
+   */
+  static getUpgradeCost(
     type: FacilityType,
-    currentLevel: number
+    currentLevel: number,
+    amount: number = 1
   ): number {
-    if (type === "stadium") {
-      const config = InfrastructureEconomics.STADIUM.EXPANSION;
-      const scaleFactor = 1 + currentLevel / 50000;
-      return Math.round(
-        config.BLOCK_SIZE * config.BASE_COST_PER_SEAT * scaleFactor
+    if (type === "stadium_capacity") {
+      const baseCost = CONFIG.BASE_COSTS.stadium_capacity;
+      const sizePenalty = currentLevel > 50000 ? 1.2 : 1.0;
+      return Math.round(amount * baseCost * sizePenalty);
+    }
+
+    const base = CONFIG.BASE_COSTS[type];
+    const factor = CONFIG.GROWTH_FACTORS[type];
+
+    return Math.round(base * Math.pow(factor, currentLevel));
+  }
+
+  static getMaintenanceCost(type: FacilityType, currentLevel: number): number {
+    const rate = CONFIG.MAINTENANCE_RATES[type];
+    return Math.round(currentLevel * rate);
+  }
+
+  static getConstructionDuration(
+    type: FacilityType,
+    currentLevel: number,
+    amount: number = 1
+  ): number {
+    if (type === "stadium_capacity") {
+      const batches = Math.ceil(
+        amount / CONFIG.CONSTRUCTION_TIME.STADIUM_SEAT_BATCH
+      );
+      return Math.max(
+        14,
+        batches * CONFIG.CONSTRUCTION_TIME.STADIUM_DAYS_PER_BATCH
       );
     }
 
-    let config;
+    const base = CONFIG.CONSTRUCTION_TIME.BASE_DAYS;
+    const addedTime = currentLevel * CONFIG.CONSTRUCTION_TIME.LEVEL_MULTIPLIER;
+
+    return Math.round(base + addedTime);
+  }
+
+  static getBenefitDescription(type: FacilityType, level: number): string {
     switch (type) {
+      case "stadium_capacity":
+        return `Capacidade: ${level.toLocaleString()} torcedores`;
+      case "stadium_quality":
+        return `Atratividade: +${level}% preço ingresso`;
       case "training":
-        config = InfrastructureEconomics.FACILITIES.TRAINING;
-        break;
-      case "youth":
-        config = InfrastructureEconomics.FACILITIES.YOUTH;
-        break;
+        return `XP Treino: +${(level * 0.5).toFixed(1)}%`;
       case "medical":
-        config = InfrastructureEconomics.FACILITIES.MEDICAL;
-        break;
+        return `Recuperação: +${(level * 0.4).toFixed(1)}% mais rápida`;
+      case "youth":
+        return `Potencial Base: ${40 + Math.floor(level * 0.4)}`;
       case "admin":
-        config = InfrastructureEconomics.FACILITIES.ADMIN;
-        break;
+        return `Eficiência Scouting: +${level}%`;
       default:
-        return 0;
+        return "N/A";
     }
-
-    return Math.round(
-      config.BASE_UPGRADE_COST * Math.pow(config.GROWTH_FACTOR, currentLevel)
-    );
   }
 
-  static calculateStadiumQualityCost(currentQuality: number): number {
-    const config = InfrastructureEconomics.STADIUM.QUALITY;
-    return Math.round(
-      config.BASE_COST * Math.pow(config.GROWTH_FACTOR, currentQuality)
-    );
-  }
-
-  static calculateConstructionTime(
-    type: FacilityType,
-    currentLevel: number
-  ): number {
-    if (type === "stadium")
-      return InfrastructureEconomics.STADIUM.EXPANSION.BASE_DAYS_TO_BUILD;
-
-    let baseDays = 10;
-    switch (type) {
-      case "training":
-        baseDays =
-          InfrastructureEconomics.FACILITIES.TRAINING.BASE_DAYS_TO_BUILD;
-        break;
-      case "youth":
-        baseDays = InfrastructureEconomics.FACILITIES.YOUTH.BASE_DAYS_TO_BUILD;
-        break;
-      case "medical":
-        baseDays =
-          InfrastructureEconomics.FACILITIES.MEDICAL.BASE_DAYS_TO_BUILD;
-        break;
-      case "admin":
-        baseDays = InfrastructureEconomics.FACILITIES.ADMIN.BASE_DAYS_TO_BUILD;
-        break;
-    }
-
-    return Math.round(baseDays + currentLevel * 0.1);
-  }
-
-  static calculateStadiumQualityTime(currentQuality: number): number {
-    return Math.round(
-      InfrastructureEconomics.STADIUM.QUALITY.BASE_DAYS_TO_BUILD +
-        currentQuality * 0.1
-    );
-  }
-
-  static calculateMonthlyMaintenance(
-    type: FacilityType,
-    levelOrCapacity: number,
-    stadiumQuality: number = 0
-  ): number {
-    if (type === "stadium") {
-      const capacityCost =
-        levelOrCapacity *
-        InfrastructureEconomics.STADIUM.MAINTENANCE.COST_PER_SEAT;
-      const qualityCost =
-        stadiumQuality *
-        InfrastructureEconomics.STADIUM.QUALITY.MAINTENANCE_PER_LEVEL;
-      return Math.round(capacityCost + qualityCost);
-    }
-
-    let costPerLevel = 0;
-    switch (type) {
-      case "training":
-        costPerLevel =
-          InfrastructureEconomics.FACILITIES.TRAINING.MAINTENANCE_PER_LEVEL;
-        break;
-      case "youth":
-        costPerLevel =
-          InfrastructureEconomics.FACILITIES.YOUTH.MAINTENANCE_PER_LEVEL;
-        break;
-      case "medical":
-        costPerLevel =
-          InfrastructureEconomics.FACILITIES.MEDICAL.MAINTENANCE_PER_LEVEL;
-        break;
-      case "admin":
-        costPerLevel =
-          InfrastructureEconomics.FACILITIES.ADMIN.MAINTENANCE_PER_LEVEL;
-        break;
-    }
-
-    return Math.round(levelOrCapacity * costPerLevel);
+  static getMaxLevel(type: FacilityType): number {
+    return type === "stadium_capacity"
+      ? CONFIG.LEVELS.STADIUM_CAPACITY_MAX
+      : CONFIG.LEVELS.MAX;
   }
 }

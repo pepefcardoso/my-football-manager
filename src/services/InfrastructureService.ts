@@ -1,25 +1,16 @@
-import { FinancialCategory } from "../domain/enums";
-import {
-  InfrastructureEconomics,
-  InfrastructureCalculator,
-} from "../engine/InfrastructureEconomics";
-import { FinancialBalance } from "../engine/FinancialBalanceConfig"; //
-import { InfrastructureValidator } from "../domain/validators/InfrastructureValidator";
-import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
-import { Result } from "../domain/ServiceResults";
+import type { IRepositoryContainer } from "../repositories/IRepositories";
 import type { ServiceResult } from "../domain/ServiceResults";
+import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
+import { FinancialCategory } from "../domain/enums";
 import type {
-  InfrastructureStatus,
-  UpgradeResult,
-  UpgradeValidationContext,
   FacilityType,
-  UpgradeType,
-  FanBaseProjection,
-  CapacityAnalysis,
+  ActiveConstruction,
+  FacilityStatus,
+  InfrastructureOverview,
 } from "../domain/types/InfrastructureTypes";
 import type { GameEventBus } from "../lib/GameEventBus";
-import { GameEventType } from "../domain/GameEventTypes";
+import type { Team } from "../domain/models";
 
 export class InfrastructureService extends BaseService {
   private eventBus: GameEventBus;
@@ -31,641 +22,374 @@ export class InfrastructureService extends BaseService {
 
   async getInfrastructureStatus(
     teamId: number
-  ): Promise<ServiceResult<InfrastructureStatus>> {
+  ): Promise<ServiceResult<InfrastructureOverview>> {
     return this.execute("getInfrastructureStatus", teamId, async (teamId) => {
       const team = await this.repos.teams.findById(teamId);
-      if (!team) {
-        throw new Error(`Time ${teamId} não encontrado.`);
+      if (!team) throw new Error("Time não encontrado.");
+
+      const facilities: Record<string, FacilityStatus> = {};
+      const types: FacilityType[] = [
+        "stadium_capacity",
+        "stadium_quality",
+        "training",
+        "medical",
+        "youth",
+        "admin",
+      ];
+
+      let totalMaintenanceCost = 0;
+
+      for (const type of types) {
+        const currentLevel = this.getCurrentLevel(team, type);
+        const amount = type === "stadium_capacity" ? 1000 : 1;
+
+        const upgradeCost = InfrastructureEconomics.getUpgradeCost(
+          type,
+          currentLevel,
+          amount
+        );
+        const maintenance = InfrastructureEconomics.getMaintenanceCost(
+          type,
+          currentLevel
+        );
+        const duration = InfrastructureEconomics.getConstructionDuration(
+          type,
+          currentLevel,
+          amount
+        );
+        const maxLevel = InfrastructureEconomics.getMaxLevel(type);
+
+        totalMaintenanceCost += maintenance;
+
+        facilities[type] = {
+          type,
+          name: this.getFacilityName(type),
+          currentLevel,
+          nextLevel: currentLevel + amount,
+          upgradeCost,
+          monthlyMaintenance: maintenance,
+          constructionDuration: duration,
+          isMaxLevel: currentLevel >= maxLevel,
+          isUpgrading: team.activeConstruction?.facilityType === type,
+          currentBenefit: InfrastructureEconomics.getBenefitDescription(
+            type,
+            currentLevel
+          ),
+          nextBenefit: InfrastructureEconomics.getBenefitDescription(
+            type,
+            currentLevel + amount
+          ),
+        };
       }
 
-      const players = await this.repos.players.findByTeamId(teamId);
-      const youthPlayers = players.filter((p) => p.isYouth);
-
-      const stadiumCapacity = team.stadiumCapacity || 10000;
-      const stadiumQuality = team.stadiumQuality || 50;
-      const fanSatisfaction = team.fanSatisfaction || 50;
-
-      const averageAttendance = Math.round(
-        stadiumCapacity * (0.3 + (fanSatisfaction / 100) * 0.7)
-      );
-      const utilizationRate = averageAttendance / stadiumCapacity;
-
-      const capacityPressure =
-        InfrastructureCalculator.calculateCapacityPressure(
-          averageAttendance,
-          stadiumCapacity
+      let projectedMaintenance = totalMaintenanceCost;
+      if (team.activeConstruction) {
+        const type = team.activeConstruction.facilityType as FacilityType;
+        const currentMaint = InfrastructureEconomics.getMaintenanceCost(
+          type,
+          team.activeConstruction.startLevel
         );
-
-      if (capacityPressure.isPressured) {
-        const expansionCost = InfrastructureCalculator.calculateExpansionCost(
-          stadiumCapacity,
-          InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK,
-          stadiumQuality
+        const targetMaint = InfrastructureEconomics.getMaintenanceCost(
+          type,
+          team.activeConstruction.targetLevel!
         );
-
-        await this.eventBus.publish(GameEventType.STADIUM_CAPACITY_PRESSURED, {
-          teamId,
-          currentCapacity: stadiumCapacity,
-          averageAttendance,
-          utilizationRate,
-          lostRevenue: Math.round(capacityPressure.revenueLoss * 19 * 50),
-          recommendedExpansion:
-            InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK,
-          expansionCost,
-        });
-
-        this.logger.warn(
-          `🚨 Stadium capacity pressured for team ${teamId}: ${(
-            utilizationRate * 100
-          ).toFixed(1)}% utilization`
-        );
+        projectedMaintenance =
+          totalMaintenanceCost - currentMaint + targetMaint;
       }
-
-      const stadiumMaintenance =
-        InfrastructureCalculator.calculateAnnualMaintenance(
-          "stadium",
-          stadiumCapacity,
-          stadiumQuality,
-          { matchesPlayed: 19 }
-        );
-
-      const stadiumExpansionCost =
-        InfrastructureCalculator.calculateExpansionCost(
-          stadiumCapacity,
-          InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK,
-          stadiumQuality
-        );
-
-      const stadiumQualityUpgradeCost =
-        InfrastructureCalculator.calculateQualityUpgradeCost(
-          "stadium",
-          stadiumQuality
-        );
-
-      const trainingQuality = team.trainingCenterQuality || 50;
-      const trainingBenefits = InfrastructureEconomics.TRAINING_CENTER.BENEFITS;
-
-      const trainingMaintenance =
-        InfrastructureCalculator.calculateAnnualMaintenance(
-          "training",
-          0,
-          trainingQuality
-        );
-
-      const trainingUpgradeCost =
-        InfrastructureCalculator.calculateQualityUpgradeCost(
-          "training",
-          trainingQuality
-        );
-
-      const youthQuality = team.youthAcademyQuality || 50;
-      const youthBenefits = InfrastructureEconomics.YOUTH_ACADEMY.BENEFITS;
-
-      const youthMaintenance =
-        InfrastructureCalculator.calculateAnnualMaintenance(
-          "youth",
-          0,
-          youthQuality,
-          { youthPlayerCount: youthPlayers.length }
-        );
-
-      const youthUpgradeCost =
-        InfrastructureCalculator.calculateQualityUpgradeCost(
-          "youth",
-          youthQuality
-        );
-
-      await this.checkInfrastructureDegradation(
-        teamId,
-        {
-          stadium: stadiumQuality,
-          training: trainingQuality,
-          youth: youthQuality,
-        },
-        {
-          stadium: stadiumMaintenance,
-          training: trainingMaintenance,
-          youth: youthMaintenance,
-        }
-      );
-
-      const totalAnnualCost =
-        stadiumMaintenance + trainingMaintenance + youthMaintenance;
-      const totalMonthlyCost = Math.round(totalAnnualCost / 12);
-
-      const currentFanBase = team.fanBase || stadiumCapacity * 2.5;
-      const projectedFanBase = InfrastructureCalculator.projectFanBaseGrowth(
-        currentFanBase,
-        stadiumCapacity,
-        stadiumQuality,
-        fanSatisfaction,
-        10
-      );
-
-      const currentBudget = team.budget || 0;
-      const recommendedReserve =
-        InfrastructureEconomics.VALIDATION.MIN_BUDGET_RESERVE_AFTER_UPGRADE;
-      const infrastructureBudgetCap = currentBudget * 0.4;
 
       return {
-        stadium: {
-          capacity: stadiumCapacity,
-          quality: stadiumQuality,
-          utilizationRate,
-          averageAttendance,
-          revenuePerMatch: Math.round(
-            averageAttendance *
-              FinancialBalance.REVENUE_STREAMS.MATCHDAY_REVENUE
-                .TIER_2_TICKET_PRICE
-          ),
-          annualMaintenanceCost: stadiumMaintenance,
-          monthlyMaintenanceCost: Math.round(stadiumMaintenance / 12),
-          isPressured: capacityPressure.isPressured,
-          expansionRecommended: utilizationRate >= 0.85,
-          nextExpansionCost: stadiumExpansionCost,
-          nextQualityUpgradeCost: stadiumQualityUpgradeCost,
-        },
-        trainingCenter: {
-          quality: trainingQuality,
-          injuryReductionRate:
-            trainingBenefits.INJURY_REDUCTION(trainingQuality),
-          fitnessBonus: trainingBenefits.FITNESS_BONUS(trainingQuality),
-          recoverySpeedMultiplier:
-            trainingBenefits.RECOVERY_SPEED(trainingQuality),
-          developmentBonus:
-            trainingBenefits.PLAYER_DEVELOPMENT(trainingQuality),
-          annualMaintenanceCost: trainingMaintenance,
-          monthlyMaintenanceCost: Math.round(trainingMaintenance / 12),
-          nextUpgradeCost: trainingUpgradeCost,
-          upgradeRecommended: trainingQuality < 70,
-        },
-        youthAcademy: {
-          quality: youthQuality,
-          intakeQualityBonus: youthBenefits.INTAKE_QUALITY_BONUS(youthQuality),
-          intakeQuantityBonus:
-            youthBenefits.INTAKE_QUANTITY_BONUS(youthQuality),
-          potentialBoost: youthBenefits.POTENTIAL_BOOST(youthQuality),
-          developmentRate: youthBenefits.DEVELOPMENT_RATE(youthQuality),
-          currentYouthPlayers: youthPlayers.length,
-          annualMaintenanceCost: youthMaintenance,
-          monthlyMaintenanceCost: Math.round(youthMaintenance / 12),
-          nextUpgradeCost: youthUpgradeCost,
-          upgradeRecommended: youthQuality < 60,
-        },
-        totalAnnualCost,
-        totalMonthlyCost,
-        fanBase: {
-          current: currentFanBase,
-          projected: projectedFanBase,
-          growthRate: (projectedFanBase - currentFanBase) / currentFanBase,
-          capacityRatio: currentFanBase / stadiumCapacity,
-        },
-        financialHealth: {
-          canAffordUpgrades:
-            currentBudget > recommendedReserve + totalMonthlyCost * 3,
-          recommendedReserve,
-          availableBudget: currentBudget,
-          infrastructureBudgetCap,
-        },
+        teamId,
+        budget: team.budget,
+        facilities: facilities as Record<FacilityType, FacilityStatus>,
+        activeConstruction:
+          team.activeConstruction as ActiveConstruction | null,
+        totalMaintenanceCost,
+        projectedMaintenanceAfterUpgrade: projectedMaintenance,
       };
     });
   }
 
-  private async checkInfrastructureDegradation(
+  async startUpgrade(
     teamId: number,
-    qualities: { stadium: number; training: number; youth: number },
-    maintenanceCosts: { stadium: number; training: number; youth: number }
-  ): Promise<void> {
-    const minQuality = 30;
-
-    if (qualities.stadium < minQuality) {
-      await this.eventBus.publish(GameEventType.INFRASTRUCTURE_DEGRADED, {
-        teamId,
-        facilityType: "stadium",
-        currentQuality: qualities.stadium,
-        minimumQuality: minQuality,
-        maintenanceCost: maintenanceCosts.stadium,
-      });
-
-      this.logger.warn(
-        `⚠️ Stadium quality degraded for team ${teamId}: ${qualities.stadium}/100`
-      );
-    }
-
-    if (qualities.training < minQuality) {
-      await this.eventBus.publish(GameEventType.INFRASTRUCTURE_DEGRADED, {
-        teamId,
-        facilityType: "training",
-        currentQuality: qualities.training,
-        minimumQuality: minQuality,
-        maintenanceCost: maintenanceCosts.training,
-      });
-
-      this.logger.warn(
-        `⚠️ Training center quality degraded for team ${teamId}: ${qualities.training}/100`
-      );
-    }
-
-    if (qualities.youth < minQuality) {
-      await this.eventBus.publish(GameEventType.INFRASTRUCTURE_DEGRADED, {
-        teamId,
-        facilityType: "youth",
-        currentQuality: qualities.youth,
-        minimumQuality: minQuality,
-        maintenanceCost: maintenanceCosts.youth,
-      });
-
-      this.logger.warn(
-        `⚠️ Youth academy quality degraded for team ${teamId}: ${qualities.youth}/100`
-      );
-    }
-  }
-
-  async expandStadium(
-    teamId: number,
-    seasonId: number
-  ): Promise<ServiceResult<UpgradeResult>> {
-    return this.execute(
-      "expandStadium",
-      { teamId, seasonId },
-      async ({ teamId, seasonId }) => {
+    facilityType: FacilityType,
+    amount: number = 1
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "startUpgrade",
+      { teamId, facilityType },
+      async () => {
         const team = await this.repos.teams.findById(teamId);
-        if (!team) {
-          throw new Error(`Time ${teamId} não encontrado.`);
+        if (!team) throw new Error("Time não encontrado.");
+
+        if (team.activeConstruction) {
+          throw new Error(
+            "Já existe uma obra em andamento. Aguarde a conclusão."
+          );
         }
 
-        const currentCapacity = team.stadiumCapacity || 10000;
-        const currentQuality = team.stadiumQuality || 50;
-        const currentBudget = team.budget || 0;
+        const currentLevel = this.getCurrentLevel(team, facilityType);
+        const maxLevel = InfrastructureEconomics.getMaxLevel(facilityType);
 
-        const expansionCost = InfrastructureCalculator.calculateExpansionCost(
-          currentCapacity,
-          InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK,
-          currentQuality
+        if (currentLevel >= maxLevel) {
+          throw new Error("Instalação já está no nível máximo.");
+        }
+
+        const actualAmount = facilityType === "stadium_capacity" ? amount : 1;
+        const targetLevel = currentLevel + actualAmount;
+
+        const cost = InfrastructureEconomics.getUpgradeCost(
+          facilityType,
+          currentLevel,
+          actualAmount
         );
 
-        const validationContext: UpgradeValidationContext = {
-          teamId,
-          facilityType: "stadium",
-          upgradeType: "expand_stadium",
-          currentBudget,
-          currentValue: currentCapacity,
-          upgradeCost: expansionCost,
-          seasonId,
-        };
-
-        const validation =
-          InfrastructureValidator.validateUpgrade(validationContext);
-
-        if (!validation.isValid) {
-          return Result.businessRule(validation.errors.join(" | ")) as any;
+        if (team.budget < cost) {
+          throw new Error(
+            `Saldo insuficiente. Necessário: €${cost.toLocaleString()}`
+          );
         }
 
-        const newCapacity =
-          currentCapacity +
-          InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK;
-        const newBudget = currentBudget - expansionCost;
+        const duration = InfrastructureEconomics.getConstructionDuration(
+          facilityType,
+          currentLevel,
+          actualAmount
+        );
+
+        const gameState = await this.repos.gameState.findCurrent();
+        const startDate = new Date(gameState?.currentDate || new Date());
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + duration);
+
+        const constructionData: ActiveConstruction = {
+          facilityType,
+          startLevel: currentLevel,
+          targetLevel: targetLevel,
+          cost,
+          startDate: startDate.toISOString().split("T")[0],
+          endDate: endDate.toISOString().split("T")[0],
+          daysRemaining: duration,
+        };
 
         await this.repos.teams.update(teamId, {
-          stadiumCapacity: newCapacity,
-          budget: newBudget,
+          budget: team.budget - cost,
+          activeConstruction: constructionData,
         });
 
         await this.repos.financial.addRecord({
           teamId,
-          seasonId,
-          date: new Date().toISOString().split("T")[0],
+          seasonId: gameState?.currentSeasonId || 1,
+          date: constructionData.startDate,
           type: "expense",
           category: FinancialCategory.INFRASTRUCTURE,
-          amount: expansionCost,
-          description: `Expansão do Estádio (+${InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK} lugares)`,
-        });
-
-        const newFanBase = Math.round(
-          (team.fanBase || currentCapacity * 2.5) * 1.05
-        );
-        await this.repos.teams.update(teamId, {
-          fanBase: newFanBase,
+          amount: cost,
+          description: `Início de obra: ${this.getFacilityName(
+            facilityType
+          )} (Nível ${targetLevel})`,
         });
 
         this.logger.info(
-          `✅ Estádio expandido: ${currentCapacity} → ${newCapacity} lugares ` +
-            `(Custo: €${expansionCost.toLocaleString()})`
+          `🔨 Obra iniciada: ${constructionData.facilityType} para time ${teamId}. Término: ${constructionData.endDate}`
         );
-
-        const result: UpgradeResult = {
-          success: true,
-          facilityType: "stadium",
-          upgradeType: "expand_stadium",
-          costPaid: expansionCost,
-          newValue: newCapacity,
-          previousValue: currentCapacity,
-          remainingBudget: newBudget,
-          message: `Estádio expandido com sucesso! Nova capacidade: ${newCapacity.toLocaleString()} lugares`,
-          warnings:
-            validation.warnings.length > 0 ? validation.warnings : undefined,
-        };
-
-        return result;
       }
     );
   }
 
-  async upgradeFacilityQuality(
+  async processDailyConstruction(
     teamId: number,
-    seasonId: number,
-    facilityType: FacilityType
-  ): Promise<ServiceResult<UpgradeResult>> {
+    currentDateStr: string
+  ): Promise<ServiceResult<boolean>> {
     return this.execute(
-      "upgradeFacilityQuality",
-      { teamId, seasonId, facilityType },
-      async ({ teamId, seasonId, facilityType }) => {
+      "processDailyConstruction",
+      { teamId, date: currentDateStr },
+      async () => {
         const team = await this.repos.teams.findById(teamId);
-        if (!team) {
-          throw new Error(`Time ${teamId} não encontrado.`);
+        if (!team || !team.activeConstruction) return false;
+
+        const construction = team.activeConstruction as ActiveConstruction;
+        const today = new Date(currentDateStr);
+        const end = new Date(construction.endDate);
+
+        const diffTime = end.getTime() - today.getTime();
+        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (daysRemaining > 0) {
+          return false;
         }
 
-        const currentQuality =
-          facilityType === "stadium"
-            ? team.stadiumQuality || 50
-            : facilityType === "training"
-            ? team.trainingCenterQuality || 50
-            : team.youthAcademyQuality || 50;
+        this.logger.info(
+          `✅ Obra finalizada para time ${teamId}: ${construction.facilityType}`
+        );
 
-        const currentBudget = team.budget || 0;
-
-        const upgradeCost =
-          InfrastructureCalculator.calculateQualityUpgradeCost(
-            facilityType,
-            currentQuality
-          );
-
-        const upgradeType: UpgradeType =
-          facilityType === "stadium"
-            ? "upgrade_stadium_quality"
-            : facilityType === "training"
-            ? "upgrade_training_quality"
-            : "upgrade_youth_quality";
-
-        const validationContext: UpgradeValidationContext = {
-          teamId,
-          facilityType,
-          upgradeType,
-          currentBudget,
-          currentValue: currentQuality,
-          upgradeCost,
-          seasonId,
+        const updateData: Partial<Team> = {
+          activeConstruction: null,
         };
 
-        const validation =
-          InfrastructureValidator.validateUpgrade(validationContext);
-
-        if (!validation.isValid) {
-          return Result.businessRule(validation.errors.join(" | ")) as any;
-        }
-
-        const increment =
-          facilityType === "stadium"
-            ? InfrastructureEconomics.STADIUM.QUALITY.LEVEL_INCREMENT
-            : facilityType === "training"
-            ? InfrastructureEconomics.TRAINING_CENTER.UPGRADE.LEVEL_INCREMENT
-            : InfrastructureEconomics.YOUTH_ACADEMY.UPGRADE.LEVEL_INCREMENT;
-
-        const newQuality = Math.min(100, currentQuality + increment);
-        const newBudget = currentBudget - upgradeCost;
-
-        const updateData: any = { budget: newBudget };
-        let facilityName = "";
-
-        if (facilityType === "stadium") {
-          updateData.stadiumQuality = newQuality;
-          facilityName = "Estádio";
-        } else if (facilityType === "training") {
-          updateData.trainingCenterQuality = newQuality;
-          facilityName = "Centro de Treinamento";
-        } else {
-          updateData.youthAcademyQuality = newQuality;
-          facilityName = "Academia de Base";
-        }
+        this.applyLevelUpdate(
+          updateData,
+          construction.facilityType,
+          construction.targetLevel!
+        );
 
         await this.repos.teams.update(teamId, updateData);
 
+        // TODO: Enviar notificação/evento para o usuário (via EventBus)
+        // await this.eventBus.publish(GameEventType.INFRASTRUCTURE_COMPLETED, { ... });
+
+        return true;
+      }
+    );
+  }
+
+  /**
+   * Chamado no dia 1 de cada mês.
+   * Cobra a manutenção de todas as instalações.
+   */
+  async applyMonthlyMaintenance(
+    teamId: number,
+    currentDate: string,
+    seasonId: number
+  ): Promise<ServiceResult<number>> {
+    return this.execute("applyMonthlyMaintenance", { teamId }, async () => {
+      const team = await this.repos.teams.findById(teamId);
+      if (!team) return 0;
+
+      const types: FacilityType[] = [
+        "stadium_capacity",
+        "stadium_quality",
+        "training",
+        "medical",
+        "youth",
+        "admin",
+      ];
+
+      let totalCost = 0;
+      for (const type of types) {
+        const level = this.getCurrentLevel(team, type);
+        totalCost += InfrastructureEconomics.getMaintenanceCost(type, level);
+      }
+
+      if (totalCost > 0) {
+        await this.repos.teams.updateBudget(teamId, team.budget - totalCost);
+
         await this.repos.financial.addRecord({
           teamId,
           seasonId,
-          date: new Date().toISOString().split("T")[0],
+          date: currentDate,
           type: "expense",
-          category: FinancialCategory.INFRASTRUCTURE,
-          amount: upgradeCost,
-          description: `Upgrade de Qualidade - ${facilityName} (Nível ${newQuality})`,
+          category: FinancialCategory.STADIUM_MAINTENANCE,
+          amount: totalCost,
+          description: "Manutenção Mensal de Infraestrutura",
         });
-
-        this.logger.info(
-          `✅ ${facilityName} melhorado: ${currentQuality} → ${newQuality} qualidade ` +
-            `(Custo: €${upgradeCost.toLocaleString()})`
-        );
-
-        const result: UpgradeResult = {
-          success: true,
-          facilityType,
-          upgradeType,
-          costPaid: upgradeCost,
-          newValue: newQuality,
-          previousValue: currentQuality,
-          remainingBudget: newBudget,
-          message: `${facilityName} melhorado com sucesso! Nova qualidade: ${newQuality}`,
-          warnings:
-            validation.warnings.length > 0 ? validation.warnings : undefined,
-        };
-
-        return result;
-      }
-    );
-  }
-
-  async getUpgradeCost(
-    teamId: number,
-    facilityType: FacilityType,
-    upgradeType: "expand" | "quality"
-  ): Promise<ServiceResult<number>> {
-    return this.execute(
-      "getUpgradeCost",
-      { teamId, facilityType, upgradeType },
-      async ({ teamId, facilityType, upgradeType }) => {
-        const team = await this.repos.teams.findById(teamId);
-        if (!team) {
-          return 0;
-        }
-
-        if (upgradeType === "expand" && facilityType === "stadium") {
-          const currentCapacity = team.stadiumCapacity || 10000;
-          const currentQuality = team.stadiumQuality || 50;
-          return InfrastructureCalculator.calculateExpansionCost(
-            currentCapacity,
-            InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK,
-            currentQuality
-          );
-        } else {
-          const currentQuality =
-            facilityType === "stadium"
-              ? team.stadiumQuality || 50
-              : facilityType === "training"
-              ? team.trainingCenterQuality || 50
-              : team.youthAcademyQuality || 50;
-
-          return InfrastructureCalculator.calculateQualityUpgradeCost(
-            facilityType,
-            currentQuality
-          );
-        }
-      }
-    );
-  }
-
-  async analyzeCapacity(
-    teamId: number
-  ): Promise<ServiceResult<CapacityAnalysis>> {
-    return this.execute("analyzeCapacity", teamId, async (teamId) => {
-      const team = await this.repos.teams.findById(teamId);
-      if (!team) {
-        throw new Error(`Time ${teamId} não encontrado.`);
       }
 
-      const currentCapacity = team.stadiumCapacity || 10000;
-      const fanSatisfaction = team.fanSatisfaction || 50;
-
-      const averageAttendance = Math.round(
-        currentCapacity * (0.3 + (fanSatisfaction / 100) * 0.7)
-      );
-
-      const utilizationRate = averageAttendance / currentCapacity;
-      const capacityPressure =
-        InfrastructureCalculator.calculateCapacityPressure(
-          averageAttendance,
-          currentCapacity
-        );
-
-      const expansionCost = InfrastructureCalculator.calculateExpansionCost(
-        currentCapacity,
-        InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK,
-        team.stadiumQuality || 50
-      );
-
-      const config = InfrastructureEconomics.ROI.STADIUM_EXPANSION;
-      const additionalSeats =
-        InfrastructureEconomics.STADIUM.EXPANSION.SEATS_PER_BLOCK;
-      const annualRevenueIncrease =
-        additionalSeats * config.ANNUAL_REVENUE_PER_SEAT;
-      const paybackMonths = Math.round(
-        (expansionCost / annualRevenueIncrease) * 12
-      );
-
-      const currentDate = new Date();
-      currentDate.setMonth(currentDate.getMonth() + paybackMonths);
-      const breakEvenDate = currentDate.toISOString().split("T")[0];
-
-      const lostRevenue = capacityPressure.isPressured
-        ? (utilizationRate - 0.9) * currentCapacity * 50 * 19
-        : 0;
-
-      return {
-        currentCapacity,
-        averageAttendance,
-        utilizationRate,
-        isPressured: capacityPressure.isPressured,
-        lostRevenue: Math.round(lostRevenue),
-        satisfactionImpact: capacityPressure.satisfactionImpact,
-        recommendedExpansion: capacityPressure.isPressured
-          ? additionalSeats
-          : 0,
-        expansionCost,
-        projectedROI: {
-          annualRevenueIncrease,
-          paybackMonths,
-          breakEvenDate,
-        },
-      };
+      return totalCost;
     });
   }
 
-  async projectFanBase(
-    teamId: number,
-    leaguePosition: number
-  ): Promise<ServiceResult<FanBaseProjection>> {
-    return this.execute(
-      "projectFanBase",
-      { teamId, leaguePosition },
-      async ({ teamId, leaguePosition }) => {
-        const team = await this.repos.teams.findById(teamId);
-        if (!team) {
-          throw new Error(`Time ${teamId} não encontrado.`);
-        }
+  async applySeasonDegradation(
+    teamId: number
+  ): Promise<ServiceResult<string[]>> {
+    return this.execute("applySeasonDegradation", teamId, async (teamId) => {
+      const team = await this.repos.teams.findById(teamId);
+      if (!team) return [];
 
-        const currentFanBase =
-          team.fanBase || (team.stadiumCapacity || 10000) * 2.5;
-        const stadiumCapacity = team.stadiumCapacity || 10000;
-        const stadiumQuality = team.stadiumQuality || 50;
-        const fanSatisfaction = team.fanSatisfaction || 50;
+      const logs: string[] = [];
+      const updateData: Partial<Team> = {};
 
-        const projectedFanBase = InfrastructureCalculator.projectFanBaseGrowth(
-          currentFanBase,
-          stadiumCapacity,
-          stadiumQuality,
-          fanSatisfaction,
-          leaguePosition
-        );
+      const degrade = (
+        type: FacilityType,
+        currentLevel: number,
+        label: string
+      ) => {
+        if (type === "stadium_capacity") return;
 
-        const growthRate = (projectedFanBase - currentFanBase) / currentFanBase;
+        let loss = 0;
+        if (currentLevel >= 90) loss = 5 + Math.floor(Math.random() * 3);
+        else if (currentLevel >= 70) loss = 3 + Math.floor(Math.random() * 2);
+        else if (currentLevel >= 30) loss = 1 + Math.floor(Math.random() * 2);
 
-        const config = InfrastructureEconomics.FAN_BASE.GROWTH_RATE;
-        const organicGrowth = config.BASE_ANNUAL;
-
-        let successBonus = 0;
-        if (leaguePosition === 1) {
-          successBonus = config.SUCCESS_MULTIPLIER.TITLE_WIN;
-        } else if (leaguePosition <= 3) {
-          successBonus = config.SUCCESS_MULTIPLIER.TOP_3_FINISH;
-        } else if (leaguePosition <= 10) {
-          successBonus = config.SUCCESS_MULTIPLIER.MID_TABLE;
-        }
-
-        const satisfactionImpact = config.SATISFACTION_FACTOR(fanSatisfaction);
-        const stadiumQualityBonus =
-          config.STADIUM_QUALITY_FACTOR(stadiumQuality);
-
-        const recommendations: string[] = [];
-
-        if (projectedFanBase / stadiumCapacity > 5) {
-          recommendations.push(
-            "Base de torcedores crescendo fortemente. Considere expansão do estádio."
+        if (loss > 0) {
+          const newLevel = Math.max(0, currentLevel - loss);
+          this.applyLevelUpdate(updateData, type, newLevel);
+          logs.push(
+            `${label}: desgaste de equipamentos reduziu qualidade em -${loss} (Novo: ${newLevel})`
           );
         }
+      };
 
-        if (satisfactionImpact < 0) {
-          recommendations.push(
-            "Baixa satisfação da torcida limitando crescimento. Melhore resultados e experiência no estádio."
-          );
-        }
+      degrade("stadium_quality", team.stadiumQuality, "Estádio (Qualidade)");
+      degrade("training", team.trainingCenterQuality, "Centro de Treinamento");
+      degrade("medical", team.medicalCenterQuality, "Centro Médico");
+      degrade("youth", team.youthAcademyQuality, "Academia de Base");
+      degrade(
+        "admin",
+        team.administrativeCenterQuality,
+        "Centro Administrativo"
+      );
 
-        if (stadiumQuality < 60) {
-          recommendations.push(
-            "Qualidade do estádio abaixo da média. Upgrade pode atrair mais torcedores."
-          );
-        }
-
-        return {
-          currentFanBase,
-          projectedFanBase,
-          growthRate,
-          factors: {
-            organicGrowth,
-            successBonus,
-            satisfactionImpact,
-            stadiumQualityBonus,
-          },
-          recommendations,
-        };
+      if (Object.keys(updateData).length > 0) {
+        await this.repos.teams.update(teamId, updateData);
       }
-    );
+
+      return logs;
+    });
+  }
+
+  private getCurrentLevel(team: Team, type: FacilityType): number {
+    switch (type) {
+      case "stadium_capacity":
+        return team.stadiumCapacity;
+      case "stadium_quality":
+        return team.stadiumQuality;
+      case "training":
+        return team.trainingCenterQuality;
+      case "medical":
+        return team.medicalCenterQuality;
+      case "youth":
+        return team.youthAcademyQuality;
+      case "admin":
+        return team.administrativeCenterQuality;
+      default:
+        return 0;
+    }
+  }
+
+  private applyLevelUpdate(
+    data: Partial<Team>,
+    type: FacilityType,
+    newLevel: number
+  ) {
+    switch (type) {
+      case "stadium_capacity":
+        data.stadiumCapacity = newLevel;
+        break;
+      case "stadium_quality":
+        data.stadiumQuality = newLevel;
+        break;
+      case "training":
+        data.trainingCenterQuality = newLevel;
+        break;
+      case "medical":
+        data.medicalCenterQuality = newLevel;
+        break;
+      case "youth":
+        data.youthAcademyQuality = newLevel;
+        break;
+      case "admin":
+        data.administrativeCenterQuality = newLevel;
+        break;
+    }
+  }
+
+  private getFacilityName(type: FacilityType): string {
+    const names: Record<FacilityType, string> = {
+      stadium_capacity: "Expansão do Estádio",
+      stadium_quality: "Melhoria do Estádio",
+      training: "Centro de Treinamento",
+      medical: "Centro Médico",
+      youth: "Academia de Base",
+      admin: "Centro Administrativo",
+    };
+    return names[type];
   }
 }

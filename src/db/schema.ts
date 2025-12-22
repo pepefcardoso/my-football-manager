@@ -7,15 +7,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 import type { TeamAchievement } from "../domain/models";
-
-export interface ActiveConstruction {
-  facilityType: "stadium" | "training" | "medical" | "youth" | "admin";
-  targetLevel?: number;
-  targetCapacity?: number;
-  cost: number;
-  startDate: string;
-  endDate: string;
-}
+import type { ActiveConstruction } from "../domain/types/InfrastructureTypes";
 
 export const teams = sqliteTable("teams", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -39,6 +31,7 @@ export const teams = sqliteTable("teams", {
   activeConstruction: text("active_construction", { mode: "json" })
     .$type<ActiveConstruction | null>()
     .default(null),
+
   fanSatisfaction: integer("fan_satisfaction").default(50).notNull(),
   fanBase: integer("fan_base").default(10000).notNull(),
   headCoachId: integer("head_coach_id"),
