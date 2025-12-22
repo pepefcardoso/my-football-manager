@@ -240,35 +240,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
         facilityType,
         amount,
       }),
-
-    compareWithLeague: (teamId: number) =>
-      ipcRenderer.invoke("infrastructure:compareWithLeague", teamId),
-
-    getBenchmarks: (teamId: number) =>
-      ipcRenderer.invoke("infrastructure:getBenchmarks", teamId),
-
-    getTopRivals: (teamId: number, limit?: number) =>
-      ipcRenderer.invoke("infrastructure:getTopRivals", { teamId, limit }),
-
-    getEvolutionData: (teamId: number, startDate?: string, endDate?: string) =>
-      ipcRenderer.invoke("infrastructure:getEvolutionData", {
-        teamId,
-        startDate,
-        endDate,
-      }),
-
-    getChartData: (
-      teamId: number,
-      metric: "capacity" | "quality" | "fanBase" | "utilization",
-      startDate?: string,
-      endDate?: string
-    ) =>
-      ipcRenderer.invoke("infrastructure:getChartData", {
-        teamId,
-        metric,
-        startDate,
-        endDate,
-      }),
   },
 
   scouting: {

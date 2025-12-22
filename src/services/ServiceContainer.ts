@@ -44,8 +44,6 @@ import {
 } from "../domain/GameEventTypes";
 import { TransferValidator } from "../domain/validators/TransferValidator";
 import { YouthAcademyService } from "./YouthAcademyService";
-import { CompetitiveAnalysisService } from "./CompetitiveAnalysisService";
-import { InfrastructureHistoryService } from "./InfrastructureHistoryService";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 
 export class ServiceContainer implements IServiceContainer {
@@ -80,8 +78,6 @@ export class ServiceContainer implements IServiceContainer {
   public readonly operationalCosts: OperationalCostsService;
   public readonly revenueService: RevenueService;
   public readonly youthAcademy: YouthAcademyService;
-  public readonly competitiveAnalysis: CompetitiveAnalysisService;
-  public readonly infrastructureHistory: InfrastructureHistoryService;
 
   constructor(
     repos: IRepositoryContainer,
@@ -114,9 +110,6 @@ export class ServiceContainer implements IServiceContainer {
     this.valuationService = new ValuationService(repos);
     this.operationalCosts = new OperationalCostsService(repos);
     this.revenueService = new RevenueService(repos);
-
-    this.competitiveAnalysis = new CompetitiveAnalysisService(repos);
-    this.infrastructureHistory = new InfrastructureHistoryService(repos);
 
     this.infrastructure = new InfrastructureService(repos, this.eventBus);
 
@@ -222,7 +215,6 @@ export class ServiceContainer implements IServiceContainer {
       }
     );
 
-    // **NOVOS EVENTOS**
     this.eventBus.subscribe(
       GameEventType.STADIUM_CAPACITY_PRESSURED,
       async (payload: StadiumCapacityPressuredPayload) => {

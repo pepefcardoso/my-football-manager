@@ -270,21 +270,6 @@ declare global {
           facilityType: string,
           amount?: number
         ) => Promise<{ success: boolean; message: string }>;
-
-        compareWithLeague: (teamId: number) => Promise<any | null>;
-        getBenchmarks: (teamId: number) => Promise<any[]>;
-        getTopRivals: (teamId: number, limit?: number) => Promise<any[]>;
-        getEvolutionData: (
-          teamId: number,
-          startDate?: string,
-          endDate?: string
-        ) => Promise<InfrastructureEvolutionData | null>;
-        getChartData: (
-          teamId: number,
-          metric: "capacity" | "quality" | "fanBase" | "utilization",
-          startDate?: string,
-          endDate?: string
-        ) => Promise<ChartDataPoint[]>;
       };
 
       scouting: {

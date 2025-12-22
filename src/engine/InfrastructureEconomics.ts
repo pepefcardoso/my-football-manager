@@ -15,38 +15,27 @@ const CONFIG = {
     STADIUM_CAPACITY_MAX: 105000,
   },
 
-  BASE_UPGRADE_COSTS: {
-    stadium_capacity: 1000,
-    stadium_quality: 500_000,
-    training_center_quality: 250_000,
-    youth_academy_quality: 200_000,
-    medical_center_quality: 150_000,
-    administrative_center_quality: 100_000,
-  },
-
-  GROWTH_FACTORS: {
-    stadium_capacity: 1.0,
-    stadium_quality: 1.08,
-    training_center_quality: 1.09,
-    youth_academy_quality: 1.08,
-    medical_center_quality: 1.07,
-    administrative_center_quality: 1.06,
+  COSTS: {
+    SEAT_PRICE: 4500,
+    QUALITY_BASE_PER_1K_SEATS: 800,
+    FACILITY_BASE: 15000,
+    GROWTH_FACTOR: 1.05,
   },
 
   MAINTENANCE_PER_LEVEL: {
-    stadium_capacity: 2,
-    stadium_quality: 2_000,
-    training_center_quality: 5_000,
-    youth_academy_quality: 4_000,
-    medical_center_quality: 3_500,
-    administrative_center_quality: 2_500,
+    stadium_capacity: 5,
+    stadium_quality: 1000,
+    training_center_quality: 2000,
+    youth_academy_quality: 1500,
+    medical_center_quality: 1500,
+    administrative_center_quality: 1000,
   },
 
   CONSTRUCTION_TIME: {
-    BASE_DAYS: 10,
-    LEVEL_MULTIPLIER: 0.3,
-    STADIUM_SEAT_BATCH: 1000,
-    STADIUM_DAYS_PER_BATCH: 5,
+    BASE_DAYS: 7,
+    LEVEL_MULTIPLIER: 0.2,
+    STADIUM_SEAT_BATCH: 2000,
+    STADIUM_DAYS_PER_BATCH: 10,
   },
 };
 
@@ -57,15 +46,33 @@ export class InfrastructureEconomics {
     amount: number = 1
   ): number {
     if (type === "stadium_capacity") {
-      const baseCost = CONFIG.BASE_UPGRADE_COSTS.stadium_capacity;
-      const sizePenalty = currentLevel > 50000 ? 1.2 : 1.0;
-      return Math.round(amount * baseCost * sizePenalty);
+      return Math.round(amount * CONFIG.COSTS.SEAT_PRICE);
     }
 
-    const base = CONFIG.BASE_UPGRADE_COSTS[type];
-    const factor = CONFIG.GROWTH_FACTORS[type];
+    if (type === "stadium_quality") {
+      // NOTA: Para simplificar sem quebrar a assinatura, vamos assumir um custo base fixo
+      // multiplicado por um fator de crescimento.
+      // Num cenário real, passaríamos a capacidade do time como argumento extra.
+      return Math.round(
+        CONFIG.COSTS.QUALITY_BASE_PER_1K_SEATS *
+          20 *
+          Math.pow(1.02, currentLevel)
+      );
+    }
 
-    return Math.round(base * Math.pow(factor, currentLevel));
+    const base = CONFIG.COSTS.FACILITY_BASE;
+    return Math.round(
+      base * Math.pow(CONFIG.COSTS.GROWTH_FACTOR, currentLevel)
+    );
+  }
+
+  static getStadiumQualityUpgradeCost(
+    currentQuality: number,
+    stadiumCapacity: number
+  ): number {
+    const capacityUnits = Math.max(1, Math.round(stadiumCapacity / 1000));
+    const baseCost = CONFIG.COSTS.QUALITY_BASE_PER_1K_SEATS * capacityUnits;
+    return Math.round(baseCost * Math.pow(1.02, currentQuality));
   }
 
   static getMaintenanceCost(type: FacilityType, currentLevel: number): number {
@@ -83,7 +90,7 @@ export class InfrastructureEconomics {
         amount / CONFIG.CONSTRUCTION_TIME.STADIUM_SEAT_BATCH
       );
       return Math.max(
-        14,
+        10,
         batches * CONFIG.CONSTRUCTION_TIME.STADIUM_DAYS_PER_BATCH
       );
     }
@@ -180,19 +187,9 @@ export class InfrastructureEconomics {
 
   static calculateAnnualDegradation(currentLevel: number): number {
     if (currentLevel <= 0) return 0;
-
-    if (currentLevel >= 90) {
-      return RandomEngine.getInt(5, 7);
-    }
-
-    if (currentLevel >= 70) {
-      return RandomEngine.getInt(3, 5);
-    }
-
-    if (currentLevel >= 30) {
-      return RandomEngine.getInt(2, 3);
-    }
-
+    if (currentLevel >= 90) return RandomEngine.getInt(5, 7);
+    if (currentLevel >= 70) return RandomEngine.getInt(3, 5);
+    if (currentLevel >= 30) return RandomEngine.getInt(2, 3);
     return 1;
   }
 
