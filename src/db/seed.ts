@@ -40,6 +40,28 @@ import {
 
 const logger = new Logger("Seed");
 
+function calculateInfraStats(reputation: number) {
+  const normalizedRep = Math.max(0, Math.min(1, (reputation - 5000) / 5000));
+  const baseLevel = Math.floor(40 + normalizedRep * 55);
+  const getLevel = () => {
+    const variation = randomInt(-5, 5);
+    return Math.max(10, Math.min(100, baseLevel + variation));
+  };
+  const baseCapacity = Math.round(reputation * 6);
+  const capacity = Math.max(
+    15000,
+    Math.min(105000, baseCapacity + randomInt(-5000, 5000))
+  );
+  return {
+    capacity,
+    stadiumQuality: getLevel(),
+    training: getLevel(),
+    youth: getLevel(),
+    medical: getLevel(),
+    admin: getLevel(),
+  };
+}
+
 function generateAttributesFromOverall(
   position: Position | string,
   overall: number
@@ -92,7 +114,7 @@ function generateAttributesFromOverall(
 }
 
 async function main() {
-  logger.info("🌱 INICIANDO SEED: BRASILEIRÃO 2025 (Focado)...");
+  logger.info("🌱 INICIANDO SEED: BRASILEIRÃO 2025 (Infraestrutura 2.0)...");
 
   logger.info("🗑️  Limpando banco de dados...");
   await db.delete(matchTactics);
@@ -154,13 +176,15 @@ async function main() {
     })
     .returning();
 
-  logger.info("🛡️  Gerando Clubes, Elencos e Staff...");
+  logger.info("🛡️  Gerando Clubes, Elencos e Infraestrutura...");
 
   const insertedTeamsMap = new Map<string, typeof teams.$inferSelect>();
   let humanTeamId = 0;
   const allPlayerIds: number[] = [];
 
   for (const t of TEAMS_DATA) {
+    const infra = calculateInfraStats(t.rep);
+
     const [insertedTeam] = await db
       .insert(teams)
       .values({
@@ -171,18 +195,24 @@ async function main() {
         reputation: t.rep,
         budget: t.budget,
         isHuman: false,
-        stadiumCapacity: randomInt(30000, 70000),
-        stadiumQuality: randomInt(60, 95),
-        trainingCenterQuality: randomInt(60, 95),
-        youthAcademyQuality: randomInt(60, 95),
+        stadiumCapacity: infra.capacity,
+        stadiumQuality: infra.stadiumQuality,
+        trainingCenterQuality: infra.training,
+        youthAcademyQuality: infra.youth,
+        medicalCenterQuality: infra.medical,
+        administrativeCenterQuality: infra.admin,
         fanSatisfaction: randomInt(50, 90),
-        fanBase: Math.round(t.rep * 200),
+        fanBase: Math.round(t.rep * 250),
         transferBudget: Math.round(t.budget * 0.4),
       })
       .returning();
 
     insertedTeamsMap.set(t.name, insertedTeam);
     if (t.name === "Botafogo") humanTeamId = insertedTeam.id;
+
+    logger.debug(
+      `Time criado: ${t.name} (Rep: ${t.rep}, CT: ${infra.training}, Med: ${infra.medical})`
+    );
 
     const teamPlayers = [];
     const positionsRequired = {
