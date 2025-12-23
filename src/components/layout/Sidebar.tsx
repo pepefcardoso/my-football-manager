@@ -74,13 +74,6 @@ function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
                             Categorias de Base
                         </NavButton>
                         <NavButton
-                            active={activePage === "scouting"}
-                            onClick={() => onNavigate("scouting")}
-                            icon="🔍"
-                        >
-                            Scouting
-                        </NavButton>
-                        <NavButton
                             active={activePage === "transfer"}
                             onClick={() => onNavigate("transfer")}
                             icon="🔄"

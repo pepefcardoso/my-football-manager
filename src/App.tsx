@@ -13,12 +13,11 @@ import type { Team } from "./domain/models";
 import FinancesPage from "./components/pages/FinancesPage";
 import InfrastructurePage from "./components/pages/InfrastructurePage";
 import { Logger } from "./lib/Logger";
-import ScoutingPage from "./components/pages/ScoutingPage";
 import StandingsPage from "./components/pages/StandingsPage";
-import TransferMarketPage from "./components/pages/TransferMarketPage";
 import { TransferNotification } from "./components/common/TransferNotification";
 import { EventModal } from "./components/features/events/EventModal";
 import YouthAcademyPage from "./components/pages/YouthAcademyPage";
+import TransferHubPage from "./components/pages/TransferHubPage";
 
 const logger = new Logger("App");
 
@@ -153,8 +152,7 @@ function App() {
           {activePage === "staff" && <StaffPage teamId={userTeam.id} />}
           {activePage === "matches" && <MatchesPage teamId={userTeam.id} teams={teams} />}
           {activePage === "youth" && <YouthAcademyPage teamId={userTeam.id} />}
-          {activePage === "scouting" && <ScoutingPage teamId={userTeam.id} />}
-          {activePage === "transfer" && <TransferMarketPage teamId={userTeam.id} />}
+          {activePage === "transfer" && <TransferHubPage teamId={userTeam.id} />}
           {activePage === "finances" && <FinancesPage teamId={userTeam.id} />}
           {activePage === "infrastructure" && <InfrastructurePage teamId={userTeam.id} />}
           {activePage === "calendar" && <PlaceholderPage title="Calendário" />}

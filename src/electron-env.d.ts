@@ -15,10 +15,6 @@ import type {
   MonthlyFinancialSummary,
   MatchEventData,
 } from "./domain/types";
-import type {
-  InfrastructureEvolutionData,
-  ChartDataPoint,
-} from "./domain/types/InfrastructureHistoryTypes";
 
 interface PlayerStatRow {
   id: number;
@@ -280,6 +276,7 @@ declare global {
         getScoutingList: (teamId: number) => Promise<any[]>;
         assignScout: (scoutId: number, playerId: number) => Promise<boolean>;
         calculateScoutingAccuracy: (teamId: number) => Promise<number>;
+        updateSlots: (teamId: number, slots: any[]) => Promise<boolean>;
       };
 
       transfer: {

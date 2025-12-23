@@ -7,20 +7,30 @@ import Badge from "../../common/Badge";
 
 const logger = new Logger("TransferProposalModal");
 
+interface PlayerOrScoutedView extends Player {
+    salary: number | undefined;
+    contractEnd: string | null | undefined;
+    visibleAttributes?: Record<string, { value: number | string; isExact: boolean; min?: number; max?: number }>;
+}
+
 interface TransferProposalModalProps {
-    player: Player & { salary: number | undefined; contractEnd: string | null | undefined };
+    player: PlayerOrScoutedView;
     proposingTeamId: number;
     proposingTeamBudget: number;
     onClose: () => void;
     onProposalSent: () => void;
     currentDate: string;
+    seasonId: number;
 }
 
 const HEURISTICS = {
-    estimateMarketValue: (overall: number) => Math.round(overall ** 3 / 50 * 1000),
+    estimateMarketValue: (overall: number | string) => {
+        const ovr = typeof overall === 'number' ? overall : parseInt(String(overall).split('-')[0]) || 60;
+        return Math.round(ovr ** 3 / 50 * 1000);
+    },
     estimateSuggestedWage: (marketValue: number) => Math.round(marketValue * 0.1),
-    FEE_MAX_MULTIPLIER: 2.5,
-    WAGE_MAX_MULTIPLIER: 1.5,
+    FEE_MAX_MULTIPLIER: 3.0,
+    WAGE_MAX_MULTIPLIER: 2.0,
     FEE_STEP: 50000,
     WAGE_STEP: 10000,
     MAX_CONTRACT_YEARS: 5,
@@ -33,11 +43,22 @@ export function TransferProposalModal({
     onClose,
     onProposalSent,
     currentDate,
+    seasonId,
 }: TransferProposalModalProps) {
-    const marketValue = useMemo(() => HEURISTICS.estimateMarketValue(player.overall), [player.overall]);
+    const safeOverall = useMemo(() => {
+        if (player.visibleAttributes?.overall) {
+            const attr = player.visibleAttributes.overall;
+            if (attr.isExact) return Number(attr.value);
+            if (attr.min && attr.max) return Math.round((attr.min + attr.max) / 2);
+        }
+        return player.overall;
+    }, [player]);
+
+    const marketValue = useMemo(() => HEURISTICS.estimateMarketValue(safeOverall), [safeOverall]);
     const suggestedWage = useMemo(() => HEURISTICS.estimateSuggestedWage(marketValue), [marketValue]);
-    const feeMax = useMemo(() => Math.round(marketValue * HEURISTICS.FEE_MAX_MULTIPLIER / HEURISTICS.FEE_STEP) * HEURISTICS.FEE_STEP, [marketValue]);
-    const wageMax = useMemo(() => Math.round(suggestedWage * HEURISTICS.WAGE_MAX_MULTIPLIER / HEURISTICS.WAGE_STEP) * HEURISTICS.WAGE_STEP, [suggestedWage]);
+
+    const feeMax = useMemo(() => Math.max(marketValue * HEURISTICS.FEE_MAX_MULTIPLIER, 1000000), [marketValue]);
+    const wageMax = useMemo(() => Math.max(suggestedWage * HEURISTICS.WAGE_MAX_MULTIPLIER, 50000), [suggestedWage]);
 
     const [fee, setFee] = useState(marketValue);
     const [wageOffer, setWageOffer] = useState(suggestedWage);
@@ -66,18 +87,6 @@ export function TransferProposalModal({
         }
     }, [isFreeAgent]);
 
-
-    const handleTypeChange = (type: TransferType) => {
-        setTransferType(type);
-        if (type === TransferType.FREE) {
-            setFee(0);
-        } else if (type === TransferType.TRANSFER) {
-            setFee(marketValue);
-        } else {
-            setFee(Math.round(marketValue * 0.2));
-        }
-    }
-
     const handleCreateProposal = useCallback(async () => {
         if (isOverBudget || isSubmitting || error) return;
 
@@ -94,7 +103,7 @@ export function TransferProposalModal({
                 wageOffer: wageOffer,
                 contractLength: contractLength,
                 currentDate: currentDate,
-                seasonId: 1,
+                seasonId: seasonId,
             };
 
             logger.info("Enviando proposta:", proposalData);
@@ -105,11 +114,11 @@ export function TransferProposalModal({
                 onProposalSent();
                 onClose();
             } else {
-                setError(result.message || "Erro ao enviar proposta. Verifique a janela de transferências.");
+                setError(result.message || "Erro ao enviar proposta.");
             }
         } catch (err) {
             logger.error("Erro no IPC ao criar proposta:", err);
-            setError("Erro interno ao comunicar com o sistema de transferências.");
+            setError("Erro interno ao comunicar com o sistema.");
         } finally {
             setIsSubmitting(false);
         }
@@ -127,8 +136,12 @@ export function TransferProposalModal({
         currentDate,
         onClose,
         onProposalSent,
-        isFreeAgent
+        isFreeAgent,
+        seasonId,
     ]);
+
+    const displayOverall = player.visibleAttributes?.overall?.value || player.overall;
+    const isMasked = player.visibleAttributes && !player.visibleAttributes.overall.isExact;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -139,59 +152,40 @@ export function TransferProposalModal({
                         <h3 className="text-2xl font-bold text-white">
                             Proposta por {player.firstName} {player.lastName}
                         </h3>
-                        <p className="text-sm text-slate-400 mt-1">
-                            OVR: {player.overall} | {player.position} | {player.age} anos
+                        <p className="text-sm text-slate-400 mt-1 flex items-center gap-2">
+                            <span className="bg-slate-800 px-1.5 rounded text-white font-bold">OVR {displayOverall}</span>
+                            <span>|</span>
+                            <span>{player.position}</span>
+                            <span>|</span>
+                            <span>{player.age} anos</span>
                         </p>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-500 mb-1">Valor de Mercado</p>
-                        <Badge variant="neutral">{formatCurrency(marketValue)}</Badge>
+                        <p className="text-xs text-slate-500 mb-1">Valor Estimado</p>
+                        <Badge variant="neutral">
+                            {isMasked ? "~ " : ""}{formatCurrency(marketValue)}
+                        </Badge>
                     </div>
                 </div>
 
                 <div className="p-6 space-y-6">
+                    {isMasked && (
+                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 text-xs flex gap-2 items-center">
+                            <span>⚠️</span>
+                            <p>
+                                <strong>Scouting Incompleto:</strong> Você está fazendo uma oferta "às cegas".
+                                O valor real do jogador pode diferir da estimativa.
+                            </p>
+                        </div>
+                    )}
 
                     {error && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/50 rounded text-red-400 text-sm" role="alert">
+                        <div className="p-3 bg-red-500/10 border border-red-500/50 rounded text-red-400 text-sm">
                             {error}
                         </div>
                     )}
 
-                    <div className="flex gap-4">
-                        <button
-                            onClick={() => handleTypeChange(TransferType.TRANSFER)}
-                            disabled={isFreeAgent}
-                            className={`p-3 rounded-lg border text-sm font-medium transition-all ${transferType === TransferType.TRANSFER
-                                ? "bg-emerald-600/20 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/50"
-                                : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 disabled:opacity-50"
-                                }`}
-                        >
-                            <span className="text-lg mr-2" aria-hidden="true">💸</span> Compra Definitiva
-                        </button>
-                        <button
-                            onClick={() => handleTypeChange(TransferType.LOAN)}
-                            disabled={isFreeAgent}
-                            className={`p-3 rounded-lg border text-sm font-medium transition-all ${transferType === TransferType.LOAN
-                                ? "bg-blue-600/20 border-blue-500 text-blue-300 ring-2 ring-blue-500/50"
-                                : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 disabled:opacity-50"
-                                }`}
-                        >
-                            <span className="text-lg mr-2" aria-hidden="true">🔁</span> Empréstimo
-                        </button>
-                        <button
-                            onClick={() => handleTypeChange(TransferType.FREE)}
-                            disabled={!isFreeAgent}
-                            className={`p-3 rounded-lg border text-sm font-medium transition-all ${transferType === TransferType.FREE
-                                ? "bg-purple-600/20 border-purple-500 text-purple-300 ring-2 ring-purple-500/50"
-                                : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 disabled:opacity-50"
-                                }`}
-                        >
-                            <span className="text-lg mr-2" aria-hidden="true">🤝</span> Agente Livre
-                        </button>
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
                                 Valor da Transferência (Fee)
@@ -201,15 +195,14 @@ export function TransferProposalModal({
                             </label>
                             <input
                                 type="range"
-                                min={transferType === TransferType.FREE ? 0 : HEURISTICS.FEE_STEP}
+                                min={0}
                                 max={feeMax}
                                 step={HEURISTICS.FEE_STEP}
                                 value={fee}
-                                disabled={isFreeAgent || transferType === TransferType.LOAN}
+                                disabled={isFreeAgent}
                                 onChange={(e) => setFee(Number(e.target.value))}
                                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
-                            <p className="text-xs text-slate-500">Valor máximo sugerido: {formatCurrency(feeMax)}</p>
                         </div>
 
                         <div className="space-y-2">
@@ -226,13 +219,12 @@ export function TransferProposalModal({
                                 onChange={(e) => setWageOffer(Number(e.target.value))}
                                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
-                            <p className="text-xs text-slate-500">Salário sugerido: {formatCurrency(suggestedWage)} (Máx: {formatCurrency(wageMax)})</p>
                         </div>
 
                         <div className="space-y-2 col-span-2 md:col-span-1">
                             <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
-                                Duração do Contrato (Anos)
-                                <Badge variant="neutral">{contractLength} {contractLength === 1 ? 'Ano' : 'Anos'}</Badge>
+                                Duração do Contrato
+                                <Badge variant="neutral">{contractLength} Anos</Badge>
                             </label>
                             <input
                                 type="range"
@@ -244,25 +236,6 @@ export function TransferProposalModal({
                                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
                         </div>
-
-                        <div className={`p-3 rounded border text-sm col-span-2 md:col-span-1 ${isOverBudget ? 'bg-red-500/10 border-red-500/50' : 'bg-slate-800 border-slate-700'}`}>
-                            <p className="font-bold mb-1">Resumo Financeiro</p>
-                            <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Orçamento Disponível</span>
-                                <span className="font-mono text-emerald-400">{formatCurrency(proposingTeamBudget)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs mt-1">
-                                <span className="text-slate-400">Custo da Transferência (Fee)</span>
-                                <span className="font-mono text-red-400">-{formatCurrency(fee)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs mt-2 pt-2 border-t border-slate-700">
-                                <span className="font-bold">Saldo Após Fee</span>
-                                <span className={`font-mono font-bold ${isOverBudget ? 'text-red-400' : 'text-white'}`}>
-                                    {formatCurrency(proposingTeamBudget - fee)}
-                                </span>
-                            </div>
-                        </div>
-
                     </div>
                 </div>
 
@@ -270,19 +243,18 @@ export function TransferProposalModal({
                     <button
                         onClick={onClose}
                         disabled={isSubmitting}
-                        className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                        className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleCreateProposal}
-                        disabled={isOverBudget || isSubmitting || !!error || transferType === TransferType.LOAN}
-                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isOverBudget || isSubmitting || !!error}
+                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all disabled:opacity-50"
                     >
                         {isSubmitting ? "Enviando..." : "Enviar Proposta"}
                     </button>
                 </div>
-
             </div>
         </div>
     );

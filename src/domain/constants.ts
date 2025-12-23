@@ -4,7 +4,6 @@ export type MenuOption =
   | "squad"
   | "staff"
   | "youth"
-  | "scouting"
   | "finances"
   | "infrastructure"
   | "matches"

@@ -811,6 +811,14 @@ function registerIpcHandlers() {
     }
   );
 
+  ipcMain.handle("scouting:updateSlots", async (_, { teamId, slots }) => {
+    const result = await serviceContainer.scouting.updateScoutingSlots(
+      teamId,
+      slots
+    );
+    return Result.isSuccess(result);
+  });
+
   ipcMain.handle("transfer:getTransferHistory", async (_, teamId: number) => {
     const result = await serviceContainer.transfer.getTransferHistory(teamId);
     return Result.unwrapOr(result, []);
