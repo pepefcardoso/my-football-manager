@@ -1,6 +1,12 @@
 import { AttributeCalculator } from "../../engine/AttributeCalculator";
 import { FIRST_NAMES, LAST_NAMES } from "./data";
-import { Position, StaffRole } from "../../domain/enums";
+import {
+  Position,
+  StaffRole,
+  TransferStrategy,
+  InterestLevel,
+} from "../../domain/enums";
+import type { ScoutingSlot } from "../../domain/models";
 
 export function random<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -101,5 +107,48 @@ export function generateStaffMember(teamId: number, role: StaffRole) {
       role === StaffRole.SCOUT
         ? random(["south_america", "europe", "youth"])
         : null,
+  };
+}
+
+export function determineTransferStrategy(
+  reputation: number,
+  budget: number
+): TransferStrategy {
+  if (reputation > 8500 && budget > 100_000_000)
+    return TransferStrategy.AGGRESSIVE;
+  if (reputation < 6000) return TransferStrategy.SELLING_CLUB;
+  if (Math.random() > 0.7) return TransferStrategy.YOUTH_FOCUSED;
+  return TransferStrategy.BALANCED;
+}
+
+export function generateDefaultScoutingSlots(): ScoutingSlot[] {
+  return [1, 2, 3].map((num) => ({
+    slotNumber: num as 1 | 2 | 3,
+    isActive: false,
+    filters: {},
+    stats: {
+      playersFound: 0,
+      lastRunDate: null,
+    },
+  }));
+}
+
+export function generateClubInterest(
+  teamId: number,
+  playerId: number,
+  priority: number = 1
+) {
+  const levels = [
+    InterestLevel.OBSERVING,
+    InterestLevel.INTERESTED,
+    InterestLevel.HIGH_PRIORITY,
+  ];
+  return {
+    teamId,
+    playerId,
+    interestLevel: random(levels),
+    priority,
+    maxFeeWillingToPay: null,
+    dateAdded: new Date().toISOString().split("T")[0],
   };
 }

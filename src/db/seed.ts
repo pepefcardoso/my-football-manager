@@ -26,10 +26,13 @@ import {
   generateStaffMember,
   randomInt,
   random,
+  determineTransferStrategy,
+  generateDefaultScoutingSlots,
+  generateClubInterest,
 } from "./seeds/generators";
 import { quickSimulateMatch } from "./seeds/match-simulator";
 import { CompetitionScheduler } from "../domain/logic/CompetitionScheduler";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import {
   Position,
   StaffRole,
@@ -114,7 +117,7 @@ function generateAttributesFromOverall(
 }
 
 async function main() {
-  logger.info("🌱 INICIANDO SEED: BRASILEIRÃO 2025 (Infraestrutura 2.0)...");
+  logger.info("🌱 INICIANDO SEED: BRASILEIRÃO 2025 (Advanced Market)...");
 
   logger.info("🗑️  Limpando banco de dados...");
   await db.delete(matchTactics);
@@ -136,7 +139,7 @@ async function main() {
   await db.delete(seasons);
   await db.delete(teams);
 
-  logger.info("📅 Criando Temporadas (2024 Histórica, 2025 Ativa)...");
+  logger.info("📅 Criando Temporadas...");
   const [season2024] = await db
     .insert(seasons)
     .values({
@@ -182,8 +185,13 @@ async function main() {
   let humanTeamId = 0;
   const allPlayerIds: number[] = [];
 
+  const highRepTeams: number[] = [];
+  const lowRepTeams: number[] = [];
+
   for (const t of TEAMS_DATA) {
     const infra = calculateInfraStats(t.rep);
+    const strategy = determineTransferStrategy(t.rep, t.budget);
+    const slots = generateDefaultScoutingSlots();
 
     const [insertedTeam] = await db
       .insert(teams)
@@ -204,17 +212,17 @@ async function main() {
         fanSatisfaction: randomInt(50, 90),
         fanBase: Math.round(t.rep * 250),
         transferBudget: Math.round(t.budget * 0.4),
+        transferStrategy: strategy,
+        scoutingSlots: slots,
       })
       .returning();
 
     insertedTeamsMap.set(t.name, insertedTeam);
     if (t.name === "Botafogo") humanTeamId = insertedTeam.id;
 
-    logger.debug(
-      `Time criado: ${t.name} (Rep: ${t.rep}, CT: ${infra.training}, Med: ${infra.medical})`
-    );
+    if (t.rep > 8000) highRepTeams.push(insertedTeam.id);
+    else lowRepTeams.push(insertedTeam.id);
 
-    const teamPlayers = [];
     const positionsRequired = {
       [Position.GK]: 3,
       [Position.DF]: 8,
@@ -246,7 +254,6 @@ async function main() {
           })
           .returning();
 
-        teamPlayers.push(p);
         allPlayerIds.push(p.id);
 
         await db.insert(playerContracts).values({
@@ -269,7 +276,6 @@ async function main() {
       for (let i = 0; i < count; i++) {
         const pData = generatePlayer(insertedTeam.id, pos, false);
         const [p] = await db.insert(players).values(pData).returning();
-        teamPlayers.push(p);
         allPlayerIds.push(p.id);
 
         await db.insert(playerContracts).values({
@@ -303,7 +309,10 @@ async function main() {
       });
     }
 
-    const captain = teamPlayers.sort((a, b) => b.overall - a.overall)[0];
+    const squad = await db.query.players.findMany({
+      where: eq(players.teamId, insertedTeam.id),
+    });
+    const captain = squad.sort((a, b) => b.overall - a.overall)[0];
     if (captain) {
       await db
         .update(players)
@@ -321,7 +330,6 @@ async function main() {
     ];
 
     let headCoachId = null;
-
     for (const config of staffRoles) {
       for (let i = 0; i < config.count; i++) {
         const sData = generateStaffMember(insertedTeam.id, config.role);
@@ -356,15 +364,6 @@ async function main() {
         amount: Math.round(t.rep * 1500),
         description: "Adiantamento TV Rights",
       },
-      {
-        teamId: insertedTeam.id,
-        seasonId: season2025.id,
-        date: "2025-01-05",
-        type: "expense",
-        category: FinancialCategory.INFRASTRUCTURE,
-        amount: 250000,
-        description: "Manutenção de Gramado",
-      },
     ]);
   }
 
@@ -372,11 +371,11 @@ async function main() {
     .update(teams)
     .set({ isHuman: true })
     .where(eq(teams.id, humanTeamId));
+
   const insertedTeams = Array.from(insertedTeamsMap.values());
   const teamIds = insertedTeams.map((t) => t.id);
 
   logger.info("📜 Simulando Temporada 2024 para gerar histórico...");
-
   const fixtures2024 = CompetitionScheduler.generateLeagueFixtures(
     teamIds,
     false
@@ -385,7 +384,6 @@ async function main() {
     number,
     typeof competitionStandings.$inferInsert
   >();
-
   teamIds.forEach((id) => {
     standings2024Map.set(id, {
       competitionId: brasileirao.id,
@@ -400,25 +398,19 @@ async function main() {
       points: 0,
     });
   });
-
   const matches2024 = [];
-
   for (const fixture of fixtures2024) {
     const homeTeam = insertedTeams.find((t) => t.id === fixture.homeTeamId)!;
     const awayTeam = insertedTeams.find((t) => t.id === fixture.awayTeamId)!;
-
     const result = quickSimulateMatch(homeTeam.reputation, awayTeam.reputation);
-
     const homeStats = standings2024Map.get(homeTeam.id)!;
     const awayStats = standings2024Map.get(awayTeam.id)!;
-
     homeStats.played!++;
     awayStats.played!++;
     homeStats.goalsFor! += result.homeScore;
     homeStats.goalsAgainst! += result.awayScore;
     awayStats.goalsFor! += result.awayScore;
     awayStats.goalsAgainst! += result.homeScore;
-
     if (result.homeScore > result.awayScore) {
       homeStats.wins!++;
       homeStats.points! += 3;
@@ -433,7 +425,6 @@ async function main() {
       awayStats.draws!++;
       awayStats.points! += 1;
     }
-
     matches2024.push({
       competitionId: brasileirao.id,
       seasonId: season2024.id,
@@ -449,18 +440,15 @@ async function main() {
       weather: "sunny",
     });
   }
-
   const batchSize = 100;
   for (let i = 0; i < matches2024.length; i += batchSize) {
     await db.insert(matches).values(matches2024.slice(i, i + batchSize));
   }
-
   await db
     .insert(competitionStandings)
     .values(Array.from(standings2024Map.values()));
 
   logger.info("📅 Gerando Calendário 2025...");
-
   const fixtures2025 = CompetitionScheduler.generateLeagueFixtures(
     teamIds,
     true
@@ -469,7 +457,6 @@ async function main() {
     const startDate = new Date("2025-04-13");
     const matchDate = new Date(startDate);
     matchDate.setDate(startDate.getDate() + (f.round - 1) * 7);
-
     return {
       competitionId: brasileirao.id,
       seasonId: season2025.id,
@@ -481,11 +468,9 @@ async function main() {
       weather: "sunny",
     };
   });
-
   for (let i = 0; i < matches2025.length; i += batchSize) {
     await db.insert(matches).values(matches2025.slice(i, i + batchSize));
   }
-
   const standings2025 = teamIds.map((id) => ({
     competitionId: brasileirao.id,
     seasonId: season2025.id,
@@ -500,54 +485,100 @@ async function main() {
   }));
   await db.insert(competitionStandings).values(standings2025);
 
-  logger.info("🕵️  Gerando Scouting e Transferências Dummy...");
+  logger.info("🕵️  Configurando Scouting e Mercado Inicial...");
 
-  const randomPlayersToScout = allPlayerIds
-    .sort(() => 0.5 - Math.random())
-    .slice(0, 5);
+  logger.debug("Gerando interesses de mercado...");
+  const marketInterests = [];
 
-  const humanScout = await db.query.staff.findFirst({
-    where: (staff, { and, eq }) =>
-      and(eq(staff.teamId, humanTeamId), eq(staff.role, StaffRole.SCOUT)),
+  const allLowRepPlayers = await db.query.players.findMany({
+    where: (players, { inArray }) => inArray(players.teamId, lowRepTeams),
+    orderBy: desc(players.overall),
+    limit: 50,
   });
 
-  if (humanScout) {
-    for (const pid of randomPlayersToScout) {
-      await db.insert(scoutingReports).values({
-        playerId: pid,
-        scoutId: humanScout.id,
-        teamId: humanTeamId,
-        date: "2025-01-10",
-        progress: randomInt(10, 50),
-        overallEstimate: randomInt(70, 90),
-        potentialEstimate: randomInt(70, 95),
-        notes: "Jogador observado em vídeos.",
-        recommendation: "Observar",
+  for (const buyerTeamId of highRepTeams) {
+    const targets = allLowRepPlayers
+      .sort(() => 0.5 - Math.random())
+      .slice(0, randomInt(2, 3));
+    for (const target of targets) {
+      marketInterests.push(
+        generateClubInterest(buyerTeamId, target.id, randomInt(1, 2))
+      );
+    }
+  }
+  if (marketInterests.length > 0) {
+    await db.insert(clubInterests).values(marketInterests);
+  }
+
+  logger.debug("Criando propostas de transferência iniciais...");
+  const humanPlayers = await db.query.players.findMany({
+    where: eq(players.teamId, humanTeamId),
+    orderBy: desc(players.overall),
+    limit: 3,
+  });
+
+  if (humanPlayers.length > 0) {
+    const target = humanPlayers[0];
+    const buyer = insertedTeams.find(
+      (t) => t.id !== humanTeamId && t.reputation > 8000
+    );
+
+    if (buyer) {
+      await db.insert(transferProposals).values({
+        playerId: target.id,
+        fromTeamId: humanTeamId,
+        toTeamId: buyer.id,
+        type: TransferType.TRANSFER,
+        status: TransferStatus.PENDING,
+        fee: target.overall * 120000,
+        wageOffer: target.overall * 2800,
+        contractLength: 4,
+        createdAt: "2025-01-14",
+        responseDeadline: "2025-01-18",
       });
     }
   }
 
-  const humanTeamPlayers = await db.query.players.findMany({
+  const humanSquad = await db.query.players.findMany({
     where: eq(players.teamId, humanTeamId),
-    limit: 1,
+  });
+  const humanScouts = await db.query.staff.findMany({
+    where: (staff, { and, eq }) =>
+      and(eq(staff.teamId, humanTeamId), eq(staff.role, StaffRole.SCOUT)),
   });
 
-  if (humanTeamPlayers.length > 0) {
-    const targetPlayer = humanTeamPlayers[0];
-    const buyerTeam = insertedTeams.find((t) => t.id !== humanTeamId)!;
+  const squadReports = humanSquad.map((p) => ({
+    playerId: p.id,
+    teamId: humanTeamId,
+    scoutId: humanScouts[0]?.id || null,
+    date: "2025-01-15",
+    progress: 100,
+    overallEstimate: p.overall,
+    potentialEstimate: p.potential,
+    notes: "Jogador do elenco.",
+    recommendation: "Manter",
+  }));
 
-    await db.insert(transferProposals).values({
-      playerId: targetPlayer.id,
-      fromTeamId: buyerTeam.id,
-      toTeamId: humanTeamId,
-      type: TransferType.TRANSFER,
-      status: TransferStatus.PENDING,
-      fee: targetPlayer.overall * 100000,
-      wageOffer: targetPlayer.overall * 2500,
-      contractLength: 3,
-      createdAt: "2025-01-14",
-      responseDeadline: "2025-01-20",
-    });
+  const rivalPlayers = await db.query.players.findMany({
+    where: (players, { ne, and, gt }) =>
+      and(ne(players.teamId, humanTeamId), gt(players.overall, 75)),
+    limit: 5,
+  });
+
+  const rivalReports = rivalPlayers.map((p) => ({
+    playerId: p.id,
+    teamId: humanTeamId,
+    scoutId: humanScouts[0]?.id || null,
+    date: "2025-01-10",
+    progress: randomInt(30, 60),
+    overallEstimate: p.overall + randomInt(-3, 3),
+    potentialEstimate: p.potential + randomInt(-5, 5),
+    notes: "Observado em jogos recentes.",
+    recommendation: "Observar",
+  }));
+
+  if (squadReports.length > 0 || rivalReports.length > 0) {
+    await db.insert(scoutingReports).values([...squadReports, ...rivalReports]);
   }
 
   logger.info("💾 Salvando GameState Inicial...");
@@ -565,8 +596,9 @@ async function main() {
   logger.info("✅ SEED CONCLUÍDO!");
   logger.info(`Times: ${insertedTeams.length}`);
   logger.info(`Jogadores: ${allPlayerIds.length}`);
+  logger.info(`Interesses de Mercado: ${marketInterests.length}`);
   logger.info(
-    `Partidas Geradas (2024+2025): ${matches2024.length + matches2025.length}`
+    `Relatórios de Scouting: ${squadReports.length + rivalReports.length}`
   );
 }
 

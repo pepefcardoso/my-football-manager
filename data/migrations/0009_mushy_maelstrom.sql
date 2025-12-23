@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `unique_player_team_scouting` ON `scouting_reports` (`player_id`,`team_id`);
