@@ -22,10 +22,11 @@ interface ScoutingConfigModalProps {
 
 function ScoutingConfigModal({ slotNumber, onSave, onClose }: ScoutingConfigModalProps) {
     const [filters, setFilters] = useState<ScoutingSlot['filters']>({
-        country: "BRA",
+        country: "Global",
         position: "FW",
         ageGroup: "young",
-        contractStatus: "any"
+        contractStatus: "any",
+        minOverall: 60,
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -85,6 +86,35 @@ function ScoutingConfigModal({ slotNumber, onSave, onClose }: ScoutingConfigModa
                             <option value="young">Jovens Promessas (&lt; 23 anos)</option>
                             <option value="prime">Auge (24-29 anos)</option>
                             <option value="veteran">Veteranos (&gt; 30 anos)</option>
+                        </select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Overall Mínimo</label>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="range"
+                                min="50"
+                                max="90"
+                                value={filters.minOverall || 60}
+                                onChange={e => setFilters({ ...filters, minOverall: parseInt(e.target.value) })}
+                                className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <span className="text-white font-mono bg-slate-800 px-2 py-1 rounded border border-slate-700">
+                                {filters.minOverall || 60}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Situação Contratual</label>
+                        <select
+                            className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white outline-none"
+                            value={filters.contractStatus}
+                            onChange={e => setFilters({ ...filters, contractStatus: e.target.value as any })}
+                        >
+                            <option value="any">Qualquer Situação</option>
+                            <option value="free_agent">Apenas Agentes Livres</option>
                         </select>
                     </div>
 
@@ -227,25 +257,34 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
     const handleRespondProposal = async (proposalId: number, response: "accept" | "reject") => {
         if (loading) return;
 
+        // Validação básica para evitar cliques múltiplos ou estado inválido
+        if (!currentDate) {
+            alert("Erro: Data do jogo não encontrada.");
+            return;
+        }
+
         setLoading(true);
         try {
+            logger.info(`Enviando resposta ${response} para proposta ${proposalId}...`);
+
             const result = await window.electronAPI.transfer.respondToProposal({
                 proposalId,
                 response,
-                currentDate: currentDate, // Vem do useGameStore
-                // Para rejeição, podes adicionar um motivo padrão ou abrir um modal, 
-                // mas aqui vamos simplificar:
-                rejectionReason: response === 'reject' ? "Proposta recusada pelo treinador." : undefined
+                currentDate: currentDate,
+                rejectionReason: response === 'reject' ? "Proposta recusada pela direção." : undefined,
+                counterOfferFee: undefined
             });
 
             if (result.success) {
-                logger.info(`Proposta ${proposalId} respondida com: ${response}`);
-                loadData();
+                logger.info(`Proposta ${proposalId} respondida com sucesso.`);
+                await loadData();
             } else {
-                alert(`Erro ao responder: ${result.message}`);
+                logger.error(`Erro retornado pelo backend: ${result.message}`);
+                alert(`Não foi possível realizar a ação: ${result.message}`);
             }
         } catch (error) {
-            logger.error("Erro ao responder proposta:", error);
+            logger.error("Erro ao responder proposta (Exception):", error);
+            alert("Erro interno de comunicação.");
         } finally {
             setLoading(false);
         }

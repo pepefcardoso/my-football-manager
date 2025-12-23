@@ -39,6 +39,7 @@ export function SearchResultsGrid({ players, loading, onPlayerClick }: SearchRes
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {players.map((player) => {
                 const isScouted = 'visibleAttributes' in player;
+                const teamName = (player as any).teamName || "Desconhecido";
 
                 return (
                     <div
@@ -53,6 +54,9 @@ export function SearchResultsGrid({ players, loading, onPlayerClick }: SearchRes
                                 </h4>
                                 <p className="text-xs text-slate-400 mt-0.5">
                                     {player.position} • {player.age} anos • {player.nationality}
+                                </p>
+                                <p className="text-[10px] text-emerald-400/80 mt-1 font-medium uppercase tracking-wide">
+                                    {teamName}
                                 </p>
                             </div>
                             <div className="text-right">

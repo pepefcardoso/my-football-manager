@@ -153,6 +153,14 @@ export class TransferValuation {
 
     const adjustedRatio = offerRatio / greedFactor;
 
+    if (adjustedRatio >= TRANSFER.AI_INSTANT_ACCEPT_THRESHOLD) {
+      return {
+        decision: "accept",
+        reason:
+          "A oferta é extraordinária e supera nossas melhores expectativas.",
+      };
+    }
+
     if (adjustedRatio < TRANSFER.AI_MIN_OFFER_RATIO) {
       return {
         decision: "reject",
@@ -192,15 +200,11 @@ export class TransferValuation {
           reason: "Estamos quase lá. Subam um pouco a oferta e fechamos.",
         };
       }
-      return {
-        decision: "accept",
-        reason: "A proposta atende às nossas expectativas.",
-      };
     }
 
     return {
       decision: "accept",
-      reason: "É uma oferta excelente que não podemos recusar.",
+      reason: "A proposta atende às nossas expectativas.",
     };
   }
 

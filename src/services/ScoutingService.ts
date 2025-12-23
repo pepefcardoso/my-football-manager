@@ -10,7 +10,7 @@ import {
   type MaskedAttribute,
 } from "../domain/factories/ReportFactory";
 import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
-import type { ScoutingSlot, Team } from "../domain/models";
+import type { ScoutingSlot } from "../domain/models";
 
 const SCOUTING_CONFIG = getBalanceValue("SCOUTING");
 
@@ -36,11 +36,14 @@ export class ScoutingService extends BaseService {
 
         const potentialTargets = await (
           this.repos.players as any
-        ).findByCriteria(slot.filters, 50);
+        ).findByCriteria(slot.filters, 20);
 
         if (potentialTargets.length === 0) return;
 
-        const discoveryChance = 10 + efficiency / 10;
+        const baseChance = SCOUTING_CONFIG.DISCOVERY_CHANCE.BASE;
+        const bonus =
+          efficiency * SCOUTING_CONFIG.DISCOVERY_CHANCE.PER_EFFICIENCY_POINT;
+        const discoveryChance = baseChance + bonus;
         let newPlayersFound = 0;
 
         for (const player of potentialTargets) {
@@ -132,14 +135,15 @@ export class ScoutingService extends BaseService {
   async getScoutedPlayer(
     playerId: number,
     viewerTeamId: number
-  ): Promise<ServiceResult<ScoutedPlayerView | null>> {
+  ): Promise<
+    ServiceResult<(ScoutedPlayerView & { teamName?: string }) | null>
+  > {
     return this.execute(
       "getScoutedPlayer",
       { playerId, viewerTeamId },
       async ({ playerId, viewerTeamId }) => {
         const player = await this.repos.players.findById(playerId);
         if (!player) {
-          this.logger.warn(`Jogador ${playerId} não encontrado para scouting.`);
           return null;
         }
 
@@ -148,15 +152,26 @@ export class ScoutingService extends BaseService {
           viewerTeamId
         );
 
+        let teamName = "Agente Livre";
+        if (player.teamId) {
+          const team = await this.repos.teams.findById(player.teamId);
+          if (team) teamName = team.name;
+        }
+
         const progress = report ? report.progress || 0 : 0;
         const lastUpdate = report ? report.date : null;
 
-        return ScoutingReportFactory.createView(
+        const view = ScoutingReportFactory.createView(
           player,
           progress,
           lastUpdate,
           viewerTeamId
         );
+
+        return {
+          ...view,
+          teamName,
+        };
       }
     );
   }
