@@ -224,13 +224,39 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
         }
     };
 
+    const handleRespondProposal = async (proposalId: number, response: "accept" | "reject") => {
+        if (loading) return;
+
+        setLoading(true);
+        try {
+            const result = await window.electronAPI.transfer.respondToProposal({
+                proposalId,
+                response,
+                currentDate: currentDate, // Vem do useGameStore
+                // Para rejeição, podes adicionar um motivo padrão ou abrir um modal, 
+                // mas aqui vamos simplificar:
+                rejectionReason: response === 'reject' ? "Proposta recusada pelo treinador." : undefined
+            });
+
+            if (result.success) {
+                logger.info(`Proposta ${proposalId} respondida com: ${response}`);
+                loadData();
+            } else {
+                alert(`Erro ao responder: ${result.message}`);
+            }
+        } catch (error) {
+            logger.error("Erro ao responder proposta:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const renderNegotiations = () => {
         const activeSent = sentProposals.filter(p => p.status !== TransferStatus.COMPLETED && p.status !== TransferStatus.CANCELLED && p.status !== TransferStatus.WITHDRAWN);
         const activeReceived = receivedProposals.filter(p => p.status !== TransferStatus.COMPLETED && p.status !== TransferStatus.CANCELLED && p.status !== TransferStatus.WITHDRAWN);
 
         return (
             <div className="space-y-8">
-                {/* OFERTAS ENVIADAS (COMPRA) */}
                 <section>
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         📤 Minhas Ofertas <span className="text-sm font-normal text-slate-500">({activeSent.length})</span>
@@ -286,7 +312,6 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                     </div>
                 </section>
 
-                {/* PROPOSTAS RECEBIDAS (VENDA) */}
                 <section>
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         📥 Propostas Recebidas <span className="text-sm font-normal text-slate-500">({activeReceived.length})</span>
@@ -307,11 +332,19 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                                         <div className="text-[10px] text-slate-500">Salário Oferecido: {formatCurrency(prop.wageOffer)}</div>
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                        <button className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded transition-colors">
-                                            Aceitar
+                                        <button
+                                            onClick={() => handleRespondProposal(prop.id, 'accept')}
+                                            disabled={loading}
+                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded transition-colors disabled:opacity-50"
+                                        >
+                                            {loading ? "..." : "Aceitar"}
                                         </button>
-                                        <button className="px-3 py-1 bg-red-600/20 hover:bg-red-600 text-red-200 hover:text-white text-xs font-bold rounded transition-colors border border-red-900">
-                                            Rejeitar
+                                        <button
+                                            onClick={() => handleRespondProposal(prop.id, 'reject')}
+                                            disabled={loading}
+                                            className="px-3 py-1 bg-red-600/20 hover:bg-red-600 text-red-200 hover:text-white text-xs font-bold rounded transition-colors border border-red-900 disabled:opacity-50"
+                                        >
+                                            {loading ? "..." : "Rejeitar"}
                                         </button>
                                     </div>
                                 </div>
@@ -325,7 +358,6 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
 
     return (
         <div className="flex h-full bg-slate-950 text-white overflow-hidden">
-            {/* Modal de Configuração */}
             {configuringSlot !== null && (
                 <ScoutingConfigModal
                     slotNumber={configuringSlot}

@@ -82,7 +82,7 @@ export class NarrativeService extends BaseService {
       "generateDailyEvent",
       { teamId, currentDate },
       async () => {
-        const EVENT_CHANCE = 20;
+        const EVENT_CHANCE = 0.05;
 
         if (!RandomEngine.chance(EVENT_CHANCE)) {
           return null;
