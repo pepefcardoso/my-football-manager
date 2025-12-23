@@ -1,0 +1,1 @@
+ALTER TABLE `teams` ADD `scouting_slots` text DEFAULT '[]' NOT NULL;

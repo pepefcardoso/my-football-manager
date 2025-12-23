@@ -57,6 +57,13 @@
       "when": 1766429599963,
       "tag": "0007_wonderful_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1766497105182,
+      "tag": "0008_wise_princess_powerful",
+      "breakpoints": true
     }
   ]
 }
