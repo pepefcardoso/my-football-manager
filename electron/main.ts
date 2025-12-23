@@ -36,6 +36,12 @@ if (!existsSync(SAVES_DIR)) {
 
 const gameEngine = new GameEngine(repositoryContainer, db);
 
+export function notifyBudgetUpdate(win: BrowserWindow, teamId: number, newBudget: number) {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send("team:budgetUpdated", { teamId, newBudget });
+  }
+}
+
 function setupTransferNotifications(win: BrowserWindow) {
   serviceContainer.eventBus.subscribe(
     GameEventType.PROPOSAL_RECEIVED,
@@ -702,19 +708,12 @@ function registerIpcHandlers() {
     }
   );
 
-  // No electron/main.ts
-
-  // ... (handlers anteriores, ex: contract)
-
-  // --- INFRASTRUCTURE HANDLERS ATUALIZADOS ---
-
   ipcMain.handle("infrastructure:getStatus", async (_, teamId: number) => {
     const result =
       await serviceContainer.infrastructure.getInfrastructureStatus(teamId);
     return Result.unwrapOr(result, null);
   });
 
-  // Substitui expandStadium e upgradeFacility por um método unificado
   ipcMain.handle(
     "infrastructure:startUpgrade",
     async (_, { teamId, facilityType, amount }) => {
@@ -722,7 +721,7 @@ function registerIpcHandlers() {
         const result = await serviceContainer.infrastructure.startUpgrade(
           teamId,
           facilityType,
-          amount || 1 // Default para 1 se não for passado
+          amount || 1
         );
 
         if (Result.isSuccess(result)) {
@@ -861,13 +860,27 @@ function registerIpcHandlers() {
 
   ipcMain.handle("transfer:finalizeTransfer", async (_, proposalId: number) => {
     const result = await serviceContainer.transfer.finalizeTransfer(proposalId);
+
     if (Result.isSuccess(result)) {
-      return {
-        success: true,
-        message: result.message || "Transferência finalizada.",
-      };
+      const proposal = await repositoryContainer.transferProposals.findById(
+        proposalId
+      );
+      if (proposal && proposal.toTeamId) {
+        const updatedTeam = await repositoryContainer.teams.findById(
+          proposal.toTeamId
+        );
+
+        if (win && updatedTeam) {
+          notifyBudgetUpdate(win, updatedTeam.id, updatedTeam.budget);
+        }
+
+        return {
+          success: true,
+          message: result.message || "Transferência finalizada.",
+          updatedBudget: updatedTeam?.budget || 0,
+        };
+      }
     }
-    return { success: false, message: result.error.message };
   });
 
   ipcMain.handle(
@@ -885,6 +898,113 @@ function registerIpcHandlers() {
   ipcMain.handle("transfer:getIncomingOffers", async (_, teamId) => {
     const result = await serviceContainer.transfer.getIncomingOffers(teamId);
     return Result.unwrapOr(result, []);
+  });
+
+  ipcMain.handle(
+    "transfer:estimatePlayerValue",
+    async (_, { playerId, teamId }) => {
+      try {
+        const marketValueResult =
+          await serviceContainer.valuationService.calculatePlayerMarketValue(
+            playerId
+          );
+
+        const salaryResult =
+          await serviceContainer.valuationService.calculatePlayerSalary(
+            playerId,
+            teamId,
+            false
+          );
+
+        return {
+          success: true,
+          marketValue: Result.unwrapOr(marketValueResult, 0),
+          suggestedWage: Result.isSuccess(salaryResult)
+            ? salaryResult.data.grossAnnualSalary
+            : 0,
+        };
+      } catch (error) {
+        logger.error("Erro ao estimar valor do jogador:", error);
+        return { success: false, marketValue: 0, suggestedWage: 0 };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "finance:canAffordTransfer",
+    async (_, { teamId, fee, wageOffer }) => {
+      try {
+        const team = await repositoryContainer.teams.findById(teamId);
+
+        if (!team) {
+          return {
+            canAfford: false,
+            reason: "Time não encontrado",
+          };
+        }
+
+        const currentBudget = team.budget || 0;
+
+        if (currentBudget < fee) {
+          return {
+            canAfford: false,
+            reason: `Orçamento insuficiente. Disponível: €${currentBudget.toLocaleString()}, Necessário: €${fee.toLocaleString()}`,
+            availableBudget: currentBudget,
+          };
+        }
+
+        const wageBillResult =
+          await serviceContainer.contract.calculateMonthlyWageBill(teamId);
+
+        if (Result.isSuccess(wageBillResult)) {
+          const monthlyWage = wageOffer / 12;
+          const maxWages = currentBudget * 0.3;
+          const currentWages = wageBillResult.data.total;
+
+          if (currentWages + monthlyWage > maxWages) {
+            return {
+              canAfford: false,
+              reason: `Folha salarial excederia o limite (${(
+                ((currentWages + monthlyWage) / maxWages) *
+                100
+              ).toFixed(0)}%)`,
+              availableBudget: currentBudget,
+            };
+          }
+        }
+
+        return {
+          canAfford: true,
+          reason: "Orçamento suficiente",
+          availableBudget: currentBudget,
+        };
+      } catch (error) {
+        logger.error("Erro ao verificar orçamento:", error);
+        return { canAfford: false, reason: "Erro interno" };
+      }
+    }
+  );
+
+  ipcMain.handle("scouting:getScoutedPlayersBatch", async (_, { teamId }) => {
+    try {
+      const scoutingList = await repositoryContainer.scouting.findByTeam(
+        teamId
+      );
+
+      const viewsPromises = scoutingList.map(async (report) => {
+        const result = await serviceContainer.scouting.getScoutedPlayer(
+          report.playerId!,
+          teamId
+        );
+        return Result.isSuccess(result) ? result.data : null;
+      });
+
+      const views = await Promise.all(viewsPromises);
+      return views.filter((v) => v !== null);
+    } catch (error) {
+      logger.error("Erro ao buscar jogadores scoutados em lote:", error);
+      return [];
+    }
   });
 
   ipcMain.handle("marketing:getFanSatisfaction", async (_, teamId: number) => {

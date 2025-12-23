@@ -3,6 +3,15 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("electronAPI", {
   team: {
     getTeams: () => ipcRenderer.invoke("team:getTeams"),
+    onBudgetUpdate: (
+      callback: (data: { teamId: number; newBudget: number }) => void
+    ) => {
+      const subscription = (_: any, data: any) => callback(data);
+      ipcRenderer.on("team:budgetUpdated", subscription);
+      return () => {
+        ipcRenderer.off("team:budgetUpdated", subscription);
+      };
+    },
   },
 
   player: {
@@ -202,6 +211,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
         leaguePosition,
         homeMatches,
       }),
+    canAffordTransfer: (teamId: number, fee: number, wageOffer: number) =>
+      ipcRenderer.invoke("finance:canAffordTransfer", {
+        teamId,
+        fee,
+        wageOffer,
+      }),
   },
 
   contract: {
@@ -255,6 +270,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("scouting:getSlots", teamId),
     updateSlots: (teamId: number, slots: any[]) =>
       ipcRenderer.invoke("scouting:updateSlots", { teamId, slots }),
+    getScoutedPlayersBatch: (teamId: number) =>
+      ipcRenderer.invoke("scouting:getScoutedPlayersBatch", { teamId }),
   },
 
   transfer: {
@@ -270,6 +287,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("transfer:finalizeTransfer", proposalId),
     getTransferWindowStatus: (date: string) =>
       ipcRenderer.invoke("transfer:getTransferWindowStatus", date),
+    getTransferHistory: (teamId: number) =>
+      ipcRenderer.invoke("transfer:getTransferHistory", teamId),
+    getMyBids: (teamId: number) =>
+      ipcRenderer.invoke("transfer:getMyBids", teamId),
+    getIncomingOffers: (teamId: number) =>
+      ipcRenderer.invoke("transfer:getIncomingOffers", teamId),
+    estimatePlayerValue: (playerId: number, teamId: number) =>
+      ipcRenderer.invoke("transfer:estimatePlayerValue", { playerId, teamId }),
     onNotification: (callback: (data: any) => void) => {
       const subscription = (_: any, data: any) => callback(data);
       ipcRenderer.on("transfer:notification", subscription);
@@ -277,12 +302,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
         ipcRenderer.off("transfer:notification", subscription);
       };
     },
-    getTransferHistory: (teamId: number) =>
-      ipcRenderer.invoke("transfer:getTransferHistory", teamId),
-    getMyBids: (teamId: number) =>
-      ipcRenderer.invoke("transfer:getMyBids", teamId),
-    getIncomingOffers: (teamId: number) =>
-      ipcRenderer.invoke("transfer:getIncomingOffers", teamId),
   },
 
   marketing: {

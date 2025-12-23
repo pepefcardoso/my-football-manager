@@ -121,11 +121,31 @@ interface TransferNotificationPayload {
   details: any;
 }
 
+interface PlayerValueEstimate {
+  success: boolean;
+  marketValue: number;
+  suggestedWage: number;
+}
+
+interface TransferAffordabilityCheck {
+  canAfford: boolean;
+  reason: string;
+  availableBudget?: number;
+}
+
+interface BudgetUpdatePayload {
+  teamId: number;
+  newBudget: number;
+}
+
 declare global {
   interface Window {
     electronAPI: {
       team: {
         getTeams: () => Promise<Team[]>;
+        onBudgetUpdate: (
+          callback: (data: BudgetUpdatePayload) => void
+        ) => () => void;
       };
 
       player: {
@@ -309,6 +329,12 @@ declare global {
           newWage: number,
           newEndDate: string
         ) => Promise<boolean>;
+
+        canAffordTransfer: (
+          teamId: number,
+          fee: number,
+          wageOffer: number
+        ) => Promise<TransferAffordabilityCheck>;
       };
 
       infrastructure: {
@@ -338,6 +364,9 @@ declare global {
           teamId: number,
           slots: ScoutingSlot[]
         ) => Promise<boolean>;
+        getScoutedPlayersBatch: (data: {
+          teamId: number;
+        }) => Promise<Array<ScoutedPlayerView & { teamName?: string }>>;
       };
 
       transfer: {
@@ -363,6 +392,14 @@ declare global {
         ) => Promise<TransferHistoryRecord[]>;
         getMyBids: (teamId: number) => Promise<TransferProposalData[]>;
         getIncomingOffers: (teamId: number) => Promise<TransferProposalData[]>;
+        estimatePlayerValue: (
+          playerId: number,
+          teamId: number
+        ) => Promise<PlayerValueEstimate>;
+
+        onNotification: (
+          callback: (data: TransferNotificationPayload) => void
+        ) => () => void;
       };
 
       marketing: {

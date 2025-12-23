@@ -154,7 +154,7 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
             }
 
             const teamsData = await window.electronAPI.team.getTeams();
-            let myTeam = teamsData.find(t => t.id === teamId) || null;
+            let myTeam = teamsData.find((t) => t.id === teamId) || null;
 
             const slots = await window.electronAPI.scouting.getSlots(teamId);
 
@@ -166,13 +166,15 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
 
             await fetchProposals(teamId);
 
-            const scoutingList = await window.electronAPI.scouting.getScoutingList(teamId);
-            const viewPromises = scoutingList.map(async (report) => {
-                return await window.electronAPI.scouting.getScoutedPlayer(report.playerId, teamId);
+            const scoutedPlayers = await window.electronAPI.scouting.getScoutedPlayersBatch({
+                teamId,
             });
-            const views = await Promise.all(viewPromises);
-            setSearchResults(views.filter(v => v !== null));
 
+            setSearchResults(scoutedPlayers);
+
+            logger.info(
+                `Dados carregados: ${scoutedPlayers.length} jogadores scoutados encontrados`
+            );
         } catch (error) {
             logger.error("Erro ao carregar dados do Hub:", error);
         } finally {

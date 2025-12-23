@@ -82,8 +82,7 @@ export class ValuationService extends BaseService {
 
         const performanceBonusPotential =
           this.calculatePerformanceBonusPotential(
-            player.position as PlayerPosition,
-            grossAnnualSalary
+            player.position as PlayerPosition
           );
 
         return {
@@ -142,7 +141,6 @@ export class ValuationService extends BaseService {
 
   private calculatePerformanceBonusPotential(
     position: PlayerPosition,
-    annualSalary: number
   ): number {
     const bonuses = FinancialBalance.CONTRACT_ECONOMICS.PERFORMANCE_BONUSES;
     let potential = 0;
@@ -216,5 +214,29 @@ export class ValuationService extends BaseService {
         };
       }
     );
+  }
+
+  async calculatePlayerMarketValue(
+    playerId: number
+  ): Promise<ServiceResult<number>> {
+    return this.execute(
+      "calculatePlayerMarketValue",
+      playerId,
+      async (playerId) => {
+        const player = await this.repos.players.findById(playerId);
+        if (!player) {
+          throw new Error(`Player ${playerId} not found`);
+        }
+
+        const marketValue = TransferValuation.calculateMarketValue(player);
+
+        return marketValue;
+      }
+    );
+  }
+
+  static calculateSuggestedWage(player: any): number {
+    const marketValue = TransferValuation.calculateMarketValue(player);
+    return Math.round(marketValue * 0.1);
   }
 }

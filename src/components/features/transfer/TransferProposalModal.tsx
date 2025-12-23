@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { Player } from "../../../domain/models";
 import { TransferType } from "../../../domain/enums";
 import { formatCurrency } from "../../../utils/formatters";
@@ -7,110 +7,111 @@ import Badge from "../../common/Badge";
 
 const logger = new Logger("TransferProposalModal");
 
-interface PlayerOrScoutedView extends Player {
-    salary: number | undefined;
-    contractEnd: string | null | undefined;
-    visibleAttributes?: Record<string, { value: number | string; isExact: boolean; min?: number; max?: number }>;
-}
-
 interface TransferProposalModalProps {
-    player: PlayerOrScoutedView;
+    player: Player | any;
     proposingTeamId: number;
-    proposingTeamBudget: number;
     onClose: () => void;
     onProposalSent: () => void;
     currentDate: string;
     seasonId: number;
 }
 
-const HEURISTICS = {
-    estimateMarketValue: (overall: number | string) => {
-        const ovr = typeof overall === 'number' ? overall : parseInt(String(overall).split('-')[0]) || 60;
-        return Math.round(ovr ** 3 / 50 * 1000);
-    },
-    estimateSuggestedWage: (marketValue: number) => Math.round(marketValue * 0.1),
-    FEE_MAX_MULTIPLIER: 3.0,
-    WAGE_MAX_MULTIPLIER: 2.0,
-    FEE_STEP: 50000,
-    WAGE_STEP: 10000,
-    MAX_CONTRACT_YEARS: 5,
-};
-
 export function TransferProposalModal({
     player,
     proposingTeamId,
-    proposingTeamBudget,
     onClose,
     onProposalSent,
     currentDate,
     seasonId,
 }: TransferProposalModalProps) {
-    const safeOverall = useMemo(() => {
-        if (player.visibleAttributes?.overall) {
-            const attr = player.visibleAttributes.overall;
-            if (attr.isExact) return Number(attr.value);
-            if (attr.min && attr.max) return Math.round((attr.min + attr.max) / 2);
-        }
-        return player.overall;
-    }, [player]);
-
-    const marketValue = useMemo(() => HEURISTICS.estimateMarketValue(safeOverall), [safeOverall]);
-    const suggestedWage = useMemo(() => HEURISTICS.estimateSuggestedWage(marketValue), [marketValue]);
-
-    const feeMax = useMemo(() => Math.max(marketValue * HEURISTICS.FEE_MAX_MULTIPLIER, 1000000), [marketValue]);
-    const wageMax = useMemo(() => Math.max(suggestedWage * HEURISTICS.WAGE_MAX_MULTIPLIER, 50000), [suggestedWage]);
-
-    const [fee, setFee] = useState(marketValue);
-    const [wageOffer, setWageOffer] = useState(suggestedWage);
+    const [isLoadingEstimate, setIsLoadingEstimate] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [marketValue, setMarketValue] = useState(0);
+    const [suggestedWage, setSuggestedWage] = useState(0);
+    const [canAfford, setCanAfford] = useState(true);
+    const [fee, setFee] = useState(0);
+    const [wageOffer, setWageOffer] = useState(0);
     const [contractLength, setContractLength] = useState(3);
     const [transferType, setTransferType] = useState<TransferType>(TransferType.TRANSFER);
-    const [error, setError] = useState<string | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const isOverBudget = fee > proposingTeamBudget;
     const isFreeAgent = player.teamId === null;
+    const isMasked = player.visibleAttributes && !player.visibleAttributes.overall?.isExact;
 
     useEffect(() => {
-        if (isOverBudget && !isFreeAgent) {
-            setError("Orçamento insuficiente para cobrir o valor da transferência (estimado).");
-        } else {
-            setError(null);
+        async function loadEstimates() {
+            try {
+                setIsLoadingEstimate(true);
+
+                const estimate = await window.electronAPI.transfer.estimatePlayerValue(
+                    player.id,
+                    proposingTeamId
+                );
+
+                if (estimate.success) {
+                    setMarketValue(estimate.marketValue);
+                    setSuggestedWage(estimate.suggestedWage);
+
+                    if (isFreeAgent) {
+                        setFee(0);
+                        setTransferType(TransferType.FREE);
+                    } else {
+                        setFee(estimate.marketValue);
+                        setTransferType(TransferType.TRANSFER);
+                    }
+
+                    setWageOffer(estimate.suggestedWage);
+                }
+            } catch (err) {
+                logger.error("Erro ao carregar estimativas:", err);
+                setError("Não foi possível calcular o valor do jogador.");
+            } finally {
+                setIsLoadingEstimate(false);
+            }
         }
-    }, [isOverBudget, isFreeAgent]);
+
+        loadEstimates();
+    }, [player.id, proposingTeamId, isFreeAgent]);
 
     useEffect(() => {
-        if (isFreeAgent) {
-            setFee(0);
-            setTransferType(TransferType.FREE);
-        } else {
-            setTransferType(TransferType.TRANSFER);
+        async function validateBudget() {
+            if (isLoadingEstimate || isFreeAgent) {
+                setCanAfford(true);
+                setError(null);
+                return;
+            }
+
+            try {
+                const result = await window.electronAPI.finance.canAffordTransfer(
+                    proposingTeamId,
+                    fee,
+                    wageOffer
+                );
+
+                setCanAfford(result.canAfford);
+
+                if (!result.canAfford) {
+                    setError(result.reason);
+                } else {
+                    setError(null);
+                }
+            } catch (err) {
+                logger.error("Erro ao validar orçamento:", err);
+                setError("Erro ao validar orçamento.");
+            }
         }
-    }, [isFreeAgent]);
+
+        const timeoutId = setTimeout(validateBudget, 300);
+        return () => clearTimeout(timeoutId);
+    }, [fee, wageOffer, proposingTeamId, isLoadingEstimate, isFreeAgent]);
 
     const handleCreateProposal = useCallback(async () => {
-        if (isSubmitting || error) return;
+        if (isSubmitting || !canAfford || isLoadingEstimate) return;
 
         setIsSubmitting(true);
         setError(null);
 
         try {
-            const teams = await window.electronAPI.team.getTeams();
-            const myTeam = teams.find(t => t.id === proposingTeamId);
-
-            if (!myTeam) {
-                setError("Erro ao identificar seu time.");
-                setIsSubmitting(false);
-                return;
-            }
-
-            const freshBudget = myTeam.budget || 0;
-
-            if (fee > freshBudget && !isFreeAgent) {
-                setError(`Orçamento insuficiente atualizado. Disponível: €${freshBudget.toLocaleString()}`);
-                setIsSubmitting(false);
-                return;
-            }
-
             const proposalData = {
                 playerId: player.id,
                 fromTeamId: isFreeAgent ? proposingTeamId : player.teamId,
@@ -141,35 +142,38 @@ export function TransferProposalModal({
         }
     }, [
         isSubmitting,
-        error,
-        player.id,
-        player.teamId,
+        canAfford,
+        isLoadingEstimate,
+        player,
         proposingTeamId,
         transferType,
         fee,
         wageOffer,
         contractLength,
         currentDate,
+        seasonId,
+        isFreeAgent,
         onClose,
         onProposalSent,
-        isFreeAgent,
-        seasonId,
     ]);
 
     const displayOverall = player.visibleAttributes?.overall?.value || player.overall;
-    const isMasked = player.visibleAttributes && !player.visibleAttributes.overall.isExact;
+
+    const feeMax = Math.max(marketValue * 3, 1000000);
+    const wageMax = Math.max(suggestedWage * 2, 50000);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-2xl w-full shadow-2xl animate-in fade-in zoom-in duration-300">
-
                 <div className="p-6 border-b border-slate-800 bg-slate-950/50 flex justify-between items-start">
                     <div>
                         <h3 className="text-2xl font-bold text-white">
                             Proposta por {player.firstName} {player.lastName}
                         </h3>
                         <p className="text-sm text-slate-400 mt-1 flex items-center gap-2">
-                            <span className="bg-slate-800 px-1.5 rounded text-white font-bold">OVR {displayOverall}</span>
+                            <span className="bg-slate-800 px-1.5 rounded text-white font-bold">
+                                OVR {displayOverall}
+                            </span>
                             <span>|</span>
                             <span>{player.position}</span>
                             <span>|</span>
@@ -178,14 +182,28 @@ export function TransferProposalModal({
                     </div>
                     <div>
                         <p className="text-xs text-slate-500 mb-1">Valor Estimado</p>
-                        <Badge variant="neutral">
-                            {isMasked ? "~ " : ""}{formatCurrency(marketValue)}
-                        </Badge>
+                        {isLoadingEstimate ? (
+                            <div className="animate-pulse bg-slate-700 h-6 w-24 rounded"></div>
+                        ) : (
+                            <Badge variant="neutral">
+                                {isMasked ? "~ " : ""}
+                                {formatCurrency(marketValue)}
+                            </Badge>
+                        )}
                     </div>
                 </div>
 
                 <div className="p-6 space-y-6">
-                    {isMasked && (
+                    {isLoadingEstimate && (
+                        <div className="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/30 rounded">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                            <span className="text-blue-400 text-sm">
+                                Calculando valor de mercado...
+                            </span>
+                        </div>
+                    )}
+
+                    {isMasked && !isLoadingEstimate && (
                         <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 text-xs flex gap-2 items-center">
                             <span>⚠️</span>
                             <p>
@@ -201,72 +219,74 @@ export function TransferProposalModal({
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
-                                Valor da Transferência (Fee)
-                                <Badge variant={isOverBudget ? 'danger' : 'success'}>
-                                    {formatCurrency(fee)}
-                                </Badge>
-                            </label>
-                            <input
-                                type="range"
-                                min={0}
-                                max={feeMax}
-                                step={HEURISTICS.FEE_STEP}
-                                value={fee}
-                                disabled={isFreeAgent}
-                                onChange={(e) => setFee(Number(e.target.value))}
-                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                        </div>
+                    {!isLoadingEstimate && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
+                                    Valor da Transferência (Fee)
+                                    <Badge variant={!canAfford && !isFreeAgent ? "danger" : "success"}>
+                                        {formatCurrency(fee)}
+                                    </Badge>
+                                </label>
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={feeMax}
+                                    step={50000}
+                                    value={fee}
+                                    disabled={isFreeAgent}
+                                    onChange={(e) => setFee(Number(e.target.value))}
+                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                            </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
-                                Salário Anual Oferecido
-                                <Badge variant="info">{formatCurrency(wageOffer)}</Badge>
-                            </label>
-                            <input
-                                type="range"
-                                min={HEURISTICS.WAGE_STEP}
-                                max={wageMax}
-                                step={HEURISTICS.WAGE_STEP}
-                                value={wageOffer}
-                                onChange={(e) => setWageOffer(Number(e.target.value))}
-                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                        </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
+                                    Salário Anual Oferecido
+                                    <Badge variant="info">{formatCurrency(wageOffer)}</Badge>
+                                </label>
+                                <input
+                                    type="range"
+                                    min={10000}
+                                    max={wageMax}
+                                    step={10000}
+                                    value={wageOffer}
+                                    onChange={(e) => setWageOffer(Number(e.target.value))}
+                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                            </div>
 
-                        <div className="space-y-2 col-span-2 md:col-span-1">
-                            <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
-                                Duração do Contrato
-                                <Badge variant="neutral">{contractLength} Anos</Badge>
-                            </label>
-                            <input
-                                type="range"
-                                min={1}
-                                max={HEURISTICS.MAX_CONTRACT_YEARS}
-                                step={1}
-                                value={contractLength}
-                                onChange={(e) => setContractLength(Number(e.target.value))}
-                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
+                            <div className="space-y-2 col-span-2 md:col-span-1">
+                                <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
+                                    Duração do Contrato
+                                    <Badge variant="neutral">{contractLength} Anos</Badge>
+                                </label>
+                                <input
+                                    type="range"
+                                    min={1}
+                                    max={5}
+                                    step={1}
+                                    value={contractLength}
+                                    onChange={(e) => setContractLength(Number(e.target.value))}
+                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 <div className="p-6 bg-slate-950/50 border-t border-slate-800 flex justify-end gap-3">
                     <button
                         onClick={onClose}
                         disabled={isSubmitting}
-                        className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                        className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleCreateProposal}
-                        disabled={(isOverBudget && !isFreeAgent) || isSubmitting || !!error}
-                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all disabled:opacity-50"
+                        disabled={!canAfford || isSubmitting || isLoadingEstimate || !!error}
+                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? "Enviando..." : "Enviar Proposta"}
                     </button>

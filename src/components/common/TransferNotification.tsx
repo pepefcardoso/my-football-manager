@@ -16,7 +16,6 @@ interface Notification {
     type: "PROPOSAL_RECEIVED" | "TRANSFER_COMPLETED";
     message: string;
     isNew: boolean;
-    timeout?: NodeJS.Timeout;
 }
 
 const getNotificationStyle = (type: Notification["type"]) => {
@@ -33,57 +32,80 @@ const getNotificationStyle = (type: Notification["type"]) => {
 export function TransferNotification() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const userTeam = useGameStore((state) => state.userTeam);
-
-    const timeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
+    const timeoutsRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
     const removeNotification = useCallback((id: number) => {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
+
+        const timeout = timeoutsRef.current.get(id);
+        if (timeout) {
+            clearTimeout(timeout);
+            timeoutsRef.current.delete(id);
+        }
     }, []);
 
-    const addNotification = useCallback(
-        (data: TransferNotificationPayload) => {
-            if (!userTeam) return;
+    const addNotification = useCallback((data: TransferNotificationPayload) => {
+        const newId = Date.now() + Math.random();
 
-            const newId = Date.now() + Math.random();
+        const timeout = setTimeout(() => {
+            setNotifications((prev) => prev.filter((n) => n.id !== newId));
+            timeoutsRef.current.delete(newId);
+        }, 8000);
 
-            const timeout = setTimeout(() => {
-                removeNotification(newId);
-                timeoutsRef.current.delete(timeout);
-            }, 8000);
+        timeoutsRef.current.set(newId, timeout);
 
-            timeoutsRef.current.add(timeout);
+        const newNotification: Notification = {
+            id: newId,
+            type: data.type,
+            message: data.message,
+            isNew: true,
+        };
 
-            const newNotification: Notification = {
-                id: newId,
-                type: data.type,
-                message: data.message,
-                isNew: true,
-                timeout: timeout,
-            };
+        logger.info(`Nova notificação recebida: ${data.message}`);
 
-            logger.info(`Nova notificação recebida: ${data.message}`);
-            setNotifications((prev) => [newNotification, ...prev].slice(0, 5));
-        },
-        [userTeam, removeNotification]
-    );
+        setNotifications((prev) => [newNotification, ...prev].slice(0, 5));
+    }, []);
 
     useEffect(() => {
         if (!userTeam) return;
 
-        const removeListener = window.electronAPI.transfer.onNotification((data) => {
-            addNotification(data);
-        });
-
-        const activeTimeouts = timeoutsRef.current;
+        const removeListener = window.electronAPI.transfer.onNotification(
+            (data: TransferNotificationPayload) => {
+                addNotification(data);
+            }
+        );
 
         return () => {
-            if (typeof removeListener === 'function') {
+            if (typeof removeListener === "function") {
                 removeListener();
             }
-            activeTimeouts.forEach(clearTimeout);
-            activeTimeouts.clear();
+
+            timeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+            timeoutsRef.current.clear();
         };
     }, [userTeam, addNotification]);
+
+    useEffect(() => {
+        if (!userTeam) return;
+
+        const cleanup = window.electronAPI.team.onBudgetUpdate(
+            (data: { teamId: number; newBudget: number }) => {
+                if (data.teamId === userTeam.id) {
+                    const currentTeam = useGameStore.getState().userTeam;
+                    if (currentTeam) {
+                        useGameStore.getState().updateUserTeam({
+                            ...currentTeam,
+                            budget: data.newBudget,
+                        });
+                    }
+
+                    logger.info(`Orçamento atualizado: €${data.newBudget.toLocaleString()}`);
+                }
+            }
+        );
+
+        return cleanup;
+    }, [userTeam]);
 
     if (notifications.length === 0) {
         return null;
@@ -99,7 +121,7 @@ export function TransferNotification() {
             transition-all duration-500 ease-in-out
             transform translate-x-0 opacity-100
             ${getNotificationStyle(notif.type)}
-            ${notif.isNew ? 'animate-in fade-in slide-in-from-right-10' : ''}
+            ${notif.isNew ? "animate-in fade-in slide-in-from-right-10" : ""}
           `}
                 >
                     <div className="flex items-start gap-3">
@@ -107,7 +129,9 @@ export function TransferNotification() {
                             {notif.type === "PROPOSAL_RECEIVED" ? "📥" : "✅"}
                         </span>
                         <div className="flex-1">
-                            <p className="font-bold text-white text-sm leading-snug">{notif.message}</p>
+                            <p className="font-bold text-white text-sm leading-snug">
+                                {notif.message}
+                            </p>
                             <Badge variant="neutral" className="mt-1 text-xs">
                                 Transferências
                             </Badge>
@@ -117,7 +141,20 @@ export function TransferNotification() {
                             className="pointer-events-auto text-slate-400 hover:text-white transition-colors p-1 -mt-1 -mr-1 rounded-full hover:bg-black/10"
                             title="Fechar notificação"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M18 6 6 18" />
+                                <path d="m6 6 12 12" />
+                            </svg>
                         </button>
                     </div>
                 </div>
