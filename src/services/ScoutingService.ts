@@ -10,6 +10,7 @@ import {
   type MaskedAttribute,
 } from "../domain/factories/ReportFactory";
 import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
+import type { ScoutingSlot } from "../domain/models";
 
 const SCOUTING_CONFIG = getBalanceValue("SCOUTING");
 const PROGRESS_CONFIG = SCOUTING_CONFIG.PROGRESS;
@@ -193,5 +194,62 @@ export class ScoutingService extends BaseService {
 
       return Math.max(0, SCOUTING_CONFIG.BASE_UNCERTAINTY - reduction);
     });
+  }
+
+  async getScoutingSlots(
+    teamId: number
+  ): Promise<ServiceResult<ScoutingSlot[]>> {
+    return this.execute("getScoutingSlots", teamId, async (teamId) => {
+      const team = await this.repos.teams.findById(teamId);
+      if (!team) throw new Error("Time não encontrado.");
+
+      let slots = team.scoutingSlots || [];
+
+      if (slots.length === 0) {
+        slots = [
+          {
+            slotNumber: 1,
+            isActive: false,
+            filters: {},
+            stats: { playersFound: 0, lastRunDate: null },
+          },
+          {
+            slotNumber: 2,
+            isActive: false,
+            filters: {},
+            stats: { playersFound: 0, lastRunDate: null },
+          },
+          {
+            slotNumber: 3,
+            isActive: false,
+            filters: {},
+            stats: { playersFound: 0, lastRunDate: null },
+          },
+        ];
+        // Opcional: Salvar essa inicialização no banco imediatamente
+        // await this.updateScoutingSlots(teamId, slots);
+      }
+
+      return slots;
+    });
+  }
+
+  async updateScoutingSlots(
+    teamId: number,
+    slots: ScoutingSlot[]
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "updateScoutingSlots",
+      { teamId, slots },
+      async ({ teamId, slots }) => {
+        if (!Array.isArray(slots) || slots.length > 3) {
+          throw new Error("Configuração de slots inválida.");
+        }
+
+        await this.repos.teams.update(teamId, { scoutingSlots: slots });
+
+        this.logger.info(`Slots de scouting atualizados para o time ${teamId}`);
+      }
+    );
   }
 }

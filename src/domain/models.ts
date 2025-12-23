@@ -11,6 +11,22 @@ import type {
 } from "./enums";
 import type { ActiveConstruction } from "./types/InfrastructureTypes";
 
+export interface ScoutingSlot {
+  slotNumber: 1 | 2 | 3;
+  isActive: boolean;
+  filters: {
+    country?: string;
+    position?: string;
+    ageGroup?: "young" | "prime" | "veteran";
+    minOverall?: number;
+    contractStatus?: "any" | "free_agent";
+  };
+  stats: {
+    playersFound: number;
+    lastRunDate: string | null;
+  };
+}
+
 export interface Team {
   id: number;
   name: string;
@@ -35,6 +51,7 @@ export interface Team {
   transferBudget: number;
   transferStrategy: TransferStrategy | string;
   history: TeamAchievement[];
+  scoutingSlots: ScoutingSlot[];
   defaultFormation: Formation;
   defaultGameStyle: TacticsConfig["style"];
   defaultMarking: TacticsConfig["marking"];
