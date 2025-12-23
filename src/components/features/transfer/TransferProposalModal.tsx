@@ -71,12 +71,12 @@ export function TransferProposalModal({
     const isFreeAgent = player.teamId === null;
 
     useEffect(() => {
-        if (isOverBudget) {
-            setError("Orçamento insuficiente para cobrir o valor da transferência.");
+        if (isOverBudget && !isFreeAgent) {
+            setError("Orçamento insuficiente para cobrir o valor da transferência (estimado).");
         } else {
             setError(null);
         }
-    }, [isOverBudget]);
+    }, [isOverBudget, isFreeAgent]);
 
     useEffect(() => {
         if (isFreeAgent) {
@@ -88,12 +88,29 @@ export function TransferProposalModal({
     }, [isFreeAgent]);
 
     const handleCreateProposal = useCallback(async () => {
-        if (isOverBudget || isSubmitting || error) return;
+        if (isSubmitting || error) return;
 
         setIsSubmitting(true);
         setError(null);
 
         try {
+            const teams = await window.electronAPI.team.getTeams();
+            const myTeam = teams.find(t => t.id === proposingTeamId);
+
+            if (!myTeam) {
+                setError("Erro ao identificar seu time.");
+                setIsSubmitting(false);
+                return;
+            }
+
+            const freshBudget = myTeam.budget || 0;
+
+            if (fee > freshBudget && !isFreeAgent) {
+                setError(`Orçamento insuficiente atualizado. Disponível: €${freshBudget.toLocaleString()}`);
+                setIsSubmitting(false);
+                return;
+            }
+
             const proposalData = {
                 playerId: player.id,
                 fromTeamId: isFreeAgent ? proposingTeamId : player.teamId,
@@ -123,7 +140,6 @@ export function TransferProposalModal({
             setIsSubmitting(false);
         }
     }, [
-        isOverBudget,
         isSubmitting,
         error,
         player.id,
@@ -249,7 +265,7 @@ export function TransferProposalModal({
                     </button>
                     <button
                         onClick={handleCreateProposal}
-                        disabled={isOverBudget || isSubmitting || !!error}
+                        disabled={(isOverBudget && !isFreeAgent) || isSubmitting || !!error}
                         className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all disabled:opacity-50"
                     >
                         {isSubmitting ? "Enviando..." : "Enviar Proposta"}

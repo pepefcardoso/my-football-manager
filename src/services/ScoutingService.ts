@@ -10,7 +10,7 @@ import {
   type MaskedAttribute,
 } from "../domain/factories/ReportFactory";
 import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
-import type { ScoutingSlot } from "../domain/models";
+import type { ScoutingSlot, Team } from "../domain/models";
 
 const SCOUTING_CONFIG = getBalanceValue("SCOUTING");
 
@@ -36,15 +36,11 @@ export class ScoutingService extends BaseService {
 
         const potentialTargets = await (
           this.repos.players as any
-        ).findByCriteria(
-          slot.filters,
-          50 // TODO MAGICA NUMBER: Limite de candidatos retornados
-        );
+        ).findByCriteria(slot.filters, 50);
 
         if (potentialTargets.length === 0) return;
 
-        const discoveryChance = 10 + efficiency / 10; // TODO MAGICA NUMBER: Chance base + bônus por eficiência
-
+        const discoveryChance = 10 + efficiency / 10;
         let newPlayersFound = 0;
 
         for (const player of potentialTargets) {
@@ -85,8 +81,11 @@ export class ScoutingService extends BaseService {
 
         if (newPlayersFound > 0) {
           const team = await this.repos.teams.findById(teamId);
+
           if (team && team.scoutingSlots) {
-            const updatedSlots = team.scoutingSlots.map((s) => {
+            const currentSlots = team.scoutingSlots;
+
+            const updatedSlots = currentSlots.map((s) => {
               if (s.slotNumber === slot.slotNumber) {
                 return {
                   ...s,
@@ -102,6 +101,7 @@ export class ScoutingService extends BaseService {
             await this.repos.teams.update(teamId, {
               scoutingSlots: updatedSlots,
             });
+
             this.logger.info(
               `Slot ${slot.slotNumber} encontrou ${newPlayersFound} novos jogadores.`
             );

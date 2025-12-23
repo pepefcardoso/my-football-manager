@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Logger } from "../../lib/Logger";
 import { useGameStore } from "../../store/useGameStore";
 import Badge from "./Badge";
@@ -30,34 +30,16 @@ const getNotificationStyle = (type: Notification["type"]) => {
     }
 };
 
-/**
- * @component TransferNotification
- * @description Componente global para exibir notificações em formato Toast
- * sobre eventos de transferência (propostas recebidas, transferências finalizadas).
- * Ele se inscreve em um canal IPC específico (`transfer:notification`) para receber eventos do main process.
- */
 export function TransferNotification() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const userTeam = useGameStore((state) => state.userTeam);
 
-    /**
-     * @function removeNotification
-     * @description Remove uma notificação da lista e limpa o timeout associado.
-     * @param id ID da notificação a ser removida.
-     */
+    const timeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
+
     const removeNotification = useCallback((id: number) => {
-        setNotifications((prev) => {
-            const target = prev.find(n => n.id === id);
-            if (target?.timeout) clearTimeout(target.timeout);
-            return prev.filter((n) => n.id !== id);
-        });
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
     }, []);
 
-    /**
-     * @function addNotification
-     * @description Adiciona uma nova notificação e define um timeout para remoção automática.
-     * @param data Dados da notificação recebida pelo IPC.
-     */
     const addNotification = useCallback(
         (data: TransferNotificationPayload) => {
             if (!userTeam) return;
@@ -66,7 +48,10 @@ export function TransferNotification() {
 
             const timeout = setTimeout(() => {
                 removeNotification(newId);
+                timeoutsRef.current.delete(timeout);
             }, 8000);
+
+            timeoutsRef.current.add(timeout);
 
             const newNotification: Notification = {
                 id: newId,
@@ -77,7 +62,6 @@ export function TransferNotification() {
             };
 
             logger.info(`Nova notificação: ${data.message}`, data);
-
             setNotifications((prev) => [newNotification, ...prev].slice(0, 5));
         },
         [userTeam, removeNotification]
@@ -86,12 +70,17 @@ export function TransferNotification() {
     useEffect(() => {
         if (!userTeam) return;
 
-        window.electronAPI.transfer.onNotification(addNotification);
+        const handleNotification = (data: TransferNotificationPayload) => addNotification(data);
+
+        window.electronAPI.transfer.onNotification(handleNotification);
+
+        const activeTimeouts = timeoutsRef.current;
 
         return () => {
-            notifications.forEach(n => n.timeout && clearTimeout(n.timeout));
+            activeTimeouts.forEach(clearTimeout);
+            activeTimeouts.clear();
         };
-    }, [userTeam, addNotification, notifications]);
+    }, [userTeam, addNotification]);
 
     if (notifications.length === 0) {
         return null;

@@ -4,6 +4,7 @@ import {
   integer,
   real,
   index,
+  unique,
 } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 import type { ScoutingSlot, TeamAchievement } from "../domain/models";
@@ -304,18 +305,27 @@ export const transfers = sqliteTable("transfers", {
   type: text("type").default("transfer").notNull(),
 });
 
-export const scoutingReports = sqliteTable("scouting_reports", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  playerId: integer("player_id").references(() => players.id),
-  scoutId: integer("scout_id").references(() => staff.id),
-  teamId: integer("team_id").references(() => teams.id),
-  date: text("date").notNull(),
-  progress: integer("progress").default(0).notNull(),
-  overallEstimate: integer("overall_estimate"),
-  potentialEstimate: integer("potential_estimate"),
-  notes: text("notes"),
-  recommendation: text("recommendation"),
-});
+export const scoutingReports = sqliteTable(
+  "scouting_reports",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    playerId: integer("player_id").references(() => players.id),
+    scoutId: integer("scout_id").references(() => staff.id),
+    teamId: integer("team_id").references(() => teams.id),
+    date: text("date").notNull(),
+    progress: integer("progress").default(0).notNull(),
+    overallEstimate: integer("overall_estimate"),
+    potentialEstimate: integer("potential_estimate"),
+    notes: text("notes"),
+    recommendation: text("recommendation"),
+  },
+  (table) => ({
+    uniquePlayerTeam: unique("unique_player_team_scouting").on(
+      table.playerId,
+      table.teamId
+    ),
+  })
+);
 
 export const financialRecords = sqliteTable("financial_records", {
   id: integer("id").primaryKey({ autoIncrement: true }),
