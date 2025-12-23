@@ -104,7 +104,8 @@ export class ServiceContainer implements IServiceContainer {
 
     this.dailySimulation = new DailySimulationService(
       repos,
-      this.playerDevelopment
+      this.playerDevelopment,
+      this.scouting
     );
     this.season = new SeasonService(repos);
     this.valuationService = new ValuationService(repos);

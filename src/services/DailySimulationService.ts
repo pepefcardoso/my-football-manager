@@ -8,6 +8,7 @@ import type { Player } from "../domain/models";
 import { TrainingFocus } from "../domain/enums";
 import type { TeamStaffImpact } from "../domain/types";
 import type { PlayerDevelopmentService } from "./PlayerDevelopmentService";
+import type { ScoutingService } from "./ScoutingService";
 import type {
   MedicalCenterBenefits,
   TrainingCenterBenefits,
@@ -44,13 +45,16 @@ export interface ProcessTeamDailyLoopInput {
 
 export class DailySimulationService extends BaseService {
   private developmentService: PlayerDevelopmentService;
+  private scoutingService: ScoutingService;
 
   constructor(
     repositories: IRepositoryContainer,
-    developmentService: PlayerDevelopmentService
+    developmentService: PlayerDevelopmentService,
+    scoutingService: ScoutingService
   ) {
     super(repositories, "DailySimulationService");
     this.developmentService = developmentService;
+    this.scoutingService = scoutingService;
   }
 
   async processTeamDailyLoop(
@@ -64,6 +68,24 @@ export class DailySimulationService extends BaseService {
       async ({ teamId, trainingFocus, staffImpact }) => {
         const team = await this.repos.teams.findById(teamId);
         if (!team) throw new Error("Time não encontrado");
+
+        if (team.isHuman && this.scoutingService) {
+          const gameState = await this.repos.gameState.findCurrent();
+          const currentDate =
+            gameState?.currentDate || new Date().toISOString();
+
+          if (team.scoutingSlots) {
+            for (const slot of team.scoutingSlots) {
+              if (slot.isActive) {
+                await this.scoutingService.executeSlotSearch(
+                  teamId,
+                  slot,
+                  currentDate
+                );
+              }
+            }
+          }
+        }
 
         const medicalLevel = team.medicalCenterQuality || 0;
         const medicalBenefits =

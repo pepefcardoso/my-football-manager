@@ -13,7 +13,6 @@ import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
 import type { ScoutingSlot } from "../domain/models";
 
 const SCOUTING_CONFIG = getBalanceValue("SCOUTING");
-const PROGRESS_CONFIG = SCOUTING_CONFIG.PROGRESS;
 
 export type { ScoutedPlayerView, MaskedAttribute };
 
@@ -22,11 +21,114 @@ export class ScoutingService extends BaseService {
     super(repositories, "ScoutingService");
   }
 
-  /**
-   * * @param playerId - O ID do jogador a ser visualizado.
-   * @param viewerTeamId - O ID do time que está visualizando.
-   * @returns Objeto ScoutedPlayerView com atributos mascarados ou null se jogador não existir.
-   */
+  async executeSlotSearch(
+    teamId: number,
+    slot: ScoutingSlot,
+    currentDate: string
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "executeSlotSearch",
+      { teamId, slotNumber: slot.slotNumber },
+      async () => {
+        if (!slot.isActive) return;
+
+        const efficiency = await this.calculateSearchEfficiency(teamId);
+
+        const potentialTargets = await (
+          this.repos.players as any
+        ).findByCriteria(
+          slot.filters,
+          50 // TODO MAGICA NUMBER: Limite de candidatos retornados
+        );
+
+        if (potentialTargets.length === 0) return;
+
+        const discoveryChance = 10 + efficiency / 10; // TODO MAGICA NUMBER: Chance base + bônus por eficiência
+
+        let newPlayersFound = 0;
+
+        for (const player of potentialTargets) {
+          const existingReport = await this.repos.scouting.findByPlayerAndTeam(
+            player.id,
+            teamId
+          );
+
+          if (existingReport) {
+            const progressGain =
+              RandomEngine.getInt(1, 3) + Math.round(efficiency / 20);
+            await this.repos.scouting.upsert({
+              ...existingReport,
+              date: currentDate,
+              progress: Math.min(
+                100,
+                (existingReport.progress || 0) + progressGain
+              ),
+            });
+            continue;
+          }
+
+          if (RandomEngine.chance(discoveryChance)) {
+            const initialProgress =
+              RandomEngine.getInt(10, 20) + Math.round(efficiency / 5);
+
+            await this.repos.scouting.upsert({
+              teamId,
+              playerId: player.id,
+              scoutId: null,
+              date: currentDate,
+              progress: Math.min(100, initialProgress),
+              notes: `Encontrado via Slot ${slot.slotNumber}`,
+            });
+            newPlayersFound++;
+          }
+        }
+
+        if (newPlayersFound > 0) {
+          const team = await this.repos.teams.findById(teamId);
+          if (team && team.scoutingSlots) {
+            const updatedSlots = team.scoutingSlots.map((s) => {
+              if (s.slotNumber === slot.slotNumber) {
+                return {
+                  ...s,
+                  stats: {
+                    playersFound: s.stats.playersFound + newPlayersFound,
+                    lastRunDate: currentDate,
+                  },
+                };
+              }
+              return s;
+            });
+
+            await this.repos.teams.update(teamId, {
+              scoutingSlots: updatedSlots,
+            });
+            this.logger.info(
+              `Slot ${slot.slotNumber} encontrou ${newPlayersFound} novos jogadores.`
+            );
+          }
+        }
+      }
+    );
+  }
+
+  private async calculateSearchEfficiency(teamId: number): Promise<number> {
+    const staff = await this.repos.staff.findByTeamId(teamId);
+    const scouts = staff.filter((s) => s.role === StaffRole.SCOUT);
+
+    if (scouts.length === 0) return 0;
+
+    const totalOverall = scouts.reduce((sum, s) => sum + s.overall, 0);
+    const avgOverall = totalOverall / scouts.length;
+
+    const team = await this.repos.teams.findById(teamId);
+    const adminLevel = team?.administrativeCenterQuality || 0;
+    const adminBonus =
+      InfrastructureEconomics.getAdminBenefits(adminLevel).scoutingEfficiency *
+      100;
+
+    return Math.round(avgOverall + adminBonus);
+  }
+
   async getScoutedPlayer(
     playerId: number,
     viewerTeamId: number
@@ -59,10 +161,6 @@ export class ScoutingService extends BaseService {
     );
   }
 
-  /**
-   * * @param teamId - O ID do time.
-   * @returns Lista de relatórios de scouting.
-   */
   async getScoutingList(teamId: number): Promise<ServiceResult<any[]>> {
     return this.execute("getScoutingList", teamId, async (teamId) => {
       this.logger.debug(`Buscando lista de observação para o time ${teamId}`);
@@ -70,12 +168,6 @@ export class ScoutingService extends BaseService {
     });
   }
 
-  /**
-   * * @param scoutId - O ID do olheiro (Staff).
-   * @param playerId - O ID do jogador alvo.
-   * @returns ServiceResult void.
-   * @throws Error se olheiro ou jogador não forem encontrados.
-   */
   async assignScoutToPlayer(
     scoutId: number,
     playerId: number
@@ -114,74 +206,10 @@ export class ScoutingService extends BaseService {
     );
   }
 
-  async processDailyScouting(
-    currentDate: string
-  ): Promise<ServiceResult<void>> {
-    return this.executeVoid(
-      "processDailyScouting",
-      currentDate,
-      async (currentDate) => {
-        this.logger.info(`Processando scouting diário para ${currentDate}`);
-
-        const activeReports = await this.repos.scouting.findActiveReports();
-        let updatesCount = 0;
-
-        const teamCache = new Map<number, number>();
-
-        for (const report of activeReports) {
-          if (!report.scoutId || (report.progress || 0) >= 100) continue;
-          if (!report.teamId) continue;
-
-          const scout = await this.repos.staff.findById(report.scoutId);
-          if (!scout) continue;
-
-          let adminQuality = teamCache.get(report.teamId);
-          if (adminQuality === undefined) {
-            const team = await this.repos.teams.findById(report.teamId);
-            adminQuality = team ? team.administrativeCenterQuality || 0 : 0;
-            teamCache.set(report.teamId, adminQuality);
-          }
-
-          const adminBenefits =
-            InfrastructureEconomics.getAdminBenefits(adminQuality);
-          const adminBonusMultiplier = 1 + adminBenefits.scoutingEfficiency;
-
-          const baseProgress =
-            Math.round(scout.overall / PROGRESS_CONFIG.SCOUT_OVERALL_DIVISOR) +
-            RandomEngine.getInt(
-              PROGRESS_CONFIG.DAILY_RANDOM_MIN,
-              PROGRESS_CONFIG.DAILY_RANDOM_MAX
-            );
-
-          const finalProgress = Math.round(baseProgress * adminBonusMultiplier);
-
-          await this.repos.scouting.upsert({
-            ...report,
-            date: currentDate,
-            progress: finalProgress,
-          });
-          updatesCount++;
-        }
-
-        this.logger.info(
-          `Scouting diário finalizado. ${updatesCount} relatórios atualizados.`
-        );
-      }
-    );
-  }
-
-  /**
-   * * @param teamId - O ID do time.
-   * @returns Um valor de incerteza (quanto menor, melhor).
-   */
   async calculateScoutingAccuracy(
     teamId: number
   ): Promise<ServiceResult<number>> {
     return this.execute("calculateScoutingAccuracy", teamId, async (teamId) => {
-      this.logger.debug(
-        `Calculando precisão de scouting para o time ${teamId}...`
-      );
-
       const allStaff = await this.repos.staff.findByTeamId(teamId);
       const scouts = allStaff.filter((s) => s.role === StaffRole.SCOUT);
 
@@ -226,8 +254,6 @@ export class ScoutingService extends BaseService {
             stats: { playersFound: 0, lastRunDate: null },
           },
         ];
-        // Opcional: Salvar essa inicialização no banco imediatamente
-        // await this.updateScoutingSlots(teamId, slots);
       }
 
       return slots;

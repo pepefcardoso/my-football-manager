@@ -1,7 +1,15 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, SQL, lte, gte, isNull, sql } from "drizzle-orm";
 import { players } from "../db/schema";
 import { BaseRepository } from "./BaseRepository";
 import type { Player } from "../domain/models";
+
+export interface PlayerSearchFilters {
+  country?: string;
+  position?: string;
+  ageGroup?: "young" | "prime" | "veteran";
+  minOverall?: number;
+  contractStatus?: "any" | "free_agent";
+}
 
 export class PlayerRepository extends BaseRepository {
   async findById(id: number): Promise<Player | undefined> {
@@ -141,6 +149,48 @@ export class PlayerRepository extends BaseRepository {
 
       await this.db.update(players).set(updateData).where(eq(players.id, u.id));
     }
+  }
+
+  async findByCriteria(
+    filters: PlayerSearchFilters,
+    limit: number = 20
+  ): Promise<Player[]> {
+    const conditions: SQL[] = [];
+
+    if (filters.country && filters.country !== "Global") {
+      conditions.push(eq(players.nationality, filters.country));
+    }
+
+    if (filters.position) {
+      conditions.push(eq(players.position, filters.position));
+    }
+
+    if (filters.minOverall) {
+      conditions.push(gte(players.overall, filters.minOverall));
+    }
+
+    if (filters.ageGroup) {
+      if (filters.ageGroup === "young") {
+        conditions.push(lte(players.age, 23));
+      } else if (filters.ageGroup === "prime") {
+        conditions.push(and(gte(players.age, 24), lte(players.age, 29))!);
+      } else if (filters.ageGroup === "veteran") {
+        conditions.push(gte(players.age, 30));
+      }
+    }
+
+    if (filters.contractStatus === "free_agent") {
+      conditions.push(isNull(players.teamId));
+    }
+
+    const result = await this.db
+      .select()
+      .from(players)
+      .where(and(...conditions))
+      .orderBy(sql`RANDOM()`)
+      .limit(limit);
+
+    return result as unknown as Player[];
   }
 }
 

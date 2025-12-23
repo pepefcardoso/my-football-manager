@@ -15,7 +15,7 @@ export interface TransferValidationContext {
   fee: number;
   wageOffer: number;
   contractLength: number;
-  transferType: "transfer" | "loan";
+  transferType: "transfer" | string;
   currentDate: string;
   seasonId: number;
 }
@@ -31,16 +31,18 @@ export class TransferValidator extends BaseService {
     super(repositories, "TransferValidator");
   }
 
-  /**
-   * @param context - Contexto completo da transferência
-   * @returns ServiceResult contendo o resultado da validação
-   */
   async validateTransfer(
     context: TransferValidationContext
   ): Promise<ServiceResult<TransferValidationResult>> {
     return this.execute("validateTransfer", context, async (ctx) => {
       const errors: string[] = [];
       const warnings: string[] = [];
+
+      if (ctx.transferType !== "transfer" && ctx.transferType !== "free") {
+        if (ctx.transferType === "loan") {
+          errors.push("Empréstimos estão desabilitados nesta versão do jogo.");
+        }
+      }
 
       const eligibilityCheck = await this.validatePlayerEligibility(
         ctx.playerId,
@@ -63,10 +65,7 @@ export class TransferValidator extends BaseService {
         errors.push(...(ownershipCheck.errors || []));
       }
 
-      const contractCheck = this.validateContractRules(
-        ctx.contractLength,
-        ctx.transferType
-      );
+      const contractCheck = this.validateContractRules(ctx.contractLength);
       if (!contractCheck.isValid) {
         errors.push(...(contractCheck.errors || []));
       }
@@ -103,11 +102,6 @@ export class TransferValidator extends BaseService {
     });
   }
 
-  /**
-   * @param playerId - ID do jogador
-   * @param seasonId - ID da temporada
-   * @returns ValidationResult
-   */
   private async validatePlayerEligibility(
     playerId: number,
     seasonId: number
@@ -153,11 +147,6 @@ export class TransferValidator extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param teamId - ID do time comprador
-   * @param fee - Valor da transferência
-   * @returns ValidationResult
-   */
   private async validateBuyerBudget(
     teamId: number,
     fee: number
@@ -195,11 +184,6 @@ export class TransferValidator extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param playerId - ID do jogador
-   * @param fromTeamId - ID do time vendedor (0 = agente livre)
-   * @returns ValidationResult
-   */
   private async validatePlayerOwnership(
     playerId: number,
     fromTeamId: number
@@ -238,15 +222,7 @@ export class TransferValidator extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param contractLength - Duração do contrato em anos
-   * @param transferType - Tipo de transferência (transfer ou loan)
-   * @returns ValidationResult
-   */
-  private validateContractRules(
-    contractLength: number,
-    transferType: "transfer" | "loan"
-  ): ValidationResult {
+  private validateContractRules(contractLength: number): ValidationResult {
     this.logger.debug(`Validando regras de contrato...`);
 
     if (!Number.isInteger(contractLength) || contractLength <= 0) {
@@ -256,37 +232,21 @@ export class TransferValidator extends BaseService {
       };
     }
 
-    if (transferType === "transfer") {
-      if (
-        contractLength < TRANSFER_VALIDATION_CONFIG.CONTRACT_MIN_YEARS ||
-        contractLength > TRANSFER_VALIDATION_CONFIG.CONTRACT_MAX_YEARS
-      ) {
-        return {
-          isValid: false,
-          errors: [
-            `Contratos permanentes devem ter entre ${TRANSFER_VALIDATION_CONFIG.CONTRACT_MIN_YEARS} e ${TRANSFER_VALIDATION_CONFIG.CONTRACT_MAX_YEARS} anos de duração.`,
-          ],
-        };
-      }
-    } else if (transferType === "loan") {
-      if (contractLength > TRANSFER_VALIDATION_CONFIG.LOAN_MAX_YEARS) {
-        return {
-          isValid: false,
-          errors: [
-            `Empréstimos não podem exceder ${TRANSFER_VALIDATION_CONFIG.LOAN_MAX_YEARS} anos.`,
-          ],
-        };
-      }
+    if (
+      contractLength < TRANSFER_VALIDATION_CONFIG.CONTRACT_MIN_YEARS ||
+      contractLength > TRANSFER_VALIDATION_CONFIG.CONTRACT_MAX_YEARS
+    ) {
+      return {
+        isValid: false,
+        errors: [
+          `Contratos devem ter entre ${TRANSFER_VALIDATION_CONFIG.CONTRACT_MIN_YEARS} e ${TRANSFER_VALIDATION_CONFIG.CONTRACT_MAX_YEARS} anos de duração.`,
+        ],
+      };
     }
 
     return { isValid: true };
   }
 
-  /**
-   * @param playerId - ID do jogador
-   * @param wageOffer - Salário anual oferecido
-   * @returns ValidationResult
-   */
   private async validateWageOffer(
     playerId: number,
     wageOffer: number
@@ -329,10 +289,6 @@ export class TransferValidator extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param teamId - ID do time comprador
-   * @returns ValidationResult
-   */
   private async validateSquadLimit(teamId: number): Promise<ValidationResult> {
     this.logger.debug(`Validando limite de elenco do time ${teamId}...`);
 
@@ -345,7 +301,7 @@ export class TransferValidator extends BaseService {
       return {
         isValid: false,
         errors: [
-          `O elenco já possui ${currentSquadSize} jogadores. Considere vender ou emprestar jogadores antes de contratar.`,
+          `O elenco já possui ${currentSquadSize} jogadores. Considere vender ou dispensar jogadores antes de contratar.`,
         ],
       };
     }
@@ -353,10 +309,6 @@ export class TransferValidator extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param teamId - ID do time
-   * @returns ValidationResult
-   */
   private async validateTransferBan(teamId: number): Promise<ValidationResult> {
     this.logger.debug(`Verificando Transfer Ban do time ${teamId}...`);
 
@@ -380,10 +332,6 @@ export class TransferValidator extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param fee - Valor da transferência
-   * @returns ValidationResult
-   */
   validateTransferFee(fee: number): ValidationResult {
     if (typeof fee !== "number" || !Number.isFinite(fee)) {
       return {
@@ -418,12 +366,6 @@ export class TransferValidator extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param playerId - ID do jogador
-   * @param fromTeamId - ID do time vendedor
-   * @param toTeamId - ID do time comprador
-   * @returns ValidationResult
-   */
   async validateNoDuplicateProposal(
     playerId: number,
     fromTeamId: number,
@@ -449,36 +391,6 @@ export class TransferValidator extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param playerId - ID do jogador
-   * @returns ValidationResult
-   */
-  async validateLoanEligibility(playerId: number): Promise<ValidationResult> {
-    this.logger.debug(
-      `Validando elegibilidade para empréstimo do jogador ${playerId}...`
-    );
-
-    const player = await this.repos.players.findById(playerId);
-    if (!player) {
-      return {
-        isValid: false,
-        errors: ["Jogador não encontrado."],
-      };
-    }
-
-    // Verificar se o jogador já está emprestado
-    // Implementação depende de ter um campo "onLoan" no schema ou verificar contratos ativos de empréstimo
-    // Por simplicidade, assume-se que se há contrato ativo do tipo "loan", ele está emprestado
-
-    // Esta verificação pode ser expandida conforme a modelagem de contratos
-
-    return { isValid: true };
-  }
-
-  /**
-   * @param context - Contexto da transferência
-   * @returns ServiceResult com o resultado consolidado
-   */
   async validateAll(
     context: TransferValidationContext
   ): Promise<ServiceResult<boolean>> {
