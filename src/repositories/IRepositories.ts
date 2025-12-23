@@ -214,6 +214,8 @@ export interface ITransferProposalRepository {
   ): Promise<any>;
   findActiveByPlayer(playerId: number): Promise<any[]>;
   expireProposals(currentDate: string): Promise<number>;
+  findWhereTeamIsBuyer(teamId: number): Promise<any[]>;
+  findWhereTeamIsSeller(teamId: number): Promise<any[]>;
 }
 
 export interface IScheduledEventRepository {

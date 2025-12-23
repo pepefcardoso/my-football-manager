@@ -7,11 +7,6 @@ export type TransferProposalInsert = typeof transferProposals.$inferInsert;
 export type TransferProposalSelect = typeof transferProposals.$inferSelect;
 
 export class TransferProposalRepository extends BaseRepository {
-  /**
-   * Cria uma nova proposta de transferência.
-   * @param data Dados da proposta
-   * @returns ID da nova proposta
-   */
   async create(data: TransferProposalInsert): Promise<number> {
     const result = await this.db
       .insert(transferProposals)
@@ -21,9 +16,6 @@ export class TransferProposalRepository extends BaseRepository {
     return result[0].id;
   }
 
-  /**
-   * Busca uma proposta pelo ID, incluindo relacionamentos importantes.
-   */
   async findById(id: number) {
     return await this.db.query.transferProposals.findFirst({
       where: eq(transferProposals.id, id),
@@ -35,9 +27,6 @@ export class TransferProposalRepository extends BaseRepository {
     });
   }
 
-  /**
-   * Atualiza os dados de uma proposta existente.
-   */
   async update(
     id: number,
     data: Partial<TransferProposalInsert>
@@ -48,17 +37,10 @@ export class TransferProposalRepository extends BaseRepository {
       .where(eq(transferProposals.id, id));
   }
 
-  /**
-   * Remove (deleta) uma proposta do banco de dados.
-   * Cuidado: Geralmente preferimos mudar o status para CANCELLED/WITHDRAWN.
-   */
   async delete(id: number): Promise<void> {
     await this.db.delete(transferProposals).where(eq(transferProposals.id, id));
   }
 
-  /**
-   * Busca todas as propostas enviadas por um time.
-   */
   async findSentByTeam(teamId: number) {
     return await this.db.query.transferProposals.findMany({
       where: eq(transferProposals.fromTeamId, teamId),
@@ -70,9 +52,6 @@ export class TransferProposalRepository extends BaseRepository {
     });
   }
 
-  /**
-   * Busca todas as propostas recebidas por um time.
-   */
   async findReceivedByTeam(teamId: number) {
     return await this.db.query.transferProposals.findMany({
       where: eq(transferProposals.toTeamId, teamId),
@@ -84,11 +63,6 @@ export class TransferProposalRepository extends BaseRepository {
     });
   }
 
-  /**
-   * Verifica se já existe uma proposta ativa (pendente ou negociando)
-   * entre dois times para um jogador específico.
-   * Útil para evitar duplicação de ofertas.
-   */
   async findActiveProposal(
     playerId: number,
     fromTeamId: number,
@@ -113,10 +87,6 @@ export class TransferProposalRepository extends BaseRepository {
     return result[0];
   }
 
-  /**
-   * Busca todas as propostas ativas relacionadas a um jogador.
-   * Útil para a IA decidir se entra numa "Leilão" (Bidding War).
-   */
   async findActiveByPlayer(playerId: number) {
     return await this.db.query.transferProposals.findMany({
       where: and(
@@ -132,12 +102,6 @@ export class TransferProposalRepository extends BaseRepository {
     });
   }
 
-  /**
-   * Expira propostas cujo prazo de resposta passou da data atual.
-   * Muda o status de 'pending'/'negotiating' para 'withdrawn' (se não respondida).
-   * * @param currentDate Data atual da simulação (YYYY-MM-DD)
-   * @returns Número de propostas expiradas
-   */
   async expireProposals(currentDate: string): Promise<number> {
     const expired = await this.db
       .select({ id: transferProposals.id })
@@ -171,6 +135,28 @@ export class TransferProposalRepository extends BaseRepository {
       );
 
     return expired.length;
+  }
+
+  async findWhereTeamIsBuyer(teamId: number) {
+    return await this.db.query.transferProposals.findMany({
+      where: eq(transferProposals.toTeamId, teamId),
+      orderBy: [desc(transferProposals.createdAt)],
+      with: {
+        player: true,
+        fromTeam: true,
+      },
+    });
+  }
+
+  async findWhereTeamIsSeller(teamId: number) {
+    return await this.db.query.transferProposals.findMany({
+      where: eq(transferProposals.fromTeamId, teamId),
+      orderBy: [desc(transferProposals.responseDeadline)],
+      with: {
+        player: true,
+        toTeam: true,
+      },
+    });
   }
 }
 

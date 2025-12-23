@@ -61,7 +61,7 @@ export function TransferNotification() {
                 timeout: timeout,
             };
 
-            logger.info(`Nova notificação: ${data.message}`, data);
+            logger.info(`Nova notificação recebida: ${data.message}`);
             setNotifications((prev) => [newNotification, ...prev].slice(0, 5));
         },
         [userTeam, removeNotification]
@@ -70,13 +70,16 @@ export function TransferNotification() {
     useEffect(() => {
         if (!userTeam) return;
 
-        const handleNotification = (data: TransferNotificationPayload) => addNotification(data);
-
-        window.electronAPI.transfer.onNotification(handleNotification);
+        const removeListener = window.electronAPI.transfer.onNotification((data) => {
+            addNotification(data);
+        });
 
         const activeTimeouts = timeoutsRef.current;
 
         return () => {
+            if (typeof removeListener === 'function') {
+                removeListener();
+            }
             activeTimeouts.forEach(clearTimeout);
             activeTimeouts.clear();
         };

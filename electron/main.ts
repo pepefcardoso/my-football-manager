@@ -877,6 +877,16 @@ function registerIpcHandlers() {
     }
   );
 
+  ipcMain.handle("transfer:getMyBids", async (_, teamId) => {
+    const result = await serviceContainer.transfer.getMyBids(teamId);
+    return Result.unwrapOr(result, []);
+  });
+
+  ipcMain.handle("transfer:getIncomingOffers", async (_, teamId) => {
+    const result = await serviceContainer.transfer.getIncomingOffers(teamId);
+    return Result.unwrapOr(result, []);
+  });
+
   ipcMain.handle("marketing:getFanSatisfaction", async (_, teamId: number) => {
     const result = await serviceContainer.marketing.getFanSatisfaction(teamId);
     return Result.unwrapOr(result, 50);

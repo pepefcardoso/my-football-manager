@@ -16,6 +16,65 @@ import type {
   MatchEventData,
 } from "./domain/types";
 
+export interface ScoutingFilter {
+  position?: string;
+  minAge?: number;
+  maxAge?: number;
+  minOverall?: number;
+  maxOverall?: number;
+  regions?: string[];
+}
+
+export interface ScoutingSlot {
+  slotNumber: number;
+  isActive: boolean;
+  filters: ScoutingFilter;
+  stats: {
+    playersFound: number;
+    lastRunDate: string | null;
+  };
+}
+
+export interface CreateProposalInput {
+  playerId: number;
+  fromTeamId: number;
+  toTeamId: number;
+  type: "permanent" | "loan";
+  fee: number;
+  wageOffer: number;
+  contractLength: number;
+  currentDate: string;
+  seasonId: number;
+}
+
+export interface RespondProposalInput {
+  proposalId: number;
+  response: "accept" | "reject" | "counter";
+  counterOfferFee?: number;
+  rejectionReason?: string;
+  currentDate: string;
+}
+
+export interface TransferProposalData {
+  id: number;
+  playerId: number;
+  playerName?: string;
+  fromTeamId: number;
+  fromTeamName?: string;
+  toTeamId?: number;
+  toTeamName?: string;
+  fee: number;
+  status:
+    | "PENDING"
+    | "ACCEPTED"
+    | "REJECTED"
+    | "NEGOTIATING"
+    | "COMPLETED"
+    | "CANCELLED";
+  createdAt: string;
+  responseDeadline: string;
+}
+
 interface PlayerStatRow {
   id: number;
   name: string;
@@ -254,13 +313,11 @@ declare global {
 
       infrastructure: {
         getStatus: (teamId: number) => Promise<InfrastructureStatus | null>;
-
         startUpgrade: (
           teamId: number,
           facilityType: string,
           amount?: number
         ) => Promise<{ success: boolean; message: string }>;
-
         downgradeFacility: (
           teamId: number,
           facilityType: string,
@@ -276,18 +333,23 @@ declare global {
         getScoutingList: (teamId: number) => Promise<any[]>;
         assignScout: (scoutId: number, playerId: number) => Promise<boolean>;
         calculateScoutingAccuracy: (teamId: number) => Promise<number>;
-        getSlots: (teamId: number) => Promise<any[]>;
-        updateSlots: (teamId: number, slots: any[]) => Promise<boolean>;
+        getSlots: (teamId: number) => Promise<ScoutingSlot[]>;
+        updateSlots: (
+          teamId: number,
+          slots: ScoutingSlot[]
+        ) => Promise<boolean>;
       };
 
       transfer: {
-        getReceivedProposals: (teamId: number) => Promise<any[]>;
-        getSentProposals: (teamId: number) => Promise<any[]>;
+        getReceivedProposals: (
+          teamId: number
+        ) => Promise<TransferProposalData[]>;
+        getSentProposals: (teamId: number) => Promise<TransferProposalData[]>;
         createProposal: (
-          input: any
+          input: CreateProposalInput
         ) => Promise<{ success: boolean; data?: number; message: string }>;
         respondToProposal: (
-          input: any
+          input: RespondProposalInput
         ) => Promise<{ success: boolean; message: string }>;
         finalizeTransfer: (
           proposalId: number
@@ -295,10 +357,12 @@ declare global {
         getTransferWindowStatus: (date: string) => Promise<string>;
         onNotification: (
           callback: (data: TransferNotificationPayload) => void
-        ) => void;
+        ) => () => void;
         getTransferHistory: (
           teamId: number
         ) => Promise<TransferHistoryRecord[]>;
+        getMyBids: (teamId: number) => Promise<TransferProposalData[]>;
+        getIncomingOffers: (teamId: number) => Promise<TransferProposalData[]>;
       };
 
       marketing: {

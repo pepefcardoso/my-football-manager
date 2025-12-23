@@ -2,10 +2,7 @@ import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import { Result } from "../../domain/ServiceResults";
 import type { ServiceResult } from "../../domain/ServiceResults";
-import type {
-  AITransferDecisionMaker,
-  AIBuyerAction,
-} from "./AITransferDecisionMaker";
+import type { AITransferDecisionMaker } from "./AITransferDecisionMaker";
 import type { TransferService } from "../transfer/TransferService";
 import { TransferType } from "../../domain/enums";
 
@@ -23,13 +20,6 @@ export class DailyTransferProcessor extends BaseService {
     this.transferService = transferService;
   }
 
-  /**
-   * Processa a lógica diária de transferências para todos os clubes controlados
-   * pela Inteligência Artificial.
-   * * @param currentDate Data atual do jogo (YYYY-MM-DD).
-   * @param currentSeasonId ID da temporada ativa.
-   * @returns ServiceResult com o número de ações executadas.
-   */
   async processDailyTransfers(
     currentDate: string,
     currentSeasonId: number
@@ -46,7 +36,6 @@ export class DailyTransferProcessor extends BaseService {
         const aiTeams = allTeams.filter((t) => !t.isHuman);
 
         let actionsCount = 0;
-        const allActions: { teamId: number; action: AIBuyerAction }[] = [];
 
         for (const team of aiTeams) {
           const actionResult =
@@ -56,7 +45,21 @@ export class DailyTransferProcessor extends BaseService {
             );
 
           if (Result.isSuccess(actionResult)) {
-            allActions.push({ teamId: team.id, action: actionResult.data });
+            const action = actionResult.data;
+            if (action.action === "make_offer" && action.targetPlayerId) {
+              const result = await this.handleMakeOffer(
+                team.id,
+                action.targetPlayerId,
+                action.offerFee!,
+                action.offerWage!,
+                currentDate,
+                currentSeasonId
+              );
+
+              if (Result.isSuccess(result)) {
+                actionsCount++;
+              }
+            }
           } else {
             this.logger.error(
               `Falha ao determinar ação para ${team.shortName}:`,
@@ -65,52 +68,16 @@ export class DailyTransferProcessor extends BaseService {
           }
         }
 
-        for (const { teamId: buyingTeamId, action } of allActions) {
-          if (action.action === "make_offer" && action.targetPlayerId) {
-            const result = await this.handleMakeOffer(
-              buyingTeamId,
-              action.targetPlayerId,
-              action.offerFee!,
-              action.offerWage!,
-              currentDate,
-              currentSeasonId
-            );
-            if (Result.isSuccess(result)) {
-              actionsCount++;
-
-              const targetPlayer = await this.repos.players.findById(
-                action.targetPlayerId
-              );
-              const sellingTeam = await this.repos.teams.findById(
-                targetPlayer?.teamId || 0
-              );
-
-              if (sellingTeam && !sellingTeam.isHuman) {
-                const evaluationResult =
-                  await this.aiDecisionMaker.evaluateIncomingProposal(
-                    result.data,
-                    currentDate
-                  );
-
-                if (
-                  Result.isSuccess(evaluationResult) &&
-                  evaluationResult.data.decision === "accept"
-                ) {
-                  await this.transferService.finalizeTransfer(result.data);
-                  actionsCount++;
-                  this.logger.info(
-                    `💰 Transferência entre AI FINALIZADA: Jogador ${targetPlayer?.lastName} para ${sellingTeam.shortName}.`
-                  );
-                }
-              }
-            }
-          }
-        }
-
         for (const team of aiTeams) {
-          const proposals =
-            await this.repos.transferProposals.findReceivedByTeam(team.id);
-          for (const proposal of proposals) {
+          const offersForMyPlayers =
+            await this.repos.transferProposals.findWhereTeamIsSeller(team.id);
+
+          const offersToBuy =
+            await this.repos.transferProposals.findWhereTeamIsBuyer(team.id);
+
+          const allProposals = [...offersForMyPlayers, ...offersToBuy];
+
+          for (const proposal of allProposals) {
             if (
               proposal.status === "pending" ||
               proposal.status === "negotiating"
@@ -120,15 +87,22 @@ export class DailyTransferProcessor extends BaseService {
                   proposal.id,
                   currentDate
                 );
+
               if (Result.isSuccess(evaluationResult)) {
                 actionsCount++;
-                
+
                 if (
                   evaluationResult.data.decision === "accept" &&
-                  proposal.toTeamId
+                  proposal.toTeamId === team.id
                 ) {
-                  await this.transferService.finalizeTransfer(proposal.id);
-                  actionsCount++;
+                  const finalizeResult =
+                    await this.transferService.finalizeTransfer(proposal.id);
+                  if (Result.isSuccess(finalizeResult)) {
+                    actionsCount++;
+                    this.logger.info(
+                      `🤖 AI (${team.shortName}) finalizou a compra da proposta #${proposal.id}`
+                    );
+                  }
                 }
               }
             }
@@ -138,7 +112,13 @@ export class DailyTransferProcessor extends BaseService {
         const expiredCount = await this.repos.transferProposals.expireProposals(
           currentDate
         );
-        this.logger.info(`📅 ${expiredCount} propostas expiradas.`);
+
+        if (expiredCount > 0) {
+          this.logger.info(
+            `📅 ${expiredCount} propostas expiradas por falta de resposta.`
+          );
+        }
+
         actionsCount += expiredCount;
 
         this.logger.info(
@@ -149,9 +129,6 @@ export class DailyTransferProcessor extends BaseService {
     );
   }
 
-  /**
-   * Tenta criar uma proposta de transferência.
-   */
   private async handleMakeOffer(
     buyingTeamId: number,
     targetPlayerId: number,
@@ -161,19 +138,22 @@ export class DailyTransferProcessor extends BaseService {
     seasonId: number
   ): Promise<ServiceResult<number>> {
     const player = await this.repos.players.findById(targetPlayerId);
-    if (!player || !player.teamId || player.teamId === buyingTeamId) {
+
+    if (!player || (player.teamId && player.teamId === buyingTeamId)) {
       return Result.notFound(
-        `Jogador ${targetPlayerId} ou o time vendedor é o mesmo que o comprador.`
+        `Jogador ${targetPlayerId} inválido ou já pertence ao time comprador.`
       );
     }
 
     const contractLength = 3;
     const transferType = TransferType.TRANSFER;
 
-    const sellingTeamId = player.teamId;
+    const sellingTeamId = player.teamId || 0;
 
     this.logger.info(
-      `Attempting to create proposal: ${buyingTeamId} (Comprador) -> ${player.lastName} @ ${sellingTeamId} (Vendedor)`
+      `🤖 AI (${buyingTeamId}) criando oferta: Jogador ${
+        player.lastName
+      } (Time Atual: ${sellingTeamId || "Free Agent"}) | Fee: ${fee}`
     );
 
     const proposalResult = await this.transferService.createProposal({

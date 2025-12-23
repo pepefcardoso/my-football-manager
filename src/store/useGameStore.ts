@@ -27,6 +27,7 @@ interface GameState {
   setLoading: (loading: boolean) => void;
   setNewGameSetup: (data: NewGameSetup) => void;
   startGame: (team: Team) => void;
+  updateUserTeam: (team: Team) => void;
   resetGame: () => void;
   navigateInGame: (page: MenuOption) => void;
   setProcessing: (isProcessing: boolean) => void;
@@ -51,6 +52,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setView: (view) => set({ view }),
   setLoading: (isLoading) => set({ isLoading }),
   setNewGameSetup: (data) => set({ newGameSetup: data }),
+
   startGame: (team) => {
     logger.info(`Iniciando jogo com o time: ${team.name}`);
     set({
@@ -62,6 +64,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       isPaused: true,
       isProcessing: false,
     });
+  },
+
+  updateUserTeam: (team) => {
+    set({ userTeam: team });
   },
 
   resetGame: () => {

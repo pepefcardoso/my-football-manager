@@ -143,7 +143,7 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
     const [configuringSlot, setConfiguringSlot] = useState<number | null>(null);
     const { userTeam, currentDate } = useGameStore();
     const [currentSeasonId, setCurrentSeasonId] = useState<number>(1);
-    const { receivedProposals, sentProposals, fetchProposals } = useTransferStore();
+    const { myBids, incomingOffers, fetchProposals, updateProposalState } = useTransferStore();
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -241,6 +241,17 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
             const result = await window.electronAPI.transfer.finalizeTransfer(proposalId);
             if (result.success) {
                 logger.info("Transferência finalizada com sucesso!");
+                updateProposalState(proposalId, TransferStatus.COMPLETED);
+
+                if (userTeam) {
+                    const teams = await window.electronAPI.team.getTeams();
+                    const updatedUserTeam = teams.find(t => t.id === userTeam.id);
+                    if (updatedUserTeam) {
+                        useGameStore.getState().updateUserTeam(updatedUserTeam);
+                        logger.info("Orçamento do usuário atualizado na UI.");
+                    }
+                }
+
                 alert("Transferência concluída! O jogador agora faz parte do seu elenco.");
                 loadData();
             } else {
@@ -257,7 +268,6 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
     const handleRespondProposal = async (proposalId: number, response: "accept" | "reject") => {
         if (loading) return;
 
-        // Validação básica para evitar cliques múltiplos ou estado inválido
         if (!currentDate) {
             alert("Erro: Data do jogo não encontrada.");
             return;
@@ -277,7 +287,9 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
 
             if (result.success) {
                 logger.info(`Proposta ${proposalId} respondida com sucesso.`);
-                await loadData();
+                const newStatus = response === 'accept' ? TransferStatus.ACCEPTED : TransferStatus.REJECTED;
+                updateProposalState(proposalId, newStatus);
+                loadData();
             } else {
                 logger.error(`Erro retornado pelo backend: ${result.message}`);
                 alert(`Não foi possível realizar a ação: ${result.message}`);
@@ -291,58 +303,64 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
     };
 
     const renderNegotiations = () => {
-        const activeSent = sentProposals.filter(p => p.status !== TransferStatus.COMPLETED && p.status !== TransferStatus.CANCELLED && p.status !== TransferStatus.WITHDRAWN);
-        const activeReceived = receivedProposals.filter(p => p.status !== TransferStatus.COMPLETED && p.status !== TransferStatus.CANCELLED && p.status !== TransferStatus.WITHDRAWN);
+        const activeBids = myBids.filter(p => p.status !== TransferStatus.COMPLETED && p.status !== TransferStatus.WITHDRAWN && p.status !== TransferStatus.CANCELLED);
+        const activeOffers = incomingOffers.filter(p => p.status !== TransferStatus.COMPLETED && p.status !== TransferStatus.WITHDRAWN && p.status !== TransferStatus.CANCELLED);
 
         return (
-            <div className="space-y-8">
+            <div className="space-y-8 animate-in fade-in duration-300">
                 <section>
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        📤 Minhas Ofertas <span className="text-sm font-normal text-slate-500">({activeSent.length})</span>
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">
+                        🛒 Minhas Tentativas de Compra <span className="text-sm font-normal text-slate-500">({activeBids.length})</span>
                     </h3>
-                    {activeSent.length === 0 && <p className="text-slate-500 text-sm italic">Nenhuma oferta de compra ativa.</p>}
+                    {activeBids.length === 0 && <p className="text-slate-500 text-sm italic py-4">Você não está negociando a compra de nenhum jogador.</p>}
+
                     <div className="space-y-3">
-                        {activeSent.map(prop => (
-                            <div key={prop.id} className="bg-slate-900 border border-slate-800 p-4 rounded flex justify-between items-center hover:border-slate-700 transition-colors">
+                        {activeBids.map(prop => (
+                            <div key={prop.id} className="bg-slate-900 border border-slate-800 p-4 rounded flex justify-between items-center hover:border-emerald-500/30 transition-colors">
                                 <div>
                                     <div className="font-bold text-white flex items-center gap-2">
                                         {(prop as any).player?.firstName} {(prop as any).player?.lastName}
-                                        <span className="text-xs font-normal text-slate-500 px-2 py-0.5 bg-slate-950 rounded border border-slate-800">
+                                        <Badge variant="neutral" className="text-[10px]">
                                             {(prop as any).player?.position}
-                                        </span>
+                                        </Badge>
                                     </div>
                                     <div className="text-xs text-slate-400 mt-1">
+                                        Time Atual: <span className="text-white">{(prop as any).fromTeam?.shortName || "Agente Livre"}</span>
+                                        <span className="mx-2">|</span>
                                         Oferta: <span className="text-emerald-400 font-mono">{formatCurrency(prop.fee)}</span>
                                         <span className="mx-2">•</span>
                                         Salário: {formatCurrency(prop.wageOffer)}
-                                        <span className="mx-2">•</span>
-                                        Time: {(prop as any).toTeam?.shortName || "Agente Livre"}
                                     </div>
                                 </div>
+
                                 <div className="text-right flex flex-col items-end gap-2">
                                     <Badge variant={
                                         prop.status === TransferStatus.ACCEPTED ? 'success' :
                                             prop.status === TransferStatus.REJECTED ? 'danger' :
-                                                prop.status === TransferStatus.NEGOTIATING ? 'warning' : 'neutral'
+                                                prop.status === TransferStatus.NEGOTIATING ? 'warning' : 'info'
                                     }>
-                                        {prop.status === TransferStatus.ACCEPTED ? "ACEITA ✅" :
-                                            prop.status === TransferStatus.REJECTED ? "REJEITADA ❌" :
-                                                prop.status === TransferStatus.NEGOTIATING ? "CONTRA-PROPOSTA 💬" : "PENDENTE ⏳"}
+                                        {prop.status === TransferStatus.ACCEPTED ? "PROPOSTA ACEITA ✅" :
+                                            prop.status === TransferStatus.REJECTED ? "RECUSADA ❌" :
+                                                prop.status === TransferStatus.NEGOTIATING ? "CONTRA-PROPOSTA 💬" : "AGUARDANDO ⏳"}
                                     </Badge>
 
                                     {prop.status === TransferStatus.ACCEPTED && (
                                         <button
                                             onClick={() => handleFinalizeTransfer(prop.id)}
                                             disabled={loading}
-                                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded shadow-lg shadow-emerald-900/50 animate-pulse hover:animate-none transition-all"
+                                            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded shadow-lg shadow-emerald-900/50 animate-pulse hover:animate-none transition-all"
                                         >
-                                            {loading ? "Processando..." : "Finalizar Contratação"}
+                                            {loading ? "Processando..." : "Finalizar & Pagar"}
                                         </button>
                                     )}
 
-                                    {prop.status !== TransferStatus.ACCEPTED && (
-                                        <div className="text-[10px] text-slate-500">
-                                            Prazo: {new Date(prop.responseDeadline).toLocaleDateString()}
+                                    {prop.status === TransferStatus.NEGOTIATING && (
+                                        <div className="flex gap-2 mt-1">
+                                            <div className="text-xs text-yellow-400 font-bold mr-2 self-center">
+                                                Pede: {formatCurrency(prop.counterOfferFee || 0)}
+                                            </div>
+                                            <button onClick={() => handleRespondProposal(prop.id, 'accept')} className="px-2 py-1 bg-blue-600 text-xs rounded text-white hover:bg-blue-500">Aceitar</button>
+                                            <button onClick={() => handleRespondProposal(prop.id, 'reject')} className="px-2 py-1 bg-red-600 text-xs rounded text-white hover:bg-red-500">Recusar</button>
                                         </div>
                                     )}
                                 </div>
@@ -352,43 +370,55 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                 </section>
 
                 <section>
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        📥 Propostas Recebidas <span className="text-sm font-normal text-slate-500">({activeReceived.length})</span>
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2 pt-4">
+                        💰 Ofertas Recebidas (Vendas) <span className="text-sm font-normal text-slate-500">({activeOffers.length})</span>
                     </h3>
-                    {activeReceived.length === 0 && <p className="text-slate-500 text-sm italic">Nenhuma proposta recebida.</p>}
+                    {activeOffers.length === 0 && <p className="text-slate-500 text-sm italic py-4">Nenhum clube interessado em seus jogadores no momento.</p>}
+
                     <div className="space-y-3">
-                        {activeReceived.map(prop => (
-                            <div key={prop.id} className="bg-slate-900 border border-blue-900/30 p-4 rounded flex justify-between items-center hover:border-blue-500/50 transition-colors">
-                                <div>
-                                    <div className="font-bold text-white">{(prop as any).player?.lastName}</div>
-                                    <div className="text-xs text-slate-400">
-                                        De: <span className="text-white">{(prop as any).fromTeam?.name}</span>
+                        {activeOffers.map(prop => {
+                            const isAnswered = prop.status === TransferStatus.ACCEPTED || prop.status === TransferStatus.REJECTED;
+                            return (
+                                <div key={prop.id} className="bg-slate-900 border border-blue-900/30 p-4 rounded flex justify-between items-center hover:border-blue-500/50 transition-colors">
+                                    <div>
+                                        <div className="font-bold text-white">{(prop as any).player?.firstName} {(prop as any).player?.lastName}</div>
+                                        <div className="text-xs text-slate-400 mt-1">
+                                            Comprador: <span className="text-white font-bold">{(prop as any).toTeam?.name}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-4">
+                                        <div className="text-right">
+                                            <div className="font-mono text-emerald-400 font-bold text-lg">{formatCurrency(prop.fee)}</div>
+                                            <div className="text-[10px] text-slate-500">Salário Proposto: {formatCurrency(prop.wageOffer)}</div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1 items-end">
+                                            {!isAnswered ? (
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleRespondProposal(prop.id, 'accept')}
+                                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded transition-colors"
+                                                    >
+                                                        Vender
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRespondProposal(prop.id, 'reject')}
+                                                        className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600 text-red-200 hover:text-white text-xs font-bold rounded transition-colors border border-red-900"
+                                                    >
+                                                        Recusar
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <Badge variant={prop.status === TransferStatus.ACCEPTED ? 'success' : 'danger'}>
+                                                    {prop.status === TransferStatus.ACCEPTED ? "AGUARDANDO PAGAMENTO..." : "RECUSADO"}
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                        <div className="font-mono text-emerald-400 font-bold">{formatCurrency(prop.fee)}</div>
-                                        <div className="text-[10px] text-slate-500">Salário Oferecido: {formatCurrency(prop.wageOffer)}</div>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <button
-                                            onClick={() => handleRespondProposal(prop.id, 'accept')}
-                                            disabled={loading}
-                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded transition-colors disabled:opacity-50"
-                                        >
-                                            {loading ? "..." : "Aceitar"}
-                                        </button>
-                                        <button
-                                            onClick={() => handleRespondProposal(prop.id, 'reject')}
-                                            disabled={loading}
-                                            className="px-3 py-1 bg-red-600/20 hover:bg-red-600 text-red-200 hover:text-white text-xs font-bold rounded transition-colors border border-red-900 disabled:opacity-50"
-                                        >
-                                            {loading ? "..." : "Rejeitar"}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </section>
             </div>
@@ -458,7 +488,7 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                                 }`}
                         >
                             Negociações
-                            {(sentProposals.filter(p => p.status === TransferStatus.ACCEPTED).length > 0) && (
+                            {(myBids.filter(p => p.status === TransferStatus.ACCEPTED).length > 0 || incomingOffers.length > 0) && (
                                 <span className="ml-2 inline-flex items-center justify-center w-2 h-2 p-2 bg-emerald-500 rounded-full text-[10px] text-white font-bold">!</span>
                             )}
                         </button>
@@ -529,6 +559,7 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                         setSelectedPlayer(null);
                         loadData();
                         setActiveTab("negotiations");
+                        window.alert("Proposta enviada! O clube analisará sua oferta nos próximos dias.");
                     }}
                 />
             )}

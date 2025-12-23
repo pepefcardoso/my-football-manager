@@ -270,10 +270,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("transfer:finalizeTransfer", proposalId),
     getTransferWindowStatus: (date: string) =>
       ipcRenderer.invoke("transfer:getTransferWindowStatus", date),
-    onNotification: (callback: (data: any) => void) =>
-      ipcRenderer.on("transfer:notification", (_, data) => callback(data)),
+    onNotification: (callback: (data: any) => void) => {
+      const subscription = (_: any, data: any) => callback(data);
+      ipcRenderer.on("transfer:notification", subscription);
+      return () => {
+        ipcRenderer.off("transfer:notification", subscription);
+      };
+    },
     getTransferHistory: (teamId: number) =>
       ipcRenderer.invoke("transfer:getTransferHistory", teamId),
+    getMyBids: (teamId: number) =>
+      ipcRenderer.invoke("transfer:getMyBids", teamId),
+    getIncomingOffers: (teamId: number) =>
+      ipcRenderer.invoke("transfer:getIncomingOffers", teamId),
   },
 
   marketing: {

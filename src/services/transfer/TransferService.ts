@@ -1,4 +1,3 @@
-
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { TransferProposalInsert } from "../../repositories/TransferProposalRepository";
 import { Result } from "../../domain/ServiceResults";
@@ -399,6 +398,18 @@ export class TransferService extends BaseService {
       );
 
       return enrichedTransfers;
+    });
+  }
+
+  async getMyBids(teamId: number): Promise<ServiceResult<any[]>> {
+    return this.execute("getMyBids", teamId, async (teamId) => {
+      return await this.repos.transferProposals.findWhereTeamIsBuyer(teamId);
+    });
+  }
+
+  async getIncomingOffers(teamId: number): Promise<ServiceResult<any[]>> {
+    return this.execute("getIncomingOffers", teamId, async (teamId) => {
+      return await this.repos.transferProposals.findWhereTeamIsSeller(teamId);
     });
   }
 }
