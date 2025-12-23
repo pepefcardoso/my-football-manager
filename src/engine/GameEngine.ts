@@ -120,10 +120,9 @@ export class GameEngine {
     return day === 3 || day === 6;
   }
 
-  /**
-   * Processa toda a lógica de um dia dentro de uma ÚNICA transação.
-   */
-  async processDailyUpdate(): Promise<DailyUpdateResult> {
+  async processDailyUpdate(
+    isPlayerMatchDay: boolean = false
+  ): Promise<DailyUpdateResult> {
     const updates: DailyUpdateResult = {
       date: this.getCurrentDate(),
       playersUpdated: 0,
@@ -250,13 +249,35 @@ export class GameEngine {
           updates.logs.push(`🔔 Novo evento: ${eventResult.data.title}`);
         }
 
-        const simulationResults = await txServices.match.simulateMatchesOfDate(
-          newDateStr
-        );
-        if (Result.isSuccess(simulationResults)) {
-          const simData = simulationResults.data;
-          if (simData.matchesPlayed > 0) {
-            updates.matchResults = simData.results.map((r) => r.result);
+        if (isPlayerMatchDay) {
+          const todaysMatches = await txRepos.matches.findPendingMatchesByDate(
+            newDateStr
+          );
+          const cpuMatches = todaysMatches.filter(
+            (m) => m.homeTeamId !== teamId && m.awayTeamId !== teamId
+          );
+
+          if (cpuMatches.length > 0) {
+            const cpuResults: MatchResult[] = [];
+            for (const m of cpuMatches) {
+              const simResult = await txServices.match.simulateFullMatch(m.id);
+              if (Result.isSuccess(simResult)) {
+                cpuResults.push(simResult.data);
+              }
+            }
+            updates.matchResults = cpuResults;
+            updates.logs.push(
+              `${cpuMatches.length} jogos de outros times simulados.`
+            );
+          }
+        } else {
+          const simulationResults =
+            await txServices.match.simulateMatchesOfDate(newDateStr);
+          if (Result.isSuccess(simulationResults)) {
+            const simData = simulationResults.data;
+            if (simData.matchesPlayed > 0) {
+              updates.matchResults = simData.results.map((r) => r.result);
+            }
           }
         }
 
@@ -438,6 +459,25 @@ export class GameEngine {
     date: string;
     result?: DailyUpdateResult;
   }> {
+    const currentPlayerTeamId = this.gameState?.playerTeamId || null;
+
+    if (currentPlayerTeamId) {
+      const pendingMatchToday = await this.stopChecker.checkPlayerTeamMatch(
+        this.getCurrentDate(),
+        currentPlayerTeamId
+      );
+
+      if (pendingMatchToday.shouldStop) {
+        this.stopSimulation();
+        return {
+          advanced: false,
+          stopReason: "match_day",
+          stopMetadata: pendingMatchToday.metadata,
+          date: this.getCurrentDate(),
+        };
+      }
+    }
+
     const currentDateObj = new Date(this.getCurrentDate());
     currentDateObj.setDate(currentDateObj.getDate() + 1);
     const nextDate = currentDateObj.toISOString().split("T")[0];
@@ -447,7 +487,7 @@ export class GameEngine {
       this.gameState?.playerTeamId || null
     );
 
-    if (condition.shouldStop) {
+    if (condition.shouldStop && condition.reason !== "match_day") {
       this.stopSimulation();
       return {
         advanced: false,
@@ -457,7 +497,21 @@ export class GameEngine {
       };
     }
 
-    const result = await this.processDailyUpdate();
+    const isPlayerMatchDay =
+      condition.shouldStop && condition.reason === "match_day";
+
+    const result = await this.processDailyUpdate(isPlayerMatchDay);
+
+    if (isPlayerMatchDay) {
+      this.stopSimulation();
+      return {
+        advanced: true,
+        date: this.getCurrentDate(),
+        result,
+        stopReason: "match_day",
+        stopMetadata: condition.metadata,
+      };
+    }
 
     return {
       advanced: true,
@@ -469,7 +523,7 @@ export class GameEngine {
   private translateStopReason(reason?: string): string {
     switch (reason) {
       case "match_day":
-        return "Dia de Jogo";
+        return "Dia de Jogo - Você tem uma partida pendente!";
       case "season_end":
         return "Fim de Temporada";
       case "transfer_proposal":

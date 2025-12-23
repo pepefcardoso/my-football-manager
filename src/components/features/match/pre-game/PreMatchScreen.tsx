@@ -12,6 +12,7 @@ interface PreMatchScreenProps {
     matchId: number;
     homeTeam: Team;
     awayTeam: Team;
+    userTeamId: number;
     onConfirm: (lineup: PreMatchLineup) => void;
     onCancel: () => void;
 }
@@ -33,13 +34,18 @@ export function PreMatchScreen({
     matchId,
     homeTeam,
     awayTeam,
+    userTeamId,
     onConfirm,
     onCancel,
 }: PreMatchScreenProps) {
+    const isUserHome = homeTeam.id === userTeamId;
+    const myTeam = isUserHome ? homeTeam : awayTeam;
+    const opponentTeam = isUserHome ? awayTeam : homeTeam;
+
     const [loading, setLoading] = useState(true);
 
     const [formation, setFormation] = useState<Formation>(
-        homeTeam.defaultFormation || "4-4-2"
+        myTeam.defaultFormation || "4-4-2"
     );
     const [starters, setStarters] = useState<(Player | null)[]>(
         Array(11).fill(null)
@@ -48,10 +54,10 @@ export function PreMatchScreen({
     const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
 
     const [tactics, setTactics] = useState<TacticsConfig>({
-        style: homeTeam.defaultGameStyle || "balanced",
-        marking: homeTeam.defaultMarking || "man_to_man",
-        mentality: homeTeam.defaultMentality || "normal",
-        passingDirectness: homeTeam.defaultPassingDirectness || "mixed",
+        style: myTeam.defaultGameStyle || "balanced",
+        marking: myTeam.defaultMarking || "man_to_man",
+        mentality: myTeam.defaultMentality || "normal",
+        passingDirectness: myTeam.defaultPassingDirectness || "mixed",
     });
 
     const [draggedPlayer, setDraggedPlayer] = useState<DraggedPlayer | null>(
@@ -61,7 +67,7 @@ export function PreMatchScreen({
     useEffect(() => {
         const loadPlayers = async () => {
             try {
-                const data = await window.electronAPI.player.getPlayers(homeTeam.id);
+                const data = await window.electronAPI.player.getPlayers(myTeam.id);
                 const validPlayers = data.filter(
                     (p: Player) => !p.isInjured && p.suspensionGamesRemaining === 0
                 );
@@ -69,6 +75,7 @@ export function PreMatchScreen({
                 const sorted = [...validPlayers].sort(
                     (a, b) => b.overall - a.overall
                 );
+
                 const top11 = sorted.slice(0, 11);
                 const remainingBench = sorted.slice(11, 18);
 
@@ -83,7 +90,7 @@ export function PreMatchScreen({
         };
 
         loadPlayers();
-    }, [homeTeam.id]);
+    }, [myTeam.id]);
 
     const handleDragStart = useCallback(
         (player: Player, sourceType: "field" | "bench", sourceIndex?: number) => {
@@ -121,7 +128,6 @@ export function PreMatchScreen({
                 const newStarters = [...starters];
                 newStarters[sourceIndex] = null;
                 setStarters(newStarters);
-
                 setBench([...bench, player]);
             }
 
@@ -160,11 +166,13 @@ export function PreMatchScreen({
             tactics,
         };
 
+        const cpuLineup = { ...myLineup, starters: [], bench: [] };
+
         try {
             await window.electronAPI.match.savePreMatchTactics(
                 matchId,
-                myLineup,
-                { ...myLineup, starters: [], bench: [] }
+                isUserHome ? myLineup : cpuLineup,
+                isUserHome ? cpuLineup : myLineup
             );
 
             onConfirm(myLineup);
@@ -173,12 +181,12 @@ export function PreMatchScreen({
             alert("Erro ao salvar táticas. Tente novamente.");
         }
 
-    }, [formation, starters, bench, tactics, onConfirm, matchId]);
+    }, [formation, starters, bench, tactics, onConfirm, matchId, isUserHome]);
 
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen bg-slate-950">
-                <div className="text-white">Carregando jogadores...</div>
+                <div className="text-white">Carregando elenco...</div>
             </div>
         );
     }
@@ -188,9 +196,14 @@ export function PreMatchScreen({
             <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold">Preparação Pré-Jogo</h1>
-                    <p className="text-sm text-slate-400">
-                        {homeTeam.name} vs {awayTeam.name}
-                    </p>
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                        <span className="text-emerald-400 font-bold">{myTeam.name}</span>
+                        <span>vs</span>
+                        <span>{opponentTeam.name}</span>
+                        <span className="bg-slate-800 px-2 py-0.5 rounded text-xs ml-2">
+                            {isUserHome ? "EM CASA 🏠" : "FORA ✈️"}
+                        </span>
+                    </div>
                 </div>
                 <div className="flex gap-3">
                     <button
@@ -201,7 +214,7 @@ export function PreMatchScreen({
                     </button>
                     <button
                         onClick={handleConfirm}
-                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 rounded font-bold transition-colors"
+                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 rounded font-bold transition-colors shadow-lg shadow-emerald-900/20"
                     >
                         Confirmar e Iniciar
                     </button>

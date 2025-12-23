@@ -38,7 +38,7 @@ export class StopConditionChecker {
     return { shouldStop: false };
   }
 
-  private async checkPlayerTeamMatch(
+  public async checkPlayerTeamMatch(
     date: string,
     teamId: number
   ): Promise<StopCondition> {
