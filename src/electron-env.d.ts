@@ -276,6 +276,7 @@ declare global {
         getScoutingList: (teamId: number) => Promise<any[]>;
         assignScout: (scoutId: number, playerId: number) => Promise<boolean>;
         calculateScoutingAccuracy: (teamId: number) => Promise<number>;
+        getSlots: (teamId: number) => Promise<any[]>;
         updateSlots: (teamId: number, slots: any[]) => Promise<boolean>;
       };
 

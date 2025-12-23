@@ -811,6 +811,11 @@ function registerIpcHandlers() {
     }
   );
 
+  ipcMain.handle("scouting:getSlots", async (_, teamId: number) => {
+    const result = await serviceContainer.scouting.getScoutingSlots(teamId);
+    return Result.unwrapOr(result, []);
+  });
+
   ipcMain.handle("scouting:updateSlots", async (_, { teamId, slots }) => {
     const result = await serviceContainer.scouting.updateScoutingSlots(
       teamId,

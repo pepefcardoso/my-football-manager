@@ -124,7 +124,14 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
             }
 
             const teamsData = await window.electronAPI.team.getTeams();
-            const myTeam = teamsData.find(t => t.id === teamId) || null;
+            let myTeam = teamsData.find(t => t.id === teamId) || null;
+
+            const slots = await window.electronAPI.scouting.getSlots(teamId);
+
+            if (myTeam) {
+                myTeam = { ...myTeam, scoutingSlots: slots };
+            }
+
             setTeam(myTeam);
 
             await fetchProposals(teamId);

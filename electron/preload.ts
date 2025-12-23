@@ -251,6 +251,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("scouting:assignScout", { scoutId, playerId }),
     calculateScoutingAccuracy: (teamId: number) =>
       ipcRenderer.invoke("scouting:calculateScoutingAccuracy", teamId),
+    getSlots: (teamId: number) =>
+      ipcRenderer.invoke("scouting:getSlots", teamId),
     updateSlots: (teamId: number, slots: any[]) =>
       ipcRenderer.invoke("scouting:updateSlots", { teamId, slots }),
   },
