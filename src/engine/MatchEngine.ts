@@ -53,7 +53,11 @@ export class MatchEngine implements IMatchEngineContext {
   private readonly MAX_SUBSTITUTIONS = 5;
   private weatherMultiplier: number = 1.0;
 
-  constructor(config: MatchConfig, private isKnockout: boolean, seed?: number) {
+  constructor(
+    config: MatchConfig,
+    public readonly isKnockout: boolean,
+    seed?: number
+  ) {
     this.config = config;
     const matchSeed = seed || Date.now();
     this.rng = new RandomEngine(matchSeed);

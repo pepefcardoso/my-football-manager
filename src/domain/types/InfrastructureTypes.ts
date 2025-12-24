@@ -75,3 +75,21 @@ export interface InfrastructureOverview {
   activeConstruction: ActiveConstruction | null;
   totalMaintenanceCost: number;
 }
+
+export interface UpgradeValidationContext {
+  upgradeType: string;
+  currentValue: number;
+  upgradeCost: number;
+  currentBudget: number;
+  hasActiveConstruction: boolean;
+  teamReputation: number;
+}
+
+export interface UpgradeValidationResult {
+  isValid: boolean;
+  canAfford: boolean;
+  meetsPrerequisites: boolean;
+  withinLimits: boolean;
+  errors: string[];
+  warnings: string[];
+}

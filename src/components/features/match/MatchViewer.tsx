@@ -31,7 +31,6 @@ export function MatchViewer({
     pauseMatch,
     resumeMatch,
     simulateToEnd,
-    reset,
     speed,
     setSpeed,
   } = useMatchSimulation();
@@ -156,7 +155,6 @@ export function MatchViewer({
           onPause={pauseMatch}
           onResume={resumeMatch}
           onSimulateToEnd={simulateToEnd}
-          onReset={reset}
         />
 
         <MatchEvents events={simulation.events} />

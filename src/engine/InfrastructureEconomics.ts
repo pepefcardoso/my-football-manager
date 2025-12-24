@@ -43,27 +43,29 @@ export class InfrastructureEconomics {
   static getUpgradeCost(
     type: FacilityType,
     currentLevel: number,
-    amount: number = 1
+    amount: number = 1,
+    stadiumCapacity: number = 10000
   ): number {
     if (type === "stadium_capacity") {
       return Math.round(amount * CONFIG.COSTS.SEAT_PRICE);
     }
 
     if (type === "stadium_quality") {
-      // NOTA: Para simplificar sem quebrar a assinatura, vamos assumir um custo base fixo
-      // multiplicado por um fator de crescimento.
-      // Num cenário real, passaríamos a capacidade do time como argumento extra.
-      return Math.round(
-        CONFIG.COSTS.QUALITY_BASE_PER_1K_SEATS *
-          20 *
-          Math.pow(1.02, currentLevel)
-      );
+      return this.getStadiumQualityUpgradeCost(currentLevel, stadiumCapacity);
     }
 
     const base = CONFIG.COSTS.FACILITY_BASE;
     return Math.round(
       base * Math.pow(CONFIG.COSTS.GROWTH_FACTOR, currentLevel)
     );
+  }
+
+  static getMaxStadiumCapacity(): number {
+    return CONFIG.LEVELS.STADIUM_CAPACITY_MAX;
+  }
+
+  static getMaxFacilityLevel(): number {
+    return CONFIG.LEVELS.MAX;
   }
 
   static getStadiumQualityUpgradeCost(

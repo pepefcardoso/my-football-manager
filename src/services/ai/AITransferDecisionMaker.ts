@@ -45,11 +45,6 @@ export class AITransferDecisionMaker extends BaseService {
     this.financialHealthChecker = financialHealthChecker;
   }
 
-  /**
-   * @param proposalId ID da proposta recebida.
-   * @param currentDate Data atual do jogo.
-   * @returns ServiceResult com a decisão.
-   */
   async evaluateIncomingProposal(
     proposalId: number,
     currentDate: string
@@ -149,11 +144,6 @@ export class AITransferDecisionMaker extends BaseService {
     );
   }
   
-  /**
-   * @param teamId ID do time da AI.
-   * @param currentDate Data atual do jogo.
-   * @returns Ação de compra recomendada.
-   */
   async determineTransferAction(
     teamId: number,
     currentDate: string

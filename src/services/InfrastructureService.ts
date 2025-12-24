@@ -309,31 +309,46 @@ export class InfrastructureService extends BaseService {
     currentDate: string,
     seasonId: number
   ): Promise<ServiceResult<number>> {
-    return this.execute("applyMonthlyMaintenance", { teamId }, async () => {
-      const team = await this.repos.teams.findById(teamId);
-      if (!team) return 0;
+    return this.execute(
+      "applyMonthlyMaintenance",
+      { teamId, currentDate, seasonId },
+      async ({ teamId, currentDate, seasonId }) => {
+        const team = await this.repos.teams.findById(teamId);
+        if (!team) return 0;
 
-      const types: FacilityType[] = [
-        "stadium_capacity",
-        "stadium_quality",
-        "training_center_quality",
-        "medical_center_quality",
-        "youth_academy_quality",
-        "administrative_center_quality",
-      ];
-      let totalCost = 0;
-      for (const type of types) {
-        totalCost += InfrastructureEconomics.getMaintenanceCost(
-          type,
-          this.getCurrentLevel(team, type)
-        );
-      }
+        const types: FacilityType[] = [
+          "stadium_capacity",
+          "stadium_quality",
+          "training_center_quality",
+          "medical_center_quality",
+          "youth_academy_quality",
+          "administrative_center_quality",
+        ];
 
-      if (totalCost > 0) {
-        await this.repos.teams.updateBudget(teamId, team.budget - totalCost);
+        let totalCost = 0;
+        for (const type of types) {
+          totalCost += InfrastructureEconomics.getMaintenanceCost(
+            type,
+            this.getCurrentLevel(team, type)
+          );
+        }
+
+        if (totalCost > 0) {
+          await this.repos.teams.updateBudget(teamId, team.budget - totalCost);
+
+          await this.repos.financial.addRecord({
+            teamId,
+            seasonId,
+            date: currentDate,
+            type: "expense",
+            category: FinancialCategory.INFRASTRUCTURE,
+            amount: totalCost,
+            description: "Manutenção Mensal de Infraestrutura",
+          });
+        }
+        return totalCost;
       }
-      return totalCost;
-    });
+    );
   }
 
   async downgradeFacility(

@@ -33,11 +33,16 @@ export function TransferProposalModal({
     const [fee, setFee] = useState(0);
     const [wageOffer, setWageOffer] = useState(0);
     const [contractLength, setContractLength] = useState(3);
-    const [transferType, setTransferType] = useState<TransferType>(TransferType.TRANSFER);
+    const [transferType, setTransferType] = useState<TransferType>(
+        TransferType.TRANSFER
+    );
 
     const isFreeAgent = player.teamId === null;
-    const isMasked = player.visibleAttributes && !player.visibleAttributes.overall?.isExact;
-    const releaseClause = (player as any).releaseClause || (player as any).currentContract?.releaseClause;
+    const isMasked =
+        player.visibleAttributes && !player.visibleAttributes.overall?.isExact;
+    const releaseClause =
+        (player as any).releaseClause ||
+        (player as any).currentContract?.releaseClause;
 
     useEffect(() => {
         async function loadEstimates() {
@@ -76,7 +81,7 @@ export function TransferProposalModal({
 
     useEffect(() => {
         async function validateBudget() {
-            if (isLoadingEstimate || isFreeAgent) {
+            if (isLoadingEstimate) {
                 setCanAfford(true);
                 setError(null);
                 return;
@@ -98,7 +103,7 @@ export function TransferProposalModal({
                 }
             } catch (err) {
                 logger.error("Erro ao validar orçamento:", err);
-                setError("Erro ao validar orçamento.");
+                setError(null);
             }
         }
 
@@ -115,9 +120,9 @@ export function TransferProposalModal({
         try {
             const proposalData = {
                 playerId: player.id,
-                fromTeamId: isFreeAgent ? proposingTeamId : player.teamId,
-                toTeamId: isFreeAgent ? null : proposingTeamId,
-                type: transferType,
+                fromTeamId: player.teamId,
+                toTeamId: proposingTeamId,
+                type: transferType as any,
                 fee: fee,
                 wageOffer: wageOffer,
                 contractLength: contractLength,
@@ -127,7 +132,9 @@ export function TransferProposalModal({
 
             logger.info("Enviando proposta:", proposalData);
 
-            const result = await window.electronAPI.transfer.createProposal(proposalData);
+            const result = await window.electronAPI.transfer.createProposal(
+                proposalData
+            );
 
             if (result.success) {
                 onProposalSent();
@@ -153,12 +160,12 @@ export function TransferProposalModal({
         contractLength,
         currentDate,
         seasonId,
-        isFreeAgent,
         onClose,
         onProposalSent,
     ]);
 
-    const displayOverall = player.visibleAttributes?.overall?.value || player.overall;
+    const displayOverall =
+        player.visibleAttributes?.overall?.value || player.overall;
 
     const feeMax = Math.max(marketValue * 3, 1000000);
     const wageMax = Math.max(suggestedWage * 2, 50000);
@@ -193,7 +200,9 @@ export function TransferProposalModal({
                         )}
                         {releaseClause > 0 && !isFreeAgent && (
                             <div className="mt-2">
-                                <p className="text-[10px] text-slate-500 mb-0.5">Cláusula Rescisão</p>
+                                <p className="text-[10px] text-slate-500 mb-0.5">
+                                    Cláusula Rescisão
+                                </p>
                                 <Badge variant="warning" className="text-xs font-mono">
                                     {formatCurrency(releaseClause)}
                                 </Badge>
@@ -216,8 +225,9 @@ export function TransferProposalModal({
                         <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 text-xs flex gap-2 items-center">
                             <span>⚠️</span>
                             <p>
-                                <strong>Scouting Incompleto:</strong> Você está fazendo uma oferta "às cegas".
-                                O valor real do jogador pode diferir da estimativa.
+                                <strong>Scouting Incompleto:</strong> Você está fazendo uma
+                                oferta "às cegas". O valor real do jogador pode diferir da
+                                estimativa.
                             </p>
                         </div>
                     )}
@@ -233,7 +243,9 @@ export function TransferProposalModal({
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-slate-300 flex justify-between items-center">
                                     Valor da Transferência (Fee)
-                                    <Badge variant={!canAfford && !isFreeAgent ? "danger" : "success"}>
+                                    <Badge
+                                        variant={!canAfford && !isFreeAgent ? "danger" : "success"}
+                                    >
                                         {formatCurrency(fee)}
                                     </Badge>
                                 </label>

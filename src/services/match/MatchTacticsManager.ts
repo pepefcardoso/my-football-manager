@@ -34,10 +34,6 @@ export class MatchTacticsManager extends BaseService {
     super(repositories, "MatchTacticsManager");
   }
 
-  /**
-   * @param request - Dados da mudança tática
-   * @returns ServiceResult void
-   */
   async updateLiveTactics(
     request: UpdateLiveTacticsRequest
   ): Promise<ServiceResult<void>> {
@@ -97,10 +93,6 @@ export class MatchTacticsManager extends BaseService {
     );
   }
 
-  /**
-   * @param tactics - Táticas a serem validadas
-   * @returns Resultado da validação
-   */
   private validateTacticalChange(tactics: Partial<TacticsConfig>): {
     isValid: boolean;
     errors?: string[];
@@ -148,11 +140,6 @@ export class MatchTacticsManager extends BaseService {
     return { isValid: true };
   }
 
-  /**
-   * @param matchId - ID da partida
-   * @param isHome - Se é o time da casa
-   * @returns Táticas atuais
-   */
   private async getCurrentMatchTactics(
     matchId: number,
     isHome: boolean
@@ -180,12 +167,6 @@ export class MatchTacticsManager extends BaseService {
     };
   }
 
-  /**
-   * @param matchId - ID da partida
-   * @param teamId - ID do time
-   * @param isHome - Se é mandante
-   * @param tactics - Novas táticas
-   */
   private async saveMatchTactics(
     matchId: number,
     teamId: number,
@@ -203,11 +184,6 @@ export class MatchTacticsManager extends BaseService {
     // TODO adicionar no MatchRepository real
   }
 
-  /**
-   * @param old - Táticas antigas
-   * @param updated - Táticas novas
-   * @returns Lista de campos alterados
-   */
   private detectChangedFields(
     old: TacticsConfig,
     updated: TacticsConfig
@@ -223,11 +199,6 @@ export class MatchTacticsManager extends BaseService {
     return changes;
   }
 
-  /**
-   * @param matchId - ID da partida
-   * @param isHome - Time a analisar
-   * @returns Análise tática com recomendações
-   */
   async analyzeTactics(
     matchId: number,
     isHome: boolean
@@ -283,10 +254,6 @@ export class MatchTacticsManager extends BaseService {
     );
   }
 
-  /**
-   * @param tactics - Táticas a analisar
-   * @returns Impacto estimado em métricas chave
-   */
   private estimateTacticalImpact(tactics: TacticsConfig): {
     attack: number;
     defense: number;
@@ -368,13 +335,6 @@ export class MatchTacticsManager extends BaseService {
     return { attack, defense, possession, stamina };
   }
 
-  /**
-   * @param matchId - ID da partida
-   * @param isHome - Time a sugerir
-   * @param currentMinute - Minuto atual
-   * @param score - Placar atual {home, away}
-   * @returns Sugestão tática
-   */
   async suggestTactics(
     matchId: number,
     isHome: boolean,
@@ -384,7 +344,7 @@ export class MatchTacticsManager extends BaseService {
     return this.execute(
       "suggestTactics",
       { matchId, isHome, currentMinute, score },
-      async ({ matchId, isHome, currentMinute, score }) => {
+      async ({ isHome, currentMinute, score }) => {
         const myScore = isHome ? score.home : score.away;
         const opponentScore = isHome ? score.away : score.home;
         const scoreDiff = myScore - opponentScore;

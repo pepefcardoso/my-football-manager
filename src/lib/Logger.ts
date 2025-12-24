@@ -1,7 +1,3 @@
-/**
- * Define a severidade do log.
- * Útil para filtrar o que deve ser exibido em produção vs desenvolvimento.
- */
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -10,11 +6,7 @@ export enum LogLevel {
   NONE = 4,
 }
 
-/**
- * Configuração do Logger.
- * Em produção, podemos mudar o minLevel para WARN ou ERROR.
- */
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = process.env.NODE_ENV === "production";
 
 const CONFIG = {
   minLevel: isProduction ? LogLevel.WARN : LogLevel.DEBUG,
@@ -33,17 +25,10 @@ const COLORS = {
 export class Logger {
   private context: string;
 
-  /**
-   * Cria uma instância de Logger para um contexto específico.
-   * @param context O nome do serviço, componente ou módulo (ex: 'MatchService')
-   */
   constructor(context: string) {
     this.context = context;
   }
 
-  /**
-   * Método interno genérico para exibir o log
-   */
   private print(level: LogLevel, message: string, data?: any) {
     if (level < CONFIG.minLevel) return;
 
@@ -77,34 +62,18 @@ export class Logger {
     }
   }
 
-  /**
-   * Detalhes de desenvolvimento, fluxos e variáveis.
-   * Só aparece se minLevel for DEBUG.
-   */
   public debug(message: string, data?: any): void {
     this.print(LogLevel.DEBUG, message, data);
   }
 
-  /**
-   * Informações gerais sobre o funcionamento do sistema.
-   * Ex: "Partida iniciada", "Usuário logado".
-   */
   public info(message: string, data?: any): void {
     this.print(LogLevel.INFO, message, data);
   }
 
-  /**
-   * Avisos que não quebram o sistema, mas merecem atenção.
-   * Ex: "Tentativa de login falhou", "Recurso não encontrado (404)".
-   */
   public warn(message: string, data?: any): void {
     this.print(LogLevel.WARN, message, data);
   }
 
-  /**
-   * Erros críticos que precisam de correção.
-   * Ex: "Falha na conexão com DB", "Exception não tratada".
-   */
   public error(message: string, error?: any): void {
     this.print(LogLevel.ERROR, message, error);
   }

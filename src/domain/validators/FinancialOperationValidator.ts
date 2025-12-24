@@ -1,6 +1,6 @@
 import { FinancialCategory } from "../../domain/enums";
-import type { ValidationResult } from "../BaseService";
 import { getBalanceValue } from "../../engine/GameBalanceConfig";
+import type { ValidationResult } from "../../services/BaseService";
 
 const CONTRACT_CONFIG = getBalanceValue("CONTRACT");
 

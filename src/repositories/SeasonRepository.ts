@@ -31,10 +31,6 @@ export class SeasonRepository extends BaseRepository {
     return result[0];
   }
 
-  /**
-   * Desativa explicitamente uma temporada específica.
-   * @param id ID da temporada a ser desativada.
-   */
   async deactivate(id: number): Promise<void> {
     await this.db
       .update(seasons)

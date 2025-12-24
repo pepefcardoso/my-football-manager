@@ -16,6 +16,15 @@ import {
   type MonthlyFinancialSummary,
 } from "../domain/factories/ReportFactory";
 
+interface InfrastructureFinancialData {
+  totalMonthlyCost: number;
+  totalAnnualCost: number;
+  stadium: { quality: number; totalAnnual: number };
+  trainingCenter: { quality: number };
+  youthAcademy: { quality: number };
+  administrative: { totalAnnual: number };
+}
+
 export class FinanceService extends BaseService {
   private operationalCosts: OperationalCostsService;
   private revenueService: RevenueService;
@@ -88,10 +97,13 @@ export class FinanceService extends BaseService {
           await this.infrastructureService.getInfrastructureStatus(teamId);
 
         let monthlyInfrastructureMaintenance = 0;
+        let infrastructureData: InfrastructureFinancialData | null = null;
 
         if (Result.isSuccess(infrastructureResult)) {
-          const infrastructure = infrastructureResult.data;
-          monthlyInfrastructureMaintenance = infrastructure.totalMonthlyCost;
+          infrastructureData =
+            infrastructureResult.data as unknown as InfrastructureFinancialData;
+          monthlyInfrastructureMaintenance =
+            infrastructureData.totalMonthlyCost;
 
           this.logger.info(
             `Infrastructure maintenance: €${monthlyInfrastructureMaintenance.toLocaleString()}/month`
@@ -105,7 +117,7 @@ export class FinanceService extends BaseService {
               type: "expense",
               category: FinancialCategory.INFRASTRUCTURE,
               amount: monthlyInfrastructureMaintenance,
-              description: `Monthly Infrastructure Maintenance (Stadium: ${infrastructure.stadium.quality}, Training: ${infrastructure.trainingCenter.quality}, Youth: ${infrastructure.youthAcademy.quality})`,
+              description: `Monthly Infrastructure Maintenance (Stadium: ${infrastructureData.stadium.quality}, Training: ${infrastructureData.trainingCenter.quality}, Youth: ${infrastructureData.youthAcademy.quality})`,
             });
           }
         }
@@ -277,7 +289,7 @@ export class FinanceService extends BaseService {
     return this.execute(
       "getFinancialDashboard",
       { teamId, seasonId },
-      async ({ teamId, seasonId }) => {
+      async ({ teamId }) => {
         const team = await this.repos.teams.findById(teamId);
         if (!team) {
           throw new Error(`Team ${teamId} not found`);
@@ -314,7 +326,7 @@ export class FinanceService extends BaseService {
           : 0;
 
         const infrastructure = Result.isSuccess(infrastructureResult)
-          ? infrastructureResult.data
+          ? (infrastructureResult.data as unknown as InfrastructureFinancialData)
           : { totalMonthlyCost: 0, totalAnnualCost: 0 };
 
         const monthlyIncome = Math.round(revenue / 12);

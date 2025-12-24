@@ -38,6 +38,8 @@ export const FacilityCard: React.FC<FacilityCardProps> = ({
         ? expansionAmount * unitCost
         : initialUpgradeCost;
 
+    const isDisabled = isLoading || !initialCanAfford;
+
     return (
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 flex flex-col justify-between hover:border-slate-700 transition-colors">
             <div>
@@ -90,14 +92,14 @@ export const FacilityCard: React.FC<FacilityCardProps> = ({
                 {!isMaxLevel ? (
                     <button
                         onClick={() => onUpgrade(isStadiumCapacity ? expansionAmount : 1)}
-                        disabled={isLoading}
-                        className={`w-full py-3 rounded text-sm font-bold transition-all flex justify-between px-4 items-center group ${isLoading
-                                ? "bg-slate-800 text-slate-500 cursor-wait"
+                        disabled={isDisabled}
+                        className={`w-full py-3 rounded text-sm font-bold transition-all flex justify-between px-4 items-center group ${isDisabled
+                                ? "bg-slate-800 text-slate-500 cursor-not-allowed opacity-75"
                                 : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20"
                             }`}
                     >
                         <span>{isStadiumCapacity ? "Expandir" : "Melhorar"}</span>
-                        <span className="bg-black/20 px-2 py-0.5 rounded text-emerald-50 group-hover:bg-black/30 font-mono">
+                        <span className={`px-2 py-0.5 rounded font-mono ${isDisabled ? 'bg-black/10' : 'bg-black/20 text-emerald-50 group-hover:bg-black/30'}`}>
                             €{dynamicCost.toLocaleString()}
                         </span>
                     </button>

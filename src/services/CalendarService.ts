@@ -49,12 +49,6 @@ export class CalendarService extends BaseService {
     super(repositories, "CalendarService");
   }
 
-  /**
-   *
-   * @param competitions
-   * @param allTeams
-   * @returns
-   */
   async scheduleSeason(
     competitions: Competition[],
     allTeams: number[]

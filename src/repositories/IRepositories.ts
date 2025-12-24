@@ -109,7 +109,6 @@ export interface IMatchRepository {
   findByTeamAndSeason(teamId: number, seasonId: number): Promise<Match[]>;
   findByDateRange(startDate: string, endDate: string): Promise<Match[]>;
   findPendingMatchesByDate(date: string): Promise<Match[]>;
-
   updateMatchResult(
     id: number,
     homeScore: number,
@@ -117,7 +116,6 @@ export interface IMatchRepository {
     attendance: number,
     ticketRevenue: number
   ): Promise<void>;
-
   createMatchEvents(
     events: Array<{
       matchId: number | null;
@@ -128,8 +126,8 @@ export interface IMatchRepository {
       description: string | null;
     }>
   ): Promise<void>;
-
   createMany(matches: Array<Partial<Match>>): Promise<void>;
+  findEventsByMatchId(matchId: number): Promise<any[]>;
 }
 
 export interface ICompetitionRepository {

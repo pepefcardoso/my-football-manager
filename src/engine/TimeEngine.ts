@@ -22,10 +22,6 @@ export class TimeEngine {
     return TimeEngine.instance;
   }
 
-  /**
-   * Inicia o loop de simulação.
-   * @param onDayProcess Callback assíncrono que contém a lógica de negócio do dia (GameEngine.processDailyUpdate).
-   */
   public start(onDayProcess: () => Promise<void>): void {
     if (this.isRunning) {
       this.logger.warn("TimeEngine já está em execução.");
@@ -71,17 +67,11 @@ export class TimeEngine {
     }
   }
 
-  /**
-   * @returns A nova data em formato ISO (YYYY-MM-DD).
-   */
   public advanceDay(): string {
     this.currentDate.setDate(this.currentDate.getDate() + 1);
     return this.getDateString();
   }
 
-  /**
-   * Incrementa múltiplos dias (útil para pular períodos sem eventos).
-   */
   public addDays(days: number): string {
     this.currentDate.setDate(this.currentDate.getDate() + days);
     return this.getDateString();

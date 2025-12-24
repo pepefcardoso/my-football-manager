@@ -31,8 +31,8 @@ export class InfrastructureValidator {
     }
 
     let withinLimits = true;
-    if (context.upgradeType === "expand_stadium") {
-      const maxCap = InfrastructureEconomics.STADIUM.EXPANSION.MAX_CAPACITY;
+    if (context.upgradeType === "stadium_capacity") {
+      const maxCap = InfrastructureEconomics.getMaxStadiumCapacity();
       if (context.currentValue >= maxCap) {
         errors.push(
           `Capacidade máxima do estádio atingida (${maxCap.toLocaleString()}).`
@@ -40,7 +40,7 @@ export class InfrastructureValidator {
         withinLimits = false;
       }
     } else {
-      const maxLevel = InfrastructureEconomics.LEVELS.MAX;
+      const maxLevel = InfrastructureEconomics.getMaxFacilityLevel();
       if (context.currentValue >= maxLevel) {
         errors.push(`Nível máximo atingido (${maxLevel}).`);
         withinLimits = false;
@@ -49,10 +49,16 @@ export class InfrastructureValidator {
 
     if (canAfford) {
       const remaining = context.currentBudget - context.upgradeCost;
-      //TODO: ajustar esse valor conforme a economia do jogo
-      if (remaining < 10_000) {
+      const safetyThreshold = this.calculateSafetyThreshold(
+        context.teamReputation
+      );
+
+      if (remaining < safetyThreshold) {
         warnings.push(
-          "Atenção: O caixa ficará muito baixo após este investimento."
+          `Atenção: O caixa ficará muito baixo (€${remaining.toLocaleString()}) para o padrão do seu clube.`
+        );
+        warnings.push(
+          `Recomendamos manter pelo menos €${safetyThreshold.toLocaleString()} para despesas operacionais.`
         );
       }
     }
@@ -65,5 +71,12 @@ export class InfrastructureValidator {
       errors,
       warnings,
     };
+  }
+
+  private static calculateSafetyThreshold(reputation: number): number {
+    if (reputation >= 7000) return 1_000_000;
+    if (reputation >= 4000) return 250_000;
+    if (reputation < 2000) return 20_000;
+    return 50_000;
   }
 }

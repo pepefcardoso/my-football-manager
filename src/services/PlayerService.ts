@@ -23,13 +23,6 @@ export class PlayerService extends BaseService {
     super(repositories, "PlayerService");
   }
 
-  /**
-   * Recalcula e atualiza o atributo 'Overall' de um jogador.
-   * Baseia-se nos atributos técnicos e físicos ponderados pela posição.
-   * * @param playerId - O ID do jogador.
-   * @returns ServiceResult void.
-   * @throws Error se o jogador não for encontrado.
-   */
   async updatePlayerOverall(playerId: number): Promise<ServiceResult<void>> {
     return this.executeVoid(
       "updatePlayerOverall",
@@ -66,11 +59,6 @@ export class PlayerService extends BaseService {
     );
   }
 
-  /**
-   * Busca os dados completos de um jogador, incluindo seu contrato atual.
-   * * @param playerId - O ID do jogador.
-   * @returns O objeto Player com dados de contrato mesclados, ou undefined.
-   */
   async getPlayerWithContract(
     playerId: number
   ): Promise<ServiceResult<Player | undefined>> {
@@ -79,44 +67,24 @@ export class PlayerService extends BaseService {
     });
   }
 
-  /**
-   * Lista todos os jogadores de um time.
-   * * @param teamId - O ID do time.
-   * @returns Lista de jogadores.
-   */
   async getPlayersByTeam(teamId: number): Promise<ServiceResult<Player[]>> {
     return this.execute("getPlayersByTeam", teamId, async (teamId) => {
       return await this.repos.players.findByTeamId(teamId);
     });
   }
 
-  /**
-   * Lista apenas os jogadores da categoria de base (Youth Academy) de um time.
-   * * @param teamId - O ID do time.
-   * @returns Lista de jogadores jovens.
-   */
   async getYouthPlayers(teamId: number): Promise<ServiceResult<Player[]>> {
     return this.execute("getYouthPlayers", teamId, async (teamId) => {
       return await this.repos.players.findYouthAcademy(teamId);
     });
   }
 
-  /**
-   * Busca jogadores sem contrato (Free Agents).
-   * * @returns Lista de jogadores livres no mercado.
-   */
   async getFreeAgents(): Promise<ServiceResult<Player[]>> {
     return this.execute("getFreeAgents", null, async () => {
       return await this.repos.players.findFreeAgents();
     });
   }
 
-  /**
-   * Atualiza as condições físicas e mentais de um jogador.
-   * * @param input - Objeto contendo playerId e os atributos a atualizar (energy, fitness, moral).
-   * @returns ServiceResult void.
-   * @throws Error se o jogador não for encontrado.
-   */
   async updatePlayerCondition(
     input: UpdatePlayerConditionInput
   ): Promise<ServiceResult<void>> {
@@ -134,11 +102,6 @@ export class PlayerService extends BaseService {
     );
   }
 
-  /**
-   * Aplica uma lesão a um jogador.
-   * * @param input - Detalhes da lesão (playerId, tipo, duração).
-   * @returns ServiceResult void.
-   */
   async injurePlayer(input: InjurePlayerInput): Promise<ServiceResult<void>> {
     return this.executeVoid(
       "injurePlayer",

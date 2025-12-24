@@ -63,12 +63,6 @@ export class RevenueService extends BaseService {
     super(repositories, "RevenueService");
   }
 
-  /**
-   * @param teamId - The home team's ID
-   * @param matchImportance - Match importance multiplier (1.0 = normal, 1.5 = derby, 2.0 = cup final)
-   * @param weatherCondition - Weather condition affecting attendance
-   * @returns Detailed matchday revenue breakdown
-   */
   async calculateMatchdayRevenue(
     teamId: number,
     matchImportance: number = 1.0,
@@ -146,13 +140,7 @@ export class RevenueService extends BaseService {
       }
     );
   }
-
-  /**
-   * @param teamId - The team's ID
-   * @param leaguePosition - Expected league finishing position
-   * @param homeMatches - Number of home matches in season
-   * @returns Annual revenue projection
-   */
+  
   async projectAnnualRevenue(
     teamId: number,
     leaguePosition: number = 10,
@@ -172,13 +160,11 @@ export class RevenueService extends BaseService {
 
         const matchday = await this.calculateAnnualMatchdayRevenue(
           team,
-          homeMatches,
-          leagueTier
+          homeMatches
         );
 
         const broadcasting = this.calculateBroadcastingRevenue(
           leagueTier,
-          leaguePosition,
           homeMatches
         );
 
@@ -279,8 +265,7 @@ export class RevenueService extends BaseService {
 
   private async calculateAnnualMatchdayRevenue(
     team: Team,
-    homeMatches: number,
-    leagueTier: LeagueTier
+    homeMatches: number
   ): Promise<AnnualRevenueProjection["matchday"]> {
     const singleMatchResult = await this.calculateMatchdayRevenue(
       team.id,
@@ -305,7 +290,6 @@ export class RevenueService extends BaseService {
 
   private calculateBroadcastingRevenue(
     leagueTier: LeagueTier,
-    leaguePosition: number,
     homeMatches: number
   ): AnnualRevenueProjection["broadcasting"] {
     const config = FinancialBalance.REVENUE_STREAMS.BROADCASTING;

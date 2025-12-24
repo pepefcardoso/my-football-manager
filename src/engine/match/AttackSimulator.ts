@@ -3,14 +3,8 @@ import type { TeamStrength } from "../../domain/types";
 import { RandomEngine } from "../RandomEngine";
 import { GameBalance } from "../GameBalanceConfig";
 
-/**
- * Resultado possível de um ataque
- */
 export type AttackOutcome = "goal" | "save" | "miss" | "blocked" | "offside";
 
-/**
- * Contexto de um ataque (dados necessários para simulação)
- */
 export interface AttackContext {
   attackingStrength: TeamStrength;
   defendingStrength: TeamStrength;
@@ -20,9 +14,6 @@ export interface AttackContext {
   isHomeTeam: boolean;
 }
 
-/**
- * Resultado detalhado de uma simulação de ataque
- */
 export interface AttackResult {
   outcome: AttackOutcome;
   shooter?: Player;
@@ -142,9 +133,6 @@ export class AttackSimulator {
     return this.rng.chance(GameBalance.MATCH.OFFSIDE_IN_GOAL_PROBABILITY);
   }
 
-  /**
-   * Resolve a disputa final e retorna o tipo de resultado
-   */
   private resolveGoalAttempt(
     shooter: Player,
     goalkeeper?: Player

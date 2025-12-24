@@ -6,11 +6,6 @@ export type ClubInterestInsert = typeof clubInterests.$inferInsert;
 export type ClubInterestSelect = typeof clubInterests.$inferSelect;
 
 export class ClubInterestRepository extends BaseRepository {
-  /**
-   * Adiciona ou atualiza o interesse de um clube num jogador.
-   * Utiliza a lógica de "Upsert": verifica se já existe para decidir entre insert ou update.
-   * * @param data Dados do interesse (teamId, playerId, nível, prioridade, etc)
-   */
   async upsert(data: ClubInterestInsert): Promise<void> {
     const existing = await this.db.query.clubInterests.findFirst({
       where: and(
@@ -34,10 +29,6 @@ export class ClubInterestRepository extends BaseRepository {
     }
   }
 
-  /**
-   * Busca todos os interesses ativos relacionados a um jogador específico.
-   * Útil para saber se haverá "leilão" (bidding war) pelo jogador.
-   */
   async findByPlayerId(playerId: number) {
     return await this.db.query.clubInterests.findMany({
       where: eq(clubInterests.playerId, playerId),
@@ -48,9 +39,6 @@ export class ClubInterestRepository extends BaseRepository {
     });
   }
 
-  /**
-   * Busca a "Shortlist" (Alvos de Transferência) de um clube.
-   */
   async findByTeamId(teamId: number) {
     return await this.db.query.clubInterests.findMany({
       where: eq(clubInterests.teamId, teamId),
@@ -61,9 +49,6 @@ export class ClubInterestRepository extends BaseRepository {
     });
   }
 
-  /**
-   * Remove o interesse de um clube num jogador (ex: jogador comprado por outro ou rejeitado).
-   */
   async remove(teamId: number, playerId: number): Promise<void> {
     await this.db
       .delete(clubInterests)
@@ -75,12 +60,6 @@ export class ClubInterestRepository extends BaseRepository {
       );
   }
 
-  /**
-   * Limpeza de manutenção: Remove interesses que não foram atualizados desde uma certa data.
-   * Isso simula que o clube "esqueceu" ou "perdeu o interesse" no jogador com o tempo.
-   * * @param dateThreshold Data limite (ex: interesses anteriores a 2024-01-01)
-   * @returns Número de registos removidos
-   */
   async deleteOlderThan(dateThreshold: string): Promise<number> {
     const result = await this.db
       .delete(clubInterests)

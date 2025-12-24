@@ -18,12 +18,6 @@ export class SeasonService extends BaseService {
     super(repositories, "SeasonService");
   }
 
-  /**
-   * Inicia uma nova temporada no jogo.
-   * Garante a integridade desativando explicitamente a temporada anterior.
-   * * @param year - O ano da temporada (ex: 2025).
-   * @returns ServiceResult void em caso de sucesso.
-   */
   async startNewSeason(year: number): Promise<ServiceResult<void>> {
     return this.executeVoid("startNewSeason", year, async (year) => {
       this.logger.info(
@@ -109,19 +103,12 @@ export class SeasonService extends BaseService {
     });
   }
 
-  /**
-   * Obtém a temporada atualmente ativa no jogo.
-   * @returns O objeto da temporada (SeasonSelect) ou undefined se nenhuma estiver ativa.
-   */
   async getCurrentSeason(): Promise<ServiceResult<SeasonSelect | undefined>> {
     return this.execute("getCurrentSeason", null, async () => {
       return await this.repos.seasons.findActiveSeason();
     });
   }
 
-  /**
-   * Retorna o objeto Team do campeão de uma competição específica na temporada.
-   */
   async getSeasonChampion(
     seasonId: number,
     competitionId: number
@@ -144,9 +131,6 @@ export class SeasonService extends BaseService {
     );
   }
 
-  /**
-   * Lista os artilheiros de uma competição na temporada.
-   */
   async getTopScorers(
     seasonId: number,
     competitionId: number,
@@ -165,9 +149,6 @@ export class SeasonService extends BaseService {
     );
   }
 
-  /**
-   * Retorna as entradas da tabela de classificação correspondentes à zona de rebaixamento.
-   */
   async getRelegationZone(
     seasonId: number,
     competitionId: number,

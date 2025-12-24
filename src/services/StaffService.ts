@@ -14,11 +14,6 @@ export class StaffService extends BaseService {
     super(repositories, "StaffService");
   }
 
-  /**
-   *
-   * @param teamId
-   * @returns
-   */
   async getStaffImpact(
     teamId: number
   ): Promise<ServiceResult<TeamStaffImpact>> {
@@ -50,11 +45,6 @@ export class StaffService extends BaseService {
     });
   }
 
-  /**
-   *
-   * @param teamId
-   * @returns
-   */
   async getStaffByTeam(teamId: number): Promise<ServiceResult<Staff[]>> {
     return this.execute("getStaffByTeam", teamId, async (teamId) => {
       this.logger.debug(`Buscando staff do time ${teamId}...`);
@@ -62,10 +52,6 @@ export class StaffService extends BaseService {
     });
   }
 
-  /**
-   *
-   * @returns
-   */
   async getFreeAgents(): Promise<ServiceResult<Staff[]>> {
     return this.execute("getFreeAgents", null, async () => {
       this.logger.debug(`Buscando staff sem contrato...`);
@@ -73,14 +59,6 @@ export class StaffService extends BaseService {
     });
   }
 
-  /**
-   *
-   * @param teamId
-   * @param staffId
-   * @param salary
-   * @param contractEnd
-   * @returns
-   */
   async hireStaff(
     teamId: number,
     staffId: number,
@@ -106,11 +84,6 @@ export class StaffService extends BaseService {
     );
   }
 
-  /**
-   *
-   * @param staffId
-   * @returns
-   */
   async fireStaff(staffId: number): Promise<ServiceResult<void>> {
     return this.executeVoid("fireStaff", staffId, async (staffId) => {
       this.logger.info(`Demitindo staff ${staffId}...`);

@@ -98,12 +98,6 @@ export class CompetitionScheduler {
     return fixtures;
   }
 
-  /**
-   * @param teamIds Lista de IDs dos times participantes
-   * @param groupSize Tamanho de cada grupo (padrão: 4)
-   * @param doubleRound Se true, gera ida e volta (padrão: true)
-   * @returns Estrutura com grupos e fixtures
-   */
   static generateGroupStageFixtures(
     teamIds: number[],
     groupSize: number = 4,
@@ -189,12 +183,6 @@ export class CompetitionScheduler {
     return fixtures;
   }
 
-  /**
-   * @param matches Partidas da fase de grupos já jogadas
-   * @param groupStructure Estrutura original dos grupos
-   * @param qualifiersPerGroup Quantos times se classificam por grupo (padrão: 2)
-   * @returns IDs dos times classificados ordenados para chaveamento
-   */
   static getGroupStageQualifiers(
     matches: Match[],
     groupStructure: Record<string, number[]>,
@@ -231,9 +219,6 @@ export class CompetitionScheduler {
     return qualifiers;
   }
 
-  /**
-   * Calcula a classificação completa de todos os grupos
-   */
   static calculateGroupStandings(
     matches: Match[],
     groupStructure: Record<string, number[]>
@@ -303,10 +288,6 @@ export class CompetitionScheduler {
     return standings;
   }
 
-  /**
-   * Gera os confrontos da próxima fase baseados nos vencedores da fase anterior.
-   * Assume jogo único. Se houve empate, simula um vencedor (pênaltis técnicos).
-   */
   static generateNextRoundPairings(
     completedMatches: Match[],
     nextRoundNumber: number

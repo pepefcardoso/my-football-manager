@@ -510,6 +510,7 @@ export class MatchService extends BaseService {
       awayTeamId: match.awayTeamId!,
       homeScore: result.homeScore,
       awayScore: result.awayScore,
+      date: match.date,
       competitionId: match.competitionId || undefined,
       seasonId: match.seasonId || undefined,
       round: match.round || undefined,

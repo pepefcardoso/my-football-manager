@@ -6,9 +6,6 @@ export type ScoutingReportInsert = typeof scoutingReports.$inferInsert;
 export type ScoutingReportSelect = typeof scoutingReports.$inferSelect;
 
 export class ScoutingRepository extends BaseRepository {
-  /**
-   * Encontra um relatório específico de um jogador para um time
-   */
   async findByPlayerAndTeam(
     playerId: number,
     teamId: number
@@ -25,9 +22,6 @@ export class ScoutingRepository extends BaseRepository {
     return result[0];
   }
 
-  /**
-   * Lista todos os relatórios de um time (Lista de Observação)
-   */
   async findByTeam(teamId: number) {
     return await this.db.query.scoutingReports.findMany({
       where: eq(scoutingReports.teamId, teamId),
@@ -39,9 +33,6 @@ export class ScoutingRepository extends BaseRepository {
     });
   }
 
-  /**
-   * Cria ou atualiza um relatório
-   */
   async upsert(data: ScoutingReportInsert): Promise<void> {
     const existing = await this.findByPlayerAndTeam(
       data.playerId!,
@@ -64,9 +55,6 @@ export class ScoutingRepository extends BaseRepository {
     }
   }
 
-  /**
-   * Busca relatórios ativos (que ainda não chegaram a 100%) para simulação diária
-   */
   async findActiveReports(): Promise<ScoutingReportSelect[]> {
     return await this.db.select().from(scoutingReports);
   }

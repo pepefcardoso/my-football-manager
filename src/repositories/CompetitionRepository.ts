@@ -139,14 +139,6 @@ export class CompetitionRepository extends BaseRepository {
       .where(eq(playerCompetitionStats.id, id));
   }
 
-  /**
-   * Busca os principais artilheiros de uma competição.
-   * Ordena por Gols (desc) e Assistências (desc).
-   * @param competitionId ID da competição.
-   * @param seasonId ID da temporada.
-   * @param limit Limite de resultados.
-   * @returns Lista de estatísticas de jogadores.
-   */
   async getTopScorers(
     competitionId: number,
     seasonId: number,
@@ -166,14 +158,6 @@ export class CompetitionRepository extends BaseRepository {
     });
   }
 
-  /**
-   * Busca os principais goleiros de uma competição.
-   * Ordena por Clean Sheets (desc) e Defesas (desc).
-   * @param competitionId ID da competição.
-   * @param seasonId ID da temporada.
-   * @param limit Limite de resultados.
-   * @returns Lista de estatísticas de jogadores.
-   */
   async getTopGoalkeepers(
     competitionId: number,
     seasonId: number,

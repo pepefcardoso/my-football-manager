@@ -11,11 +11,6 @@ export class CupProgressionManager extends BaseService {
     super(repositories, "CupProgressionManager");
   }
 
-  /**
-   *
-   * @param matchId
-   * @returns
-   */
   async checkAndProgressCup(matchId: number): Promise<ServiceResult<void>> {
     return this.executeVoid("checkAndProgressCup", matchId, async (matchId) => {
       const match = await this.repos.matches.findById(matchId);

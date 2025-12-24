@@ -2,7 +2,7 @@ import { BaseService } from "../BaseService";
 import type { IRepositoryContainer } from "../../repositories/IRepositories";
 import type { ServiceResult } from "../../domain/ServiceResults";
 import { Result } from "../../domain/ServiceResults";
-import type { Team } from "../../domain/models";
+import type { Team, Player } from "../../domain/models";
 import { FinancialBalance } from "../../engine/FinancialBalanceConfig";
 
 export interface OperationalCostsBreakdown {
@@ -53,11 +53,6 @@ export class OperationalCostsService extends BaseService {
     super(repositories, "OperationalCostsService");
   }
 
-  /**
-   * @param teamId - The team's ID
-   * @param matchesPlayed - Number of home matches played this season (affects cleaning costs)
-   * @returns Detailed breakdown of all operational costs
-   */
   async calculateOperationalCosts(
     teamId: number,
     matchesPlayed: number = 0
@@ -83,12 +78,9 @@ export class OperationalCostsService extends BaseService {
           youthPlayers.length
         );
 
-        const administrative = await this.calculateAdministrativeCosts(
-          team,
-          players.length
-        );
+        const administrative = this.calculateAdministrativeCosts(players);
 
-        const medical = this.calculateMedicalCosts(team, players.length);
+        const medical = this.calculateMedicalCosts(players.length);
 
         const totalAnnual =
           stadium.totalAnnual +
@@ -208,13 +200,11 @@ export class OperationalCostsService extends BaseService {
     };
   }
 
-  private async calculateAdministrativeCosts(
-    team: Team,
-    playerCount: number
-  ): Promise<OperationalCostsBreakdown["administrative"]> {
+  private calculateAdministrativeCosts(
+    players: Player[]
+  ): OperationalCostsBreakdown["administrative"] {
     const config = FinancialBalance.OPERATIONAL_COSTS.ADMINISTRATIVE;
 
-    const players = await this.repos.players.findByTeamId(team.id);
     const totalPayroll = players.reduce((sum, p) => {
       const estimatedSalary = Math.pow(p.overall, 2.5) * 1000;
       return sum + estimatedSalary;
@@ -236,7 +226,6 @@ export class OperationalCostsService extends BaseService {
   }
 
   private calculateMedicalCosts(
-    team: Team,
     playerCount: number
   ): OperationalCostsBreakdown["medical"] {
     const config = FinancialBalance.OPERATIONAL_COSTS.MEDICAL;
@@ -256,10 +245,6 @@ export class OperationalCostsService extends BaseService {
     };
   }
 
-  /**
-   * @param severity - Injury severity (minor, moderate, severe)
-   * @returns Estimated treatment cost
-   */
   calculateInjuryTreatmentCost(
     severity: "minor" | "moderate" | "severe"
   ): number {
@@ -274,10 +259,6 @@ export class OperationalCostsService extends BaseService {
     );
   }
 
-  /**
-   * @param teamId - The team's ID
-   * @returns Monthly operational cost estimate
-   */
   async calculateMonthlyOperationalCosts(
     teamId: number
   ): Promise<ServiceResult<number>> {
@@ -296,11 +277,6 @@ export class OperationalCostsService extends BaseService {
     );
   }
 
-  /**
-   * @param teamId - The team's ID
-   * @param months - Number of months to check ahead
-   * @returns Whether team can sustain operations
-   */
   async canAffordOperationalCosts(
     teamId: number,
     months: number = 3

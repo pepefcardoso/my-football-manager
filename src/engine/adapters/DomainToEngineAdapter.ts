@@ -8,9 +8,6 @@ import type {
 } from "../../domain/EngineTypes";
 
 export class DomainToEngineAdapter {
-  /**
-   * Converte um jogador do domínio (DB) para o formato do motor.
-   */
   static toEnginePlayer(player: Player): EnginePlayer {
     const skills: EngineAttributes = {
       finishing: player.finishing,
@@ -39,12 +36,6 @@ export class DomainToEngineAdapter {
     };
   }
 
-  /**
-   * Converte um time e sua lista de jogadores para o formato do motor.
-   * @param team Dados do time
-   * @param players Lista de jogadores (já filtrada/selecionada para a partida se necessário)
-   * @param tacticalBonus Bônus tático opcional (padrão 0)
-   */
   static toEngineTeam(
     team: Team,
     players: Player[],

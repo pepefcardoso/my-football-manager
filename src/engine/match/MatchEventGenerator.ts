@@ -15,10 +15,6 @@ export interface GeneratorContext {
   players: Player[];
 }
 
-/**
- * MatchEventGenerator
- * Responsabilidade: Gerar eventos randômicos (Faltas, Cartões, Lesões)
- */
 export class MatchEventGenerator {
   static tryGenerateRandomEvent(
     context: GeneratorContext,

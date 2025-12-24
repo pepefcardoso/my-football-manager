@@ -49,10 +49,6 @@ export class SquadAnalysisService extends BaseService {
     super(repositories, "SquadAnalysisService");
   }
 
-  /**
-   * @param teamId - ID do time a ser analisado
-   * @returns Análise completa do elenco com necessidades priorizadas
-   */
   async analyzeSquad(teamId: number): Promise<ServiceResult<SquadAnalysis>> {
     return this.execute("analyzeSquad", teamId, async (teamId) => {
       this.logger.info(`🔍 Iniciando análise de elenco do time ${teamId}...`);
@@ -121,11 +117,6 @@ export class SquadAnalysisService extends BaseService {
     });
   }
 
-  /**
-   * @param playerId - ID do jogador candidato
-   * @param teamId - ID do time que possui a necessidade
-   * @returns Avaliação de fit do jogador para as necessidades do time
-   */
   async evaluatePlayerFit(
     playerId: number,
     teamId: number
@@ -185,10 +176,6 @@ export class SquadAnalysisService extends BaseService {
     );
   }
 
-  /**
-   * @param teamId - ID do time
-   * @returns Lista de jogadores que podem ser vendidos
-   */
   async identifySellablePlayers(
     teamId: number
   ): Promise<ServiceResult<Player[]>> {
@@ -240,12 +227,6 @@ export class SquadAnalysisService extends BaseService {
     });
   }
 
-  /**
-   * @param teamId - ID do time
-   * @param estimatedFee - Valor estimado da transferência
-   * @param estimatedWage - Salário anual estimado
-   * @returns Booleano indicando viabilidade financeira
-   */
   async canAffordPlayer(
     teamId: number,
     estimatedFee: number,
@@ -369,10 +350,6 @@ export class SquadAnalysisService extends BaseService {
     return Math.round(sum / players.length);
   }
 
-  /**
-   * @param teamId ID do time
-   * @returns O valor em moeda do espaço salarial mensal restante.
-   */
   private async calculateWageRoom(teamId: number): Promise<number> {
     const team = await this.repos.teams.findById(teamId);
     if (!team) return 0;
@@ -693,10 +670,6 @@ export class SquadAnalysisService extends BaseService {
     return priority;
   }
 
-  /**
-   * @param player O objeto Player a ser verificado.
-   * @returns true se o contrato estiver expirando, false caso contrário.
-   */
   private isContractExpiring(player: Player): boolean {
     const playerWithContract = player as PlayerWithContractInfo;
 

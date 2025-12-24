@@ -1,58 +1,29 @@
-/**
- * Metadata about a save file - displayed in the Load Game menu
- */
 export interface GameSaveMetadata {
-  /** Unique identifier for this save */
   id: string;
-  /** User-defined filename (without extension) */
   filename: string;
-  /** Manager/Player name */
   managerName: string;
-  /** Current team name (or "Unemployed") */
   teamName: string;
-  /** Current team ID (0 if unemployed) */
   teamId: number;
-  /** Current in-game date (YYYY-MM-DD) */
   currentDate: string;
-  /** Year of current season */
   seasonYear: number;
-  /** Team reputation (used for sorting/display) */
   reputation: number;
-  /** Total playtime in seconds */
   playTimeSeconds: number;
-  /** Real-world timestamp of last save */
   lastSaveTimestamp: string;
-  /** Game version (for compatibility checks) */
   version: string;
-  /** Team primary color (for UI theming) */
   primaryColor: string;
 }
 
-/**
- * Complete game state snapshot
- */
 export interface GameStateSnapshot {
-  /** Current game date */
   currentDate: string;
-  /** Active season ID */
   currentSeasonId: number | null;
-  /** Manager/Player name */
   managerName: string;
-  /** Controlled team ID (null if unemployed) */
   playerTeamId: number | null;
-  /** Current training focus */
   trainingFocus: string | null;
-  /** Simulation speed multiplier */
   simulationSpeed: number;
-  /** Total playtime in seconds */
   totalPlayTime: number;
-  /** Unique save identifier */
   saveId: string;
 }
 
-/**
- * Team snapshot with essential data
- */
 export interface TeamSnapshot {
   id: number;
   name: string;
@@ -72,9 +43,6 @@ export interface TeamSnapshot {
   transferStrategy: string;
 }
 
-/**
- * Player snapshot with contract data
- */
 export interface PlayerSnapshot {
   id: number;
   teamId: number | null;
@@ -110,9 +78,6 @@ export interface PlayerSnapshot {
   contractStatus: string | null;
 }
 
-/**
- * Staff snapshot
- */
 export interface StaffSnapshot {
   id: number;
   teamId: number | null;
@@ -127,9 +92,6 @@ export interface StaffSnapshot {
   specialization: string | null;
 }
 
-/**
- * Match snapshot (for match history)
- */
 export interface MatchSnapshot {
   id: number;
   competitionId: number | null;
@@ -147,9 +109,6 @@ export interface MatchSnapshot {
   groupName: string | null;
 }
 
-/**
- * Competition standing snapshot
- */
 export interface StandingSnapshot {
   id: number;
   competitionId: number | null;
@@ -166,9 +125,6 @@ export interface StandingSnapshot {
   points: number;
 }
 
-/**
- * Financial record snapshot
- */
 export interface FinancialSnapshot {
   id: number;
   teamId: number | null;
@@ -180,9 +136,6 @@ export interface FinancialSnapshot {
   description: string | null;
 }
 
-/**
- * Transfer record snapshot
- */
 export interface TransferSnapshot {
   id: number;
   playerId: number | null;
@@ -194,9 +147,6 @@ export interface TransferSnapshot {
   type: string;
 }
 
-/**
- * Scouting report snapshot
- */
 export interface ScoutingSnapshot {
   id: number;
   playerId: number | null;
@@ -210,9 +160,6 @@ export interface ScoutingSnapshot {
   recommendation: string | null;
 }
 
-/**
- * Transfer proposal snapshot
- */
 export interface TransferProposalSnapshot {
   id: number;
   playerId: number;
@@ -229,9 +176,6 @@ export interface TransferProposalSnapshot {
   rejectionReason: string | null;
 }
 
-/**
- * Club interest snapshot
- */
 export interface ClubInterestSnapshot {
   id: number;
   teamId: number;
@@ -242,53 +186,28 @@ export interface ClubInterestSnapshot {
   dateAdded: string;
 }
 
-/**
- * Complete game save containing all game data
- */
 export interface GameSave {
-  /** Save metadata for UI display */
   metadata: GameSaveMetadata;
-  /** Current game state */
   gameState: GameStateSnapshot;
-  /** All teams */
   teams: TeamSnapshot[];
-  /** All players with contract data */
   players: PlayerSnapshot[];
-  /** All staff members */
   staff: StaffSnapshot[];
-  /** Match history (last N matches to reduce size) */
   matches: MatchSnapshot[];
-  /** Competition standings */
   standings: StandingSnapshot[];
-  /** Financial records (last N records) */
   financialRecords: FinancialSnapshot[];
-  /** Transfer history (last N transfers) */
   transfers: TransferSnapshot[];
-  /** Active scouting reports */
   scoutingReports: ScoutingSnapshot[];
-  /** Active transfer proposals */
   transferProposals: TransferProposalSnapshot[];
-  /** Active club interests */
   clubInterests: ClubInterestSnapshot[];
 }
 
-/**
- * Options for creating a save
- */
 export interface CreateSaveOptions {
-  /** User-defined filename */
   filename: string;
-  /** Whether to compress the save data */
   compress?: boolean;
-  /** Number of historical matches to include */
   matchHistoryLimit?: number;
-  /** Number of financial records to include */
   financialRecordLimit?: number;
 }
 
-/**
- * Result of a save operation
- */
 export interface SaveOperationResult {
   success: boolean;
   saveId: string;
@@ -297,9 +216,6 @@ export interface SaveOperationResult {
   message: string;
 }
 
-/**
- * Result of a load operation
- */
 export interface LoadOperationResult {
   success: boolean;
   save: GameSave | null;
@@ -307,9 +223,6 @@ export interface LoadOperationResult {
   compatibilityWarnings?: string[];
 }
 
-/**
- * Save file validation result
- */
 export interface SaveValidationResult {
   isValid: boolean;
   version: string;

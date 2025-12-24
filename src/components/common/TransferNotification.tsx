@@ -69,6 +69,8 @@ export function TransferNotification() {
     useEffect(() => {
         if (!userTeam) return;
 
+        const activeTimeouts = timeoutsRef.current;
+
         const removeListener = window.electronAPI.transfer.onNotification(
             (data: TransferNotificationPayload) => {
                 addNotification(data);
@@ -80,8 +82,8 @@ export function TransferNotification() {
                 removeListener();
             }
 
-            timeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
-            timeoutsRef.current.clear();
+            activeTimeouts.forEach((timeout) => clearTimeout(timeout));
+            activeTimeouts.clear();
         };
     }, [userTeam, addNotification]);
 

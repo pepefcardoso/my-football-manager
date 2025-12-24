@@ -15,14 +15,6 @@ export class StatsService extends BaseService {
     super(repositories, "StatsService");
   }
 
-  /**
-   * Processa as estatísticas de uma partida finalizada, atualizando ou criando
-   * registros acumulativos para cada jogador envolvido.
-   * * @param matchId ID da partida
-   * @param competitionId ID da competição
-   * @param seasonId ID da temporada
-   * @param result Resultado completo da partida (eventos, scores, etc)
-   */
   async processMatchStats(
     matchId: number,
     competitionId: number,
@@ -47,13 +39,6 @@ export class StatsService extends BaseService {
     );
   }
 
-  /**
-   * Retorna os melhores goleiros de uma competição em uma temporada específica.
-   * Essencial para o histórico, pois permite consultar temporadas passadas via seasonId.
-   * * @param competitionId ID da competição
-   * @param seasonId ID da temporada (Histórico ou Atual)
-   * @param limit Limite de registros (padrão 10)
-   */
   async getTopGoalkeepers(
     competitionId: number,
     seasonId: number,
@@ -72,13 +57,6 @@ export class StatsService extends BaseService {
     );
   }
 
-  /**
-   * Retorna os artilheiros de uma competição em uma temporada específica.
-   * Essencial para o histórico, pois permite consultar temporadas passadas via seasonId.
-   * * @param competitionId ID da competição
-   * @param seasonId ID da temporada (Histórico ou Atual)
-   * @param limit Limite de registros (padrão 10)
-   */
   async getTopScorers(
     competitionId: number,
     seasonId: number,
@@ -97,9 +75,6 @@ export class StatsService extends BaseService {
     );
   }
 
-  /**
-   * Busca estatísticas individuais de um jogador em uma competição/temporada específica.
-   */
   async getPlayerStats(
     playerId: number,
     competitionId: number,

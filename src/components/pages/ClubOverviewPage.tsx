@@ -18,7 +18,6 @@ function ClubOverviewPage({ team }: { team: Team }) {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [seasonSummary, setSeasonSummary] = useState<SeasonSummary | null>(null);
     const [showSeasonModal, setShowSeasonModal] = useState(false);
-
     const isSimulatingRef = useRef(false);
 
     const {
@@ -69,11 +68,11 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
                 if (result.stopReason === 'transfer_proposal') {
                     logger.info("⏸️ Simulação pausada: Proposta de Transferência.");
+
                     navigateInGame("transfer");
-                    // TODO: mostrar notificação toast aqui
+
                     return { shouldStop: true, reason: 'transfer_proposal' };
                 }
-
                 return { shouldStop: true, reason: result.stopReason };
             }
 

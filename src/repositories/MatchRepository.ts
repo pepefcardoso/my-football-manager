@@ -6,6 +6,7 @@ import type { TeamLineup } from "../domain/types";
 export type MatchSelect = typeof matches.$inferSelect;
 export type MatchInsert = typeof matches.$inferInsert;
 export type MatchEventInsert = typeof matchEvents.$inferInsert;
+export type MatchEventSelect = typeof matchEvents.$inferSelect;
 
 export class MatchRepository extends BaseRepository {
   async findById(id: number): Promise<MatchSelect | undefined> {
@@ -48,6 +49,14 @@ export class MatchRepository extends BaseRepository {
       .select()
       .from(matches)
       .where(and(eq(matches.isPlayed, false), eq(matches.date, date)));
+  }
+
+  async findEventsByMatchId(matchId: number): Promise<MatchEventSelect[]> {
+    return await this.db
+      .select()
+      .from(matchEvents)
+      .where(eq(matchEvents.matchId, matchId))
+      .orderBy(asc(matchEvents.minute));
   }
 
   async updateMatchResult(

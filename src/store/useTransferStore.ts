@@ -13,12 +13,16 @@ interface TransferState {
 
 interface TransferActions {
   fetchProposals: (teamId: number) => Promise<void>;
-  updateProposalState: (proposalId: number, newStatus: string, newFee?: number | null) => void;
+  updateProposalState: (
+    proposalId: number,
+    newStatus: string,
+    newFee?: number | null
+  ) => void;
   resetState: () => void;
 }
 
 export const useTransferStore = create<TransferState & TransferActions>(
-  (set, _get) => ({
+  (set) => ({
     myBids: [],
     incomingOffers: [],
     loading: false,
@@ -34,19 +38,21 @@ export const useTransferStore = create<TransferState & TransferActions>(
 
     fetchProposals: async (teamId: number) => {
       set({ loading: true, error: null });
-      
+
       try {
         const [bids, offers] = await Promise.all([
           window.electronAPI.transfer.getMyBids(teamId),
           window.electronAPI.transfer.getIncomingOffers(teamId),
         ]);
 
-        const sortProposals = (a: TransferProposal, b: TransferProposal) =>
+        const sortProposals = (a: any, b: any) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 
         set({
-          myBids: bids.sort(sortProposals),
-          incomingOffers: offers.sort(sortProposals),
+          myBids: (bids as unknown as TransferProposal[]).sort(sortProposals),
+          incomingOffers: (offers as unknown as TransferProposal[]).sort(
+            sortProposals
+          ),
           loading: false,
         });
       } catch (err) {

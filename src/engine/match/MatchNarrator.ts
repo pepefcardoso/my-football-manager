@@ -1,9 +1,6 @@
 import { MatchEventType } from "../../domain/enums";
 import type { Player, Team } from "../../domain/models";
 
-/**
- * Contexto necessário para gerar descrições de eventos
- */
 export interface NarratorContext {
   player?: Player;
   team?: Team;
@@ -14,27 +11,7 @@ export interface NarratorContext {
   additionalInfo?: Record<string, any>;
 }
 
-/**
- * MatchNarrator
- *
- * Responsabilidade: Centralizar toda a geração de textos narrativos da partida.
- * Princípio: Single Responsibility - apenas traduz eventos em linguagem natural.
- *
- * Uso:
- * ```ts
- * const description = MatchNarrator.getEventDescription(
- *   MatchEventType.GOAL,
- *   { player, team }
- * );
- * ```
- */
 export class MatchNarrator {
-  /**
-   * Gera a descrição textual de um evento de partida
-   * @param type Tipo do evento (goal, save, foul, etc)
-   * @param context Dados contextuais (jogador, time, placar, etc)
-   * @returns String formatada para exibição
-   */
   static getEventDescription(
     type: MatchEventType | string,
     context: NarratorContext = {}
@@ -251,23 +228,14 @@ export class MatchNarrator {
     return `🔄 Substituição: Sai ${playerOut.firstName}, entra ${playerIn.firstName}.`;
   }
 
-  /**
-   * Gera narração para início de partida
-   */
   static narrateKickOff(homeTeam: Team, awayTeam: Team): string {
     return `⚽ A partida começou! ${homeTeam.shortName} vs ${awayTeam.shortName}`;
   }
 
-  /**
-   * Gera narração para prorrogação
-   */
   static narrateExtraTime(): string {
     return "⏰ PRORROGAÇÃO! A partida vai para os 30 minutos extras.";
   }
 
-  /**
-   * Gera narração genérica com contexto customizado
-   */
   static narrateCustom(template: string, context: Record<string, any>): string {
     let result = template;
 

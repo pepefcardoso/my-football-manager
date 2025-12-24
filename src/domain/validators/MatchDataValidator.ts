@@ -1,5 +1,5 @@
 import type { ITeamRepository } from "../../repositories/IRepositories";
-import type { ValidationResult } from "../BaseService";
+import type { ValidationResult } from "../../services/BaseService";
 
 export class MatchDataValidator {
   static async validateTeams(

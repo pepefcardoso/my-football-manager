@@ -39,7 +39,7 @@ export interface CreateProposalInput {
   playerId: number;
   fromTeamId: number;
   toTeamId: number;
-  type: "permanent" | "loan";
+  type: "transfer" | "loan" | "free" | string;
   fee: number;
   wageOffer: number;
   contractLength: number;
@@ -320,6 +320,11 @@ declare global {
           isFreeTransfer: boolean
         ) => Promise<any>;
         getTeamWageBill: (teamId: number) => Promise<any>;
+        canAffordTransfer: (
+          teamId: number,
+          fee: number,
+          wageOffer: number
+        ) => Promise<TransferAffordabilityCheck>;
       };
 
       contract: {
@@ -329,12 +334,6 @@ declare global {
           newWage: number,
           newEndDate: string
         ) => Promise<boolean>;
-
-        canAffordTransfer: (
-          teamId: number,
-          fee: number,
-          wageOffer: number
-        ) => Promise<TransferAffordabilityCheck>;
       };
 
       infrastructure: {

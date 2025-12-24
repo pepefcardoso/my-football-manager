@@ -42,9 +42,11 @@ export class NarrativeService extends BaseService {
               GameEventType.SCHEDULED_EVENT_TRIGGERED,
               {
                 eventId: eventToTrigger.id,
+                teamId: teamId,
+                date: currentDate,
                 type: eventToTrigger.type,
                 title: eventToTrigger.title,
-                date: currentDate,
+                description: eventToTrigger.description,
               }
             );
           }

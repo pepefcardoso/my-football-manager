@@ -18,9 +18,6 @@ export type DbTransaction = Parameters<
 
 const logger = new Logger("Database");
 
-/**
- * Determines the database path based on the environment.
- */
 const getDatabasePath = (): string => {
   if (process.env.NODE_ENV === "development") {
     return path.join(process.cwd(), "data", "database.sqlite");
@@ -40,9 +37,6 @@ const getDatabasePath = (): string => {
   return path.join(process.cwd(), "data", "database.sqlite");
 };
 
-/**
- * Ensures the directory for the database exists.
- */
 const ensureDatabaseDirectory = (filePath: string) => {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {

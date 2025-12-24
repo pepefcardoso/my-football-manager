@@ -11,10 +11,6 @@ export class TransferWindowManager extends BaseService {
     super(repositories, "TransferWindowManager");
   }
 
-  /**
-   * Verifica se a janela de transferências está aberta na data fornecida.
-   * @param dateStr Data no formato "YYYY-MM-DD"
-   */
   public isWindowOpen(dateStr: string): boolean {
     const date = new Date(dateStr);
     const month = date.getUTCMonth();
@@ -29,11 +25,6 @@ export class TransferWindowManager extends BaseService {
     );
   }
 
-  /**
-   * Retorna o número de dias restantes na janela atual.
-   * Retorna 0 se a janela estiver fechada.
-   * @param dateStr Data no formato "YYYY-MM-DD"
-   */
   public getDaysRemaining(dateStr: string): number {
     if (!this.isWindowOpen(dateStr)) {
       return 0;
@@ -59,11 +50,6 @@ export class TransferWindowManager extends BaseService {
     return diffDays;
   }
 
-  /**
-   * Valida se uma operação de transferência pode ocorrer na data informada.
-   * Utilizado para bloquear propostas fora de época.
-   * @param dateStr Data no formato "YYYY-MM-DD"
-   */
   public validateTransferTiming(dateStr: string): ServiceResult<void> {
     if (this.isWindowOpen(dateStr)) {
       return Result.success(undefined, "Janela de transferências aberta.");
@@ -74,9 +60,6 @@ export class TransferWindowManager extends BaseService {
     );
   }
 
-  /**
-   * Retorna informações sobre a próxima janela ou a janela atual.
-   */
   public getWindowStatus(dateStr: string): string {
     if (this.isWindowOpen(dateStr)) {
       const days = this.getDaysRemaining(dateStr);
