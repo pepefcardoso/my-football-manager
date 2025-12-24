@@ -37,6 +37,7 @@ export function TransferProposalModal({
 
     const isFreeAgent = player.teamId === null;
     const isMasked = player.visibleAttributes && !player.visibleAttributes.overall?.isExact;
+    const releaseClause = (player as any).releaseClause || (player as any).currentContract?.releaseClause;
 
     useEffect(() => {
         async function loadEstimates() {
@@ -189,6 +190,14 @@ export function TransferProposalModal({
                                 {isMasked ? "~ " : ""}
                                 {formatCurrency(marketValue)}
                             </Badge>
+                        )}
+                        {releaseClause > 0 && !isFreeAgent && (
+                            <div className="mt-2">
+                                <p className="text-[10px] text-slate-500 mb-0.5">Cláusula Rescisão</p>
+                                <Badge variant="warning" className="text-xs font-mono">
+                                    {formatCurrency(releaseClause)}
+                                </Badge>
+                            </div>
                         )}
                     </div>
                 </div>
