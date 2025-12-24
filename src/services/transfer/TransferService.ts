@@ -144,6 +144,8 @@ export class TransferService extends BaseService {
           fromTeamId: toTeamId,
           toTeamId: fromTeamId,
           fee,
+          wageOffer,
+          deadline: responseDeadline,
         });
 
         return proposalId;
@@ -233,13 +235,18 @@ export class TransferService extends BaseService {
     }
     const currentSeasonId = activeSeason.id;
 
+    const transactionDate = new Date().toISOString().split("T")[0];
+
     return this.executeVoid("finalizeTransfer", proposalId, async () => {
       this.logger.info(
         `🔄 Iniciando transação da transferência #${proposalId}...`
       );
 
       const buyingTeam = await this.repos.teams.findById(proposal.toTeamId!);
-      const sellingTeam = await this.repos.teams.findById(proposal.fromTeamId);
+      const sellingTeam = proposal.fromTeamId
+        ? await this.repos.teams.findById(proposal.fromTeamId)
+        : null;
+
       const player = await this.repos.players.findById(proposal.playerId);
 
       if (!buyingTeam || !player) {
@@ -260,7 +267,7 @@ export class TransferService extends BaseService {
       await this.repos.financial.addRecord({
         teamId: buyingTeam.id,
         seasonId: currentSeasonId,
-        date: new Date().toISOString().split("T")[0],
+        date: transactionDate,
         type: "expense",
         category: FinancialCategory.TRANSFER_OUT,
         amount: proposal.fee,
@@ -276,7 +283,7 @@ export class TransferService extends BaseService {
         await this.repos.financial.addRecord({
           teamId: sellingTeam.id,
           seasonId: currentSeasonId,
-          date: new Date().toISOString().split("T")[0],
+          date: transactionDate,
           type: "income",
           category: FinancialCategory.TRANSFER_IN,
           amount: proposal.fee,
@@ -284,9 +291,31 @@ export class TransferService extends BaseService {
         });
       }
 
+      const oldContract = await this.repos.contracts.findActiveByPlayerId(
+        player.id
+      );
+      if (oldContract) {
+        await this.repos.contracts.updateStatus(oldContract.id, "terminated");
+      }
+
       await this.repos.players.update(player.id, {
         teamId: buyingTeam.id,
         moral: TRANSFER_CONFIG.PLAYER_MORAL_ON_TRANSFER,
+      });
+
+      const contractEndDate = this.calculateContractEndDate(
+        transactionDate,
+        proposal.contractLength || 1
+      );
+
+      await this.repos.contracts.create({
+        playerId: player.id,
+        teamId: buyingTeam.id,
+        startDate: transactionDate,
+        endDate: contractEndDate,
+        wage: proposal.wageOffer,
+        type: "professional",
+        status: "active",
       });
 
       await this.repos.transfers.create({
@@ -294,7 +323,7 @@ export class TransferService extends BaseService {
         fromTeamId: proposal.fromTeamId,
         toTeamId: buyingTeam.id,
         fee: proposal.fee,
-        date: new Date().toISOString().split("T")[0],
+        date: transactionDate,
         seasonId: currentSeasonId,
         type: proposal.type,
       });
@@ -304,7 +333,7 @@ export class TransferService extends BaseService {
       });
 
       this.logger.info(
-        `✅ Transação concluída: ${player.lastName} -> ${buyingTeam.shortName}`
+        `✅ Transação concluída: ${player.lastName} -> ${buyingTeam.shortName} (Contrato até ${contractEndDate})`
       );
 
       await this.eventBus.publish(GameEventType.TRANSFER_COMPLETED, {
@@ -312,9 +341,16 @@ export class TransferService extends BaseService {
         fromTeamId: proposal.fromTeamId,
         toTeamId: proposal.toTeamId!,
         fee: proposal.fee,
-        date: new Date().toISOString().split("T")[0],
+        wageOffer: proposal.wageOffer,
+        date: transactionDate,
       });
     });
+  }
+
+  private calculateContractEndDate(startDate: string, years: number): string {
+    const date = new Date(startDate);
+    date.setFullYear(date.getFullYear() + years);
+    return date.toISOString().split("T")[0];
   }
 
   async getReceivedProposals(teamId: number): Promise<ServiceResult<any[]>> {
