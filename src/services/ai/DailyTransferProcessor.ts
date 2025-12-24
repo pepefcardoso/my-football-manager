@@ -4,20 +4,27 @@ import { Result } from "../../domain/ServiceResults";
 import type { ServiceResult } from "../../domain/ServiceResults";
 import type { AITransferDecisionMaker } from "./AITransferDecisionMaker";
 import type { TransferService } from "../transfer/TransferService";
-import { TransferType } from "../../domain/enums";
+import type { SquadAnalysisService } from "./SquadAnalysisService";
+import { InterestLevel, TransferType } from "../../domain/enums";
+import type { Player, Team } from "../../domain/models";
+import { TransferValuation } from "../../domain/logic/TransferValuation";
+import { RandomEngine } from "../../engine/RandomEngine";
 
 export class DailyTransferProcessor extends BaseService {
   private aiDecisionMaker: AITransferDecisionMaker;
   private transferService: TransferService;
+  private squadAnalysisService: SquadAnalysisService;
 
   constructor(
     repositories: IRepositoryContainer,
     aiDecisionMaker: AITransferDecisionMaker,
-    transferService: TransferService
+    transferService: TransferService,
+    squadAnalysisService: SquadAnalysisService
   ) {
     super(repositories, "DailyTransferProcessor");
     this.aiDecisionMaker = aiDecisionMaker;
     this.transferService = transferService;
+    this.squadAnalysisService = squadAnalysisService;
   }
 
   async processDailyTransfers(
@@ -62,9 +69,18 @@ export class DailyTransferProcessor extends BaseService {
             }
           } else {
             this.logger.error(
-              `Falha ao determinar ação para ${team.shortName}:`,
+              `Falha ao determinar ação de compra para ${team.shortName}:`,
               actionResult.error.message
             );
+          }
+
+          if (RandomEngine.chance(10)) {
+            const salesCount = await this.processAISales(
+              team.id,
+              currentDate,
+              allTeams
+            );
+            actionsCount += salesCount;
           }
         }
 
@@ -127,6 +143,71 @@ export class DailyTransferProcessor extends BaseService {
         return actionsCount;
       }
     );
+  }
+
+  private async processAISales(
+    teamId: number,
+    currentDate: string,
+    allTeams: Team[]
+  ): Promise<number> {
+    const sellableResult =
+      await this.squadAnalysisService.identifySellablePlayers(teamId);
+    let interestsCreated = 0;
+
+    if (Result.isSuccess(sellableResult)) {
+      const playersToSell = sellableResult.data.slice(0, 3);
+
+      for (const player of playersToSell) {
+        const existingInterests = await this.repos.clubInterests.findByPlayerId(
+          player.id
+        );
+        if (existingInterests.length > 0) continue;
+
+        const marketValue = TransferValuation.calculateMarketValue(player);
+        const potentialBuyerId = this.findPotentialBuyer(
+          player,
+          marketValue,
+          teamId,
+          allTeams
+        );
+
+        if (potentialBuyerId) {
+          await this.repos.clubInterests.upsert({
+            teamId: potentialBuyerId,
+            playerId: player.id,
+            interestLevel: InterestLevel.INTERESTED,
+            priority: 1,
+            maxFeeWillingToPay: Math.round(marketValue * 1.1),
+            dateAdded: currentDate,
+          });
+
+          this.logger.info(
+            `📢 Mercado: ${player.lastName} (Time ${teamId}) oferecido ao mercado. Interesse gerado no Time ${potentialBuyerId}.`
+          );
+          interestsCreated++;
+        }
+      }
+    }
+    return interestsCreated;
+  }
+
+  private findPotentialBuyer(
+    player: Player,
+    marketValue: number,
+    sellingTeamId: number,
+    allTeams: Team[]
+  ): number | null {
+    const candidates = allTeams.filter(
+      (t) =>
+        t.id !== sellingTeamId &&
+        (t.budget || 0) > marketValue * 1.2 &&
+        Math.abs((t.reputation || 0) - player.overall * 100) < 2000
+    );
+
+    if (candidates.length === 0) return null;
+
+    const selected = RandomEngine.pickOne(candidates);
+    return selected.id;
   }
 
   private async handleMakeOffer(

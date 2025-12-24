@@ -253,6 +253,15 @@ export class TransferService extends BaseService {
         throw new Error("Entidades inválidas no momento da finalização.");
       }
 
+      const currentSquad = await this.repos.players.findByTeamId(buyingTeam.id);
+      const squadLimit = TRANSFER_CONFIG.VALIDATION.SQUAD_MAX_SIZE;
+
+      if (currentSquad.length >= squadLimit) {
+        throw new Error(
+          `Falha na transação: O elenco de ${buyingTeam.shortName} já está cheio (${currentSquad.length}/${squadLimit}). Venda ou dispense jogadores antes de finalizar.`
+        );
+      }
+
       if (buyingTeam.budget < proposal.fee) {
         throw new Error(
           `Falha na transação: O comprador ${buyingTeam.name} não tem fundos (€${buyingTeam.budget} < €${proposal.fee}).`

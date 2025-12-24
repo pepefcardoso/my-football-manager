@@ -148,7 +148,8 @@ export class ServiceContainer implements IServiceContainer {
     this.dailyTransferProcessor = new DailyTransferProcessor(
       repos,
       this.aiTransferDecisionMaker,
-      this.transfer
+      this.transfer,
+      this.squadAnalysis
     );
     this.narrativeService = new NarrativeService(repos, this.eventBus);
     this.cpuSimulation = new CPUSimulationService(
