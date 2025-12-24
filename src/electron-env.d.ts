@@ -273,6 +273,9 @@ declare global {
         startAutoSimulation: () => Promise<boolean>;
         stopAutoSimulation: () => Promise<boolean>;
         onDailyUpdate: (callback: (data: any) => void) => void;
+        deleteSave: (
+          filename: string
+        ) => Promise<{ success: boolean; message: string }>;
       };
 
       finance: {

@@ -523,15 +523,34 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("game:saveGame", async (_, filename: string) => {
-    const saveResult = await gameEngine.createGameSave(filename);
+    const cleanFilename = filename.replace(".json", "");
+
+    const saveResult = await gameEngine.createGameSave(cleanFilename);
 
     if (Result.isFailure(saveResult)) {
       return { success: false, message: saveResult.error.message };
     }
 
     const gameSave = saveResult.data;
-    const filePath = path.join(SAVES_DIR, `${filename}.json`);
+
+    const filePath = path.join(SAVES_DIR, `${cleanFilename}.json`);
     await fs.writeFile(filePath, JSON.stringify(gameSave, null, 2));
+
+    try {
+      const currentState = await repositoryContainer.gameState.findCurrent();
+      if (currentState) {
+        await repositoryContainer.gameState.save({
+          ...currentState,
+          saveId: cleanFilename,
+        });
+        const engineState = gameEngine.getGameState();
+        if (engineState) {
+          engineState.saveId = cleanFilename;
+        }
+      }
+    } catch (err) {
+      logger.error("Erro ao sincronizar ID do save após salvar:", err);
+    }
 
     return {
       success: true,
@@ -579,6 +598,8 @@ function registerIpcHandlers() {
   ipcMain.handle("game:loadGame", async (_, filename: string) => {
     try {
       const file = filename.endsWith(".json") ? filename : `${filename}.json`;
+      const cleanFilename = filename.replace(".json", ""); // Nome sem extensão
+
       const filePath = path.join(SAVES_DIR, file);
       const content = await fs.readFile(filePath, "utf-8");
       const gameSave = JSON.parse(content);
@@ -589,10 +610,50 @@ function registerIpcHandlers() {
         return { success: false, message: result.error.message };
       }
 
+      const currentState = await repositoryContainer.gameState.findCurrent();
+      if (currentState) {
+        await repositoryContainer.gameState.save({
+          ...currentState,
+          saveId: cleanFilename,
+        });
+
+        const engineState = gameEngine.getGameState();
+        if (engineState) {
+          engineState.saveId = cleanFilename;
+        }
+      }
+
       return { success: true, message: "Jogo carregado com sucesso!" };
     } catch (error) {
       logger.error("Erro ao carregar save:", error);
       return { success: false, message: "Falha ao ler arquivo de save." };
+    }
+  });
+
+  ipcMain.handle("game:deleteSave", async (_, filename: string) => {
+    try {
+      const file = filename.endsWith(".json") ? filename : `${filename}.json`;
+      const filePath = path.join(SAVES_DIR, file);
+
+      try {
+        await fs.access(filePath);
+      } catch {
+        return { success: false, message: "Arquivo de save não encontrado." };
+      }
+
+      await fs.unlink(filePath);
+      logger.info(`Save deletado: ${file}`);
+
+      return { success: true, message: "Save excluído com sucesso." };
+    } catch (error) {
+      logger.error("Erro ao deletar save:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Erro desconhecido ao deletar.",
+      };
     }
   });
 

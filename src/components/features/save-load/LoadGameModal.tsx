@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { GameSaveMetadata } from "../../../domain/GameSaveTypes";
 import { SaveSlotCard } from "./SaveSlotCard";
 import { Logger } from "../../../lib/Logger";
@@ -17,23 +17,28 @@ export function LoadGameModal({ onClose, onLoad }: LoadGameModalProps) {
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchSaves = async () => {
-            try {
-                const data = await window.electronAPI.game.listSaves();
-                setSaves(data);
-                if (data.length > 0) {
-                    setSelectedFilename(data[0].filename);
+    const fetchSaves = useCallback(async () => {
+        setLoading(true);
+        try {
+            const data = await window.electronAPI.game.listSaves();
+            setSaves(data);
+            setSelectedFilename((currentSelected) => {
+                if (currentSelected && !data.find(s => s.filename === currentSelected)) {
+                    return null;
                 }
-            } catch (err) {
-                logger.error("Erro ao listar saves", err);
-                setError("Não foi possível ler o diretório de saves.");
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchSaves();
+                return currentSelected;
+            });
+        } catch (err) {
+            logger.error("Erro ao listar saves", err);
+            setError("Não foi possível ler o diretório de saves.");
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchSaves();
+    }, [fetchSaves]);
 
     const handleConfirmLoad = async () => {
         if (!selectedFilename || processing) return;
@@ -49,6 +54,26 @@ export function LoadGameModal({ onClose, onLoad }: LoadGameModalProps) {
         }
     };
 
+    const handleDelete = async (filename: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        if (!confirm(`Tem certeza que deseja EXCLUIR permanentemente o save "${filename}"?`)) {
+            return;
+        }
+
+        try {
+            const result = await window.electronAPI.game.deleteSave(filename);
+            if (result.success) {
+                await fetchSaves();
+            } else {
+                alert(`Erro: ${result.message}`);
+            }
+        } catch (error) {
+            logger.error("Erro ao deletar:", error);
+            alert("Erro crítico ao tentar deletar o save.");
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
             <div className="bg-slate-950 border border-slate-800 rounded-xl w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
@@ -56,7 +81,7 @@ export function LoadGameModal({ onClose, onLoad }: LoadGameModalProps) {
                 <div className="p-6 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
                     <div>
                         <h2 className="text-2xl font-light text-white">Carregar Jogo</h2>
-                        <p className="text-slate-400 text-sm">Selecione um arquivo para continuar sua carreira</p>
+                        <p className="text-slate-400 text-sm">Gerencie seus arquivos de carreira</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -85,12 +110,21 @@ export function LoadGameModal({ onClose, onLoad }: LoadGameModalProps) {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {saves.map((save) => (
-                                <SaveSlotCard
-                                    key={save.id}
-                                    metadata={save}
-                                    selected={selectedFilename === save.filename}
-                                    onClick={() => setSelectedFilename(save.filename)}
-                                />
+                                <div key={save.id} className="relative group">
+                                    <SaveSlotCard
+                                        metadata={save}
+                                        selected={selectedFilename === save.filename}
+                                        onClick={() => setSelectedFilename(save.filename)}
+                                    />
+
+                                    <button
+                                        onClick={(e) => handleDelete(save.filename, e)}
+                                        className="absolute top-2 right-2 p-2 bg-red-900/80 hover:bg-red-600 text-red-200 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-lg backdrop-blur-sm z-10"
+                                        title="Excluir Save"
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
                             ))}
                         </div>
                     )}

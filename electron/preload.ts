@@ -169,6 +169,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     }) => ipcRenderer.invoke("game:startNewGame", data),
     respondToEvent: (data: any) =>
       ipcRenderer.invoke("game:respondToEvent", data),
+    deleteSave: (filename: string) =>
+      ipcRenderer.invoke("game:deleteSave", filename),
   },
 
   finance: {
