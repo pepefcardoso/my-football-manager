@@ -21,32 +21,41 @@ export function generatePlayer(
   position: string,
   isYouth = false
 ) {
-  const age = isYouth ? randomInt(16, 19) : randomInt(18, 34);
+  const age = isYouth ? randomInt(15, 17) : randomInt(19, 34);
 
-  let finishing = randomInt(40, 80);
-  let passing = randomInt(40, 80);
-  let dribbling = randomInt(40, 80);
-  let defending = randomInt(40, 80);
-  let physical = randomInt(50, 85);
-  let pace = randomInt(50, 85);
-  let shooting = randomInt(40, 80);
+  const getAttribute = (min: number, max: number) => {
+    if (isYouth) {
+      const youthMin = Math.max(20, min - 15);
+      const youthMax = Math.min(68, max - 15);
+      return randomInt(youthMin, youthMax);
+    }
+    return randomInt(min, max);
+  };
+
+  let finishing = getAttribute(40, 80);
+  let passing = getAttribute(40, 80);
+  let dribbling = getAttribute(40, 80);
+  let defending = getAttribute(40, 80);
+  let physical = getAttribute(50, 85);
+  let pace = getAttribute(50, 85);
+  let shooting = getAttribute(40, 80);
 
   if (position === Position.GK) {
-    defending = randomInt(60, 90);
-    finishing = randomInt(10, 30);
-    dribbling = randomInt(20, 50);
-    passing = randomInt(40, 70);
+    defending = getAttribute(60, 90);
+    finishing = getAttribute(10, 30);
+    dribbling = getAttribute(20, 50);
+    passing = getAttribute(40, 70);
   } else if (position === Position.DF) {
-    defending = randomInt(65, 90);
-    physical = randomInt(65, 90);
-    finishing = randomInt(20, 50);
+    defending = getAttribute(65, 90);
+    physical = getAttribute(65, 90);
+    finishing = getAttribute(20, 50);
   } else if (position === Position.MF) {
-    passing = randomInt(65, 90);
-    dribbling = randomInt(60, 85);
+    passing = getAttribute(65, 90);
+    dribbling = getAttribute(60, 85);
   } else if (position === Position.FW) {
-    finishing = randomInt(65, 90);
-    shooting = randomInt(65, 90);
-    pace = randomInt(65, 90);
+    finishing = getAttribute(65, 90);
+    shooting = getAttribute(65, 90);
+    pace = getAttribute(65, 90);
   }
 
   const overall = AttributeCalculator.calculateOverall(position as Position, {
@@ -60,8 +69,8 @@ export function generatePlayer(
   });
 
   const potential = isYouth
-    ? Math.min(99, overall + randomInt(15, 30))
-    : Math.min(99, overall + randomInt(0, 10));
+    ? Math.min(99, overall + randomInt(5, 20))
+    : Math.min(99, overall + randomInt(0, 5));
 
   return {
     teamId,
@@ -80,10 +89,10 @@ export function generatePlayer(
     physical,
     pace,
     shooting,
-    moral: randomInt(70, 100),
-    energy: randomInt(90, 100),
-    fitness: randomInt(80, 100),
-    form: randomInt(40, 70),
+    moral: isYouth ? 50 : randomInt(70, 100),
+    energy: 100,
+    fitness: 100,
+    form: 50,
     isYouth,
     isInjured: false,
     isCaptain: false,

@@ -102,10 +102,8 @@ export class YouthAcademyService extends BaseService {
       if (!team) throw new Error("Time não encontrado");
 
       const quality = team.youthAcademyQuality || 0;
-
       const benefits = InfrastructureEconomics.getYouthBenefits(quality);
-
-      const quantity = RandomEngine.getInt(3, 6);
+      const quantity = RandomEngine.getInt(2, 5);
       const createdPlayers: Player[] = [];
 
       this.logger.info(
@@ -115,17 +113,16 @@ export class YouthAcademyService extends BaseService {
       for (let i = 0; i < quantity; i++) {
         const position = RandomEngine.pickOne(Object.values(Position));
         const age = RandomEngine.getInt(15, 17);
+        const qualityBonus = Math.round(quality * 0.2);
+        const variance = RandomEngine.getInt(-4, 4);
 
         const baseOvr = Math.max(
-          35,
-          Math.min(
-            65,
-            Math.round(35 + quality * 0.25 + RandomEngine.getInt(-5, 5))
-          )
+          30,
+          Math.min(58, 30 + qualityBonus + variance)
         );
 
         const minPot = baseOvr + 10 + benefits.minPotentialBonus;
-        const maxPot = baseOvr + 35 + benefits.maxPotentialBonus;
+        const maxPot = Math.min(94, baseOvr + 40 + benefits.maxPotentialBonus);
 
         const potential = Math.min(99, RandomEngine.getInt(minPot, maxPot));
 
@@ -137,7 +134,7 @@ export class YouthAcademyService extends BaseService {
           lastName: `Promessa ${RandomEngine.getInt(100, 999)}`,
           age,
           position,
-          nationality: "BRA",
+          nationality: "BRA", // TODO: Usar nacionalidade do time no futuro
           overall: baseOvr,
           potential,
           isYouth: true,
@@ -169,47 +166,50 @@ export class YouthAcademyService extends BaseService {
 
   private generateBaseStats(position: string, ovr: number) {
     const base = ovr;
+
+    const v = () => RandomEngine.getInt(-2, 2);
+
     if (position === Position.GK) {
       return {
-        defending: base + 5,
-        physical: base,
-        passing: base - 10,
-        finishing: 10,
-        dribbling: 10,
-        pace: base - 5,
-        shooting: 10,
+        defending: base + 5 + v(),
+        physical: base + v(),
+        passing: Math.max(1, base - 20 + v()),
+        finishing: 5,
+        dribbling: 5,
+        pace: Math.max(1, base - 10 + v()),
+        shooting: 5,
       };
     }
     if (position === Position.DF) {
       return {
-        defending: base + 5,
-        physical: base + 2,
-        passing: base - 5,
-        finishing: base - 15,
-        dribbling: base - 10,
-        pace: base,
-        shooting: base - 15,
+        defending: base + 3 + v(),
+        physical: base + 2 + v(),
+        passing: base - 5 + v(),
+        finishing: Math.max(1, base - 20),
+        dribbling: base - 10 + v(),
+        pace: base - 2 + v(),
+        shooting: Math.max(1, base - 15),
       };
     }
     if (position === Position.FW) {
       return {
-        defending: 15,
-        physical: base - 5,
-        passing: base - 5,
-        finishing: base + 5,
-        dribbling: base,
-        pace: base + 2,
-        shooting: base + 5,
+        defending: Math.max(1, base - 25),
+        physical: base - 5 + v(),
+        passing: base - 5 + v(),
+        finishing: base + 5 + v(),
+        dribbling: base + v(),
+        pace: base + 2 + v(),
+        shooting: base + 4 + v(),
       };
     }
     return {
-      defending: base - 5,
-      physical: base,
-      passing: base + 5,
-      finishing: base - 5,
-      dribbling: base,
-      pace: base,
-      shooting: base - 5,
+      defending: base - 5 + v(),
+      physical: base - 2 + v(),
+      passing: base + 5 + v(),
+      finishing: base - 5 + v(),
+      dribbling: base + 2 + v(),
+      pace: base + v(),
+      shooting: base - 5 + v(),
     };
   }
 }
