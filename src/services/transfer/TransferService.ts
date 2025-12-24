@@ -15,6 +15,7 @@ import {
 import { BaseService } from "../BaseService";
 import type { GameEventBus } from "../../lib/GameEventBus";
 import { GameEventType } from "../../domain/GameEventTypes";
+import type { IUnitOfWork } from "../../repositories/IUnitOfWork";
 
 export interface CreateProposalInput {
   playerId: number;
@@ -41,15 +42,18 @@ const TRANSFER_CONFIG = getBalanceValue("TRANSFER");
 export class TransferService extends BaseService {
   private eventBus: GameEventBus;
   private transferValidator: TransferValidator;
+  private unitOfWork: IUnitOfWork;
 
   constructor(
     repositories: IRepositoryContainer,
     eventBus: GameEventBus,
-    transferValidator: TransferValidator
+    transferValidator: TransferValidator,
+    unitOfWork: IUnitOfWork
   ) {
     super(repositories, "TransferService");
     this.eventBus = eventBus;
     this.transferValidator = transferValidator;
+    this.unitOfWork = unitOfWork;
   }
 
   async createProposal(
@@ -227,123 +231,125 @@ export class TransferService extends BaseService {
       );
     }
 
-    const activeSeason = await this.repos.seasons.findActiveSeason();
-    if (!activeSeason || !activeSeason.id) {
-      return Result.businessRule(
-        "Não foi possível encontrar a temporada ativa para registrar finanças."
-      );
-    }
-    const currentSeasonId = activeSeason.id;
-
     const transactionDate = new Date().toISOString().split("T")[0];
 
     return this.executeVoid("finalizeTransfer", proposalId, async () => {
-      this.logger.info(
-        `🔄 Iniciando transação da transferência #${proposalId}...`
-      );
-
-      const buyingTeam = await this.repos.teams.findById(proposal.toTeamId!);
-      const sellingTeam = proposal.fromTeamId
-        ? await this.repos.teams.findById(proposal.fromTeamId)
-        : null;
-
-      const player = await this.repos.players.findById(proposal.playerId);
-
-      if (!buyingTeam || !player) {
-        throw new Error("Entidades inválidas no momento da finalização.");
-      }
-
-      const currentSquad = await this.repos.players.findByTeamId(buyingTeam.id);
-      const squadLimit = TRANSFER_CONFIG.VALIDATION.SQUAD_MAX_SIZE;
-
-      if (currentSquad.length >= squadLimit) {
-        throw new Error(
-          `Falha na transação: O elenco de ${buyingTeam.shortName} já está cheio (${currentSquad.length}/${squadLimit}). Venda ou dispense jogadores antes de finalizar.`
-        );
-      }
-
-      if (buyingTeam.budget < proposal.fee) {
-        throw new Error(
-          `Falha na transação: O comprador ${buyingTeam.name} não tem fundos (€${buyingTeam.budget} < €${proposal.fee}).`
-        );
-      }
-
-      await this.repos.teams.updateBudget(
-        buyingTeam.id,
-        buyingTeam.budget - proposal.fee
-      );
-
-      await this.repos.financial.addRecord({
-        teamId: buyingTeam.id,
-        seasonId: currentSeasonId,
-        date: transactionDate,
-        type: "expense",
-        category: FinancialCategory.TRANSFER_OUT,
-        amount: proposal.fee,
-        description: `Compra de ${player.firstName} ${player.lastName}`,
-      });
-
-      if (sellingTeam) {
-        await this.repos.teams.updateBudget(
-          sellingTeam.id,
-          sellingTeam.budget + proposal.fee
+      await this.unitOfWork.execute(async (txRepos) => {
+        this.logger.info(
+          `🔄 Iniciando transação da transferência #${proposalId}...`
         );
 
-        await this.repos.financial.addRecord({
-          teamId: sellingTeam.id,
+        const activeSeason = await txRepos.seasons.findActiveSeason();
+        if (!activeSeason || !activeSeason.id) {
+          throw new Error(
+            "Temporada ativa não encontrada para registro financeiro."
+          );
+        }
+        const currentSeasonId = activeSeason.id;
+
+        const buyingTeam = await txRepos.teams.findById(proposal.toTeamId!);
+        const sellingTeam = proposal.fromTeamId
+          ? await txRepos.teams.findById(proposal.fromTeamId)
+          : null;
+
+        const player = await txRepos.players.findById(proposal.playerId);
+
+        if (!buyingTeam || !player) {
+          throw new Error("Entidades críticas não encontradas na finalização.");
+        }
+
+        const currentSquad = await txRepos.players.findByTeamId(buyingTeam.id);
+        const squadLimit = TRANSFER_CONFIG.VALIDATION.SQUAD_MAX_SIZE;
+
+        if (currentSquad.length >= squadLimit) {
+          throw new Error(
+            `Falha na transação: O elenco de ${buyingTeam.shortName} já está cheio (${currentSquad.length}/${squadLimit}).`
+          );
+        }
+
+        if (buyingTeam.budget < proposal.fee) {
+          throw new Error(
+            `Falha na transação: O comprador ${buyingTeam.name} não tem fundos suficientes.`
+          );
+        }
+
+        await txRepos.teams.updateBudget(
+          buyingTeam.id,
+          buyingTeam.budget - proposal.fee
+        );
+
+        await txRepos.financial.addRecord({
+          teamId: buyingTeam.id,
           seasonId: currentSeasonId,
           date: transactionDate,
-          type: "income",
-          category: FinancialCategory.TRANSFER_IN,
+          type: "expense",
+          category: FinancialCategory.TRANSFER_OUT,
           amount: proposal.fee,
-          description: `Venda de ${player.firstName} ${player.lastName}`,
+          description: `Compra de ${player.firstName} ${player.lastName}`,
         });
-      }
 
-      const oldContract = await this.repos.contracts.findActiveByPlayerId(
-        player.id
-      );
-      if (oldContract) {
-        await this.repos.contracts.updateStatus(oldContract.id, "terminated");
-      }
+        if (sellingTeam) {
+          await txRepos.teams.updateBudget(
+            sellingTeam.id,
+            sellingTeam.budget + proposal.fee
+          );
 
-      await this.repos.players.update(player.id, {
-        teamId: buyingTeam.id,
-        moral: TRANSFER_CONFIG.PLAYER_MORAL_ON_TRANSFER,
+          await txRepos.financial.addRecord({
+            teamId: sellingTeam.id,
+            seasonId: currentSeasonId,
+            date: transactionDate,
+            type: "income",
+            category: FinancialCategory.TRANSFER_IN,
+            amount: proposal.fee,
+            description: `Venda de ${player.firstName} ${player.lastName}`,
+          });
+        }
+
+        const oldContract = await txRepos.contracts.findActiveByPlayerId(
+          player.id
+        );
+        if (oldContract) {
+          await txRepos.contracts.updateStatus(oldContract.id, "terminated");
+        }
+
+        await txRepos.players.update(player.id, {
+          teamId: buyingTeam.id,
+          moral: TRANSFER_CONFIG.PLAYER_MORAL_ON_TRANSFER,
+        });
+
+        const contractEndDate = this.calculateContractEndDate(
+          transactionDate,
+          proposal.contractLength || 1
+        );
+
+        await txRepos.contracts.create({
+          playerId: player.id,
+          teamId: buyingTeam.id,
+          startDate: transactionDate,
+          endDate: contractEndDate,
+          wage: proposal.wageOffer,
+          type: "professional",
+          status: "active",
+        });
+
+        await txRepos.transfers.create({
+          playerId: player.id,
+          fromTeamId: proposal.fromTeamId,
+          toTeamId: buyingTeam.id,
+          fee: proposal.fee,
+          date: transactionDate,
+          seasonId: currentSeasonId,
+          type: proposal.type,
+        });
+
+        await txRepos.transferProposals.update(proposal.id, {
+          status: TransferStatus.COMPLETED,
+        });
+
+        this.logger.info(
+          `✅ Transação concluída com sucesso: ${player.lastName} -> ${buyingTeam.shortName}`
+        );
       });
-
-      const contractEndDate = this.calculateContractEndDate(
-        transactionDate,
-        proposal.contractLength || 1
-      );
-
-      await this.repos.contracts.create({
-        playerId: player.id,
-        teamId: buyingTeam.id,
-        startDate: transactionDate,
-        endDate: contractEndDate,
-        wage: proposal.wageOffer,
-        type: "professional",
-        status: "active",
-      });
-
-      await this.repos.transfers.create({
-        playerId: player.id,
-        fromTeamId: proposal.fromTeamId,
-        toTeamId: buyingTeam.id,
-        fee: proposal.fee,
-        date: transactionDate,
-        seasonId: currentSeasonId,
-        type: proposal.type,
-      });
-
-      await this.repos.transferProposals.update(proposal.id, {
-        status: TransferStatus.COMPLETED,
-      });
-
-      this.logger.info(
-        `✅ Transação concluída: ${player.lastName} -> ${buyingTeam.shortName} (Contrato até ${contractEndDate})`
-      );
 
       await this.eventBus.publish(GameEventType.TRANSFER_COMPLETED, {
         playerId: proposal.playerId,

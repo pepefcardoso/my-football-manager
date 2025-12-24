@@ -26,6 +26,12 @@ export interface EvaluationResult {
 }
 
 export class TransferValuation {
+  static calculateSuggestedWage(player: Player): number {
+    const marketValue = this.calculateMarketValue(player);
+    const wageRatio = GameBalance.TRANSFER.WAGE_RATIO_BASE || 0.1;
+    return this.roundValue(marketValue * wageRatio, 500);
+  }
+
   static calculateEconomicWage(
     player: Player,
     leagueTier: LeagueTier

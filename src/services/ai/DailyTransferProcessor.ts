@@ -78,6 +78,7 @@ export class DailyTransferProcessor extends BaseService {
             const salesCount = await this.processAISales(
               team.id,
               currentDate,
+              currentSeasonId,
               allTeams
             );
             actionsCount += salesCount;
@@ -148,6 +149,7 @@ export class DailyTransferProcessor extends BaseService {
   private async processAISales(
     teamId: number,
     currentDate: string,
+    seasonId: number,
     allTeams: Team[]
   ): Promise<number> {
     const sellableResult =
@@ -161,30 +163,46 @@ export class DailyTransferProcessor extends BaseService {
         const existingInterests = await this.repos.clubInterests.findByPlayerId(
           player.id
         );
-        if (existingInterests.length > 0) continue;
 
-        const marketValue = TransferValuation.calculateMarketValue(player);
-        const potentialBuyerId = this.findPotentialBuyer(
-          player,
-          marketValue,
-          teamId,
-          allTeams
-        );
-
-        if (potentialBuyerId) {
-          await this.repos.clubInterests.upsert({
-            teamId: potentialBuyerId,
-            playerId: player.id,
-            interestLevel: InterestLevel.INTERESTED,
-            priority: 1,
-            maxFeeWillingToPay: Math.round(marketValue * 1.1),
-            dateAdded: currentDate,
-          });
-
-          this.logger.info(
-            `📢 Mercado: ${player.lastName} (Time ${teamId}) oferecido ao mercado. Interesse gerado no Time ${potentialBuyerId}.`
+        if (existingInterests.length === 0) {
+          const marketValue = TransferValuation.calculateMarketValue(player);
+          const potentialBuyerId = this.findPotentialBuyer(
+            player,
+            marketValue,
+            teamId,
+            allTeams
           );
-          interestsCreated++;
+
+          if (potentialBuyerId) {
+            await this.repos.clubInterests.upsert({
+              teamId: potentialBuyerId,
+              playerId: player.id,
+              interestLevel: InterestLevel.INTERESTED,
+              priority: 1,
+              maxFeeWillingToPay: Math.round(marketValue * 1.1),
+              dateAdded: currentDate,
+            });
+
+            this.logger.info(
+              `📢 Mercado: ${player.lastName} (Time ${teamId}) gerou interesse no Time ${potentialBuyerId}.`
+            );
+
+            const estimatedWage =
+              TransferValuation.calculateSuggestedWage(player);
+
+            const attractiveFee = Math.round(marketValue * 0.95);
+
+            await this.handleMakeOffer(
+              potentialBuyerId,
+              player.id,
+              attractiveFee,
+              estimatedWage,
+              currentDate,
+              seasonId
+            );
+
+            interestsCreated++;
+          }
         }
       }
     }

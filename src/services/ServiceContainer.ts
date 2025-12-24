@@ -134,7 +134,8 @@ export class ServiceContainer implements IServiceContainer {
     this.transfer = new TransferService(
       repos,
       this.eventBus,
-      transferValidator
+      transferValidator,
+      this.unitOfWork
     );
 
     this.squadAnalysis = new SquadAnalysisService(repos);

@@ -6,7 +6,7 @@ import {
   TransferValuation,
   type EvaluationResult,
 } from "../../domain/logic/TransferValuation";
-import { InterestLevel } from "../../domain/enums";
+import { InterestLevel, TransferStatus } from "../../domain/enums";
 import { RandomEngine } from "../../engine/RandomEngine";
 import type { Player } from "../../domain/models";
 import type { TransferService } from "../transfer/TransferService";
@@ -84,6 +84,39 @@ export class AITransferDecisionMaker extends BaseService {
           );
         }
 
+        const effectiveFee =
+          proposal.status === TransferStatus.NEGOTIATING &&
+          proposal.counterOfferFee
+            ? proposal.counterOfferFee
+            : proposal.fee;
+
+        const activeContract = await this.repos.contracts.findActiveByPlayerId(
+          player.id
+        );
+
+        if (
+          activeContract &&
+          activeContract.releaseClause &&
+          effectiveFee >= activeContract.releaseClause
+        ) {
+          this.logger.info(
+            `💰 Cláusula de rescisão atingida para ${player.lastName} (€${effectiveFee} >= €${activeContract.releaseClause})`
+          );
+
+          const autoAcceptResult: EvaluationResult = {
+            decision: "accept",
+            reason: "Cláusula de rescisão contratual ativada.",
+          };
+
+          await this.transferService.respondToProposal({
+            proposalId,
+            response: "accept",
+            currentDate,
+          });
+
+          return autoAcceptResult;
+        }
+
         const currentYear = new Date(currentDate).getFullYear();
         const contractEndYear = player.contractEnd
           ? new Date(player.contractEnd).getFullYear()
@@ -92,13 +125,13 @@ export class AITransferDecisionMaker extends BaseService {
 
         const evaluation = TransferValuation.evaluateOffer(
           player,
-          proposal.fee,
+          effectiveFee,
           sellingTeam.transferStrategy,
           yearsLeft
         );
 
         this.logger.info(
-          `AI Decisão para proposta #${proposalId} (${player.lastName}): ${evaluation.decision}. Razão: ${evaluation.reason}`
+          `AI Decisão para proposta #${proposalId} (${player.lastName}) | Oferta: €${effectiveFee}: ${evaluation.decision}. Razão: ${evaluation.reason}`
         );
 
         const responseInput = {
@@ -115,7 +148,7 @@ export class AITransferDecisionMaker extends BaseService {
       }
     );
   }
-
+  
   /**
    * @param teamId ID do time da AI.
    * @param currentDate Data atual do jogo.
