@@ -3,10 +3,15 @@ import { teams } from "../db/schema";
 import { BaseRepository } from "./BaseRepository";
 import type { Team, TeamAchievement } from "../domain/models";
 
-export type TeamSelect = typeof teams.$inferSelect;
-export type TeamInsert = typeof teams.$inferInsert;
+type BudgetListener = (teamId: number, newBudget: number) => void;
 
 export class TeamRepository extends BaseRepository {
+  private budgetListener: BudgetListener | null = null;
+
+  public setBudgetListener(listener: BudgetListener): void {
+    this.budgetListener = listener;
+  }
+
   async findAll(): Promise<Team[]> {
     const result = await this.db.select().from(teams);
     return result as unknown as Team[];
@@ -39,7 +44,7 @@ export class TeamRepository extends BaseRepository {
   async update(id: number, data: Partial<Team>): Promise<void> {
     await this.db
       .update(teams)
-      .set(data as Partial<TeamInsert>)
+      .set(data as any)
       .where(eq(teams.id, id));
   }
 
@@ -48,12 +53,12 @@ export class TeamRepository extends BaseRepository {
       .update(teams)
       .set({ budget: newBudget })
       .where(eq(teams.id, id));
+
+    if (this.budgetListener) {
+      this.budgetListener(id, newBudget);
+    }
   }
 
-  /**
-   * * @param teamId ID do time
-   * @param achievement Objeto contendo detalhes da conquista
-   */
   async addAchievement(
     teamId: number,
     achievement: TeamAchievement

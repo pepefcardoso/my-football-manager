@@ -69,6 +69,10 @@ export class DailySimulationService extends BaseService {
         const team = await this.repos.teams.findById(teamId);
         if (!team) throw new Error("Time não encontrado");
 
+        if (this.scoutingService) {
+          await this.scoutingService.processDailyScoutingProgress(teamId);
+        }
+
         if (team.isHuman && this.scoutingService) {
           const gameState = await this.repos.gameState.findCurrent();
           const currentDate =

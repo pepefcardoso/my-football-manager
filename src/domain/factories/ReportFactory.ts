@@ -15,6 +15,7 @@ export interface ScoutedPlayerView extends Player {
     progress: number;
     lastUpdate: string;
   };
+  teamName: string;
 }
 
 export interface MonthlyFinancialSummary {
@@ -30,7 +31,8 @@ export class ScoutingReportFactory {
     player: Player,
     progress: number,
     lastUpdate: string | null,
-    viewerTeamId: number
+    viewerTeamId: number,
+    teamName: string
   ): ScoutedPlayerView {
     const isOwnPlayer = player.teamId === viewerTeamId;
     const effectiveProgress = isOwnPlayer ? 100 : progress;
@@ -50,6 +52,7 @@ export class ScoutingReportFactory {
         progress: effectiveProgress,
         lastUpdate: isOwnPlayer ? "Hoje" : lastUpdate || "Nunca",
       },
+      teamName,
     };
   }
 

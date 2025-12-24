@@ -46,6 +46,15 @@ export function notifyBudgetUpdate(
   }
 }
 
+function setupBudgetListener(win: BrowserWindow) {
+  repositoryContainer.teams.setBudgetListener((teamId, newBudget) => {
+    if (win && !win.isDestroyed()) {
+      notifyBudgetUpdate(win, teamId, newBudget);
+      console.log(`[Budget Update] Team ${teamId}: €${newBudget}`);
+    }
+  });
+}
+
 function setupTransferNotifications(win: BrowserWindow) {
   serviceContainer.eventBus.subscribe(
     GameEventType.PROPOSAL_RECEIVED,
@@ -1128,5 +1137,6 @@ app.whenReady().then(() => {
 
   if (win) {
     setupTransferNotifications(win);
+    setupBudgetListener(win);
   }
 });

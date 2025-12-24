@@ -1,7 +1,7 @@
 import { RandomEngine } from "../engine/RandomEngine";
 import type { IRepositoryContainer } from "../repositories/IRepositories";
 import { BaseService } from "./BaseService";
-import type { ServiceResult } from "../domain/ServiceResults";
+import { Result, type ServiceResult } from "../domain/ServiceResults";
 import { getBalanceValue } from "../engine/GameBalanceConfig";
 import { StaffRole } from "../domain/enums";
 import {
@@ -135,9 +135,7 @@ export class ScoutingService extends BaseService {
   async getScoutedPlayer(
     playerId: number,
     viewerTeamId: number
-  ): Promise<
-    ServiceResult<(ScoutedPlayerView & { teamName?: string }) | null>
-  > {
+  ): Promise<ServiceResult<ScoutedPlayerView | null>> {
     return this.execute(
       "getScoutedPlayer",
       { playerId, viewerTeamId },
@@ -165,13 +163,11 @@ export class ScoutingService extends BaseService {
           player,
           progress,
           lastUpdate,
-          viewerTeamId
+          viewerTeamId,
+          teamName
         );
 
-        return {
-          ...view,
-          teamName,
-        };
+        return view;
       }
     );
   }
@@ -290,6 +286,50 @@ export class ScoutingService extends BaseService {
         await this.repos.teams.update(teamId, { scoutingSlots: slots });
 
         this.logger.info(`Slots de scouting atualizados para o time ${teamId}`);
+      }
+    );
+  }
+
+  async processDailyScoutingProgress(
+    teamId: number
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "processDailyScoutingProgress",
+      teamId,
+      async (teamId) => {
+        const reports = await this.repos.scouting.findByTeam(teamId);
+
+        const activeReports = reports.filter(
+          (r: any) => (r.progress || 0) < 100
+        );
+
+        if (activeReports.length === 0) return;
+
+        const accuracyResult = await this.calculateScoutingAccuracy(teamId);
+        const accuracy = Result.unwrapOr(
+          accuracyResult,
+          SCOUTING_CONFIG.BASE_UNCERTAINTY
+        );
+
+        for (const report of activeReports) {
+          const randomFactor = RandomEngine.getInt(1, 3);
+          const efficiencyBonus = Math.round(accuracy / 10);
+          const dailyGain = 5 + efficiencyBonus + randomFactor;
+
+          const newProgress = Math.min(100, (report.progress || 0) + dailyGain);
+
+          if (newProgress !== report.progress) {
+            await this.repos.scouting.upsert({
+              ...report,
+              progress: newProgress,
+              date: new Date().toISOString().split("T")[0],
+            });
+          }
+        }
+
+        this.logger.debug(
+          `Progresso de scouting atualizado para ${activeReports.length} jogadores do time ${teamId}.`
+        );
       }
     );
   }

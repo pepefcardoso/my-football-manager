@@ -64,7 +64,12 @@ export interface IContractRepository {
   findExpiring(date: string): Promise<ContractSelect[]>;
   findActiveByPlayerId(playerId: number): Promise<ContractSelect | undefined>;
   updateStatus(contractId: number, status: string): Promise<void>;
-  updateTerms(contractId: number, wage: number, endDate: string, releaseClause?: number): Promise<void>;
+  updateTerms(
+    contractId: number,
+    wage: number,
+    endDate: string,
+    releaseClause?: number
+  ): Promise<void>;
   create(data: ContractInsert): Promise<number>;
 }
 
@@ -73,9 +78,12 @@ export interface ITeamRepository {
   findById(id: number): Promise<Team | undefined>;
   findHumanTeam(): Promise<Team | undefined>;
   findByIdWithRelations(id: number): Promise<any>;
-
   update(id: number, data: Partial<Team>): Promise<void>;
   updateBudget(id: number, newBudget: number): Promise<void>;
+  setBudgetListener(
+    listener: (teamId: number, newBudget: number) => void
+  ): void;
+  addAchievement(teamId: number, achievement: any): Promise<void>;
 }
 
 export interface IStaffRepository {
