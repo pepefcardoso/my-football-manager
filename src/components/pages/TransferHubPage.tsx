@@ -304,6 +304,40 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
         }
     };
 
+    const handleRespondToCounter = async (proposalId: number, accept: boolean) => {
+        if (loading) return;
+
+        if (!confirm(accept
+            ? "Aceitar o novo valor pedido pelo clube? O valor da transferência será atualizado."
+            : "Recusar a contra-proposta e encerrar as negociações?")) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            logger.info(`Respondendo contra-proposta ${proposalId}: ${accept ? 'ACEITAR' : 'RECUSAR'}`);
+
+            const result = await window.electronAPI.transfer.respondToCounter({
+                proposalId,
+                accept
+            });
+
+            if (result.success) {
+                const newStatus = accept ? TransferStatus.ACCEPTED : TransferStatus.REJECTED;
+                updateProposalState(proposalId, newStatus);
+                alert(result.message);
+                loadData();
+            } else {
+                alert(`Erro: ${result.message}`);
+            }
+        } catch (error) {
+            logger.error("Erro ao responder contra-proposta:", error);
+            alert("Erro interno de comunicação.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const renderNegotiations = () => {
         const activeBids = myBids.filter(p => p.status !== TransferStatus.COMPLETED && p.status !== TransferStatus.WITHDRAWN && p.status !== TransferStatus.CANCELLED);
         const activeOffers = incomingOffers.filter(p => p.status !== TransferStatus.COMPLETED && p.status !== TransferStatus.WITHDRAWN && p.status !== TransferStatus.CANCELLED);
@@ -357,12 +391,26 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                                     )}
 
                                     {prop.status === TransferStatus.NEGOTIATING && (
-                                        <div className="flex gap-2 mt-1">
-                                            <div className="text-xs text-yellow-400 font-bold mr-2 self-center">
-                                                Pede: {formatCurrency(prop.counterOfferFee || 0)}
+                                        <div className="flex flex-col items-end gap-1 mt-1 bg-yellow-900/20 p-2 rounded border border-yellow-500/30">
+                                            <div className="text-xs text-yellow-400 font-bold mb-1">
+                                                Contra-Proposta: {formatCurrency(prop.counterOfferFee || 0)}
                                             </div>
-                                            <button onClick={() => handleRespondProposal(prop.id, 'accept')} className="px-2 py-1 bg-blue-600 text-xs rounded text-white hover:bg-blue-500">Aceitar</button>
-                                            <button onClick={() => handleRespondProposal(prop.id, 'reject')} className="px-2 py-1 bg-red-600 text-xs rounded text-white hover:bg-red-500">Recusar</button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleRespondToCounter(prop.id, true)}
+                                                    className="px-2 py-1 bg-emerald-600 text-xs rounded text-white hover:bg-emerald-500 font-bold"
+                                                    title="Aceitar novo valor"
+                                                >
+                                                    Aceitar Valor
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRespondToCounter(prop.id, false)}
+                                                    className="px-2 py-1 bg-red-600 text-xs rounded text-white hover:bg-red-500"
+                                                    title="Encerrar negociação"
+                                                >
+                                                    Recusar
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -553,7 +601,6 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                 <TransferProposalModal
                     player={selectedPlayer as any}
                     proposingTeamId={userTeam.id}
-                    proposingTeamBudget={userTeam.budget || 0}
                     currentDate={currentDate}
                     seasonId={currentSeasonId}
                     onClose={() => setSelectedPlayer(null)}

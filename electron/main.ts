@@ -36,7 +36,11 @@ if (!existsSync(SAVES_DIR)) {
 
 const gameEngine = new GameEngine(repositoryContainer, db);
 
-export function notifyBudgetUpdate(win: BrowserWindow, teamId: number, newBudget: number) {
+export function notifyBudgetUpdate(
+  win: BrowserWindow,
+  teamId: number,
+  newBudget: number
+) {
   if (win && !win.isDestroyed()) {
     win.webContents.send("team:budgetUpdated", { teamId, newBudget });
   }
@@ -927,6 +931,26 @@ function registerIpcHandlers() {
         logger.error("Erro ao estimar valor do jogador:", error);
         return { success: false, marketValue: 0, suggestedWage: 0 };
       }
+    }
+  );
+
+  ipcMain.handle(
+    "transfer:respondToCounter",
+    async (_, { proposalId, accept }) => {
+      const result = await serviceContainer.transfer.respondToCounterOffer(
+        proposalId,
+        accept
+      );
+
+      if (Result.isSuccess(result)) {
+        return {
+          success: true,
+          message: accept
+            ? "Contra-proposta aceita!"
+            : "Contra-proposta recusada.",
+        };
+      }
+      return { success: false, message: result.error.message };
     }
   );
 

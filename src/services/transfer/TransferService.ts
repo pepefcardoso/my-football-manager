@@ -448,4 +448,50 @@ export class TransferService extends BaseService {
       return await this.repos.transferProposals.findWhereTeamIsSeller(teamId);
     });
   }
+
+  async respondToCounterOffer(
+    proposalId: number,
+    accept: boolean
+  ): Promise<ServiceResult<void>> {
+    return this.executeVoid(
+      "respondToCounterOffer",
+      { proposalId, accept },
+      async ({ proposalId, accept }) => {
+        const proposal = await this.repos.transferProposals.findById(
+          proposalId
+        );
+
+        if (!proposal) {
+          throw new Error("Proposta não encontrada.");
+        }
+
+        if (proposal.status !== TransferStatus.NEGOTIATING) {
+          throw new Error("Esta proposta não está em fase de negociação.");
+        }
+
+        if (accept) {
+          if (!proposal.counterOfferFee || proposal.counterOfferFee <= 0) {
+            throw new Error("Valor da contra-proposta inválido.");
+          }
+
+          await this.repos.transferProposals.update(proposalId, {
+            fee: proposal.counterOfferFee,
+            status: TransferStatus.ACCEPTED,
+            // TODO Opcional: limpar o counterOfferFee ou mantê-lo para histórico
+          });
+
+          this.logger.info(
+            `Contra-proposta aceita para #${proposalId}. Novo valor: €${proposal.counterOfferFee}`
+          );
+        } else {
+          await this.repos.transferProposals.update(proposalId, {
+            status: TransferStatus.REJECTED,
+            rejectionReason: "Contra-proposta recusada pelo comprador.",
+          });
+
+          this.logger.info(`Contra-proposta recusada para #${proposalId}.`);
+        }
+      }
+    );
+  }
 }

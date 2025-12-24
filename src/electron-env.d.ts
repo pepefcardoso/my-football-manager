@@ -400,6 +400,10 @@ declare global {
         onNotification: (
           callback: (data: TransferNotificationPayload) => void
         ) => () => void;
+        respondToCounter: (data: {
+          proposalId: number;
+          accept: boolean;
+        }) => Promise<{ success: boolean; message: string }>;
       };
 
       marketing: {

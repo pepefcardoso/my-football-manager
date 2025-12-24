@@ -302,6 +302,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
         ipcRenderer.off("transfer:notification", subscription);
       };
     },
+    respondToCounter: (data: { proposalId: number; accept: boolean }) =>
+      ipcRenderer.invoke("transfer:respondToCounter", data),
   },
 
   marketing: {
