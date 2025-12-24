@@ -80,10 +80,8 @@ export interface ITeamRepository {
   findByIdWithRelations(id: number): Promise<any>;
   update(id: number, data: Partial<Team>): Promise<void>;
   updateBudget(id: number, newBudget: number): Promise<void>;
-  setBudgetListener(
-    listener: (teamId: number, newBudget: number) => void
-  ): void;
   addAchievement(teamId: number, achievement: any): Promise<void>;
+  setEventBus(eventBus: any): void;
 }
 
 export interface IStaffRepository {

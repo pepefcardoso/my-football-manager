@@ -46,13 +46,18 @@ export function notifyBudgetUpdate(
   }
 }
 
-function setupBudgetListener(win: BrowserWindow) {
-  repositoryContainer.teams.setBudgetListener((teamId, newBudget) => {
-    if (win && !win.isDestroyed()) {
-      notifyBudgetUpdate(win, teamId, newBudget);
-      console.log(`[Budget Update] Team ${teamId}: €${newBudget}`);
+function setupBudgetSubscription(win: BrowserWindow) {
+  serviceContainer.eventBus.subscribe(
+    GameEventType.BUDGET_UPDATED,
+    (payload) => {
+      if (win && !win.isDestroyed()) {
+        notifyBudgetUpdate(win, payload.teamId, payload.newBudget);
+        console.log(
+          `[Budget Update Event] Team ${payload.teamId}: €${payload.newBudget}`
+        );
+      }
     }
-  });
+  );
 }
 
 function setupTransferNotifications(win: BrowserWindow) {
@@ -1137,6 +1142,6 @@ app.whenReady().then(() => {
 
   if (win) {
     setupTransferNotifications(win);
-    setupBudgetListener(win);
+    setupBudgetSubscription(win);
   }
 });

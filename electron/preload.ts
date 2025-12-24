@@ -270,8 +270,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("scouting:getSlots", teamId),
     updateSlots: (teamId: number, slots: any[]) =>
       ipcRenderer.invoke("scouting:updateSlots", { teamId, slots }),
-    getScoutedPlayersBatch: (teamId: number) =>
-      ipcRenderer.invoke("scouting:getScoutedPlayersBatch", { teamId }),
+    getScoutedPlayersBatch: (data: { teamId: number }) =>
+      ipcRenderer.invoke("scouting:getScoutedPlayersBatch", data),
   },
 
   transfer: {

@@ -74,7 +74,7 @@ export class DailyTransferProcessor extends BaseService {
             );
           }
 
-          if (RandomEngine.chance(10)) {
+          if (RandomEngine.chance(40)) {
             const salesCount = await this.processAISales(
               team.id,
               currentDate,

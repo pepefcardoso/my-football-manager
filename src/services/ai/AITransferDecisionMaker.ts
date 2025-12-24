@@ -13,6 +13,7 @@ import type { TransferService } from "../transfer/TransferService";
 import type { SquadAnalysisService } from "./SquadAnalysisService";
 import type { TransferWindowManager } from "../transfer/TransferWindowManager";
 import type { FinancialHealthChecker } from "../finance/FinancialHealthChecker";
+import { getBalanceValue } from "../../engine/GameBalanceConfig";
 
 interface PlayerWithContractInfo extends Player {
   contractEnd: string | null | undefined;
@@ -59,6 +60,34 @@ export class AITransferDecisionMaker extends BaseService {
 
         if (!proposal) {
           throw new Error("Proposta de Transferência não encontrada.");
+        }
+
+        if (proposal.toTeamId) {
+          const squad = await this.repos.players.findByTeamId(
+            proposal.toTeamId
+          );
+          const SQUAD_LIMIT =
+            getBalanceValue("TRANSFER").VALIDATION.SQUAD_MAX_SIZE;
+
+          if (squad.length >= SQUAD_LIMIT) {
+            const reason = `Elenco cheio (${squad.length}/${SQUAD_LIMIT}).`;
+
+            await this.transferService.respondToProposal({
+              proposalId,
+              response: "reject",
+              rejectionReason: reason,
+              currentDate,
+            });
+
+            this.logger.info(
+              `AI Recusa Automática (Proposta #${proposalId}): ${reason}`
+            );
+
+            return {
+              decision: "reject",
+              reason: reason,
+            };
+          }
         }
 
         const player = (await this.repos.players.findById(
@@ -143,7 +172,7 @@ export class AITransferDecisionMaker extends BaseService {
       }
     );
   }
-  
+
   async determineTransferAction(
     teamId: number,
     currentDate: string

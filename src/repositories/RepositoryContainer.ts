@@ -53,13 +53,21 @@ import {
   scheduledEventRepository,
   ScheduledEventRepository,
 } from "./ScheduledEventRepository";
+import type { GameEventBus } from "../lib/GameEventBus";
 
 export class RepositoryFactory {
-  static create(context: DbInstance | DbTransaction): IRepositoryContainer {
+  static create(
+    context: DbInstance | DbTransaction, 
+    eventBus?: GameEventBus
+  ): IRepositoryContainer {
+    const teamsRepo = new TeamRepository(context);
+    if (eventBus) {
+      teamsRepo.setEventBus(eventBus);
+    }
     return {
       players: new PlayerRepository(context),
       contracts: new ContractRepository(context),
-      teams: new TeamRepository(context),
+      teams: teamsRepo,
       staff: new StaffRepository(context),
       matches: new MatchRepository(context),
       competitions: new CompetitionRepository(context),

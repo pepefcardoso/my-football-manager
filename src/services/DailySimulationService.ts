@@ -73,7 +73,7 @@ export class DailySimulationService extends BaseService {
           await this.scoutingService.processDailyScoutingProgress(teamId);
         }
 
-        if (team.isHuman && this.scoutingService) {
+        if (this.scoutingService) {
           const gameState = await this.repos.gameState.findCurrent();
           const currentDate =
             gameState?.currentDate || new Date().toISOString();

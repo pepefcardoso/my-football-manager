@@ -44,7 +44,7 @@ import {
 } from "../domain/GameEventTypes";
 import { TransferValidator } from "../domain/validators/TransferValidator";
 import { YouthAcademyService } from "./YouthAcademyService";
-import type { IRepositoryContainer } from "../repositories/IRepositories";
+import type { IRepositoryContainer, ITeamRepository } from "../repositories/IRepositories";
 
 export class ServiceContainer implements IServiceContainer {
   public readonly unitOfWork: IUnitOfWork;
@@ -84,8 +84,11 @@ export class ServiceContainer implements IServiceContainer {
     unitOfWork?: IUnitOfWork,
     eventBus?: GameEventBus
   ) {
-    this.unitOfWork = unitOfWork || new UnitOfWork();
     this.eventBus = eventBus || new GameEventBus();
+    this.unitOfWork = unitOfWork || new UnitOfWork(undefined, this.eventBus);
+    if (repos.teams && "setEventBus" in repos.teams) {
+      (repos.teams as ITeamRepository).setEventBus(this.eventBus);
+    }
 
     this.financialPenalty = new FinancialPenaltyService(repos);
     this.stats = new StatsService(repos);

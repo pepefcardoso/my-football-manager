@@ -5,6 +5,9 @@ import type { Player } from "../domain/models";
 import { Position } from "../domain/enums";
 import { RandomEngine } from "../engine/RandomEngine";
 import { InfrastructureEconomics } from "../engine/InfrastructureEconomics";
+import { getBalanceValue } from "../engine/GameBalanceConfig";
+
+const TRANSFER_CONFIG = getBalanceValue("TRANSFER");
 
 export class YouthAcademyService extends BaseService {
   constructor(repositories: IRepositoryContainer) {
@@ -34,7 +37,7 @@ export class YouthAcademyService extends BaseService {
           throw new Error("Jogador já faz parte do elenco profissional.");
 
         const squad = await this.repos.players.findByTeamId(teamId);
-        if (squad.length >= 30) {
+        if (squad.length >= TRANSFER_CONFIG.VALIDATION.SQUAD_MAX_SIZE) {
           throw new Error(
             "Elenco principal cheio. Venda ou dispense jogadores antes."
           );

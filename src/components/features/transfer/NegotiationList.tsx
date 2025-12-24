@@ -56,11 +56,25 @@ export function NegotiationList({
                                 )}
 
                                 {prop.status === TransferStatus.NEGOTIATING && (
-                                    <div className="flex flex-col items-end gap-1 mt-1 bg-yellow-900/20 p-2 rounded border border-yellow-500/30">
-                                        <div className="text-xs text-yellow-400 font-bold mb-1">Contra: {formatCurrency(prop.counterOfferFee || 0)}</div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => onRespondCounter(prop.id, true)} className="px-2 py-1 bg-emerald-600 text-xs rounded text-white font-bold">Aceitar</button>
-                                            <button onClick={() => onRespondCounter(prop.id, false)} className="px-2 py-1 bg-red-600 text-xs rounded text-white">Recusar</button>
+                                    <div className="flex flex-col items-end gap-2 mt-2 bg-yellow-500/10 p-3 rounded border border-yellow-500/30">
+                                        <div className="text-xs text-yellow-200">
+                                            <span className="font-bold text-yellow-400">Contra-Proposta:</span>
+                                            <span className="ml-2 font-mono text-lg">{formatCurrency(prop.counterOfferFee || 0)}</span>
+                                        </div>
+
+                                        <div className="flex gap-2 w-full justify-end">
+                                            <button
+                                                onClick={() => onRespondCounter(prop.id, true)}
+                                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs rounded text-white font-bold transition-colors"
+                                            >
+                                                Aceitar
+                                            </button>
+                                            <button
+                                                onClick={() => onRespondCounter(prop.id, false)}
+                                                className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 text-xs rounded text-white transition-colors"
+                                            >
+                                                Recusar
+                                            </button>
                                         </div>
                                     </div>
                                 )}

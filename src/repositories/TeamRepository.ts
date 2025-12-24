@@ -2,14 +2,14 @@ import { eq } from "drizzle-orm";
 import { teams } from "../db/schema";
 import { BaseRepository } from "./BaseRepository";
 import type { Team, TeamAchievement } from "../domain/models";
-
-type BudgetListener = (teamId: number, newBudget: number) => void;
+import type { GameEventBus } from "../lib/GameEventBus";
+import { GameEventType } from "../domain/GameEventTypes";
 
 export class TeamRepository extends BaseRepository {
-  private budgetListener: BudgetListener | null = null;
+  private eventBus: GameEventBus | null = null;
 
-  public setBudgetListener(listener: BudgetListener): void {
-    this.budgetListener = listener;
+  public setEventBus(eventBus: GameEventBus): void {
+    this.eventBus = eventBus;
   }
 
   async findAll(): Promise<Team[]> {
@@ -54,8 +54,11 @@ export class TeamRepository extends BaseRepository {
       .set({ budget: newBudget })
       .where(eq(teams.id, id));
 
-    if (this.budgetListener) {
-      this.budgetListener(id, newBudget);
+    if (this.eventBus) {
+      this.eventBus.publish(GameEventType.BUDGET_UPDATED, {
+        teamId: id,
+        newBudget: newBudget,
+      });
     }
   }
 
