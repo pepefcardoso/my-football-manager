@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "productName": "Football Manager 2D",
+  "productName": "my-football-manager",
   "appId": "com.footballmanager.app",
   "directories": {
     "output": "release/${version}",

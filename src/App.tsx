@@ -138,15 +138,6 @@ function App() {
             />
           }
         >
-          {activePage === "menu" && (
-            <div className="p-8">
-              <h2 className="text-2xl text-white mb-4">Opções do Jogo</h2>
-              <button onClick={resetGame} className="px-4 py-2 bg-red-600 rounded text-white">
-                Sair para o Menu Principal
-              </button>
-            </div>
-          )}
-
           {activePage === "club" && <ClubOverviewPage team={userTeam} />}
           {activePage === "squad" && <SquadPage teamId={userTeam.id} />}
           {activePage === "staff" && <StaffPage teamId={userTeam.id} />}

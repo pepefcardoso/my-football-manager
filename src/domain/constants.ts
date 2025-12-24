@@ -1,5 +1,4 @@
 export type MenuOption =
-  | "menu"
   | "club"
   | "squad"
   | "staff"

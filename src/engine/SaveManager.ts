@@ -192,7 +192,7 @@ export class SaveManager {
         }
       }
 
-      const saveId = this.generateSaveId();
+      const saveId = filename;
 
       const metadata: GameSaveMetadata = {
         id: saveId,

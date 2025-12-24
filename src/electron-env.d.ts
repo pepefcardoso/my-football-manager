@@ -251,7 +251,11 @@ declare global {
           seasonRollover?: any;
         }>;
         updateTrainingFocus: (focus: string) => Promise<boolean>;
-        saveGame: () => Promise<boolean>;
+        saveGame: (filename: string) => Promise<{
+          success: boolean;
+          message: string;
+          metadata?: any;
+        }>;
         listSaves: () => Promise<any[]>;
         loadGame: (
           filename: string
