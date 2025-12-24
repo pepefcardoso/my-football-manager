@@ -24,6 +24,7 @@ export interface TransferValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
+  mustAccept?: boolean;
 }
 
 export class TransferValidator extends BaseService {
@@ -37,6 +38,7 @@ export class TransferValidator extends BaseService {
     return this.execute("validateTransfer", context, async (ctx) => {
       const errors: string[] = [];
       const warnings: string[] = [];
+      let mustAccept = false;
 
       if (ctx.transferType !== "transfer" && ctx.transferType !== "free") {
         if (ctx.transferType === "loan") {
@@ -50,6 +52,17 @@ export class TransferValidator extends BaseService {
       );
       if (!eligibilityCheck.isValid) {
         errors.push(...(eligibilityCheck.errors || []));
+      }
+
+      const releaseClauseCheck = await this.checkReleaseClause(
+        ctx.playerId,
+        ctx.fee
+      );
+      if (releaseClauseCheck.triggered) {
+        mustAccept = true;
+        this.logger.info(
+          `💰 Oferta de €${ctx.fee} atingiu a cláusula de rescisão do jogador ${ctx.playerId}.`
+        );
       }
 
       const budgetCheck = await this.validateBuyerBudget(ctx.toTeamId, ctx.fee);
@@ -98,6 +111,7 @@ export class TransferValidator extends BaseService {
         isValid: errors.length === 0,
         errors,
         warnings,
+        mustAccept,
       };
     });
   }
@@ -412,5 +426,22 @@ export class TransferValidator extends BaseService {
     }
 
     return Result.success(true, "Transferência validada com sucesso.");
+  }
+
+  private async checkReleaseClause(
+    playerId: number,
+    offerFee: number
+  ): Promise<{ triggered: boolean }> {
+    const contract = await this.repos.contracts.findActiveByPlayerId(playerId);
+
+    if (
+      contract &&
+      contract.releaseClause &&
+      offerFee >= contract.releaseClause
+    ) {
+      return { triggered: true };
+    }
+
+    return { triggered: false };
   }
 }

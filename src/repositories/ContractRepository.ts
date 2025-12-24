@@ -54,15 +54,24 @@ export class ContractRepository extends BaseRepository {
       .where(eq(playerContracts.id, contractId));
   }
 
+  async update(id: number, data: Partial<ContractInsert>): Promise<void> {
+    await this.db
+      .update(playerContracts)
+      .set(data)
+      .where(eq(playerContracts.id, id));
+  }
+
   async updateTerms(
     contractId: number,
     wage: number,
-    endDate: string
+    endDate: string,
+    releaseClause?: number
   ): Promise<void> {
-    await this.db
-      .update(playerContracts)
-      .set({ wage, endDate })
-      .where(eq(playerContracts.id, contractId));
+    const data: Partial<ContractInsert> = { wage, endDate };
+    if (releaseClause !== undefined) {
+      data.releaseClause = releaseClause;
+    }
+    await this.update(contractId, data);
   }
 
   async create(data: ContractInsert): Promise<number> {

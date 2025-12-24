@@ -64,7 +64,7 @@ export interface IContractRepository {
   findExpiring(date: string): Promise<ContractSelect[]>;
   findActiveByPlayerId(playerId: number): Promise<ContractSelect | undefined>;
   updateStatus(contractId: number, status: string): Promise<void>;
-  updateTerms(contractId: number, wage: number, endDate: string): Promise<void>;
+  updateTerms(contractId: number, wage: number, endDate: string, releaseClause?: number): Promise<void>;
   create(data: ContractInsert): Promise<number>;
 }
 

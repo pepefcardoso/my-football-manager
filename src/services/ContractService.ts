@@ -7,6 +7,7 @@ import type { GameEventBus } from "../lib/GameEventBus";
 import { GameEventType } from "../domain/GameEventTypes";
 import { FinancialBalance } from "../engine/FinancialBalanceConfig";
 import { FinancialCategory } from "../domain/enums";
+import { TransferValuation } from "../domain/logic/TransferValuation";
 
 export interface WageBillDetails {
   playerWages: number;
@@ -112,29 +113,24 @@ export class ContractService extends BaseService {
         const currentContract = await this.repos.contracts.findActiveByPlayerId(
           playerId
         );
-
-        if (!currentContract) {
+        if (!currentContract)
           throw new Error(
             `Nenhum contrato ativo encontrado para jogador ${playerId}`
           );
-        }
 
         const team = await this.repos.teams.findById(currentContract.teamId);
-        if (!team) {
+        if (!team)
           throw new Error(`Time ${currentContract.teamId} não encontrado.`);
-        }
 
         const player = await this.repos.players.findById(playerId);
-        if (!player) {
-          throw new Error(`Jogador ${playerId} não encontrado.`);
-        }
+        if (!player) throw new Error(`Jogador ${playerId} não encontrado.`);
 
         const renewalFee = this.calculateRenewalFee(newWage);
         const currentBudget = team.budget || 0;
 
         if (currentBudget < renewalFee) {
           throw new Error(
-            `Orçamento insuficiente para renovação. Custo: €${renewalFee.toLocaleString()}, Disponível: €${currentBudget.toLocaleString()}`
+            `Orçamento insuficiente. Custo: €${renewalFee.toLocaleString()}, Disponível: €${currentBudget.toLocaleString()}`
           );
         }
 
@@ -142,11 +138,10 @@ export class ContractService extends BaseService {
           team.id,
           currentBudget - renewalFee
         );
-
         const gameState = await this.repos.gameState.findCurrent();
+        const currentSeasonId = gameState?.currentSeasonId || 1;
         const currentDate =
           gameState?.currentDate || new Date().toISOString().split("T")[0];
-        const currentSeasonId = gameState?.currentSeasonId || 1;
 
         await this.repos.financial.addRecord({
           teamId: team.id,
@@ -158,14 +153,23 @@ export class ContractService extends BaseService {
           description: `Bônus de Renovação - ${player.firstName} ${player.lastName}`,
         });
 
+        const marketValue = TransferValuation.calculateMarketValue(player);
+        const multiplier =
+          FinancialBalance.CONTRACT_ECONOMICS.RELEASE_CLAUSE
+            .RECOMMENDED_MULTIPLIER;
+        const newReleaseClause = Math.round(marketValue * multiplier);
+
         await this.repos.contracts.updateTerms(
           currentContract.id,
           newWage,
-          newEndDate
+          newEndDate,
+          newReleaseClause
         );
 
         this.logger.info(
-          `Contrato renovado: ${player.firstName} ${player.lastName}. Custo deduzido: €${renewalFee}`
+          `Contrato renovado: ${player.firstName} ${
+            player.lastName
+          }. Nova Cláusula: €${newReleaseClause.toLocaleString()}`
         );
       }
     );
@@ -245,5 +249,43 @@ export class ContractService extends BaseService {
       await this.repos.staff.fire(member.id);
     }
     return expiredStaff.length;
+  }
+
+  async createContract(
+    playerId: number,
+    teamId: number,
+    wage: number,
+    endDate: string,
+    type: string = "professional"
+  ): Promise<ServiceResult<number>> {
+    return this.execute("createContract", { playerId, teamId }, async () => {
+      const player = await this.repos.players.findById(playerId);
+      if (!player) throw new Error(`Jogador ${playerId} não encontrado.`);
+
+      const marketValue = TransferValuation.calculateMarketValue(player);
+      const multiplier =
+        FinancialBalance.CONTRACT_ECONOMICS.RELEASE_CLAUSE
+          .RECOMMENDED_MULTIPLIER;
+      const releaseClause = Math.round(marketValue * multiplier);
+
+      const contractId = await this.repos.contracts.create({
+        playerId,
+        teamId,
+        startDate: new Date().toISOString().split("T")[0],
+        endDate,
+        wage,
+        releaseClause,
+        type,
+        status: "active",
+      });
+
+      this.logger.info(
+        `Contrato criado para ${
+          player.lastName
+        }. Cláusula: €${releaseClause.toLocaleString()}`
+      );
+
+      return contractId;
+    });
   }
 }
