@@ -1,7 +1,56 @@
+import { memo, useMemo } from "react";
 import type { Staff } from "../../../domain/models";
 import { formatCurrency, formatRole } from "../../../utils/formatters";
 
+interface EnrichedStaff extends Staff {
+    fullName: string;
+    formattedRole: string;
+    formattedSpecialization: string;
+    formattedSalary: string;
+}
+
+const StaffRow = memo(({ member }: { member: EnrichedStaff }) => {
+    return (
+        <tr className="hover:bg-slate-800/50 transition-colors">
+            <td className="p-4 font-medium text-slate-200">
+                {member.fullName}
+            </td>
+            <td className="p-4 text-slate-300">
+                {member.formattedRole}
+            </td>
+            <td className="p-4 text-center text-slate-400">
+                {member.age}
+            </td>
+            <td className="p-4 text-center">
+                <div className="inline-block px-2 py-1 rounded bg-slate-800 font-bold text-white border border-slate-700">
+                    {member.overall}
+                </div>
+            </td>
+            <td className="p-4 text-slate-400 italic">
+                {member.formattedSpecialization}
+            </td>
+            <td className="p-4 text-right text-slate-300 font-mono text-xs">
+                {member.formattedSalary}/ano
+            </td>
+        </tr>
+    );
+});
+
+StaffRow.displayName = "StaffRow";
+
 function StaffTable({ staff }: { staff: Staff[] }) {
+    const enrichedStaff = useMemo(() => {
+        return staff.map((member): EnrichedStaff => ({
+            ...member,
+            fullName: `${member.firstName} ${member.lastName}`,
+            formattedRole: formatRole(member.role),
+            formattedSpecialization: member.specialization
+                ? formatRole(member.specialization)
+                : '-',
+            formattedSalary: formatCurrency(member.salary)
+        }));
+    }, [staff]);
+
     if (staff.length === 0) {
         return <div className="text-slate-500 p-4">Nenhum staff contratado.</div>;
     }
@@ -20,27 +69,8 @@ function StaffTable({ staff }: { staff: Staff[] }) {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                    {staff.map((member) => (
-                        <tr key={member.id} className="hover:bg-slate-800/50 transition-colors">
-                            <td className="p-4 font-medium text-slate-200">
-                                {member.firstName} {member.lastName}
-                            </td>
-                            <td className="p-4 text-slate-300">
-                                {formatRole(member.role)}
-                            </td>
-                            <td className="p-4 text-center text-slate-400">{member.age}</td>
-                            <td className="p-4 text-center">
-                                <div className="inline-block px-2 py-1 rounded bg-slate-800 font-bold text-white border border-slate-700">
-                                    {member.overall}
-                                </div>
-                            </td>
-                            <td className="p-4 text-slate-400 italic">
-                                {member.specialization ? formatRole(member.specialization) : '-'}
-                            </td>
-                            <td className="p-4 text-right text-slate-300 font-mono text-xs">
-                                {formatCurrency(member.salary)}/ano
-                            </td>
-                        </tr>
+                    {enrichedStaff.map((member) => (
+                        <StaffRow key={member.id} member={member} />
                     ))}
                 </tbody>
             </table>
@@ -48,4 +78,4 @@ function StaffTable({ staff }: { staff: Staff[] }) {
     );
 }
 
-export default StaffTable;
+export default memo(StaffTable);
