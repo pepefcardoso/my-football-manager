@@ -67,7 +67,7 @@ function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
                     />
 
                     <h1 className="text-2xl font-black italic tracking-tighter relative z-10">
-                        FM <span style={{ color: 'var(--team-primary)' }}>2025</span>
+                        Maestro
                     </h1>
                     {team && (
                         <div className="mt-6 flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-500">
