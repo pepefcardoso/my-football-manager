@@ -37,7 +37,7 @@ export function NewGameModal({ onClose, onConfirm }: NewGameModalProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md shadow-2xl p-6">
 
                 <h2 className="text-2xl font-light text-white mb-1">Novo Jogo</h2>
@@ -57,7 +57,7 @@ export function NewGameModal({ onClose, onConfirm }: NewGameModalProps) {
                             value={saveName}
                             onChange={(e) => setSaveName(e.target.value)}
                             placeholder="Ex: Carreira 2025"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors select-text"
                             autoFocus
                         />
                     </div>
@@ -69,7 +69,7 @@ export function NewGameModal({ onClose, onConfirm }: NewGameModalProps) {
                             value={managerName}
                             onChange={(e) => setManagerName(e.target.value)}
                             placeholder="Ex: Seu Nome"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors select-text"
                         />
                     </div>
 

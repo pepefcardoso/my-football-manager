@@ -4,14 +4,13 @@ import type { Team } from "../domain/models";
 export function useTeamTheme(team: Team | null) {
   useEffect(() => {
     const root = document.documentElement;
-
-    if (team) {
-      root.style.setProperty("--team-primary", team.primaryColor);
-      root.style.setProperty("--team-secondary", team.secondaryColor);
-      root.style.setProperty("--team-primary-dim", `${team.primaryColor}CC`);
-    } else {
-      root.style.setProperty("--team-primary", "#059669");
-      root.style.setProperty("--team-secondary", "#10b981");
-    }
-  }, [team?.id, team?.primaryColor, team?.secondaryColor, team]);
+    const primary = team?.primaryColor || "#059669";
+    const secondary = team?.secondaryColor || "#10b981";
+    root.style.setProperty("--team-primary", primary);
+    root.style.setProperty("--team-secondary", secondary);
+    root.style.setProperty("--team-primary-10", `${primary}1A`);
+    root.style.setProperty("--team-primary-20", `${primary}33`);
+    root.style.setProperty("--team-primary-50", `${primary}80`);
+    root.style.setProperty("--team-primary-80", `${primary}CC`);
+  }, [team?.id, team?.primaryColor, team?.secondaryColor]);
 }

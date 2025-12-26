@@ -23,14 +23,20 @@ function NavItem({ icon, label, isActive, onClick }: NavItemProps) {
     return (
         <button
             onClick={onClick}
-            className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-all duration-200 group ${isActive
-                    ? "text-white shadow-lg font-bold"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
+            className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-all duration-200 group relative overflow-hidden ${isActive
+                ? "text-white font-bold shadow-lg"
+                : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                 }`}
-            style={isActive ? { backgroundColor: 'var(--team-primary)' } : {}}
+            style={isActive ? {
+                backgroundColor: 'var(--team-primary)',
+                boxShadow: '0 0 15px var(--team-primary-20)'
+            } : {}}
         >
-            <span className="text-lg group-hover:scale-110 transition-transform">{icon}</span>
-            <span className="text-sm">{label}</span>
+            {isActive && (
+                <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent pointer-events-none" />
+            )}
+            <span className="text-lg group-hover:scale-110 transition-transform relative z-10">{icon}</span>
+            <span className="text-sm relative z-10">{label}</span>
         </button>
     );
 }
@@ -55,8 +61,13 @@ function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
         <>
             <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col h-full z-20 relative">
                 <div className="p-6 border-b border-slate-800">
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--team-primary)] to-slate-400 bg-clip-text text-transparent transition-all duration-500">
-                        FM 2025
+                    <div
+                        className="absolute -top-10 -left-10 w-40 h-40 rounded-full blur-[50px] opacity-20 pointer-events-none"
+                        style={{ backgroundColor: 'var(--team-primary)' }}
+                    />
+
+                    <h1 className="text-2xl font-black italic tracking-tighter relative z-10">
+                        FM <span style={{ color: 'var(--team-primary)' }}>2025</span>
                     </h1>
                     {team && (
                         <div className="mt-6 flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-500">

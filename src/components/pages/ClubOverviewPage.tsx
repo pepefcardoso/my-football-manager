@@ -4,6 +4,7 @@ import { Logger } from "../../lib/Logger";
 import { useGameStore } from "../../store/useGameStore";
 import { TrainingFocus } from "../../domain/enums";
 import { TeamLogo } from "../common/TeamLogo";
+import { BrandButton } from "../common/BrandButton";
 
 const logger = new Logger("ClubOverviewPage");
 
@@ -255,7 +256,10 @@ function ClubOverviewPage({ team }: { team: Team }) {
                 </div>
 
                 <div className="flex flex-col items-end gap-3">
-                    <div className="text-slate-300 font-mono bg-slate-900 px-6 py-2 rounded-xl border border-slate-800 text-sm shadow-lg">
+                    <div
+                        className="text-slate-300 font-mono bg-slate-900/80 backdrop-blur-sm px-6 py-2 rounded-xl border text-sm shadow-lg"
+                        style={{ borderColor: 'var(--team-primary-20)' }}
+                    >
                         📅 {displayDate}
                     </div>
                     <div className="flex gap-2">
@@ -278,15 +282,12 @@ function ClubOverviewPage({ team }: { team: Team }) {
                                 </div>
                             </button>
                         ) : (
-                            <button
-                                onClick={handleSimulateContinue}
-                                className="group px-8 py-3 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg hover:shadow-2xl hover:shadow-emerald-500/20 active:scale-95"
-                            >
+                            <BrandButton onClick={handleSimulateContinue}>
                                 <div className="flex items-center gap-2">
                                     <span>▶ Continuar</span>
-                                    <span className="text-emerald-200 group-hover:translate-x-1 transition-transform">➤</span>
+                                    <span className="opacity-70 group-hover:translate-x-1 transition-transform">➤</span>
                                 </div>
-                            </button>
+                            </BrandButton>
                         )}
                     </div>
                 </div>
@@ -294,8 +295,14 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 auto-rows-[minmax(120px,auto)]">
 
-                <div className="col-span-1 md:col-span-12 lg:col-span-8 row-span-2 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-8 shadow-2xl relative overflow-hidden group hover:border-emerald-500/30 transition-all">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div
+                    className="col-span-1 md:col-span-12 lg:col-span-8 row-span-2 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 rounded-2xl border p-8 shadow-2xl relative overflow-hidden group transition-all"
+                    style={{ borderColor: 'var(--team-primary-20)' }}
+                >
+                    <div
+                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
+                        style={{ background: 'radial-gradient(circle at top right, var(--team-primary-20), transparent 70%)' }}
+                    />
 
                     {nextMatch ? (
                         <div className="relative z-10 h-full flex flex-col justify-between">
@@ -303,7 +310,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
                                 <span className="text-3xl">⚽</span>
                                 <div>
                                     <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Próximo Desafio</h3>
-                                    <p className="text-xs text-emerald-400 font-mono">{nextMatch.competitionName}</p>
+                                    <p className="text-xs font-mono" style={{ color: 'var(--team-primary)' }}>{nextMatch.competitionName}</p>
                                 </div>
                             </div>
 
@@ -362,7 +369,8 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
                                 <button
                                     onClick={() => navigateInGame("matches")}
-                                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-2xl hover:shadow-emerald-500/20 active:scale-95"
+                                    className="px-6 py-3 font-bold rounded-xl transition-all shadow-lg active:scale-95 text-white"
+                                    style={{ backgroundColor: 'var(--team-primary)' }}
                                 >
                                     Ver Detalhes →
                                 </button>
@@ -377,7 +385,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
                     )}
                 </div>
 
-                <div className="col-span-1 md:col-span-6 lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-lg hover:border-slate-700 transition-all">
+                <div className="col-span-1 md:col-span-6 lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-lg hover:border-slate-700 transition-all hover:shadow-[0_0_20px_var(--team-primary-10)]">
                     <div className="flex items-center gap-2 mb-4">
                         <span className="text-2xl">💰</span>
                         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Orçamento</h3>
@@ -398,7 +406,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
                     </div>
                 </div>
 
-                <div className="col-span-1 md:col-span-6 lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-lg hover:border-slate-700 transition-all">
+                <div className="col-span-1 md:col-span-6 lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-lg hover:border-slate-700 transition-all hover:shadow-[0_0_20px_var(--team-primary-10)]">
                     <div className="flex items-center gap-2 mb-4">
                         <span className="text-2xl">⭐</span>
                         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Reputação</h3>
@@ -406,8 +414,11 @@ function ClubOverviewPage({ team }: { team: Team }) {
                     <div className="text-4xl font-black text-white mb-2 tracking-tight">{team.reputation}</div>
                     <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
                         <div
-                            className="bg-gradient-to-r from-yellow-500 to-amber-500 h-2 rounded-full transition-all duration-1000"
-                            style={{ width: `${Math.min(100, (team.reputation / 10000) * 100)}%` }}
+                            className="h-2 rounded-full transition-all duration-1000"
+                            style={{
+                                width: `${Math.min(100, (team.reputation / 10000) * 100)}%`,
+                                backgroundColor: 'var(--team-primary)'
+                            }}
                         />
                     </div>
                 </div>
