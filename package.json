@@ -24,6 +24,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.12",
     "better-sqlite3": "^12.5.0",
     "drizzle-orm": "^0.45.0",
     "jsdom": "^27.3.0",

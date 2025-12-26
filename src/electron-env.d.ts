@@ -26,7 +26,7 @@ export interface ScoutingFilter {
 }
 
 export interface ScoutingSlot {
-  slotNumber: number;
+  slotNumber: 1 | 2 | 3;
   isActive: boolean;
   filters: ScoutingFilter;
   stats: {
@@ -58,21 +58,27 @@ export interface RespondProposalInput {
 export interface TransferProposalData {
   id: number;
   playerId: number;
-  playerName?: string;
+  player?: Player;
   fromTeamId: number;
-  fromTeamName?: string;
+  fromTeam?: Team;
   toTeamId?: number;
-  toTeamName?: string;
+  toTeam?: Team;
   fee: number;
   status:
-    | "PENDING"
-    | "ACCEPTED"
-    | "REJECTED"
-    | "NEGOTIATING"
-    | "COMPLETED"
-    | "CANCELLED";
+    | "pending"
+    | "negotiating"
+    | "accepted"
+    | "rejected"
+    | "completed"
+    | "cancelled"
+    | "withdrawn";
+  type: string;
+  wageOffer: number;
+  contractLength: number;
   createdAt: string;
   responseDeadline: string;
+  counterOfferFee?: number | null;
+  rejectionReason?: string | null;
 }
 
 interface PlayerStatRow {

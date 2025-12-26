@@ -1,25 +1,62 @@
+import { useState } from "react";
+import { useGameStore } from "../../store/useGameStore";
+import { formatCurrency } from "../../utils/formatters";
+import { useTransferNegotiations } from "../../hooks/transfer/useTransferNegotiations";
+import { useScoutingNetwork } from "../../hooks/transfer/useScoutingNetwork";
+import { useTransferActions } from "../../hooks/transfer/useTransferActions";
+import { useFreeAgents } from "../../hooks/transfer/useFreeAgents";
 import { ScoutingSlotCard } from "../features/scouting/ScoutingSlotCard";
 import { SearchResultsGrid } from "../features/scouting/SearchResultsGrid";
 import { TransferProposalModal } from "../features/transfer/TransferProposalModal";
 import { ScoutingConfigModal } from "../features/scouting/ScoutingConfigModal";
 import { NegotiationList } from "../features/transfer/NegotiationList";
-import { useTransferHubController } from "../../hooks/useTransferHubController";
-import { formatCurrency } from "../../utils/formatters";
+import type { Player } from "../../domain/models";
+import { TransferStatus } from "../../domain/enums";
 
 interface TransferHubPageProps {
     teamId: number;
 }
 
+type TabType = "results" | "market" | "negotiations";
+
 function TransferHubPage({ teamId }: TransferHubPageProps) {
-    const ctrl = useTransferHubController(teamId);
+    const [activeTab, setActiveTab] = useState<TabType>("results");
+    const [configuringSlot, setConfiguringSlot] = useState<number | null>(null);
+    const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+
+    const { userTeam, currentDate } = useGameStore();
+    const currentSeasonId = 1;
+
+    const { bids, offers, isLoading: loadingNegs, refresh: refreshNegs } = useTransferNegotiations(teamId);
+    const { slots, results: scoutedPlayers, isLoading: loadingScout, saveSlotConfig, stopSlot } = useScoutingNetwork(teamId);
+    const { finalizeTransfer, respondToCounter, respondToOffer, isProcessing } = useTransferActions(teamId);
+    const { agents, isLoading: loadingAgents, fetch: fetchFreeAgents } = useFreeAgents();
+
+    const handleFetchFreeAgents = () => {
+        fetchFreeAgents().then(() => setActiveTab("market"));
+    };
+
+    const handleProposalSent = () => {
+        setSelectedPlayer(null);
+        setActiveTab("negotiations");
+        refreshNegs();
+        alert("Proposta enviada!");
+    };
+
+    const isLoading = loadingNegs || loadingScout || loadingAgents || isProcessing;
+    const displayPlayers = activeTab === "market" ? agents : scoutedPlayers;
+    const hasActiveNegotiations = offers.length > 0 || bids.some(b => b.status === TransferStatus.ACCEPTED);
 
     return (
         <div className="flex h-full bg-slate-950 text-white overflow-hidden">
-            {ctrl.configuringSlot !== null && (
+            {configuringSlot !== null && (
                 <ScoutingConfigModal
-                    slotNumber={ctrl.configuringSlot}
-                    onSave={ctrl.saveSlotConfig}
-                    onClose={() => ctrl.setConfiguringSlot(null)}
+                    slotNumber={configuringSlot}
+                    onSave={(filters) => {
+                        saveSlotConfig(configuringSlot, filters, slots);
+                        setConfiguringSlot(null);
+                    }}
+                    onClose={() => setConfiguringSlot(null)}
                 />
             )}
 
@@ -29,15 +66,16 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                 </h2>
 
                 <div className="space-y-4">
-                    {ctrl.team?.scoutingSlots?.map((slot) => (
+                    {slots.length > 0 ? slots.map((slot) => (
                         <ScoutingSlotCard
                             key={slot.slotNumber}
                             slot={slot}
-                            onConfigure={ctrl.setConfiguringSlot}
-                            onStop={ctrl.stopSlot}
+                            onConfigure={setConfiguringSlot}
+                            onStop={(slotNum) => stopSlot(slotNum, slots)}
                         />
-                    ))}
-                    {(!ctrl.team?.scoutingSlots) && <div className="text-slate-500 text-sm text-center">A carregar slots...</div>}
+                    )) : (
+                        <div className="text-slate-500 text-sm text-center">A carregar slots...</div>
+                    )}
                 </div>
 
                 <div className="mt-8 p-4 bg-blue-900/10 border border-blue-900/30 rounded text-xs text-blue-200">
@@ -52,86 +90,89 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                         <h1 className="text-3xl font-bold tracking-tight">Transfer Hub</h1>
                         <div className="text-right">
                             <p className="text-xs text-slate-500">Orçamento Disponível</p>
-                            <p className={`text-xl font-mono ${ctrl.userTeam && ctrl.userTeam.budget < 0 ? 'text-red-500' : 'text-emerald-400'}`}>
-                                {formatCurrency(ctrl.userTeam?.budget || 0)}
+                            <p className={`text-xl font-mono ${userTeam && userTeam.budget < 0 ? 'text-red-500' : 'text-emerald-400'}`}>
+                                {formatCurrency(userTeam?.budget || 0)}
                             </p>
                         </div>
                     </div>
 
                     <nav className="flex gap-6">
                         <TabButton
-                            isActive={ctrl.activeTab === "results"}
-                            onClick={() => ctrl.setActiveTab("results")}
-                            label={`Relatórios (${ctrl.searchResults.length})`}
+                            isActive={activeTab === "results"}
+                            onClick={() => setActiveTab("results")}
+                            label={`Relatórios (${scoutedPlayers.length})`}
                         />
                         <TabButton
-                            isActive={ctrl.activeTab === "negotiations"}
-                            onClick={() => ctrl.setActiveTab("negotiations")}
+                            isActive={activeTab === "negotiations"}
+                            onClick={() => setActiveTab("negotiations")}
                             label="Negociações"
-                            notification={ctrl.incomingOffers.length > 0 || ctrl.myBids.some(b => b.status === 'accepted')}
+                            notification={hasActiveNegotiations}
                         />
                         <TabButton
-                            isActive={ctrl.activeTab === "market"}
-                            onClick={() => ctrl.setActiveTab("market")}
+                            isActive={activeTab === "market"}
+                            onClick={() => setActiveTab("market")}
                             label="Mercado Livre"
                         />
                     </nav>
                 </header>
 
                 <div className="flex-1 overflow-y-auto p-8 relative">
-                    {ctrl.loading && (
+                    {isLoading && (
                         <div className="absolute inset-0 bg-slate-950/80 z-10 flex items-center justify-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
                         </div>
                     )}
 
-                    {ctrl.activeTab === "results" && (
-                        <SearchResultsGrid
-                            players={ctrl.searchResults}
-                            loading={ctrl.loading}
-                            onPlayerClick={ctrl.setSelectedPlayer}
-                        />
+                    {(activeTab === "results" || activeTab === "market") && (
+                        <>
+                            {activeTab === "market" && agents.length === 0 && !isLoading && (
+                                <div className="text-center text-slate-500 mt-10">
+                                    <h3 className="text-white text-lg font-bold mb-2">Agentes Livres</h3>
+                                    <p className="text-sm mb-8">Jogadores sem contrato podem ser contratados sem taxa de transferência.</p>
+                                    <button
+                                        className="px-6 py-3 bg-slate-800 border border-slate-700 rounded hover:bg-slate-700 text-white transition-all shadow-lg"
+                                        onClick={handleFetchFreeAgents}
+                                    >
+                                        🔍 Buscar Todos os Agentes Livres
+                                    </button>
+                                </div>
+                            )}
+
+                            {(activeTab !== "market" || agents.length > 0) && (
+                                <SearchResultsGrid
+                                    players={displayPlayers}
+                                    loading={isLoading}
+                                    onPlayerClick={setSelectedPlayer}
+                                />
+                            )}
+                        </>
                     )}
 
-                    {ctrl.activeTab === "negotiations" && (
+                    {activeTab === "negotiations" && (
                         <NegotiationList
-                            bids={ctrl.myBids}
-                            offers={ctrl.incomingOffers}
-                            loading={ctrl.loading}
-                            onFinalize={ctrl.finalizeTransfer}
-                            onRespondCounter={ctrl.respondToCounter}
-                            onRespondOffer={ctrl.respondToOffer}
+                            bids={bids}
+                            offers={offers}
+                            loading={isProcessing}
+                            onFinalize={(id) => {
+                                if (confirm("Confirmar transferência e pagamento?")) {
+                                    finalizeTransfer(id);
+                                }
+                            }}
+                            onRespondCounter={(id, accept) => respondToCounter({ proposalId: id, accept })}
+                            onRespondOffer={(id, response) => respondToOffer({ proposalId: id, response, currentDate })}
                         />
-                    )}
-
-                    {ctrl.activeTab === "market" && (
-                        <div className="text-center text-slate-500 mt-10">
-                            <h3 className="text-white text-lg font-bold mb-2">Agentes Livres</h3>
-                            <p className="text-sm mb-8">Jogadores sem contrato podem ser contratados sem taxa de transferência.</p>
-                            <button
-                                className="px-6 py-3 bg-slate-800 border border-slate-700 rounded hover:bg-slate-700 text-white transition-all shadow-lg"
-                                onClick={ctrl.fetchFreeAgents}
-                            >
-                                🔍 Buscar Todos os Agentes Livres
-                            </button>
-                        </div>
                     )}
                 </div>
             </main>
 
-            {ctrl.selectedPlayer && ctrl.userTeam && (
+            {selectedPlayer && userTeam && (
                 <TransferProposalModal
-                    player={ctrl.selectedPlayer}
-                    proposingTeamId={ctrl.userTeam.id}
-                    currentDate={ctrl.currentDate}
-                    seasonId={ctrl.currentSeasonId}
-                    onClose={() => ctrl.setSelectedPlayer(null)}
-                    onProposalSent={() => {
-                        ctrl.setSelectedPlayer(null);
-                        ctrl.setActiveTab("negotiations");
-                        ctrl.refresh();
-                        alert("Proposta enviada!");
-                    }}
+                    player={selectedPlayer}
+                    proposingTeamId={userTeam.id}
+                    currentDate={currentDate}
+                    seasonId={currentSeasonId}
+                    onClose={() => setSelectedPlayer(null)}
+                    onProposalSent={handleProposalSent}
                 />
             )}
         </div>
