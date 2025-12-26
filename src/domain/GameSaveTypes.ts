@@ -30,6 +30,7 @@ export interface TeamSnapshot {
   shortName: string;
   primaryColor: string;
   secondaryColor: string;
+  badgeUrl?: string | null;
   reputation: number;
   budget: number;
   isHuman: boolean;

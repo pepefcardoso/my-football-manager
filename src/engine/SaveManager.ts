@@ -236,6 +236,7 @@ export class SaveManager {
         shortName: team.shortName,
         primaryColor: team.primaryColor,
         secondaryColor: team.secondaryColor,
+        badgeUrl: team.badgeUrl,
         reputation: team.reputation,
         budget: team.budget,
         isHuman: team.isHuman,

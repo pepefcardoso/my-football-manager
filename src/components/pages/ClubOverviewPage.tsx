@@ -3,6 +3,7 @@ import type { GameState, Team } from "../../domain/models";
 import { Logger } from "../../lib/Logger";
 import { useGameStore } from "../../store/useGameStore";
 import { TrainingFocus } from "../../domain/enums";
+import { TeamLogo } from "../common/TeamLogo";
 
 const logger = new Logger("ClubOverviewPage");
 
@@ -218,22 +219,34 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
     return (
         <div className="min-h-screen bg-slate-950 p-8 animate-in fade-in duration-500">
-            <header className="mb-8 flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <div
-                        className="w-20 h-20 rounded-2xl flex items-center justify-center font-black text-3xl shadow-2xl border-2 border-white/10 relative overflow-hidden"
-                        style={{ backgroundColor: team.primaryColor || "#333" }}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
-                        <span className="relative z-10 text-white drop-shadow-lg select-none">
-                            {team.shortName.substring(0, 2)}
-                        </span>
+            <header className="mb-8 flex justify-between items-center relative">
+                <div
+                    className="absolute -top-20 -left-20 w-96 h-96 rounded-full opacity-10 blur-3xl pointer-events-none"
+                    style={{ backgroundColor: team.primaryColor }}
+                />
+
+                <div className="flex items-center gap-6 relative z-10">
+                    <div className="relative group">
+                        <TeamLogo
+                            team={team}
+                            className="w-24 h-24 text-4xl rounded-2xl"
+                        />
+                        <div
+                            className="absolute inset-0 rounded-2xl blur-xl opacity-40 -z-10 group-hover:opacity-60 transition-opacity duration-500"
+                            style={{ backgroundColor: team.primaryColor }}
+                        />
                     </div>
+
                     <div>
-                        <h1 className="text-4xl font-black text-white tracking-tight">{team.name}</h1>
-                        <div className="flex items-center gap-3 mt-1">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span className="text-slate-400 text-sm">Temporada 2024/25</span>
+                        <h1 className="text-5xl font-black text-white tracking-tight leading-none drop-shadow-sm">
+                            {team.name}
+                        </h1>
+                        <div className="flex items-center gap-3 mt-2">
+                            <span
+                                className="h-1.5 w-12 rounded-full"
+                                style={{ backgroundColor: team.secondaryColor || '#fff' }}
+                            />
+                            <span className="text-slate-400 text-sm font-medium tracking-wide uppercase">Temporada 2024/25</span>
                         </div>
                     </div>
                 </div>

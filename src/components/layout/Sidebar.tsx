@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { MenuOption } from "../../domain/constants";
 import type { Team } from "../../domain/models";
-import NavButton from "../common/NavButton";
 import { SystemMenuModal } from "../features/system/SystemMenuModal";
+import { useTeamTheme } from "../../hooks/useTeamTheme";
+import { TeamLogo } from "../common/TeamLogo";
 
 interface SidebarProps {
     activePage: MenuOption;
@@ -10,129 +11,102 @@ interface SidebarProps {
     team: Team | null;
 }
 
+interface NavItemProps {
+    page: MenuOption;
+    icon: string;
+    label: string;
+    isActive: boolean;
+    onClick: () => void;
+}
+
+function NavItem({ icon, label, isActive, onClick }: NavItemProps) {
+    return (
+        <button
+            onClick={onClick}
+            className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-all duration-200 group ${isActive
+                    ? "text-white shadow-lg font-bold"
+                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                }`}
+            style={isActive ? { backgroundColor: 'var(--team-primary)' } : {}}
+        >
+            <span className="text-lg group-hover:scale-110 transition-transform">{icon}</span>
+            <span className="text-sm">{label}</span>
+        </button>
+    );
+}
+
 function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
     const [isSystemMenuOpen, setIsSystemMenuOpen] = useState(false);
 
+    useTeamTheme(team);
+
+    const renderNavItem = (page: MenuOption, icon: string, label: string) => (
+        <NavItem
+            key={page}
+            page={page}
+            icon={icon}
+            label={label}
+            isActive={activePage === page}
+            onClick={() => onNavigate(page)}
+        />
+    );
+
     return (
         <>
-            <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-full">
+            <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col h-full z-20 relative">
                 <div className="p-6 border-b border-slate-800">
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent">
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--team-primary)] to-slate-400 bg-clip-text text-transparent transition-all duration-500">
                         FM 2025
                     </h1>
                     {team && (
-                        <div className="mt-4 flex items-center gap-3">
-                            <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-lg"
-                                style={{ backgroundColor: team.primaryColor || "#333" }}
-                            >
-                                {team.shortName.substring(0, 2)}
-                            </div>
+                        <div className="mt-6 flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-500">
+                            <TeamLogo team={team} className="w-12 h-12" />
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold truncate">{team.name}</p>
-                                <p className="text-xs text-slate-500">Reputação: {team.reputation}</p>
+                                <p className="text-sm font-bold truncate text-white leading-tight">{team.name}</p>
+                                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mt-0.5">
+                                    Reputação: {team.reputation}
+                                </p>
                             </div>
                         </div>
                     )}
                 </div>
 
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
                     {team && (
                         <>
-                            <div className="pt-4 pb-2 px-2 text-xs font-semibold text-slate-500 uppercase">
-                                Gestão
+                            <div className="pt-4 pb-2 px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                                Clube
                             </div>
-                            <NavButton
-                                active={activePage === "club"}
-                                onClick={() => onNavigate("club")}
-                                icon="🏛️"
-                            >
-                                Visão Geral
-                            </NavButton>
-                            <NavButton
-                                active={activePage === "squad"}
-                                onClick={() => onNavigate("squad")}
-                                icon="⚽"
-                            >
-                                Elenco Principal
-                            </NavButton>
-                            <NavButton
-                                active={activePage === "staff"}
-                                onClick={() => onNavigate("staff")}
-                                icon="👔"
-                            >
-                                Equipa Técnica
-                            </NavButton>
-                            <NavButton
-                                active={activePage === "youth"}
-                                onClick={() => onNavigate("youth")}
-                                icon="🎓"
-                            >
-                                Categorias de Base
-                            </NavButton>
-                            <NavButton
-                                active={activePage === "transfer"}
-                                onClick={() => onNavigate("transfer")}
-                                icon="🔄"
-                            >
-                                Transferências
-                            </NavButton>
-                            <NavButton
-                                active={activePage === "finances"}
-                                onClick={() => onNavigate("finances")}
-                                icon="💰"
-                            >
-                                Finanças
-                            </NavButton>
-                            <NavButton
-                                active={activePage === "infrastructure"}
-                                onClick={() => onNavigate("infrastructure")}
-                                icon="🏗️"
-                            >
-                                Infraestrutura
-                            </NavButton>
+                            {renderNavItem("club", "🏛️", "Visão Geral")}
+                            {renderNavItem("squad", "⚽", "Elenco")}
+                            {renderNavItem("staff", "👔", "Staff")}
+                            {renderNavItem("youth", "🎓", "Academia")}
+                            {renderNavItem("infrastructure", "🏗️", "Infraestrutura")}
 
-                            <div className="pt-4 pb-2 px-2 text-xs font-semibold text-slate-500 uppercase">
+                            <div className="pt-6 pb-2 px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                                Mercado
+                            </div>
+                            {renderNavItem("transfer", "🔄", "Transfer Hub")}
+                            {renderNavItem("finances", "💰", "Finanças")}
+
+                            <div className="pt-6 pb-2 px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">
                                 Competição
                             </div>
-                            <NavButton
-                                active={activePage === "matches"}
-                                onClick={() => onNavigate("matches")}
-                                icon="🎮"
-                            >
-                                Próximas Partidas
-                            </NavButton>
-                            <NavButton
-                                active={activePage === "calendar"}
-                                onClick={() => onNavigate("calendar")}
-                                icon="📅"
-                            >
-                                Calendário
-                            </NavButton>
-                            <NavButton
-                                active={activePage === "competitions"}
-                                onClick={() => onNavigate("competitions")}
-                                icon="🏆"
-                            >
-                                Competições
-                            </NavButton>
+                            {renderNavItem("matches", "🎮", "Jogos")}
+                            {renderNavItem("calendar", "📅", "Calendário")}
+                            {renderNavItem("competitions", "🏆", "Tabelas")}
                         </>
                     )}
                 </nav>
 
-                <div className="p-4 border-t border-slate-800 space-y-3">
+                <div className="p-4 border-t border-slate-800 space-y-3 bg-slate-900/30">
                     <button
                         onClick={() => setIsSystemMenuOpen(true)}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
                     >
                         <span>⚙️</span>
-                        <span className="text-sm font-medium">Sistema / Salvar</span>
+                        <span className="text-sm font-medium">Sistema</span>
                     </button>
-
-                    <div className="text-xs text-slate-500 pt-2 border-t border-slate-800/50">
-                        <p>Data: 15 Jan 2025</p>
-                        <p className="mt-1">Temporada 2024/25</p>
-                    </div>
                 </div>
             </aside>
 

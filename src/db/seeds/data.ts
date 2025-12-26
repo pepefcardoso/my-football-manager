@@ -123,6 +123,7 @@ export interface TeamSeedData {
   secondary: string;
   rep: number;
   budget: number;
+  badgeUrl?: string;
   realPlayers?: RealPlayer[];
 }
 
@@ -134,6 +135,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 8800,
     budget: 120000000,
+    badgeUrl: "/badges/bot.png",
     realPlayers: [
       {
         firstName: "Luiz",
@@ -198,6 +200,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 9000,
     budget: 140000000,
+    badgeUrl: "/badges/pal.png",
     realPlayers: [
       {
         firstName: "Raphael",
@@ -262,6 +265,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#000000",
     rep: 9100,
     budget: 160000000,
+    badgeUrl: "/badges/fla.png",
     realPlayers: [
       {
         firstName: "Pedro",
@@ -326,6 +330,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#C3281E",
     rep: 8200,
     budget: 65000000,
+    badgeUrl: "/badges/for.png",
     realPlayers: [
       {
         firstName: "Juan",
@@ -381,6 +386,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 8300,
     budget: 75000000,
+    badgeUrl: "/badges/int.png",
     realPlayers: [
       {
         firstName: "Alan",
@@ -436,6 +442,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#C3281E",
     rep: 8500,
     budget: 90000000,
+    badgeUrl: "/badges/sao.png",
     realPlayers: [
       {
         firstName: "Lucas",
@@ -491,6 +498,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#000000",
     rep: 8400,
     budget: 85000000,
+    badgeUrl: "/badges/cor.png",
     realPlayers: [
       {
         firstName: "Memphis",
@@ -546,6 +554,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#E30613",
     rep: 7900,
     budget: 100000000,
+    badgeUrl: "/badges/bah.png",
     realPlayers: [
       {
         firstName: "Everton",
@@ -592,6 +601,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 8100,
     budget: 95000000,
+    badgeUrl: "/badges/cru.png",
     realPlayers: [
       {
         firstName: "Matheus",
@@ -638,6 +648,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 8000,
     budget: 70000000,
+    badgeUrl: "/badges/vas.png",
     realPlayers: [
       {
         firstName: "Pablo",
@@ -684,6 +695,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 8600,
     budget: 110000000,
+    badgeUrl: "/badges/cam.png",
     realPlayers: [
       {
         firstName: "Givanildo",
@@ -739,6 +751,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#000000",
     rep: 8000,
     budget: 70000000,
+    badgeUrl: "/badges/gre.png",
     realPlayers: [
       {
         firstName: "Mathías",
@@ -785,6 +798,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#075F38",
     rep: 8100,
     budget: 65000000,
+    badgeUrl: "/badges/flu.png",
     realPlayers: [
       {
         firstName: "Jhon",
@@ -840,6 +854,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 7200,
     budget: 80000000,
+    badgeUrl: "/badges/rbb.png",
     realPlayers: [
       {
         firstName: "Cleiton",
@@ -886,6 +901,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#000000",
     rep: 7500,
     budget: 70000000,
+    badgeUrl: "/badges/cap.png",
     realPlayers: [
       {
         firstName: "Agustín",
@@ -932,6 +948,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#000000",
     rep: 7800,
     budget: 60000000,
+    badgeUrl: "/badges/san.png",
     realPlayers: [
       {
         firstName: "João",
@@ -987,6 +1004,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#000000",
     rep: 6800,
     budget: 35000000,
+    badgeUrl: "/badges/vit.png",
     realPlayers: [
       {
         firstName: "Lucas",
@@ -1024,6 +1042,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 6600,
     budget: 30000000,
+    badgeUrl: "/badges/juv.png",
     realPlayers: [
       {
         firstName: "Jadson",
@@ -1061,6 +1080,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#FFFFFF",
     rep: 6800,
     budget: 35000000,
+    badgeUrl: "/badges/cea.png",
     realPlayers: [
       {
         firstName: "Erick",
@@ -1098,6 +1118,7 @@ export const TEAMS_DATA: TeamSeedData[] = [
     secondary: "#000000",
     rep: 6900,
     budget: 38000000,
+    badgeUrl: "/badges/spt.png",
     realPlayers: [
       {
         firstName: "Lucas",

@@ -32,6 +32,7 @@ export const teams = sqliteTable("teams", {
   activeConstruction: text("active_construction", { mode: "json" })
     .$type<ActiveConstruction | null>()
     .default(null),
+  badgeUrl: text("badge_url"),
   scoutingSlots: text("scouting_slots", { mode: "json" })
     .$type<ScoutingSlot[]>()
     .default([])

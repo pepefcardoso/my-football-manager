@@ -33,6 +33,7 @@ export interface Team {
   shortName: string;
   primaryColor: string;
   secondaryColor: string;
+  badgeUrl?: string | null;
   reputation: number;
   budget: number;
   isHuman: boolean;

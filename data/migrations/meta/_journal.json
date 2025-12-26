@@ -71,6 +71,13 @@
       "when": 1766501406754,
       "tag": "0009_mushy_maelstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1766756029750,
+      "tag": "0010_tan_rattler",
+      "breakpoints": true
     }
   ]
 }
