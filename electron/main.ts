@@ -13,7 +13,6 @@ import { eq } from "drizzle-orm";
 import { GameEventType } from "../src/domain/GameEventTypes";
 import { Result } from "../src/domain/ServiceResults";
 
-app.name = "Football Manager 2D";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = new Logger("electron-main");
 
