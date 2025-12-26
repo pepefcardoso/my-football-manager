@@ -26,11 +26,14 @@
   "dependencies": {
     "@tanstack/react-query": "^5.90.12",
     "better-sqlite3": "^12.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.0",
     "jsdom": "^27.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "recharts": "^3.6.0",
+    "tailwind-merge": "^3.4.0",
     "vitest": "^4.0.15",
     "zustand": "^5.0.9"
   },
