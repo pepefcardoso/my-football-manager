@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { formatCurrency } from "../../../utils/formatters";
 import { Logger } from "../../../lib/Logger";
 import StatCard from "../../common/StatCard";
+import { SkeletonCard } from "../../common/Skeleton";
 
 const logger = new Logger("FinancialDashboard");
 
@@ -59,8 +60,18 @@ export function FinancialDashboard({ teamId, seasonId }: FinancialDashboardProps
 
     if (loading) {
         return (
-            <div className="flex justify-center p-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+            <div className="space-y-6 animate-in fade-in">
+                <SkeletonCard />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <SkeletonCard />
+                    <SkeletonCard />
+                </div>
             </div>
         );
     }
@@ -206,8 +217,8 @@ export function FinancialDashboard({ teamId, seasonId }: FinancialDashboardProps
                         <div>
                             <p className="text-xs text-slate-500 mb-1">Projected Profit</p>
                             <p className={`text-xl font-bold ${data.projectedAnnualRevenue - (data.salaryBill.annual + data.operationalCosts.annual) >= 0
-                                    ? "text-emerald-400"
-                                    : "text-red-400"
+                                ? "text-emerald-400"
+                                : "text-red-400"
                                 }`}>
                                 {formatCurrency(
                                     data.projectedAnnualRevenue - (data.salaryBill.annual + data.operationalCosts.annual)

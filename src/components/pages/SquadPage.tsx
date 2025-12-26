@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import PlayerTable from "../features/squad/PlayerTable";
 import type { Player } from "../../domain/models";
 import { Logger } from "../../lib/Logger";
+import { SkeletonRow } from "../common/Skeleton";
 
 type FilterType = "all" | "starters";
 
@@ -64,11 +65,10 @@ function SquadPage({ teamId }: { teamId: number }) {
             type="button"
             onClick={() => setFilter("all")}
             aria-pressed={filter === "all"}
-            className={`px-3 py-1 text-xs rounded border transition-colors ${
-              filter === "all"
+            className={`px-3 py-1 text-xs rounded border transition-colors ${filter === "all"
                 ? "bg-slate-800 hover:bg-slate-700 border-slate-700"
                 : "bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400"
-            }`}
+              }`}
           >
             Todos ({players.length})
           </button>
@@ -76,11 +76,10 @@ function SquadPage({ teamId }: { teamId: number }) {
             type="button"
             onClick={() => setFilter("starters")}
             aria-pressed={filter === "starters"}
-            className={`px-3 py-1 text-xs rounded border transition-colors ${
-              filter === "starters"
+            className={`px-3 py-1 text-xs rounded border transition-colors ${filter === "starters"
                 ? "bg-slate-800 hover:bg-slate-700 border-slate-700"
                 : "bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400"
-            }`}
+              }`}
           >
             Titulares (11)
           </button>
@@ -97,15 +96,10 @@ function SquadPage({ teamId }: { teamId: number }) {
       )}
 
       {loading ? (
-        <div
-          className="flex justify-center p-10"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-            <p className="text-slate-400">A carregar jogadores...</p>
-          </div>
+        <div className="bg-slate-900/50 rounded-lg border border-slate-800 overflow-hidden">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <SkeletonRow key={i} cols={6} />
+          ))}
         </div>
       ) : (
         <PlayerTable players={filteredPlayers} />

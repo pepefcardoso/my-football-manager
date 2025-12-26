@@ -1,4 +1,5 @@
 import { useGameManagement } from "../../hooks/useGameManagement";
+import { LoadingOverlay } from "../common/Loading";
 import { LoadGameModal } from "../features/save-load/LoadGameModal";
 import { NewGameModal } from "../features/save-load/NewGameModal";
 import { StartMenuButton } from "../features/save-load/StartMenuButton";
@@ -127,12 +128,7 @@ function StartPage() {
             </div>
 
             {isLoading && (
-                <div className="absolute inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="w-16 h-16 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-                    <p className="text-white font-light text-lg tracking-widest animate-pulse">
-                        {loadingMessage || "Processando..."}
-                    </p>
-                </div>
+                <LoadingOverlay message={loadingMessage || "Processando..."} />
             )}
 
             {activeModal === 'load_game' && (

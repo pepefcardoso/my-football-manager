@@ -4,6 +4,7 @@ import { FinancialDashboard } from "../features/finance/FinancialDashBoard";
 import { FinancialTransactions } from "../features/finance/FinancialTransactions";
 import { OperationalCostsPanel } from "../features/finance/OperationalCostsPanel";
 import { RevenueProjectionPanel } from "../features/finance/RevenueProjectionPanel";
+import { LoadingSpinner } from "../common/Loading";
 
 const logger = new Logger("FinancesPage");
 
@@ -36,11 +37,7 @@ function FinancesPage({ teamId }: FinancesPageProps) {
 
     const renderTabContent = useCallback(() => {
         if (loading || !seasonId) {
-            return (
-                <div className="flex justify-center items-center p-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-                </div>
-            );
+            return <LoadingSpinner text="A carregar dados financeiros..." />;
         }
 
         switch (activeTab) {
@@ -70,8 +67,8 @@ function FinancesPage({ teamId }: FinancesPageProps) {
                 <button
                     onClick={() => setActiveTab("dashboard")}
                     className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${activeTab === "dashboard"
-                            ? "border-emerald-500 text-emerald-400"
-                            : "border-transparent text-slate-400 hover:text-white"
+                        ? "border-emerald-500 text-emerald-400"
+                        : "border-transparent text-slate-400 hover:text-white"
                         }`}
                 >
                     📊 Dashboard
@@ -79,8 +76,8 @@ function FinancesPage({ teamId }: FinancesPageProps) {
                 <button
                     onClick={() => setActiveTab("transactions")}
                     className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${activeTab === "transactions"
-                            ? "border-emerald-500 text-emerald-400"
-                            : "border-transparent text-slate-400 hover:text-white"
+                        ? "border-emerald-500 text-emerald-400"
+                        : "border-transparent text-slate-400 hover:text-white"
                         }`}
                 >
                     💳 Transactions
@@ -88,8 +85,8 @@ function FinancesPage({ teamId }: FinancesPageProps) {
                 <button
                     onClick={() => setActiveTab("operations")}
                     className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${activeTab === "operations"
-                            ? "border-emerald-500 text-emerald-400"
-                            : "border-transparent text-slate-400 hover:text-white"
+                        ? "border-emerald-500 text-emerald-400"
+                        : "border-transparent text-slate-400 hover:text-white"
                         }`}
                 >
                     🏭 Operations
@@ -97,8 +94,8 @@ function FinancesPage({ teamId }: FinancesPageProps) {
                 <button
                     onClick={() => setActiveTab("revenue")}
                     className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${activeTab === "revenue"
-                            ? "border-emerald-500 text-emerald-400"
-                            : "border-transparent text-slate-400 hover:text-white"
+                        ? "border-emerald-500 text-emerald-400"
+                        : "border-transparent text-slate-400 hover:text-white"
                         }`}
                 >
                     💰 Revenue
