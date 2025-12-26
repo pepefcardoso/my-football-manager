@@ -49,7 +49,7 @@ export function MatchViewer({
   const isUserAway = userTeam?.id === awayTeamId;
   const isUserPlaying = isUserHome || isUserAway;
 
-  const canControl = isUserPlaying && simulation?.state !== "finished";
+  const canControl = isUserPlaying && simulation.state !== "finished";
 
   const handleStart = () => {
     startMatch(matchId);
@@ -77,7 +77,7 @@ export function MatchViewer({
   };
 
   const handleOpenSubstitution = () => {
-    if (simulation?.state === "playing") {
+    if (simulation.state === "playing") {
       pauseMatch();
     }
     setIsSubModalOpen(true);
@@ -99,9 +99,9 @@ export function MatchViewer({
   };
 
   const getLineups = () => {
-    if (!simulation) return { onField: [], bench: [] };
-
     const simData = simulation as any;
+
+    if (!simData) return { onField: [], bench: [] };
 
     if (isUserHome) {
       return simData.homeLineup || { onField: [], bench: [] };
@@ -110,7 +110,7 @@ export function MatchViewer({
     }
   };
 
-  if (!simulation) {
+  if (!simulation.matchId || simulation.matchId !== matchId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-8 animate-in fade-in">
         <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 max-w-2xl w-full shadow-2xl">
