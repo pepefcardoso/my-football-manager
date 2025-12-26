@@ -138,23 +138,27 @@ export function MatchViewer({
 
   const { onField, bench } = getLineups();
 
-  return (
+ return (
     <div className="h-screen bg-slate-950 text-white flex flex-col overflow-hidden relative">
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <MatchScoreboard
-          homeTeamName={homeTeamName}
-          awayTeamName={awayTeamName}
-          homeScore={simulation.homeScore}
-          awayScore={simulation.awayScore}
-          currentMinute={simulation.currentMinute}
-          state={simulation.state as any}
+          match={{
+            homeTeamName,
+            awayTeamName,
+            homeScore: simulation.homeScore,
+            awayScore: simulation.awayScore,
+            currentMinute: simulation.currentMinute,
+            state: simulation.state as any,
+          }}
+          controls={{
+            speed,
+            onSpeedChange: setSpeed,
+            onPause: pauseMatch,
+            onResume: resumeMatch,
+            onSimulateToEnd: simulateToEnd,
+          }}
           isLoading={simulation.isLoading}
           error={simulation.error as string | null}
-          speed={speed}
-          onSpeedChange={setSpeed}
-          onPause={pauseMatch}
-          onResume={resumeMatch}
-          onSimulateToEnd={simulateToEnd}
         />
 
         <MatchEvents events={simulation.events} />

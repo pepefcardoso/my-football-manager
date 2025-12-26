@@ -1,15 +1,16 @@
 import { MatchState } from "../../../domain/enums";
 import { LoadingSpinner } from "../../common/Loading";
 
-interface MatchScoreboardProps {
+interface MatchInfo {
     homeTeamName: string;
     awayTeamName: string;
     homeScore: number;
     awayScore: number;
     currentMinute: number;
     state: MatchState;
-    isLoading: boolean;
-    error: string | null;
+}
+
+interface MatchControls {
     speed: number;
     onSpeedChange: (speed: number) => void;
     onPause: () => void;
@@ -17,21 +18,36 @@ interface MatchScoreboardProps {
     onSimulateToEnd: () => void;
 }
 
+interface MatchScoreboardProps {
+    match: MatchInfo;
+    controls: MatchControls;
+    isLoading: boolean;
+    error: string | null;
+}
+
 export function MatchScoreboard({
-    homeTeamName,
-    awayTeamName,
-    homeScore,
-    awayScore,
-    currentMinute,
-    state,
+    match,
+    controls,
     isLoading,
     error,
-    speed,
-    onSpeedChange,
-    onPause,
-    onResume,
-    onSimulateToEnd,
 }: MatchScoreboardProps) {
+    const {
+        state,
+        currentMinute,
+        homeScore,
+        awayScore,
+        homeTeamName,
+        awayTeamName
+    } = match;
+
+    const {
+        speed,
+        onSpeedChange,
+        onPause,
+        onResume,
+        onSimulateToEnd
+    } = controls;
+
     const isPlaying = state === MatchState.PLAYING;
     const isPaused = state === MatchState.PAUSED;
     const isFinished = state === MatchState.FINISHED;

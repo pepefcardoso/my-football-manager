@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { MenuOption } from "../../domain/constants";
 import type { Team } from "../../domain/models";
 import { SystemMenuModal } from "../features/system/SystemMenuModal";
 import { useTeamTheme } from "../../hooks/useTeamTheme";
 import { TeamLogo } from "../common/TeamLogo";
+import { MENU_ITEMS, MENU_GROUPS, type MenuGroupKey } from "../../config/navigation";
 
 interface SidebarProps {
     activePage: MenuOption;
@@ -46,16 +47,20 @@ function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
 
     useTeamTheme(team);
 
-    const renderNavItem = (page: MenuOption, icon: string, label: string) => (
-        <NavItem
-            key={page}
-            page={page}
-            icon={icon}
-            label={label}
-            isActive={activePage === page}
-            onClick={() => onNavigate(page)}
-        />
-    );
+    const groupedItems = useMemo(() => {
+        const groups: Record<string, typeof MENU_ITEMS> = {};
+
+        MENU_ITEMS.forEach(item => {
+            if (!groups[item.group]) {
+                groups[item.group] = [];
+            }
+            groups[item.group].push(item);
+        });
+
+        return groups;
+    }, []);
+
+    const groupOrder: MenuGroupKey[] = ["club", "market", "competition"];
 
     return (
         <>
@@ -83,31 +88,24 @@ function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
-                    {team && (
-                        <>
-                            <div className="pt-4 pb-2 px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                                Clube
+                    {team && groupOrder.map((groupKey) => (
+                        <div key={groupKey}>
+                            <div className={`px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest ${groupKey === 'club' ? 'pt-4 pb-2' : 'pt-6 pb-2'}`}>
+                                {MENU_GROUPS[groupKey]}
                             </div>
-                            {renderNavItem("club", "🏛️", "Visão Geral")}
-                            {renderNavItem("squad", "⚽", "Elenco")}
-                            {renderNavItem("staff", "👔", "Staff")}
-                            {renderNavItem("youth", "🎓", "Academia")}
-                            {renderNavItem("infrastructure", "🏗️", "Infraestrutura")}
 
-                            <div className="pt-6 pb-2 px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                                Mercado
-                            </div>
-                            {renderNavItem("transfer", "🔄", "Transfer Hub")}
-                            {renderNavItem("finances", "💰", "Finanças")}
-
-                            <div className="pt-6 pb-2 px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                                Competição
-                            </div>
-                            {renderNavItem("matches", "🎮", "Jogos")}
-                            {renderNavItem("calendar", "📅", "Calendário")}
-                            {renderNavItem("competitions", "🏆", "Tabelas")}
-                        </>
-                    )}
+                            {groupedItems[groupKey]?.map((item) => (
+                                <NavItem
+                                    key={item.id}
+                                    page={item.id}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    isActive={activePage === item.id}
+                                    onClick={() => onNavigate(item.id)}
+                                />
+                            ))}
+                        </div>
+                    ))}
                 </nav>
 
                 <div className="p-4 border-t border-slate-800 space-y-3 bg-slate-900/30">
