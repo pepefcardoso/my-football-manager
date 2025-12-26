@@ -172,6 +172,12 @@ function StandingsPage() {
     loadForms();
   }, [filteredStandings, selectedCompId, activeTab, currentSeasonId]);
 
+  const getPositionStyle = (index: number, totalTeams: number) => {
+    if (index < 4) return "text-emerald-400 border-l-2 border-l-emerald-500";
+    if (index > totalTeams - 4) return "text-red-400 border-l-2 border-l-red-500";
+    return "text-slate-500";
+  };
+
   return (
     <div className="p-8 pb-20">
       <header className="mb-6 flex justify-between items-end">
@@ -304,9 +310,7 @@ function StandingsPage() {
                   <tbody className="divide-y divide-slate-800">
                     {filteredStandings.map((row, index) => (
                       <tr key={`${row.teamId}-${row.groupName || 'reg'}`} className="hover:bg-slate-800/50 transition-colors">
-                        <td className={`p-4 text-center font-mono ${index < 4 ? "text-emerald-400 border-l-2 border-l-emerald-500" :
-                          index > filteredStandings.length - 4 ? "text-red-400 border-l-2 border-l-red-500" : "text-slate-500"
-                          }`}>
+                        <td className={`p-4 text-center font-mono ${getPositionStyle(index, filteredStandings.length)}`}>
                           {index + 1}
                         </td>
                         <td className="p-4 font-medium text-white">

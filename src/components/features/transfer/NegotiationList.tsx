@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { TransferProposal } from "../../../domain/models";
 import { TransferStatus } from "../../../domain/enums";
 import Badge from "../../common/Badge";
@@ -12,6 +13,12 @@ interface NegotiationListProps {
     onRespondOffer: (id: number, response: "accept" | "reject") => void;
 }
 
+const COMPLETED_STATUSES = [
+    TransferStatus.COMPLETED,
+    TransferStatus.WITHDRAWN,
+    TransferStatus.CANCELLED
+];
+
 export function NegotiationList({
     bids,
     offers,
@@ -20,9 +27,13 @@ export function NegotiationList({
     onRespondCounter,
     onRespondOffer
 }: NegotiationListProps) {
+    const activeBids = useMemo(() =>
+        bids.filter(p => !COMPLETED_STATUSES.includes(p.status as TransferStatus)),
+        [bids]);
 
-    const activeBids = bids.filter(p => ![TransferStatus.COMPLETED, TransferStatus.WITHDRAWN, TransferStatus.CANCELLED].includes(p.status as any));
-    const activeOffers = offers.filter(p => ![TransferStatus.COMPLETED, TransferStatus.WITHDRAWN, TransferStatus.CANCELLED].includes(p.status as any));
+    const activeOffers = useMemo(() =>
+        offers.filter(p => !COMPLETED_STATUSES.includes(p.status as TransferStatus)),
+        [offers]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-300">
