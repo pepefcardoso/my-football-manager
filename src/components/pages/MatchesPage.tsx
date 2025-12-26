@@ -6,6 +6,7 @@ import type { Match, Team, Competition } from "../../domain/models";
 import { Logger } from "../../lib/Logger";
 import { useGameStore } from "../../store/useGameStore";
 import { TeamLogo } from "../common/TeamLogo";
+import { LoadingSpinner } from "../common/Loading";
 
 const logger = new Logger("MatchesPage");
 
@@ -143,9 +144,11 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
             </header>
 
             {loading ? (
-                <div className="flex justify-center p-20">
-                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-emerald-500"></div>
-                </div>
+                <LoadingSpinner
+                    size="lg"
+                    centered={true}
+                    className="py-20"
+                />
             ) : (
                 <div className="space-y-4 max-w-5xl mx-auto">
                     {matches.length === 0 && (

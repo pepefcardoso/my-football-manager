@@ -1,6 +1,7 @@
 import type { Player } from "../../../domain/models";
 import type { ScoutedPlayerView } from "../../../domain/factories/ReportFactory";
 import Badge from "../../common/Badge";
+import { LoadingSpinner } from "../../common/Loading";
 
 interface SearchResultsGridProps {
     players: (Player | ScoutedPlayerView)[];
@@ -10,11 +11,7 @@ interface SearchResultsGridProps {
 
 export function SearchResultsGrid({ players, loading, onPlayerClick }: SearchResultsGridProps) {
     if (loading) {
-        return (
-            <div className="flex justify-center p-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-            </div>
-        );
+        return <LoadingSpinner size="md" centered={true} />;
     }
 
     if (players.length === 0) {

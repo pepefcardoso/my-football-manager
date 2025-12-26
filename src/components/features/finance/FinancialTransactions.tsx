@@ -3,6 +3,7 @@ import { formatCurrency } from "../../../utils/formatters";
 import type { FinancialRecord } from "../../../domain/models";
 import { Logger } from "../../../lib/Logger";
 import FinancialChart from "./FinancialChart";
+import { LoadingSpinner } from "../../common/Loading";
 
 const logger = new Logger("FinancialTransactions");
 
@@ -57,9 +58,11 @@ export function FinancialTransactions({ teamId, seasonId }: FinancialTransaction
 
     if (loading) {
         return (
-            <div className="flex justify-center p-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-            </div>
+            <LoadingSpinner
+                size="md"
+                centered={true}
+                text="A carregar dados..."
+            />
         );
     }
 

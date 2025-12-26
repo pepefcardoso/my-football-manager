@@ -5,6 +5,7 @@ import { TacticsPanel } from "./TacticsPanel";
 import { FieldView } from "./FieldView";
 import { BenchPanel } from "./BenchPanel";
 import { Logger } from "../../../../lib/Logger";
+import { LoadingSpinner } from "../../../common/Loading";
 
 const logger = new Logger("PreMatchScreen");
 
@@ -185,8 +186,8 @@ export function PreMatchScreen({
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-slate-950">
-                <div className="text-white">Carregando elenco...</div>
+            <div className="h-screen bg-slate-950">
+                <LoadingSpinner text="Carregando elenco..." />
             </div>
         );
     }

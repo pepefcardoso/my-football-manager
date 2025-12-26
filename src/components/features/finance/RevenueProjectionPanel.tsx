@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { formatCurrency } from "../../../utils/formatters";
 import { Logger } from "../../../lib/Logger";
+import { LoadingSpinner } from "../../common/Loading";
 
 const logger = new Logger("RevenueProjectionPanel");
 
@@ -56,11 +57,7 @@ export function RevenueProjectionPanel({ teamId }: RevenueProjectionPanelProps) 
     }, [teamId]);
 
     if (loading) {
-        return (
-            <div className="flex justify-center p-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-            </div>
-        );
+        return <LoadingSpinner size="md" centered={true} />;
     }
 
     if (!data) {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Logger } from "../../lib/Logger";
 import type { Player } from "../../domain/models";
 import Badge from "../common/Badge";
+import { LoadingSpinner } from "../common/Loading";
 
 const logger = new Logger("YouthAcademyPage");
 
@@ -55,7 +56,7 @@ export default function YouthAcademyPage({ teamId }: { teamId: number }) {
     };
 
     if (loading) {
-        return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div></div>;
+        return <LoadingSpinner size="md" centered={true} />;
     }
 
     return (

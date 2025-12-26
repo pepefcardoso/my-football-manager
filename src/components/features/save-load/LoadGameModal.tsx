@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { GameSaveMetadata } from "../../../domain/GameSaveTypes";
 import { SaveSlotCard } from "./SaveSlotCard";
 import { Logger } from "../../../lib/Logger";
+import { LoadingSpinner } from "../../common/Loading";
 
 const logger = new Logger("LoadGameModal");
 
@@ -93,10 +94,11 @@ export function LoadGameModal({ onClose, onLoad }: LoadGameModalProps) {
 
                 <div className="flex-1 overflow-y-auto p-6 bg-slate-950">
                     {loading ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-4">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                            <p>Buscando arquivos de save...</p>
-                        </div>
+                        <LoadingSpinner
+                            size="md"
+                            centered={true}
+                            text="Buscando arquivos de save..."
+                        />
                     ) : error ? (
                         <div className="h-full flex flex-col items-center justify-center text-red-400 gap-2">
                             <span className="text-4xl">⚠️</span>

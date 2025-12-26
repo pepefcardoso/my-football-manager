@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { FacilityCard } from "../features/infrastructure/FacilityCard";
+import { LoadingSpinner } from "../common/Loading";
 
 type FacilityType =
     | "stadium_capacity"
@@ -124,11 +125,7 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
     };
 
     if (loading && !status) {
-        return (
-            <div className="p-8 flex justify-center items-center h-full">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-            </div>
-        );
+        return <LoadingSpinner size="lg" centered={true} />;
     }
 
     if (!team || !status) {

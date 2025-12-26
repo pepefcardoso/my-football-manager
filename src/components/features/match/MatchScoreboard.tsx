@@ -1,4 +1,5 @@
 import { MatchState } from "../../../domain/enums";
+import { LoadingSpinner } from "../../common/Loading";
 
 interface MatchScoreboardProps {
     homeTeamName: string;
@@ -121,9 +122,12 @@ export function MatchScoreboard({
             )}
 
             {isLoading && (
-                <div className="mt-4 text-center text-slate-400 animate-pulse">
-                    <p className="text-sm">Processando simulação...</p>
-                </div>
+                <LoadingSpinner
+                    size="sm"
+                    text="Processando simulação..."
+                    centered={false}
+                    className="mt-4"
+                />
             )}
 
             {error && (

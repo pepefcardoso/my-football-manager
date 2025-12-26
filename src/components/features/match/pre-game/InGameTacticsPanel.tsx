@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { TacticsConfig } from "../../../../domain/models";
+import { LoadingOverlay } from "../../../common/Loading";
 
 interface InGameTacticsPanelProps {
     matchId: number;
@@ -231,13 +232,7 @@ export function InGameTacticsPanel({
                         </button>
                     </div>
 
-                    {isLoading && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <div className="bg-slate-900 p-4 rounded-lg">
-                                <div className="animate-spin w-8 h-8 border-4 border-emerald-400 border-t-transparent rounded-full" />
-                            </div>
-                        </div>
-                    )}
+                    {isLoading && <LoadingOverlay message="" />}
                 </div>
             )}
         </>

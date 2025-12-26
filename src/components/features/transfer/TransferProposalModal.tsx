@@ -4,6 +4,7 @@ import { TransferType } from "../../../domain/enums";
 import { formatCurrency } from "../../../utils/formatters";
 import { Logger } from "../../../lib/Logger";
 import Badge from "../../common/Badge";
+import { LoadingSpinner } from "../../common/Loading";
 
 const logger = new Logger("TransferProposalModal");
 
@@ -214,7 +215,8 @@ export function TransferProposalModal({
                 <div className="p-6 space-y-6">
                     {isLoadingEstimate && (
                         <div className="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/30 rounded">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                            <LoadingSpinner size="sm" />
+
                             <span className="text-blue-400 text-sm">
                                 Calculando valor de mercado...
                             </span>

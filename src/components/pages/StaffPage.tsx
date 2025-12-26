@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Staff } from "../../domain/models";
 import StaffTable from "../features/staff/StaffTable";
 import { Logger } from "../../lib/Logger";
+import { LoadingSpinner } from "../common/Loading";
 
 const logger = new Logger("StaffPage");
 
@@ -36,9 +37,7 @@ function StaffPage({ teamId }: { teamId: number }) {
             </header>
 
             {loading ? (
-                <div className="flex justify-center p-10">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                </div>
+                <LoadingSpinner size="md" centered={true} />
             ) : (
                 <StaffTable staff={staff} />
             )}

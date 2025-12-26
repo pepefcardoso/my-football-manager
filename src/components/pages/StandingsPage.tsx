@@ -7,6 +7,7 @@ import type {
 import { Logger } from "../../lib/Logger";
 import { TeamLogo } from "../common/TeamLogo";
 import { useGameStore } from "../../store/useGameStore";
+import { LoadingSpinner } from "../common/Loading";
 
 const logger = new Logger("StandingsPage");
 
@@ -269,9 +270,7 @@ function StandingsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center p-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-        </div>
+        <LoadingSpinner size="md" centered={true} />
       ) : (
         <>
           {activeTab === "table" && (

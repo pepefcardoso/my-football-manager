@@ -12,6 +12,7 @@ import { ScoutingConfigModal } from "../features/scouting/ScoutingConfigModal";
 import { NegotiationList } from "../features/transfer/NegotiationList";
 import type { Player } from "../../domain/models";
 import { TransferStatus } from "../../domain/enums";
+import { LoadingOverlay } from "../common/Loading";
 
 interface TransferHubPageProps {
     teamId: number;
@@ -117,11 +118,7 @@ function TransferHubPage({ teamId }: TransferHubPageProps) {
                 </header>
 
                 <div className="flex-1 overflow-y-auto p-8 relative">
-                    {isLoading && (
-                        <div className="absolute inset-0 bg-slate-950/80 z-10 flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                        </div>
-                    )}
+                    {isLoading && <LoadingOverlay message="" />}
 
                     {(activeTab === "results" || activeTab === "market") && (
                         <>
