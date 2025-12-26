@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Logger } from "../../../lib/Logger";
 import type { NarrativeEvent } from "../../../domain/narrative";
 import Badge from "../../common/Badge";
@@ -15,7 +15,7 @@ export function EventModal({ event, teamId, onResolve }: EventModalProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [resultMessage, setResultMessage] = useState<string | null>(null);
 
-    const handleOptionClick = async (optionId: string) => {
+    const handleOptionClick = useCallback(async (optionId: string) => {
         setIsProcessing(true);
         try {
             const response = await window.electronAPI.game.respondToEvent({
@@ -39,7 +39,7 @@ export function EventModal({ event, teamId, onResolve }: EventModalProps) {
         } finally {
             setIsProcessing(false);
         }
-    };
+    }, [event.id, teamId, onResolve]);
 
     const getImportanceColor = (imp: string) => {
         switch (imp) {
@@ -60,6 +60,26 @@ export function EventModal({ event, teamId, onResolve }: EventModalProps) {
             default: return "📩";
         }
     };
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (isProcessing) return;
+
+            if (e.key === "Escape" && (!event.options || event.options.length === 0)) {
+                onResolve();
+            }
+
+            if (event.options && event.options.length > 0) {
+                const key = parseInt(e.key);
+                if (!isNaN(key) && key >= 1 && key <= event.options.length) {
+                    handleOptionClick(event.options[key - 1].id);
+                }
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [event, isProcessing, onResolve, handleOptionClick]);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
@@ -105,21 +125,28 @@ export function EventModal({ event, teamId, onResolve }: EventModalProps) {
                     ) : (
                         <div className="grid gap-3 pt-4">
                             {event.options && event.options.length > 0 ? (
-                                event.options.map((opt) => (
+                                event.options.map((opt, index) => (
                                     <button
                                         key={opt.id}
                                         onClick={() => handleOptionClick(opt.id)}
                                         disabled={isProcessing}
-                                        className="w-full p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-left rounded-lg transition-all group disabled:opacity-50 disabled:cursor-wait"
+                                        className="w-full p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-left rounded-lg transition-all group disabled:opacity-50 disabled:cursor-wait relative"
                                     >
-                                        <span className="block font-bold text-slate-200 group-hover:text-white">
-                                            {opt.label}
-                                        </span>
-                                        {opt.effectDescription && (
-                                            <span className="text-xs text-slate-500 group-hover:text-slate-400">
-                                                {opt.effectDescription}
+                                        <div className="flex items-center gap-3">
+                                            <span className="bg-slate-950 px-2 py-0.5 rounded text-xs text-slate-500 border border-slate-700 font-mono">
+                                                {index + 1}
                                             </span>
-                                        )}
+                                            <div>
+                                                <span className="block font-bold text-slate-200 group-hover:text-white">
+                                                    {opt.label}
+                                                </span>
+                                                {opt.effectDescription && (
+                                                    <span className="text-xs text-slate-500 group-hover:text-slate-400">
+                                                        {opt.effectDescription}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </button>
                                 ))
                             ) : (
@@ -127,7 +154,7 @@ export function EventModal({ event, teamId, onResolve }: EventModalProps) {
                                     onClick={() => onResolve()}
                                     className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors"
                                 >
-                                    Continuar
+                                    Continuar (ESC)
                                 </button>
                             )}
                         </div>

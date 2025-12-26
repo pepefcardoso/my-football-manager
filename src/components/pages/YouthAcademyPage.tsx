@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Logger } from "../../lib/Logger";
 import type { Player } from "../../domain/models";
 import Badge from "../common/Badge";
@@ -78,57 +79,66 @@ export default function YouthAcademyPage({ teamId }: { teamId: number }) {
                     <p className="text-xs">Aguarde a próxima "Peneira" anual para novos talentos.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {players.map(player => (
-                        <div key={player.id} className="bg-slate-900 border border-slate-800 rounded-lg p-5 hover:border-slate-600 transition-all group">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="font-bold text-white text-lg">{player.firstName} {player.lastName}</h3>
-                                    <div className="flex gap-2 mt-1">
-                                        <Badge variant="neutral" className="text-xs">{player.position}</Badge>
-                                        <span className="text-xs text-slate-400 self-center">{player.age} anos</span>
+                <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <AnimatePresence>
+                        {players.map(player => (
+                            <motion.div
+                                layout
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                key={player.id}
+                                className="bg-slate-900 border border-slate-800 rounded-lg p-5 hover:border-emerald-500/50 transition-all group"
+                            >
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="font-bold text-white text-lg">{player.firstName} {player.lastName}</h3>
+                                        <div className="flex gap-2 mt-1">
+                                            <Badge variant="neutral" className="text-xs">{player.position}</Badge>
+                                            <span className="text-xs text-slate-400 self-center">{player.age} anos</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-xs text-slate-500 uppercase">Overall</div>
+                                        <div className="text-2xl font-bold text-emerald-400">{player.overall}</div>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-xs text-slate-500 uppercase">Overall</div>
-                                    <div className="text-2xl font-bold text-emerald-400">{player.overall}</div>
-                                </div>
-                            </div>
 
-                            <div className="space-y-2 mb-6">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-slate-400">Potencial Estimado</span>
-                                    <span className="text-yellow-400 font-bold">{player.potential}</span>
+                                <div className="space-y-2 mb-6">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-400">Potencial Estimado</span>
+                                        <span className="text-yellow-400 font-bold">{player.potential}</span>
+                                    </div>
+                                    <div className="w-full bg-slate-800 rounded-full h-1.5">
+                                        <div className="bg-yellow-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, (player.potential / 99) * 100)}%` }}></div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 mt-2">
+                                        <div>Fin: {player.finishing}</div>
+                                        <div>Pas: {player.passing}</div>
+                                        <div>Vel: {player.pace}</div>
+                                        <div>Fís: {player.physical}</div>
+                                    </div>
                                 </div>
-                                <div className="w-full bg-slate-800 rounded-full h-1.5">
-                                    <div className="bg-yellow-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, (player.potential / 99) * 100)}%` }}></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 mt-2">
-                                    <div>Fin: {player.finishing}</div>
-                                    <div>Pas: {player.passing}</div>
-                                    <div>Vel: {player.pace}</div>
-                                    <div>Fís: {player.physical}</div>
-                                </div>
-                            </div>
 
-                            <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    onClick={() => handlePromote(player)}
-                                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-sm font-bold transition-colors"
-                                >
-                                    Promover
-                                </button>
-                                <button
-                                    onClick={() => handleRelease(player)}
-                                    className="px-3 py-2 bg-slate-800 hover:bg-red-900/50 text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-800 rounded transition-colors"
-                                    title="Dispensar"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                                <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={() => handlePromote(player)}
+                                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-sm font-bold transition-colors"
+                                    >
+                                        Promover
+                                    </button>
+                                    <button
+                                        onClick={() => handleRelease(player)}
+                                        className="px-3 py-2 bg-slate-800 hover:bg-red-900/50 text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-800 rounded transition-colors"
+                                        title="Dispensar"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </motion.div>
             )}
         </div>
     );

@@ -5,6 +5,7 @@ import { formatCurrency } from "../../../utils/formatters";
 import { Logger } from "../../../lib/Logger";
 import Badge from "../../common/Badge";
 import { LoadingSpinner } from "../../common/Loading";
+import { useGameStore } from "../../../store/useGameStore";
 
 const logger = new Logger("TransferProposalModal");
 
@@ -44,6 +45,11 @@ export function TransferProposalModal({
     const releaseClause =
         (player as any).releaseClause ||
         (player as any).currentContract?.releaseClause;
+
+    const userTeam = useGameStore((state) => state.userTeam);
+    const currentBudget = userTeam?.budget || 0;
+    const projectedBudget = currentBudget - fee;
+    const isProjectedDeficit = projectedBudget < 0;
 
     useEffect(() => {
         async function loadEstimates() {
@@ -295,6 +301,28 @@ export function TransferProposalModal({
                                 />
                             </div>
                         </div>
+                    )}
+                </div>
+
+                <div className="mt-6 p-4 bg-slate-950 border border-slate-800 rounded-lg">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Impacto Financeiro</h4>
+                    <div className="flex justify-between items-center text-sm">
+                        <div className="text-slate-400">Orçamento Atual:</div>
+                        <div className="font-mono text-white">{formatCurrency(currentBudget)}</div>
+                    </div>
+                    <div className="flex justify-between items-center text-sm mt-1">
+                        <div className="text-slate-400">Custo da Transferência:</div>
+                        <div className="font-mono text-red-400">- {formatCurrency(fee)}</div>
+                    </div>
+                    <div className="h-px bg-slate-800 my-2" />
+                    <div className="flex justify-between items-center font-bold">
+                        <div className="text-slate-300">Orçamento Restante:</div>
+                        <div className={`font-mono ${isProjectedDeficit ? "text-red-500" : "text-emerald-400"}`}>
+                            {formatCurrency(projectedBudget)}
+                        </div>
+                    </div>
+                    {isProjectedDeficit && (
+                        <p className="text-xs text-red-500 mt-2 text-right">⚠️ Saldo insuficiente</p>
                     )}
                 </div>
 
