@@ -24,6 +24,23 @@ export interface GameStateSnapshot {
   saveId: string;
 }
 
+export interface CompetitionSnapshot {
+  id: number;
+  name: string;
+  shortName: string;
+  country: string;
+  tier: number;
+  type: string;
+  priority: number;
+  teams: number;
+  prize: number;
+  reputation: number;
+  config: any;
+  window: string | null;
+  startMonth: number | null;
+  endMonth: number | null;
+}
+
 export interface TeamSnapshot {
   id: number;
   name: string;
@@ -193,6 +210,7 @@ export interface GameSave {
   teams: TeamSnapshot[];
   players: PlayerSnapshot[];
   staff: StaffSnapshot[];
+  competitions: CompetitionSnapshot[];
   matches: MatchSnapshot[];
   standings: StandingSnapshot[];
   financialRecords: FinancialSnapshot[];

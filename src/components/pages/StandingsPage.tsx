@@ -5,6 +5,8 @@ import type {
   Team,
 } from "../../domain/models";
 import { Logger } from "../../lib/Logger";
+import { TeamLogo } from "../common/TeamLogo";
+import { useGameStore } from "../../store/useGameStore";
 
 const logger = new Logger("StandingsPage");
 
@@ -309,7 +311,16 @@ function StandingsPage() {
                           {index + 1}
                         </td>
                         <td className="p-4 font-medium text-white">
-                          {row.team?.name || "Time Desconhecido"}
+                          <div className="flex items-center gap-3">
+                            <TeamLogo
+                              team={row.team}
+                              className="w-6 h-6"
+                              showShadow={false}
+                            />
+                            <span className={row.teamId === useGameStore.getState().userTeam?.id ? "text-emerald-400 font-bold" : ""}>
+                              {row.team?.name || "Time Desconhecido"}
+                            </span>
+                          </div>
                         </td>
                         {filterPhase !== 'regular' && (!filterGroup || filterGroup === 'all') && (
                           <td className="p-4 text-center text-slate-500 font-bold">{row.groupName || '-'}</td>

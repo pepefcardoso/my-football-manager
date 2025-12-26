@@ -13,26 +13,32 @@ export function SaveSlotCard({ metadata, selected, onClick }: SaveSlotCardProps)
 
     const hours = Math.floor(metadata.playTimeSeconds / 3600);
     const minutes = Math.floor((metadata.playTimeSeconds % 3600) / 60);
+    const teamColor = metadata.primaryColor || '#334155';
 
     return (
         <div
             onClick={onClick}
             className={`
-                relative w-full p-0 rounded-xl border cursor-pointer transition-all duration-200 group overflow-hidden
+                relative w-full p-0 rounded-xl border cursor-pointer transition-all duration-300 group overflow-hidden
                 ${selected
-                    ? "bg-slate-900 border-emerald-500 ring-1 ring-emerald-500/50 shadow-2xl shadow-emerald-900/20"
-                    : "bg-slate-900/60 border-slate-800 hover:border-slate-600 hover:bg-slate-800"
+                    ? "bg-slate-900 border-emerald-500 ring-1 ring-emerald-500/50 shadow-2xl shadow-emerald-900/20 scale-[1.02]"
+                    : "bg-slate-900/60 border-slate-800 hover:border-slate-600 hover:bg-slate-800 hover:-translate-y-1"
                 }
             `}
         >
-            <div className="h-2 w-full" style={{ backgroundColor: metadata.primaryColor || '#10b981' }} />
+            <div className="h-1.5 w-full transition-all duration-500" style={{ backgroundColor: teamColor }} />
 
-            <div className="p-5">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
+            <div className="p-5 relative">
+                <div
+                    className="absolute top-0 right-0 w-32 h-32 rounded-full blur-[60px] opacity-10 pointer-events-none group-hover:opacity-20 transition-opacity"
+                    style={{ backgroundColor: teamColor }}
+                />
+
+                <div className="flex justify-between items-start mb-4 relative z-10">
+                    <div className="flex items-center gap-4">
                         <div
-                            className="w-12 h-12 rounded-lg flex items-center justify-center text-lg font-black text-white shadow-inner"
-                            style={{ backgroundColor: metadata.primaryColor || '#334155' }}
+                            className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-black text-white shadow-lg border border-white/10"
+                            style={{ backgroundColor: teamColor }}
                         >
                             {metadata.teamName.substring(0, 2).toUpperCase()}
                         </div>
@@ -40,8 +46,8 @@ export function SaveSlotCard({ metadata, selected, onClick }: SaveSlotCardProps)
                             <h4 className={`font-bold text-lg leading-tight ${selected ? "text-white" : "text-slate-200"}`}>
                                 {metadata.teamName}
                             </h4>
-                            <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-0.5">
-                                {metadata.managerName}
+                            <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-0.5 flex items-center gap-1">
+                                <span>👔</span> {metadata.managerName}
                             </p>
                         </div>
                     </div>

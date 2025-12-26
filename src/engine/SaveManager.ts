@@ -18,6 +18,7 @@ import type {
   ScoutingSnapshot,
   TransferProposalSnapshot,
   ClubInterestSnapshot,
+  CompetitionSnapshot,
 } from "../domain/GameSaveTypes";
 import * as schema from "../db/schema";
 import type { IUnitOfWork } from "../repositories/IUnitOfWork";
@@ -61,6 +62,7 @@ export class SaveManager {
         teams,
         players,
         staff,
+        competitions,
         matches,
         standings,
         financialRecords,
@@ -72,6 +74,7 @@ export class SaveManager {
         this.captureTeams(),
         this.capturePlayers(),
         this.captureStaff(),
+        this.captureCompetitions(),
         this.captureMatches(options.matchHistoryLimit),
         this.captureStandings(),
         this.captureFinancialRecords(options.financialRecordLimit),
@@ -88,6 +91,7 @@ export class SaveManager {
         players,
         staff,
         matches,
+        competitions,
         standings,
         financialRecords,
         transfers,
@@ -224,6 +228,31 @@ export class SaveManager {
     } catch (error) {
       this.logger.error("Failed to capture game state:", error);
       return Result.fail("Failed to capture game state");
+    }
+  }
+
+  private async captureCompetitions(): Promise<CompetitionSnapshot[]> {
+    try {
+      const comps = await this.repos.competitions.findAll();
+      return comps.map((c) => ({
+        id: c.id,
+        name: c.name,
+        shortName: c.shortName,
+        country: c.country,
+        tier: c.tier,
+        type: c.type,
+        priority: c.priority,
+        teams: c.teams,
+        prize: c.prize,
+        reputation: c.reputation,
+        config: c.config,
+        window: c.window || null,
+        startMonth: c.startMonth || null,
+        endMonth: c.endMonth || null,
+      }));
+    } catch (error) {
+      this.logger.error("Failed to capture competitions:", error);
+      return [];
     }
   }
 
@@ -673,6 +702,7 @@ export class SaveManager {
         await txDb.delete(schema.playerCompetitionStats);
         await txDb.delete(schema.competitionStandings);
         await txDb.delete(schema.matches);
+        await txDb.delete(schema.competitions);
         await txDb.delete(schema.playerContracts);
         await txDb.delete(schema.players);
         await txDb.delete(schema.staff);
@@ -709,6 +739,13 @@ export class SaveManager {
             });
           }
           this.logger.debug(`Restored ${seasonsToRestore.size} seasons.`);
+        }
+
+        if (save.competitions && save.competitions.length > 0) {
+          await txDb.insert(schema.competitions).values(save.competitions);
+          this.logger.debug(
+            `Restored ${save.competitions.length} competitions.`
+          );
         }
 
         if (save.teams.length > 0) {

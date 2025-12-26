@@ -15,6 +15,7 @@ interface ExtendedMatchInfo {
     location: "HOME" | "AWAY";
     score?: string;
     result?: "W" | "D" | "L";
+    opponent?: Team | null;
 }
 
 interface SeasonSummary {
@@ -59,7 +60,8 @@ function ClubOverviewPage({ team }: { team: Team }) {
                     opponentName: opponent?.name || "Desconhecido",
                     opponentShortName: opponent?.shortName || "???",
                     competitionName: "Liga Nacional",
-                    location: isHome ? "HOME" : "AWAY"
+                    location: isHome ? "HOME" : "AWAY",
+                    opponent: opponent
                 });
             } else {
                 setNextMatch(null);
@@ -84,10 +86,11 @@ function ClubOverviewPage({ team }: { team: Team }) {
                     date: new Date(m.date).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }),
                     opponentName: opponent?.name || "???",
                     opponentShortName: opponent?.shortName || "???",
-                    competitionName: "Liga", // TODO adicionar competição real
+                    competitionName: "Liga",
                     location: (isHome ? "HOME" : "AWAY") as "HOME" | "AWAY",
                     score: `${m.homeScore} - ${m.awayScore}`,
-                    result
+                    result,
+                    opponent: opponent
                 };
             });
 
@@ -305,14 +308,12 @@ function ClubOverviewPage({ team }: { team: Team }) {
                             </div>
 
                             <div className="flex items-center justify-between mb-6">
-                                <div className="text-center flex-1">
+                                <div className="text-center flex-1 flex flex-col items-center">
                                     <div className="text-sm text-slate-500 mb-2">{team.name}</div>
-                                    <div
-                                        className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-2xl font-black text-white shadow-lg border border-white/10"
-                                        style={{ backgroundColor: team.primaryColor }}
-                                    >
-                                        {team.shortName.substring(0, 3)}
-                                    </div>
+                                    <TeamLogo
+                                        team={team}
+                                        className="w-20 h-20 mx-auto rounded-2xl shadow-lg"
+                                    />
                                 </div>
 
                                 <div className="px-8 text-center">
@@ -325,11 +326,12 @@ function ClubOverviewPage({ team }: { team: Team }) {
                                     </div>
                                 </div>
 
-                                <div className="text-center flex-1">
+                                <div className="text-center flex-1 flex flex-col items-center">
                                     <div className="text-sm text-slate-500 mb-2">{nextMatch.opponentName}</div>
-                                    <div className="w-20 h-20 mx-auto rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl font-black text-white shadow-lg">
-                                        {nextMatch.opponentShortName.substring(0, 3)}
-                                    </div>
+                                    <TeamLogo
+                                        team={nextMatch.opponent}
+                                        className="w-20 h-20 mx-auto rounded-2xl shadow-lg"
+                                    />
                                 </div>
                             </div>
 
@@ -429,9 +431,16 @@ function ClubOverviewPage({ team }: { team: Team }) {
                                         >
                                             {match.result}
                                         </span>
-                                        <div>
-                                            <div className="font-bold text-slate-200">{match.opponentName}</div>
-                                            <div className="text-xs text-slate-500 font-mono">{match.date} • {match.location === "HOME" ? "Casa" : "Fora"}</div>
+                                        <div className="flex items-center gap-3">
+                                            <TeamLogo
+                                                team={match.opponent}
+                                                className="w-8 h-8 rounded-lg"
+                                                showShadow={false}
+                                            />
+                                            <div>
+                                                <div className="font-bold text-slate-200">{match.opponentName}</div>
+                                                <div className="text-xs text-slate-500 font-mono">{match.date} • {match.location === "HOME" ? "Casa" : "Fora"}</div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="text-lg font-mono font-bold text-white tracking-widest bg-slate-900 px-3 py-1 rounded-md border border-slate-800">

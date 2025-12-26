@@ -5,6 +5,7 @@ import { PreMatchScreen, type PreMatchLineup } from "../features/match/pre-game/
 import type { Match, Team, Competition } from "../../domain/models";
 import { Logger } from "../../lib/Logger";
 import { useGameStore } from "../../store/useGameStore";
+import { TeamLogo } from "../common/TeamLogo";
 
 const logger = new Logger("MatchesPage");
 
@@ -156,6 +157,7 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
                     {sortedMatches.map((match) => {
                         const isHome = match.homeTeamId === teamId;
                         const homeTeamObj = allTeams.find(t => t.id === match.homeTeamId);
+                        const awayTeamObj = allTeams.find(t => t.id === match.awayTeamId);
                         const competition = competitions.find(c => c.id === match.competitionId);
                         const stadiumName = homeTeamObj ? `Estádio do ${homeTeamObj.shortName}` : "Campo Neutro";
                         const isToday = match.date === currentDate;
@@ -219,11 +221,14 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
                                 </div>
 
                                 <div className="flex-1 flex justify-center items-center gap-4 w-full">
-                                    <div className={`flex-1 text-right font-semibold text-lg truncate ${isHome ? "text-white" : "text-slate-400"}`}>
-                                        {getTeamName(match.homeTeamId)}
+                                    <div className="flex-1 flex items-center justify-end gap-3 min-w-0">
+                                        <span className={`font-semibold text-lg truncate ${isHome ? "text-white" : "text-slate-400"}`}>
+                                            {getTeamName(match.homeTeamId)}
+                                        </span>
+                                        <TeamLogo team={homeTeamObj} className="w-8 h-8 flex-shrink-0" />
                                     </div>
 
-                                    <div className="bg-slate-950 px-4 py-2 rounded-lg border border-slate-800 min-w-[80px] text-center shrink-0">
+                                    <div className="bg-slate-950 px-4 py-2 rounded-lg border border-slate-800 min-w-[80px] text-center shrink-0 shadow-inner">
                                         {match.isPlayed ? (
                                             <span className="text-xl font-black text-white tracking-widest">
                                                 {match.homeScore} - {match.awayScore}
@@ -233,8 +238,11 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
                                         )}
                                     </div>
 
-                                    <div className={`flex-1 text-left font-semibold text-lg truncate ${!isHome ? "text-white" : "text-slate-400"}`}>
-                                        {getTeamName(match.awayTeamId)}
+                                    <div className="flex-1 flex items-center justify-start gap-3 min-w-0">
+                                        <TeamLogo team={awayTeamObj} className="w-8 h-8 flex-shrink-0" />
+                                        <span className={`font-semibold text-lg truncate ${!isHome ? "text-white" : "text-slate-400"}`}>
+                                            {getTeamName(match.awayTeamId)}
+                                        </span>
                                     </div>
                                 </div>
 

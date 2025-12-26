@@ -200,6 +200,7 @@ async function main() {
         shortName: t.short,
         primaryColor: t.primary,
         secondaryColor: t.secondary,
+        badgeUrl: t.badgeUrl,
         reputation: t.rep,
         budget: t.budget,
         isHuman: false,
