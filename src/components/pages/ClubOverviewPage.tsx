@@ -6,6 +6,8 @@ import { ClubHeader } from "../features/club/ClubHeader";
 import { NextMatchCard } from "../features/club/NextMatchCard";
 import { TrainingPanel } from "../features/club/TrainingPanel";
 import StatCard from "../common/StatCard";
+import { SeasonEndModal } from "../features/season/SeasonEndModal";
+import { useCallback } from "react";
 
 function ClubOverviewPage({ team }: { team: Team }) {
     const { currentDate, isProcessing, navigateInGame } = useGameStore();
@@ -14,7 +16,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
         gameState,
         nextMatch,
         formStreak,
-        updateTrainingFocus
+        refresh: refreshOverview
     } = useClubOverviewData(team.id, currentDate);
 
     const {
@@ -25,6 +27,15 @@ function ClubOverviewPage({ team }: { team: Team }) {
         showSeasonModal,
         setShowSeasonModal
     } = useGameSimulation();
+
+    const handleUpdateTraining = useCallback(async (focus: string) => {
+        await window.electronAPI.game.updateTrainingFocus(focus);
+        refreshOverview();
+    }, [refreshOverview]);
+
+    const handleNavigateToMatches = useCallback(() => {
+        navigateInGame("matches");
+    }, [navigateInGame]);
 
     const budgetFormatted = `€${(team.budget / 1_000_000).toFixed(1)}M`;
     const budgetStatus = team.budget < 0 ? "⚠️ Risco" : "Estável";
@@ -46,7 +57,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
                     match={nextMatch}
                     team={team}
                     formStreak={formStreak}
-                    onViewDetails={() => navigateInGame("matches")}
+                    onViewDetails={handleNavigateToMatches}
                 />
 
                 <div className="col-span-1 md:col-span-6 lg:col-span-4">
@@ -67,24 +78,15 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
                 <TrainingPanel
                     currentFocus={gameState?.trainingFocus}
-                    onUpdate={updateTrainingFocus}
+                    onUpdate={handleUpdateTraining}
                 />
-
             </div>
 
             {showSeasonModal && seasonSummary && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-lg w-full text-center">
-                        <h2 className="text-3xl font-bold text-white mb-4">Temporada Encerrada!</h2>
-                        <p className="text-slate-300 mb-6">Campeão: {seasonSummary.championName}</p>
-                        <button
-                            onClick={() => setShowSeasonModal(false)}
-                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg"
-                        >
-                            Iniciar Nova Temporada
-                        </button>
-                    </div>
-                </div>
+                <SeasonEndModal
+                    summary={seasonSummary}
+                    onClose={() => setShowSeasonModal(false)}
+                />
             )}
         </div>
     );
