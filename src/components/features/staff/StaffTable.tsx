@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react";
 import type { Staff } from "../../../domain/models";
 import { formatCurrency, formatRole } from "../../../utils/formatters";
+import { EmptyState } from "../../common/EmptyState";
 
 interface EnrichedStaff extends Staff {
     fullName: string;
@@ -52,7 +53,15 @@ function StaffTable({ staff }: { staff: Staff[] }) {
     }, [staff]);
 
     if (staff.length === 0) {
-        return <div className="text-slate-500 p-4">Nenhum staff contratado.</div>;
+        return (
+            <div className="bg-slate-900/50 rounded-lg border border-slate-800">
+                <EmptyState
+                    icon={<span className="text-4xl">👔</span>}
+                    title="Equipa Técnica Vazia"
+                    description="Não existem membros na equipa técnica. Contrate profissionais para melhorar o rendimento do clube."
+                />
+            </div>
+        );
     }
 
     return (

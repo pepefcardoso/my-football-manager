@@ -4,6 +4,7 @@ import { Logger } from "../../lib/Logger";
 import type { Player } from "../../domain/models";
 import Badge from "../common/Badge";
 import { LoadingSpinner } from "../common/Loading";
+import { EmptyState } from "../common/EmptyState";
 
 const logger = new Logger("YouthAcademyPage");
 
@@ -74,9 +75,12 @@ export default function YouthAcademyPage({ teamId }: { teamId: number }) {
             </header>
 
             {players.length === 0 ? (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-10 text-center text-slate-500">
-                    <p className="mb-2">Nenhum jogador na base no momento.</p>
-                    <p className="text-xs">Aguarde a próxima "Peneira" anual para novos talentos.</p>
+                <div className="bg-slate-900 border border-slate-800 rounded-lg">
+                    <EmptyState
+                        icon={<span className="text-4xl">🎓</span>}
+                        title="Academia Vazia"
+                        description="Nenhum jogador na base no momento. Aguarde a próxima 'Peneira' anual para revelar novos talentos."
+                    />
                 </div>
             ) : (
                 <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

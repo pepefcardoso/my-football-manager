@@ -2,6 +2,7 @@ import type { Player } from "../../../domain/models";
 import type { ScoutedPlayerView } from "../../../domain/factories/ReportFactory";
 import Badge from "../../common/Badge";
 import { LoadingSpinner } from "../../common/Loading";
+import { EmptyState } from "../../common/EmptyState";
 
 interface SearchResultsGridProps {
     players: (Player | ScoutedPlayerView)[];
@@ -16,9 +17,12 @@ export function SearchResultsGrid({ players, loading, onPlayerClick }: SearchRes
 
     if (players.length === 0) {
         return (
-            <div className="text-center p-12 text-slate-500 bg-slate-900/30 rounded-lg border border-slate-800">
-                <p className="text-lg mb-2">Nenhum jogador encontrado.</p>
-                <p className="text-sm">Configure seus Slots de Scouting para começar a buscar talentos.</p>
+            <div className="bg-slate-900/30 rounded-lg border border-slate-800">
+                <EmptyState
+                    icon={<span className="text-4xl">🔭</span>}
+                    title="Nenhum jogador encontrado"
+                    description="Configure seus Slots de Scouting para começar a buscar talentos."
+                />
             </div>
         );
     }

@@ -1,9 +1,9 @@
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import type { Player } from "../../../domain/models";
 import { formatCurrency } from "../../../utils/formatters";
 import { getEnergyColorClass, getMoralColorClass, getPositionVariant } from "../../../utils/styleHelpers";
 import Badge from "../../common/Badge";
-import type { BadgeVariant } from "../../../domain/types";
+import { EmptyState } from "../../common/EmptyState";
 
 interface PlayerTableProps {
   players: Player[];
@@ -15,20 +15,7 @@ interface ProgressBarProps {
   colorClass: string;
 }
 
-interface EnrichedPlayer extends Player {
-  fullName: string;
-  energyColor: string;
-  moralColor: string;
-  positionVariant: BadgeVariant;
-  status: {
-    hasInjury: boolean;
-    hasSuspension: boolean;
-    isAvailable: boolean;
-    isYouth: boolean;
-  };
-}
-
-const ProgressBar = memo(({ value, label, colorClass }: ProgressBarProps) => (
+const ProgressBar = ({ value, label, colorClass }: ProgressBarProps) => (
   <div className="flex items-center gap-2">
     <div
       className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden"
@@ -44,54 +31,57 @@ const ProgressBar = memo(({ value, label, colorClass }: ProgressBarProps) => (
       />
     </div>
   </div>
-));
-
-ProgressBar.displayName = "ProgressBar";
-
-const PlayerStatusBadges = memo(
-  ({ status, suspensionGames }: { status: EnrichedPlayer["status"], suspensionGames: number }) => {
-    return (
-      <div
-        className="flex justify-center gap-1"
-        role="group"
-        aria-label="Status do jogador"
-      >
-        {status.hasInjury && (
-          <Badge variant="danger" title="Jogador lesionado">
-            LES
-          </Badge>
-        )}
-        {status.hasSuspension && (
-          <Badge
-            variant="danger"
-            title={`Suspenso por ${suspensionGames} jogo(s)`}
-          >
-            SUS
-          </Badge>
-        )}
-        {status.isYouth && (
-          <Badge variant="info" title="Jogador da categoria de base">
-            BASE
-          </Badge>
-        )}
-        {status.isAvailable && (
-          <Badge variant="success" title="Jogador disponível">
-            OK
-          </Badge>
-        )}
-      </div>
-    );
-  }
 );
 
-PlayerStatusBadges.displayName = "PlayerStatusBadges";
+const PlayerStatusBadges = ({ player }: { player: Player }) => {
+  const hasInjury = player.isInjured;
+  const hasSuspension = player.suspensionGamesRemaining > 0;
+  const isAvailable = !hasInjury && !hasSuspension;
 
-const PlayerRow = memo(({ player }: { player: EnrichedPlayer }) => {
+  return (
+    <div
+      className="flex justify-center gap-1"
+      role="group"
+      aria-label="Status do jogador"
+    >
+      {hasInjury && (
+        <Badge variant="danger" title="Jogador lesionado">
+          LES
+        </Badge>
+      )}
+      {hasSuspension && (
+        <Badge
+          variant="danger"
+          title={`Suspenso por ${player.suspensionGamesRemaining} jogo(s)`}
+        >
+          SUS
+        </Badge>
+      )}
+      {player.isYouth && (
+        <Badge variant="info" title="Jogador da categoria de base">
+          BASE
+        </Badge>
+      )}
+      {isAvailable && (
+        <Badge variant="success" title="Jogador disponível">
+          OK
+        </Badge>
+      )}
+    </div>
+  );
+};
+
+const PlayerRow = ({ player }: { player: Player }) => {
+  const fullName = `${player.firstName} ${player.lastName}`;
+  const energyColor = getEnergyColorClass(player.energy);
+  const moralColor = getMoralColorClass(player.moral);
+  const positionVariant = getPositionVariant(player.position);
+
   return (
     <tr className="hover:bg-slate-800/50 transition-colors group">
       <td className="p-4 font-medium text-slate-200">
         <div className="flex items-center gap-2">
-          <span>{player.fullName}</span>
+          <span>{fullName}</span>
           {player.isCaptain && (
             <span
               className="text-yellow-500 text-sm font-bold"
@@ -105,7 +95,7 @@ const PlayerRow = memo(({ player }: { player: EnrichedPlayer }) => {
       </td>
 
       <td className="p-4">
-        <Badge variant={player.positionVariant}>
+        <Badge variant={positionVariant}>
           {player.position}
         </Badge>
       </td>
@@ -132,7 +122,7 @@ const PlayerRow = memo(({ player }: { player: EnrichedPlayer }) => {
           <ProgressBar
             value={player.energy}
             label="Energia"
-            colorClass={player.energyColor}
+            colorClass={energyColor}
           />
           <ProgressBar
             value={player.fitness}
@@ -144,7 +134,7 @@ const PlayerRow = memo(({ player }: { player: EnrichedPlayer }) => {
 
       <td className="p-4 text-center">
         <span
-          className={`font-semibold ${player.moralColor}`}
+          className={`font-semibold ${moralColor}`}
           aria-label={`Moral: ${player.moral}%`}
         >
           {player.moral}%
@@ -158,49 +148,21 @@ const PlayerRow = memo(({ player }: { player: EnrichedPlayer }) => {
       </td>
 
       <td className="p-4 text-center">
-        <PlayerStatusBadges
-          status={player.status}
-          suspensionGames={player.suspensionGamesRemaining}
-        />
+        <PlayerStatusBadges player={player} />
       </td>
     </tr>
   );
-});
-
-PlayerRow.displayName = "PlayerRow";
+};
 
 function PlayerTable({ players }: PlayerTableProps) {
-  const enrichedPlayers = useMemo(() => {
-    return players.map((player): EnrichedPlayer => {
-      const hasInjury = player.isInjured;
-      const hasSuspension = player.suspensionGamesRemaining > 0;
-
-      return {
-        ...player,
-        fullName: `${player.firstName} ${player.lastName}`,
-        energyColor: getEnergyColorClass(player.energy),
-        moralColor: getMoralColorClass(player.moral),
-        positionVariant: getPositionVariant(player.position),
-        status: {
-          hasInjury,
-          hasSuspension,
-          isYouth: player.isYouth,
-          isAvailable: !hasInjury && !hasSuspension
-        }
-      };
-    });
-  }, [players]);
-
   if (players.length === 0) {
     return (
-      <div
-        className="text-slate-500 p-8 text-center bg-slate-900/50 rounded-lg border border-slate-800"
-        role="status"
-      >
-        <p className="text-lg">Nenhum jogador encontrado.</p>
-        <p className="text-sm mt-2 text-slate-600">
-          A equipa não possui jogadores registados neste momento.
-        </p>
+      <div className="bg-slate-900/50 rounded-lg border border-slate-800">
+        <EmptyState
+          icon={<span className="text-4xl">🏃</span>}
+          title="Nenhum jogador encontrado"
+          description="A equipa não possui jogadores registados com os filtros atuais."
+        />
       </div>
     );
   }
@@ -226,7 +188,7 @@ function PlayerTable({ players }: PlayerTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800">
-          {enrichedPlayers.map((player) => (
+          {players.map((player) => (
             <PlayerRow key={player.id} player={player} />
           ))}
         </tbody>

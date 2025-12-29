@@ -1,4 +1,5 @@
 import type { Team } from "../../domain/models";
+import { EmptyState } from "../common/EmptyState";
 import { TeamLogo } from "../common/TeamLogo"; //
 
 function MenuPage({
@@ -20,13 +21,18 @@ function MenuPage({
             </header>
 
             {teams.length === 0 && (
-                <button
-                    onClick={onLoadTeams}
-                    disabled={loading}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-medium transition-colors disabled:opacity-50 text-white"
-                >
-                    {loading ? "A carregar..." : "Carregar Clubes"}
-                </button>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl mt-8">
+                    <EmptyState
+                        icon={<span className="text-4xl">🛡️</span>}
+                        title="Base de Dados"
+                        description="Carregue a lista oficial de clubes para escolher a sua equipa e iniciar a carreira."
+                        action={{
+                            label: loading ? "A carregar..." : "Carregar Clubes",
+                            onClick: onLoadTeams
+                        }}
+                        className="py-12"
+                    />
+                </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">

@@ -1,5 +1,6 @@
 import { cva } from "class-variance-authority";
-import { COLOR_SYSTEM, cn } from "../../utils/designSystem";
+import { COLOR_SYSTEM } from "../../utils/designSystem";
+import { cn } from "../../utils/cn";
 
 const { status } = COLOR_SYSTEM;
 

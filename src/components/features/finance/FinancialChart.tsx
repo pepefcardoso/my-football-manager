@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { formatCurrency } from "../../../utils/formatters";
 import type { FinancialRecord } from "../../../domain/models";
+import { EmptyState } from "../../common/EmptyState";
 
 interface FinancialChartProps {
     records: FinancialRecord[];
@@ -38,8 +39,13 @@ function FinancialChart({ records }: FinancialChartProps) {
 
     if (monthlyData.length === 0) {
         return (
-            <div className="h-64 flex items-center justify-center border border-slate-800 rounded-lg bg-slate-900/50 text-slate-500">
-                Sem dados financeiros suficientes para gerar gráfico.
+            <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+                <EmptyState
+                    icon={<span className="text-4xl">📉</span>}
+                    title="Sem dados suficientes"
+                    description="Realize transações financeiras para começar a visualizar o histórico de receitas e despesas."
+                    className="py-12"
+                />
             </div>
         );
     }

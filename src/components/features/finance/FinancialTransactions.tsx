@@ -4,6 +4,7 @@ import type { FinancialRecord } from "../../../domain/models";
 import { Logger } from "../../../lib/Logger";
 import FinancialChart from "./FinancialChart";
 import { LoadingSpinner } from "../../common/Loading";
+import { EmptyState } from "../../common/EmptyState";
 
 const logger = new Logger("FinancialTransactions");
 
@@ -165,8 +166,13 @@ export function FinancialTransactions({ teamId, seasonId }: FinancialTransaction
                         <tbody className="divide-y divide-slate-800">
                             {filteredRecords.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
-                                        No transactions found matching the current filters
+                                    <td colSpan={4}>
+                                        <EmptyState
+                                            icon={<span className="text-4xl">🧾</span>}
+                                            title="Nenhuma transação encontrada"
+                                            description="Não existem registos financeiros que correspondam aos filtros selecionados."
+                                            className="py-12"
+                                        />
                                     </td>
                                 </tr>
                             ) : (

@@ -8,6 +8,7 @@ import { Logger } from "../../lib/Logger";
 import { TeamLogo } from "../common/TeamLogo";
 import { useGameStore } from "../../store/useGameStore";
 import { LoadingSpinner } from "../common/Loading";
+import { EmptyState } from "../common/EmptyState";
 
 const logger = new Logger("StandingsPage");
 
@@ -282,9 +283,12 @@ function StandingsPage() {
           {activeTab === "table" && (
             <div className="bg-slate-900/50 rounded-lg border border-slate-800 overflow-hidden">
               {filteredStandings.length === 0 && (
-                <div className="p-8 text-center text-slate-500">
-                  Nenhuma classificação encontrada para os filtros selecionados.
-                </div>
+                <EmptyState
+                  icon={<span className="text-4xl">📊</span>}
+                  title="Sem Classificação"
+                  description="Nenhuma classificação encontrada para os filtros selecionados."
+                  className="py-12"
+                />
               )}
 
               {filteredStandings.length > 0 && (

@@ -4,6 +4,7 @@ import { SaveSlotCard } from "./SaveSlotCard";
 import { Logger } from "../../../lib/Logger";
 import { LoadingSpinner } from "../../common/Loading";
 import { Modal } from "../../common/Modal";
+import { EmptyState } from "../../common/EmptyState";
 
 const logger = new Logger("LoadGameModal");
 
@@ -105,10 +106,11 @@ export function LoadGameModal({ onClose, onLoad }: LoadGameModalProps) {
                     <p>{error}</p>
                 </div>
             ) : saves.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2 min-h-[300px]">
-                    <span className="text-4xl opacity-50">📂</span>
-                    <p>Nenhum jogo salvo encontrado.</p>
-                </div>
+                <EmptyState
+                    icon={<span className="text-4xl">💾</span>}
+                    title="Nenhum jogo salvo"
+                    description="Ainda não tens carreiras salvas. Começa um novo jogo no menu principal!"
+                />
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {saves.map((save) => (

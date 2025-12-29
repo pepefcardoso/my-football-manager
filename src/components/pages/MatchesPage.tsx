@@ -7,6 +7,7 @@ import { Logger } from "../../lib/Logger";
 import { useGameStore } from "../../store/useGameStore";
 import { TeamLogo } from "../common/TeamLogo";
 import { LoadingSpinner } from "../common/Loading";
+import { EmptyState } from "../common/EmptyState";
 
 const logger = new Logger("MatchesPage");
 
@@ -151,13 +152,15 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
                 />
             ) : (
                 <div className="space-y-4 max-w-5xl mx-auto">
-                    {matches.length === 0 && (
-                        <div className="text-center py-10 bg-slate-900/50 rounded-lg border border-slate-800 border-dashed">
-                            <p className="text-slate-500">Nenhuma partida agendada para esta temporada.</p>
+                    {matches.length === 0 ? (
+                        <div className="bg-slate-900/50 rounded-lg border border-slate-800 border-dashed">
+                            <EmptyState
+                                icon={<span className="text-4xl">📅</span>}
+                                title="Sem jogos agendados"
+                                description="Não existem partidas marcadas para esta fase da temporada."
+                            />
                         </div>
-                    )}
-
-                    {sortedMatches.map((match) => {
+                    ) : (sortedMatches.map((match) => {
                         const isHome = match.homeTeamId === teamId;
                         const homeTeamObj = allTeams.find(t => t.id === match.homeTeamId);
                         const awayTeamObj = allTeams.find(t => t.id === match.awayTeamId);
@@ -276,7 +279,8 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
                                 </div>
                             </div>
                         );
-                    })}
+                    })
+                    )}
                 </div>
             )}
         </div>
