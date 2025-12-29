@@ -1,28 +1,7 @@
-import { useEffect, useState } from "react";
 import { formatCurrency } from "../../../utils/formatters";
-import { Logger } from "../../../lib/Logger";
 import StatCard from "../../common/StatCard";
 import { SkeletonCard } from "../../common/Skeleton";
-
-const logger = new Logger("FinancialDashboard");
-
-interface DashboardData {
-    currentBudget: number;
-    monthlyIncome: number;
-    monthlyExpenses: number;
-    monthlyCashflow: number;
-    salaryBill: {
-        annual: number;
-        monthly: number;
-        playerCount: number;
-    };
-    operationalCosts: {
-        annual: number;
-        monthly: number;
-    };
-    projectedAnnualRevenue: number;
-    financialHealth: string;
-}
+import { useFinanceDashboard } from "../../../hooks/api/useFinance";
 
 interface FinancialDashboardProps {
     teamId: number;
@@ -30,47 +9,14 @@ interface FinancialDashboardProps {
 }
 
 export function FinancialDashboard({ teamId, seasonId }: FinancialDashboardProps) {
-    const [data, setData] = useState<DashboardData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { data, isLoading, error } = useFinanceDashboard(teamId, seasonId);
 
-    useEffect(() => {
-        const fetchDashboard = async () => {
-            setLoading(true);
-            setError(null);
-
-            try {
-                const dashboard = await window.electronAPI.finance.getDashboard(teamId, seasonId);
-
-                if (dashboard) {
-                    setData(dashboard);
-                } else {
-                    setError("Failed to load financial dashboard");
-                }
-            } catch (err) {
-                logger.error("Error fetching dashboard:", err);
-                setError(err instanceof Error ? err.message : "Unknown error");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchDashboard();
-    }, [teamId, seasonId]);
-
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="space-y-6 animate-in fade-in">
                 <SkeletonCard />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <SkeletonCard />
-                    <SkeletonCard />
-                    <SkeletonCard />
-                    <SkeletonCard />
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <SkeletonCard />
-                    <SkeletonCard />
+                    <SkeletonCard /> <SkeletonCard /> <SkeletonCard /> <SkeletonCard />
                 </div>
             </div>
         );
@@ -79,35 +25,27 @@ export function FinancialDashboard({ teamId, seasonId }: FinancialDashboardProps
     if (error || !data) {
         return (
             <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-6 text-red-400">
-                <p className="font-bold mb-2">Error Loading Dashboard</p>
-                <p className="text-sm">{error || "No data available"}</p>
+                <p className="font-bold mb-2">Erro ao carregar Dashboard</p>
+                <p className="text-sm">{error instanceof Error ? error.message : "Erro desconhecido"}</p>
             </div>
         );
     }
 
     const getHealthColor = (health: string) => {
         switch (health) {
-            case "Healthy":
-                return "text-emerald-400";
-            case "Warning":
-                return "text-yellow-400";
-            case "Critical":
-                return "text-red-400";
-            default:
-                return "text-slate-400";
+            case "Healthy": return "text-emerald-400";
+            case "Warning": return "text-yellow-400";
+            case "Critical": return "text-red-400";
+            default: return "text-slate-400";
         }
     };
 
     const getHealthIcon = (health: string) => {
         switch (health) {
-            case "Healthy":
-                return "✅";
-            case "Warning":
-                return "⚠️";
-            case "Critical":
-                return "🚨";
-            default:
-                return "❓";
+            case "Healthy": return "✅";
+            case "Warning": return "⚠️";
+            case "Critical": return "🚨";
+            default: return "❓";
         }
     };
 
@@ -116,7 +54,7 @@ export function FinancialDashboard({ teamId, seasonId }: FinancialDashboardProps
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h3 className="text-sm font-medium text-slate-400 mb-2">Financial Health Status</h3>
+                        <h3 className="text-sm font-medium text-slate-400 mb-2">Saúde Financeira</h3>
                         <div className="flex items-center gap-3">
                             <span className="text-3xl">{getHealthIcon(data.financialHealth)}</span>
                             <span className={`text-2xl font-bold ${getHealthColor(data.financialHealth)}`}>
@@ -129,101 +67,52 @@ export function FinancialDashboard({ teamId, seasonId }: FinancialDashboardProps
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
-                    title="Current Budget"
+                    title="Orçamento Atual"
                     value={formatCurrency(data.currentBudget)}
-                    subtitle={data.currentBudget < 0 ? "⚠️ In debt" : "Available funds"}
+                    subtitle={data.currentBudget < 0 ? "⚠️ Em Dívida" : "Fundos Disponíveis"}
                 />
                 <StatCard
-                    title="Monthly Income"
+                    title="Receita Mensal"
                     value={formatCurrency(data.monthlyIncome)}
-                    subtitle="Projected revenue"
+                    subtitle="Projeção"
                 />
                 <StatCard
-                    title="Monthly Expenses"
+                    title="Despesa Mensal"
                     value={formatCurrency(data.monthlyExpenses)}
-                    subtitle="Total costs"
+                    subtitle="Custos totais"
                 />
                 <StatCard
-                    title="Monthly Cashflow"
+                    title="Fluxo de Caixa"
                     value={formatCurrency(data.monthlyCashflow)}
-                    subtitle={data.monthlyCashflow >= 0 ? "Surplus" : "Deficit"}
+                    subtitle={data.monthlyCashflow >= 0 ? "Superávit" : "Déficit"}
                 />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-white mb-4">💼 Salary Bill</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4">💼 Folha Salarial</h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-slate-400">Monthly Wages</span>
+                            <span className="text-slate-400">Mensal</span>
                             <span className="font-mono text-emerald-400">{formatCurrency(data.salaryBill.monthly)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-slate-400">Annual Total</span>
+                            <span className="text-slate-400">Anual</span>
                             <span className="font-mono text-white">{formatCurrency(data.salaryBill.annual)}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-3 border-t border-slate-800">
-                            <span className="text-slate-400">Active Players</span>
-                            <span className="font-bold text-white">{data.salaryBill.playerCount}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-slate-400">Avg. per Player</span>
-                            <span className="font-mono text-slate-300">
-                                {formatCurrency(Math.round(data.salaryBill.annual / data.salaryBill.playerCount))}
-                            </span>
                         </div>
                     </div>
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-white mb-4">🏭 Operational Costs</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4">🏭 Custos Operacionais</h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-slate-400">Monthly Operations</span>
+                            <span className="text-slate-400">Mensal</span>
                             <span className="font-mono text-red-400">{formatCurrency(data.operationalCosts.monthly)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-slate-400">Annual Projection</span>
+                            <span className="text-slate-400">Anual</span>
                             <span className="font-mono text-white">{formatCurrency(data.operationalCosts.annual)}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-3 border-t border-slate-800">
-                            <span className="text-slate-400">% of Revenue</span>
-                            <span className="font-bold text-white">
-                                {((data.operationalCosts.annual / data.projectedAnnualRevenue) * 100).toFixed(1)}%
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 lg:col-span-2">
-                    <h3 className="text-lg font-semibold text-white mb-4">💰 Revenue Projection</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">Projected Annual</p>
-                            <p className="text-xl font-bold text-emerald-400">{formatCurrency(data.projectedAnnualRevenue)}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">Monthly Avg.</p>
-                            <p className="text-xl font-bold text-white">
-                                {formatCurrency(Math.round(data.projectedAnnualRevenue / 12))}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">Total Costs</p>
-                            <p className="text-xl font-bold text-red-400">
-                                {formatCurrency(data.salaryBill.annual + data.operationalCosts.annual)}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">Projected Profit</p>
-                            <p className={`text-xl font-bold ${data.projectedAnnualRevenue - (data.salaryBill.annual + data.operationalCosts.annual) >= 0
-                                ? "text-emerald-400"
-                                : "text-red-400"
-                                }`}>
-                                {formatCurrency(
-                                    data.projectedAnnualRevenue - (data.salaryBill.annual + data.operationalCosts.annual)
-                                )}
-                            </p>
                         </div>
                     </div>
                 </div>
