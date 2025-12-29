@@ -12,6 +12,8 @@ export function useGameSimulation() {
     advanceDate,
     triggerEvent,
     navigateInGame,
+    setSeasonId,
+    currentSeasonId,
   } = useGameStore();
 
   const [seasonSummary, setSeasonSummary] = useState<SeasonSummary | null>(
@@ -53,7 +55,14 @@ export function useGameSimulation() {
       }
 
       if ((result as any).seasonRollover) {
-        setSeasonSummary((result as any).seasonRollover);
+        const summary = (result as any).seasonRollover;
+        setSeasonSummary(summary);
+        const nextSeasonId = currentSeasonId + 1;
+        logger.info(
+          `🔄 Virada de temporada detectada. Atualizando para Season ID: ${nextSeasonId}`
+        );
+        setSeasonId(nextSeasonId);
+
         setShowSeasonModal(true);
         return { shouldStop: true, reason: "season_end" };
       }
@@ -63,7 +72,7 @@ export function useGameSimulation() {
       logger.error("Erro crítico ao avançar dia:", error);
       return { shouldStop: true, reason: "error" };
     }
-  }, [advanceDate, triggerEvent, navigateInGame]);
+  }, [advanceDate, triggerEvent, navigateInGame, setSeasonId, currentSeasonId]);
 
   const handleAdvanceOneDay = useCallback(async () => {
     if (isProcessing) return;

@@ -21,7 +21,7 @@ export function useGameManagement() {
     error: null,
   });
 
-  const { startGame, setNewGameSetup, setView, advanceDate } = useGameStore();
+  const { startGame, setNewGameSetup, setView, advanceDate, setSeasonId } = useGameStore();
 
   const openModal = (type: ModalType) => {
     setUiState((prev) => ({ ...prev, activeModal: type, error: null }));
@@ -72,6 +72,8 @@ export function useGameManagement() {
         }
 
         advanceDate(gameState.currentDate);
+        setSeasonId(gameState.currentSeasonId || 1);
+        
         startGame(userTeam);
         closeModal();
       } catch (err) {
@@ -92,16 +94,17 @@ export function useGameManagement() {
         }));
       }
     },
-    [startGame, advanceDate]
+    [startGame, advanceDate, setSeasonId]
   );
 
   const setupNewGame = useCallback(
     (saveName: string, managerName: string) => {
       setNewGameSetup({ saveName, managerName });
+      setSeasonId(1);
       closeModal();
       setView("team_selection");
     },
-    [setNewGameSetup, setView]
+    [setNewGameSetup, setView, setSeasonId]
   );
 
   return {
