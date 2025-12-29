@@ -1,12 +1,8 @@
 import { memo, useMemo } from "react";
 import type { Player } from "../../../domain/models";
 import { formatCurrency } from "../../../utils/formatters";
-import { getPositionVariant } from "../../../utils/styleHelpers";
+import { getEnergyColorClass, getMoralColorClass, getPositionVariant } from "../../../utils/styleHelpers";
 import Badge from "../../common/Badge";
-import {
-  getEnergyColorClass,
-  getMoralColorClass,
-} from "../../../utils/designTokens";
 import type { BadgeVariant } from "../../../domain/types";
 
 interface PlayerTableProps {

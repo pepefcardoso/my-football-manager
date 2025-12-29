@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Logger } from "../../lib/Logger";
 import { useGameStore } from "../../store/useGameStore";
 import Badge from "./Badge";
+import { cn } from "../../utils/cn";
+import { COLOR_SYSTEM } from "../../utils/designSystem";
 
 const logger = new Logger("TransferNotification");
 
@@ -21,11 +23,11 @@ interface Notification {
 const getNotificationStyle = (type: Notification["type"]) => {
     switch (type) {
         case "PROPOSAL_RECEIVED":
-            return "bg-blue-900 border-blue-500/50 text-blue-100";
+            return cn(COLOR_SYSTEM.status.info.bg, COLOR_SYSTEM.status.info.border, COLOR_SYSTEM.status.info.text);
         case "TRANSFER_COMPLETED":
-            return "bg-emerald-900 border-emerald-500/50 text-emerald-100";
+            return cn(COLOR_SYSTEM.status.success.bg, COLOR_SYSTEM.status.success.border, COLOR_SYSTEM.status.success.text);
         default:
-            return "bg-slate-800 border-slate-700 text-slate-300";
+            return cn(COLOR_SYSTEM.status.neutral.bg, COLOR_SYSTEM.status.neutral.border, COLOR_SYSTEM.status.neutral.text);
     }
 };
 

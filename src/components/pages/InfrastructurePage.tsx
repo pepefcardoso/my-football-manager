@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { FacilityCard } from "../features/infrastructure/FacilityCard";
 import { LoadingSpinner } from "../common/Loading";
+import { cn } from "../../utils/cn";
+import { COLOR_SYSTEM } from "../../utils/designSystem";
 
 type FacilityType =
     | "stadium_capacity"
@@ -157,7 +159,7 @@ function InfrastructurePage({ teamId }: { teamId: number }) {
             </header>
 
             {status.activeConstruction && (
-                <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg flex items-center justify-between animate-pulse">
+                <div className={cn(COLOR_SYSTEM.status.info.bg, COLOR_SYSTEM.status.info.border,"p-4 rounded-lg flex items-center justify-between animate-pulse")}>
                     <div className="flex items-center gap-3">
                         <span className="text-2xl">🏗️</span>
                         <div>
