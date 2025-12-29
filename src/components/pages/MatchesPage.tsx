@@ -4,7 +4,7 @@ import { MatchViewer } from "../features/match/MatchViewer";
 import { PreMatchScreen, type PreMatchLineup } from "../features/match/pre-game/PreMatchScreen";
 import type { Match, Team, Competition } from "../../domain/models";
 import { Logger } from "../../lib/Logger";
-import { useGameStore } from "../../store/useGameStore";
+import { useCurrentDate } from "../../store/useGameStore";
 import { TeamLogo } from "../common/TeamLogo";
 import { LoadingSpinner } from "../common/Loading";
 import { EmptyState } from "../common/EmptyState";
@@ -25,8 +25,7 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
     const [loading, setLoading] = useState(true);
     const [viewState, setViewState] = useState<ViewState>('calendar');
     const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-
-    const currentDate = useGameStore((state) => state.currentDate);
+    const currentDate = useCurrentDate();
 
     const refreshData = useCallback(async () => {
         setLoading(true);
@@ -145,11 +144,7 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
             </header>
 
             {loading ? (
-                <LoadingSpinner
-                    size="lg"
-                    centered={true}
-                    className="py-20"
-                />
+                <LoadingSpinner size="lg" centered={true} className="py-20" />
             ) : (
                 <div className="space-y-4 max-w-5xl mx-auto">
                     {matches.length === 0 ? (
@@ -279,8 +274,7 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
                                 </div>
                             </div>
                         );
-                    })
-                    )}
+                    }))}
                 </div>
             )}
         </div>

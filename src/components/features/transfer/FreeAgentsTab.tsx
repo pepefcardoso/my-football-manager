@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFreeAgents } from "../../../hooks/transfer/useFreeAgents";
-import { useGameStore } from "../../../store/useGameStore";
+import { useUserTeam, useCurrentDate, useCurrentSeasonId } from "../../../store/useGameStore";
 import { SearchResultsGrid } from "../scouting/SearchResultsGrid";
 import { TransferProposalModal } from "../transfer/TransferProposalModal";
 import type { Player } from "../../../domain/models";
@@ -10,7 +10,9 @@ import { EmptyState } from "../../common/EmptyState";
 export function FreeAgentsTab() {
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
     const { agents, isLoading, fetch: fetchFreeAgents } = useFreeAgents();
-    const { userTeam, currentDate, currentSeasonId } = useGameStore();
+    const userTeam = useUserTeam();
+    const currentDate = useCurrentDate();
+    const currentSeasonId = useCurrentSeasonId();
 
     const handleProposalSent = () => {
         setSelectedPlayer(null);

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import type { MenuOption } from "../../domain/constants";
 import type { Team } from "../../domain/models";
 import { SystemMenuModal } from "../features/system/SystemMenuModal";
@@ -126,4 +126,4 @@ function Sidebar({ activePage, onNavigate, team }: SidebarProps) {
     );
 }
 
-export default Sidebar;
+export default memo(Sidebar);

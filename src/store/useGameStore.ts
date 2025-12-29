@@ -118,3 +118,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ currentEvent: null });
   },
 }));
+
+export const useUserTeam = () => useGameStore((state) => state.userTeam);
+export const useCurrentDate = () => useGameStore((state) => state.currentDate);
+export const useCurrentSeasonId = () =>
+  useGameStore((state) => state.currentSeasonId);
+export const useIsProcessing = () =>
+  useGameStore((state) => state.isProcessing);
+export const useActivePage = () => useGameStore((state) => state.activePage);
+export const useGameView = () => useGameStore((state) => state.view);
+export const useCurrentEvent = () =>
+  useGameStore((state) => state.currentEvent);
+
+export const useGameActions = () => ({
+  navigateInGame: useGameStore.getState().navigateInGame,
+  setProcessing: useGameStore.getState().setProcessing,
+  updateUserTeam: useGameStore.getState().updateUserTeam,
+});

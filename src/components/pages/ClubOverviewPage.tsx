@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useGameStore } from "../../store/useGameStore";
+import { useGameStore, useCurrentDate, useIsProcessing } from "../../store/useGameStore";
 import type { Team } from "../../domain/models";
 import { useClubOverviewData } from "../../hooks/useClubOverviewData";
 import { useGameSimulation } from "../../hooks/useGameSimulation";
@@ -11,7 +11,9 @@ import StatCard from "../common/StatCard";
 import { SeasonEndModal } from "../features/season/SeasonEndModal";
 
 function ClubOverviewPage({ team }: { team: Team }) {
-    const { currentDate, isProcessing, navigateInGame } = useGameStore();
+    const currentDate = useCurrentDate();
+    const isProcessing = useIsProcessing();
+    const navigateInGame = useGameStore((state) => state.navigateInGame);
 
     const {
         gameState,

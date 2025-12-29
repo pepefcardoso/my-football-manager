@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useScoutingNetwork } from "../../../hooks/transfer/useScoutingNetwork";
-import { useGameStore } from "../../../store/useGameStore";
+import { useUserTeam, useCurrentDate, useCurrentSeasonId } from "../../../store/useGameStore";
 import { SearchResultsGrid } from "../scouting/SearchResultsGrid";
 import { TransferProposalModal } from "../transfer/TransferProposalModal";
 import type { Player } from "../../../domain/models";
@@ -13,7 +13,9 @@ interface ScoutingResultsTabProps {
 export function ScoutingResultsTab({ teamId }: ScoutingResultsTabProps) {
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
     const { results: scoutedPlayers, isLoading } = useScoutingNetwork(teamId);
-    const { userTeam, currentDate, currentSeasonId } = useGameStore();
+    const userTeam = useUserTeam();
+    const currentDate = useCurrentDate();
+    const currentSeasonId = useCurrentSeasonId();
 
     const handleProposalSent = () => {
         setSelectedPlayer(null);
