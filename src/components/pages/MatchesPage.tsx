@@ -1,88 +1,50 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
-import Badge from "../common/Badge";
-import { MatchViewer } from "../features/match/MatchViewer";
-import { PreMatchScreen, type PreMatchLineup } from "../features/match/pre-game/PreMatchScreen";
-import type { Match, Team, Competition } from "../../domain/models";
-import { Logger } from "../../lib/Logger";
 import { useCurrentDate } from "../../store/useGameStore";
-import { TeamLogo } from "../common/TeamLogo";
+import type { Team } from "../../domain/models";
 import { LoadingSpinner } from "../common/Loading";
-import { EmptyState } from "../common/EmptyState";
-
-const logger = new Logger("MatchesPage");
+import { useMatchNavigation } from "../../hooks/ui/useMatchNavigation";
+import { useMatchData } from "../../hooks/data/useMatchData";
+import { MatchCalendar } from "../features/match/MatchCalendar";
+import { PreMatchScreen, type PreMatchLineup } from "../features/match/pre-game/PreMatchScreen";
+import { MatchViewer } from "../features/match/MatchViewer";
 
 interface MatchesPageProps {
     teamId: number;
     teams: Team[];
 }
 
-type ViewState = 'calendar' | 'pre-match' | 'match';
-
-function MatchesPage({ teamId, teams }: MatchesPageProps) {
-    const [matches, setMatches] = useState<Match[]>([]);
-    const [competitions, setCompetitions] = useState<Competition[]>([]);
-    const [allTeams, setAllTeams] = useState<Team[]>(teams);
-    const [loading, setLoading] = useState(true);
-    const [viewState, setViewState] = useState<ViewState>('calendar');
-    const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+function MatchesPage({ teamId, teams: initialTeams }: MatchesPageProps) {
     const currentDate = useCurrentDate();
 
-    const refreshData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const state = await window.electronAPI.game.getGameState();
-            if (state && state.currentSeasonId) {
-                const [matchesData, competitionsData, teamsData] = await Promise.all([
-                    window.electronAPI.match.getMatches(teamId, state.currentSeasonId),
-                    window.electronAPI.competition.getCompetitions(),
-                    window.electronAPI.team.getTeams()
-                ]);
+    const {
+        matches,
+        competitions,
+        allTeams,
+        loading,
+        refreshData
+    } = useMatchData(teamId, initialTeams);
 
-                setMatches(matchesData);
-                setCompetitions(competitionsData);
-                setAllTeams(teamsData);
-            }
-        } catch (error) {
-            logger.error("Erro ao carregar dados:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [teamId]);
-
-    useEffect(() => {
-        refreshData();
-    }, [refreshData]);
-
-    const sortedMatches = useMemo(() => {
-        return [...matches].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    }, [matches]);
-
-    const getTeamName = (id: number | null) => {
-        if (!id) return "Time Indefinido";
-        const team = allTeams.find(t => t.id === id);
-        return team ? team.name : "Desconhecido";
-    };
-
-    const handleStartMatchFlow = (match: Match) => {
-        setSelectedMatch(match);
-        setViewState('pre-match');
-    };
+    const {
+        view,
+        selectedMatch,
+        navigateToPreMatch,
+        navigateToMatch,
+        backToCalendar
+    } = useMatchNavigation();
 
     const handleConfirmLineup = (_lineup: PreMatchLineup) => {
-        setViewState('match');
+        navigateToMatch();
     };
 
     const handleBackToCalendar = async () => {
-        setSelectedMatch(null);
-        setViewState('calendar');
+        backToCalendar();
         await refreshData();
     };
 
-    if (selectedMatch && viewState === 'pre-match') {
+    if (selectedMatch && view === 'pre-match') {
         const homeTeam = allTeams.find((t) => t.id === selectedMatch.homeTeamId);
         const awayTeam = allTeams.find((t) => t.id === selectedMatch.awayTeamId);
 
-        if (!homeTeam || !awayTeam) return <div>Erro: Times não encontrados</div>;
+        if (!homeTeam || !awayTeam) return <div className="p-8 text-white">Erro: Times não encontrados</div>;
 
         return (
             <PreMatchScreen
@@ -91,12 +53,12 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
                 awayTeam={awayTeam}
                 userTeamId={teamId}
                 onConfirm={handleConfirmLineup}
-                onCancel={handleBackToCalendar}
+                onCancel={backToCalendar}
             />
         );
     }
 
-    if (selectedMatch && viewState === 'match') {
+    if (selectedMatch && view === 'match') {
         const homeTeam = allTeams.find((t) => t.id === selectedMatch.homeTeamId);
         const awayTeam = allTeams.find((t) => t.id === selectedMatch.awayTeamId);
 
@@ -146,136 +108,14 @@ function MatchesPage({ teamId, teams }: MatchesPageProps) {
             {loading ? (
                 <LoadingSpinner size="lg" centered={true} className="py-20" />
             ) : (
-                <div className="space-y-4 max-w-5xl mx-auto">
-                    {matches.length === 0 ? (
-                        <div className="bg-slate-900/50 rounded-lg border border-slate-800 border-dashed">
-                            <EmptyState
-                                icon={<span className="text-4xl">📅</span>}
-                                title="Sem jogos agendados"
-                                description="Não existem partidas marcadas para esta fase da temporada."
-                            />
-                        </div>
-                    ) : (sortedMatches.map((match) => {
-                        const isHome = match.homeTeamId === teamId;
-                        const homeTeamObj = allTeams.find(t => t.id === match.homeTeamId);
-                        const awayTeamObj = allTeams.find(t => t.id === match.awayTeamId);
-                        const competition = competitions.find(c => c.id === match.competitionId);
-                        const stadiumName = homeTeamObj ? `Estádio do ${homeTeamObj.shortName}` : "Campo Neutro";
-                        const isToday = match.date === currentDate;
-                        const isFuture = new Date(match.date) > new Date(currentDate);
-                        const homeScore = match.homeScore || 0;
-                        const awayScore = match.awayScore || 0;
-
-                        let resultVariant: "success" | "danger" | "neutral" = "neutral";
-                        let resultText = "-";
-                        if (match.isPlayed) {
-                            if (homeScore === awayScore) {
-                                resultVariant = "neutral";
-                                resultText = "E";
-                            } else if (isHome) {
-                                resultVariant = homeScore > awayScore ? "success" : "danger";
-                                resultText = homeScore > awayScore ? "V" : "D";
-                            } else {
-                                resultVariant = awayScore > homeScore ? "success" : "danger";
-                                resultText = awayScore > homeScore ? "V" : "D";
-                            }
-                        }
-
-                        let rowBorderClass = "border-slate-800 hover:border-slate-700";
-                        let rowBgClass = "bg-slate-900";
-                        if (isToday && !match.isPlayed) {
-                            rowBorderClass = "border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.15)]";
-                            rowBgClass = "bg-slate-800";
-                        } else if (match.isPlayed) {
-                            rowBgClass = "bg-slate-950/50 opacity-80 hover:opacity-100";
-                        }
-
-                        return (
-                            <div
-                                key={match.id}
-                                className={`
-                                    relative p-4 rounded-xl border transition-all duration-300 flex flex-col md:flex-row items-center justify-between group gap-4
-                                    ${rowBorderClass} ${rowBgClass}
-                                `}
-                            >
-                                {isToday && !match.isPlayed && (
-                                    <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-emerald-500 rounded-r-lg animate-pulse hidden md:block" />
-                                )}
-
-                                <div className="flex items-center gap-4 w-full md:w-1/4">
-                                    <div className="flex flex-col items-center justify-center bg-slate-950 w-14 h-14 rounded-lg border border-slate-800 text-slate-400 shrink-0">
-                                        <span className="text-xs uppercase font-bold text-slate-500">
-                                            {new Date(match.date).toLocaleDateString("pt-PT", { month: "short" }).replace(".", "")}
-                                        </span>
-                                        <span className={`text-xl font-bold ${isToday ? "text-emerald-400" : "text-white"}`}>
-                                            {new Date(match.date).getDate()}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-0.5">
-                                            {competition?.name || "Amistoso"}
-                                        </span>
-                                        <span className="text-xs text-slate-500 flex items-center gap-1">
-                                            🏟️ {stadiumName}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="flex-1 flex justify-center items-center gap-4 w-full">
-                                    <div className="flex-1 flex items-center justify-end gap-3 min-w-0">
-                                        <span className={`font-semibold text-lg truncate ${isHome ? "text-white" : "text-slate-400"}`}>
-                                            {getTeamName(match.homeTeamId)}
-                                        </span>
-                                        <TeamLogo team={homeTeamObj} className="w-8 h-8 flex-shrink-0" />
-                                    </div>
-
-                                    <div className="bg-slate-950 px-4 py-2 rounded-lg border border-slate-800 min-w-[80px] text-center shrink-0 shadow-inner">
-                                        {match.isPlayed ? (
-                                            <span className="text-xl font-black text-white tracking-widest">
-                                                {match.homeScore} - {match.awayScore}
-                                            </span>
-                                        ) : (
-                                            <span className="text-slate-600 font-mono text-lg">VS</span>
-                                        )}
-                                    </div>
-
-                                    <div className="flex-1 flex items-center justify-start gap-3 min-w-0">
-                                        <TeamLogo team={awayTeamObj} className="w-8 h-8 flex-shrink-0" />
-                                        <span className={`font-semibold text-lg truncate ${!isHome ? "text-white" : "text-slate-400"}`}>
-                                            {getTeamName(match.awayTeamId)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="w-full md:w-1/4 flex justify-end items-center">
-                                    {match.isPlayed ? (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-slate-500 font-medium uppercase mr-2">Finalizado</span>
-                                            <Badge variant={resultVariant} className="w-8 h-8 flex items-center justify-center p-0 rounded-full text-sm font-bold">
-                                                {resultText}
-                                            </Badge>
-                                        </div>
-                                    ) : isToday ? (
-                                        <button
-                                            onClick={() => handleStartMatchFlow(match)}
-                                            className="w-full md:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-emerald-900/30 hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-                                        >
-                                            <span>⚽</span> JOGAR
-                                        </button>
-                                    ) : isFuture ? (
-                                        <span className="px-4 py-2 rounded-lg bg-slate-800 text-slate-500 text-sm border border-slate-700 font-medium">
-                                            Agendado
-                                        </span>
-                                    ) : (
-                                        <span className="px-4 py-2 rounded-lg bg-amber-900/20 text-amber-500 text-sm border border-amber-900/30 font-medium flex items-center gap-2">
-                                            <span>⚠️</span> Pendente
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    }))}
-                </div>
+                <MatchCalendar
+                    matches={matches}
+                    teams={allTeams}
+                    competitions={competitions}
+                    userTeamId={teamId}
+                    currentDate={currentDate}
+                    onSelectMatch={navigateToPreMatch}
+                />
             )}
         </div>
     );
