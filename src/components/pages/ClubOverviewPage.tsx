@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useGameStore, useCurrentDate, useIsProcessing } from "../../store/useGameStore";
 import type { Team } from "../../domain/models";
-import { useClubOverviewData } from "../../hooks/useClubOverviewData";
+import { useClubOverview } from "../../hooks/useClubOverview";
 import { useGameSimulation } from "../../hooks/useGameSimulation";
 import { useTrainingManagement } from "../../hooks/useTrainingManagement";
 import { ClubHeader } from "../features/club/ClubHeader";
@@ -9,18 +9,13 @@ import { NextMatchCard } from "../features/club/NextMatchCard";
 import { TrainingPanel } from "../features/club/TrainingPanel";
 import StatCard from "../common/StatCard";
 import { SeasonEndModal } from "../features/season/SeasonEndModal";
+import { LoadingSpinner } from "../common/Loading";
 
 function ClubOverviewPage({ team }: { team: Team }) {
     const currentDate = useCurrentDate();
     const isProcessing = useIsProcessing();
     const navigateInGame = useGameStore((state) => state.navigateInGame);
-
-    const {
-        gameState,
-        nextMatch,
-        formStreak,
-        refresh: refreshOverview
-    } = useClubOverviewData(team.id, currentDate);
+    const { data: overviewData, isLoading, refetch } = useClubOverview(team.id);
 
     const {
         handleAdvanceOneDay,
@@ -32,7 +27,7 @@ function ClubOverviewPage({ team }: { team: Team }) {
     } = useGameSimulation();
 
     const { updateTraining, isUpdating: isTrainingUpdating } = useTrainingManagement({
-        onSuccess: refreshOverview
+        onSuccess: () => refetch()
     });
 
     const handleNavigateToMatches = useCallback(() => {
@@ -41,6 +36,12 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
     const budgetFormatted = `€${(team.budget / 1_000_000).toFixed(1)}M`;
     const budgetStatus = team.budget < 0 ? "⚠️ Risco" : "Estável";
+
+    if (isLoading || !overviewData) {
+        return <LoadingSpinner size="lg" centered={true} text="Analisando dados do clube..." />;
+    }
+
+    const { gameState, nextMatch, formStreak } = overviewData;
 
     return (
         <div className="min-h-screen bg-slate-950 p-8 animate-in fade-in duration-500">
