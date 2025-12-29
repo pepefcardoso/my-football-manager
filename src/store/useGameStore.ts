@@ -19,6 +19,7 @@ interface GameState {
   newGameSetup: NewGameSetup | null;
   currentEvent: NarrativeEvent | null;
   currentDate: string;
+  currentSeasonId: number;
   isProcessing: boolean;
   isPaused: boolean;
   isLoading: boolean;
@@ -33,6 +34,7 @@ interface GameState {
   setProcessing: (isProcessing: boolean) => void;
   setPaused: (isPaused: boolean) => void;
   advanceDate: (newDate: string) => void;
+  setSeasonId: (id: number) => void;
   triggerEvent: (event: NarrativeEvent) => void;
   resolveEvent: () => void;
 }
@@ -43,8 +45,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   userTeam: null,
   newGameSetup: null,
   currentEvent: null,
-
   currentDate: "2025-01-15",
+  currentSeasonId: 1,
   isProcessing: false,
   isPaused: true,
   isLoading: false,
@@ -52,7 +54,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setView: (view) => set({ view }),
   setLoading: (isLoading) => set({ isLoading }),
   setNewGameSetup: (data) => set({ newGameSetup: data }),
-
+  setSeasonId: (id) => set({ currentSeasonId: id }),
   startGame: (team) => {
     logger.info(`Iniciando jogo com o time: ${team.name}`);
     set({
@@ -76,6 +78,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       view: "start_screen",
       userTeam: null,
       currentDate: "2025-01-15",
+      currentSeasonId: 1,
       newGameSetup: null,
       currentEvent: null,
       isProcessing: false,
