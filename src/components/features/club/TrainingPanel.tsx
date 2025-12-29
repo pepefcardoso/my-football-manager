@@ -1,11 +1,13 @@
 import { TrainingFocus } from "../../../domain/enums";
+import { LoadingSpinner } from "../../common/Loading";
 
 interface TrainingPanelProps {
     currentFocus: string | null | undefined;
     onUpdate: (focus: string) => void;
+    isLoading?: boolean;
 }
 
-export function TrainingPanel({ currentFocus, onUpdate }: TrainingPanelProps) {
+export function TrainingPanel({ currentFocus, onUpdate, isLoading = false }: TrainingPanelProps) {
     const trainingOptions = [
         { id: TrainingFocus.TECHNICAL, label: "⚽ Técnico", color: "emerald" },
         { id: TrainingFocus.TACTICAL, label: "📋 Tático", color: "blue" },
@@ -14,7 +16,13 @@ export function TrainingPanel({ currentFocus, onUpdate }: TrainingPanelProps) {
     ];
 
     return (
-        <div className="col-span-1 md:col-span-12 lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-lg">
+        <div className="col-span-1 md:col-span-12 lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-lg relative overflow-hidden">
+            {isLoading && (
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-20 flex items-center justify-center">
+                    <LoadingSpinner size="md" text="Atualizando..." centered={false} />
+                </div>
+            )}
+
             <div className="flex items-center gap-2 mb-6">
                 <span className="text-2xl">🏋️</span>
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Foco Treino</h3>
@@ -27,8 +35,10 @@ export function TrainingPanel({ currentFocus, onUpdate }: TrainingPanelProps) {
                         <button
                             key={option.id}
                             onClick={() => onUpdate(option.id)}
+                            disabled={isLoading}
                             className={`
                                 p-4 rounded-xl border transition-all text-xs font-bold flex flex-col items-center justify-center gap-2 h-24 relative
+                                disabled:opacity-50 disabled:cursor-not-allowed
                                 ${isActive
                                     ? `bg-${option.color}-600/20 border-${option.color}-500 text-white shadow-lg`
                                     : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800"

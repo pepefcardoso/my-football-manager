@@ -1,13 +1,14 @@
+import { useCallback } from "react";
 import { useGameStore } from "../../store/useGameStore";
 import type { Team } from "../../domain/models";
 import { useClubOverviewData } from "../../hooks/useClubOverviewData";
 import { useGameSimulation } from "../../hooks/useGameSimulation";
+import { useTrainingManagement } from "../../hooks/useTrainingManagement";
 import { ClubHeader } from "../features/club/ClubHeader";
 import { NextMatchCard } from "../features/club/NextMatchCard";
 import { TrainingPanel } from "../features/club/TrainingPanel";
 import StatCard from "../common/StatCard";
 import { SeasonEndModal } from "../features/season/SeasonEndModal";
-import { useCallback } from "react";
 
 function ClubOverviewPage({ team }: { team: Team }) {
     const { currentDate, isProcessing, navigateInGame } = useGameStore();
@@ -28,10 +29,9 @@ function ClubOverviewPage({ team }: { team: Team }) {
         setShowSeasonModal
     } = useGameSimulation();
 
-    const handleUpdateTraining = useCallback(async (focus: string) => {
-        await window.electronAPI.game.updateTrainingFocus(focus);
-        refreshOverview();
-    }, [refreshOverview]);
+    const { updateTraining, isUpdating: isTrainingUpdating } = useTrainingManagement({
+        onSuccess: refreshOverview
+    });
 
     const handleNavigateToMatches = useCallback(() => {
         navigateInGame("matches");
@@ -78,7 +78,8 @@ function ClubOverviewPage({ team }: { team: Team }) {
 
                 <TrainingPanel
                     currentFocus={gameState?.trainingFocus}
-                    onUpdate={handleUpdateTraining}
+                    onUpdate={updateTraining}
+                    isLoading={isTrainingUpdating}
                 />
             </div>
 
