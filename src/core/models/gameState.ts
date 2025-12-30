@@ -16,6 +16,7 @@ export interface GameState {
     saveName: string;
     currentDate: Timestamp;
     currentUserManagerId: ID;
+    userClubId: ID | null;
     activeSeasonId: ID;
     createdAt: Timestamp;
     updatedAt: Timestamp;

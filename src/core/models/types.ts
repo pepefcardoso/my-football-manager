@@ -1,4 +1,4 @@
-export type ID = number;
+export type ID = string;
 export type Timestamp = number;
 export type Money = number;
 export type Attribute = number;
