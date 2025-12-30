@@ -1,0 +1,64 @@
+import { ID, Timestamp } from "./types";
+import * as People from "./people";
+import * as Club from "./club";
+import * as Competition from "./competition";
+import * as Match from "./match";
+import * as Contract from "./contract";
+import * as Tactics from "./tactics";
+import * as Stats from "./stats";
+import * as Events from "./events";
+import * as Geo from "./geo";
+import * as Scouting from "./scouting";
+
+export interface GameState {
+  meta: {
+    version: string;
+    saveName: string;
+    currentDate: Timestamp;
+    currentUserManagerId: ID;
+    activeSeasonId: ID;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+  };
+
+  managers: Record<ID, People.Manager>;
+  players: Record<ID, People.Player>;
+  staff: Record<ID, People.Staff>;
+  scoutingKnowledge: Record<string, Scouting.ScoutingKnowledge>;
+  clubs: Record<ID, Club.Club>;
+  clubInfras: Record<ID, Club.ClubInfra>;
+  clubFinances: Record<ID, Club.ClubFinances>;
+  clubRelationships: Record<ID, Club.ClubRelationship>;
+  clubRivalries: Record<string, Club.ClubRivalry[]>;
+  financialEntries: Record<ID, Club.FinancialEntry>;
+  stadiums: Record<ID, Club.Stadium>;
+  sponsorships: Record<ID, Club.Sponsorship>;
+  nations: Record<ID, Geo.Nation>;
+  cities: Record<ID, Geo.City>;
+  seasons: Record<ID, Competition.Season>;
+  competitions: Record<ID, Competition.Competition>;
+  competitionSeasons: Record<ID, Competition.CompetitionSeason>;
+  competitionFases: Record<ID, Competition.CompetitionFase>;
+  competitionGroups: Record<ID, Competition.CompetitionGroup>;
+  classificationRules: Record<ID, Competition.ClassificationRule>;
+  prizeRules: Record<ID, Competition.PrizeRule>;
+  standings: Record<ID, Competition.CompetitionStandings>;
+  matches: Record<ID, Match.Match>;
+  matchEvents: Record<ID, Match.MatchEvent[]>;
+  contracts: Record<ID, Contract.Contract>;
+  clubManagers: Record<ID, Contract.ClubManager>;
+  staffContracts: Record<ID, Contract.StaffContract>;
+  transferOffers: Record<ID, Contract.TransferOffer>;
+  playerLoans: Record<ID, Contract.PlayerLoan>;
+  playerStates: Record<ID, Stats.PlayerState>;
+  playerInjuries: Record<ID, Stats.PlayerInjury>;
+  playerSeasonStats: Record<string, Stats.PlayerSeasonStats>;
+  playerMatchStats: Record<ID, Match.PlayerMatchStats>;
+  playerSecondaryPositions: Record<string, Stats.PlayerSecondaryPosition[]>;
+  formations: Record<ID, Tactics.Formation>;
+  positions: Record<ID, Tactics.Position>;
+  teamTactics: Record<ID, Tactics.TeamTactics>;
+  news: Record<ID, Events.NewsItem>;
+  scheduledEvents: Record<ID, Events.ScheduledEvent>;
+  gameEvents: Record<ID, Events.GameEvent>;
+}
