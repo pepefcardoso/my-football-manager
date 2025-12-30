@@ -1,1 +1,0 @@
-ALTER TABLE `game_state` ADD `training_focus` text DEFAULT 'technical';

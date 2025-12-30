@@ -1,1 +1,0 @@
-ALTER TABLE `teams` ADD `badge_url` text;
