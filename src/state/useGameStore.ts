@@ -1,9 +1,17 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { GameState } from "../core/models/gameState";
+import {
+  advanceOneDay,
+  advanceDays,
+  advanceToNextMatch,
+  TimeAdvanceResult,
+} from "../core/systems/TimeSystem";
 
 interface GameActions {
-  advanceDay: () => void;
+  advanceDay: () => TimeAdvanceResult;
+  advanceMultipleDays: (days: number) => TimeAdvanceResult;
+  advanceToNextUserMatch: () => TimeAdvanceResult | null;
   loadGame: (state: GameState) => void;
   resetGame: () => void;
   updateSaveName: (name: string) => void;
@@ -65,30 +73,58 @@ const initialState: GameState = {
 };
 
 export const useGameStore = create<GameStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     ...initialState,
-    advanceDay: () =>
+    advanceDay: () => {
+      let result: TimeAdvanceResult = {
+        newDate: 0,
+        matchesToday: [],
+        eventsProcessed: [],
+        economyProcessed: false,
+      };
+
       set((state) => {
-        // Lógica simplificada por enquanto (placeholder)
-        // No futuro, isso chamará o TimeSystem.advance(state)
-        const oneDayMs = 24 * 60 * 60 * 1000;
-        state.meta.currentDate += oneDayMs;
-        state.meta.updatedAt = Date.now();
-      }),
+        result = advanceOneDay(state);
+      });
+
+      return result;
+    },
+    advanceMultipleDays: (days: number) => {
+      let result: TimeAdvanceResult = {
+        newDate: 0,
+        matchesToday: [],
+        eventsProcessed: [],
+        economyProcessed: false,
+      };
+
+      set((state) => {
+        result = advanceDays(state, days);
+      });
+
+      return result;
+    },
+    advanceToNextUserMatch: () => {
+      let result: TimeAdvanceResult | null = null;
+
+      set((state) => {
+        result = advanceToNextMatch(state);
+      });
+
+      return result;
+    },
     loadGame: (loadedState: GameState) =>
       set((state) => {
-       Object.assign(state, loadedState);
+        Object.assign(state, loadedState);
       }),
-
     resetGame: () =>
       set(() => ({
         ...initialState,
         meta: { ...initialState.meta, createdAt: Date.now() },
       })),
-
     updateSaveName: (name: string) =>
       set((state) => {
         state.meta.saveName = name;
+        state.meta.updatedAt = Date.now();
       }),
   }))
 );
