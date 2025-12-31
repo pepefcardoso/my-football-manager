@@ -8,6 +8,10 @@
     @apply h-full w-full overflow-hidden bg-background text-text-primary;
   }
 
+  #root {
+    @apply h-full w-full;
+  }
+
   body {
     @apply antialiased font-sans selection:bg-primary selection:text-white;
   }
