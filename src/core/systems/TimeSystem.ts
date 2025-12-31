@@ -26,45 +26,6 @@ export function advanceOneDay(state: GameState): TimeAdvanceResult {
   };
 }
 
-export function advanceDays(state: GameState, days: number): TimeAdvanceResult {
-  let lastResult: TimeAdvanceResult = {
-    newDate: state.meta.currentDate,
-    matchesToday: [],
-    eventsProcessed: [],
-    economyProcessed: false,
-  };
-
-  for (let i = 0; i < days; i++) {
-    lastResult = advanceOneDay(state);
-  }
-
-  return lastResult;
-}
-
-export function advanceToNextMatch(state: GameState): TimeAdvanceResult | null {
-  const userClubId = state.meta.userClubId;
-  if (!userClubId) return null;
-
-  const MAX_DAYS_AHEAD = 365;
-  let daysAdvanced = 0;
-
-  while (daysAdvanced < MAX_DAYS_AHEAD) {
-    const result = advanceOneDay(state);
-    daysAdvanced++;
-
-    const userMatch = result.matchesToday.find(
-      (match) =>
-        match.homeClubId === userClubId || match.awayClubId === userClubId
-    );
-
-    if (userMatch) {
-      return result;
-    }
-  }
-
-  return null;
-}
-
 function findMatchesForDate(state: GameState, targetDate: number): Match[] {
   const matches: Match[] = [];
   const targetDay = normalizeToDay(targetDate);

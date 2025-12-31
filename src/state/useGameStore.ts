@@ -1,20 +1,20 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { produce } from "immer";
 import { GameState } from "../core/models/gameState";
 import {
   advanceOneDay,
-  advanceDays,
-  advanceToNextMatch,
   TimeAdvanceResult,
 } from "../core/systems/TimeSystem";
+import { saveGameToDisk, loadGameFromDisk } from "../data/fileSystem";
+import { createNewGame } from "../data/initialSetup";
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
-  advanceMultipleDays: (days: number) => TimeAdvanceResult;
-  advanceToNextUserMatch: () => TimeAdvanceResult | null;
-  loadGame: (state: GameState) => void;
-  resetGame: () => void;
-  updateSaveName: (name: string) => void;
+  saveGame: (saveName: string) => Promise<boolean>;
+  loadGame: (saveName: string) => Promise<boolean>;
+  newGame: () => void;
+  setState: (fn: (state: GameState) => void) => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -75,6 +75,7 @@ const initialState: GameState = {
 export const useGameStore = create<GameStore>()(
   immer((set, get) => ({
     ...initialState,
+
     advanceDay: () => {
       let result: TimeAdvanceResult = {
         newDate: 0,
@@ -89,42 +90,43 @@ export const useGameStore = create<GameStore>()(
 
       return result;
     },
-    advanceMultipleDays: (days: number) => {
-      let result: TimeAdvanceResult = {
-        newDate: 0,
-        matchesToday: [],
-        eventsProcessed: [],
-        economyProcessed: false,
-      };
 
-      set((state) => {
-        result = advanceDays(state, days);
-      });
+    saveGame: async (saveName: string) => {
+      const state = get();
+      const stateCopy = { ...state };
+      const dataToSave = Object.fromEntries(
+        Object.entries(stateCopy).filter(
+          ([_key, value]) => typeof value !== "function"
+        )
+      ) as unknown as GameState;
 
-      return result;
+      dataToSave.meta.saveName = saveName;
+      dataToSave.meta.updatedAt = Date.now();
+
+      const success = await saveGameToDisk(saveName, dataToSave);
+
+      if (success) {
+        set((state) => {
+          state.meta.saveName = saveName;
+        });
+      }
+      return success;
     },
-    advanceToNextUserMatch: () => {
-      let result: TimeAdvanceResult | null = null;
 
-      set((state) => {
-        result = advanceToNextMatch(state);
-      });
-
-      return result;
+    loadGame: async (saveName: string) => {
+      const loadedState = await loadGameFromDisk(saveName);
+      if (loadedState) {
+        set(() => loadedState as GameStore);
+        return true;
+      }
+      return false;
     },
-    loadGame: (loadedState: GameState) =>
-      set((state) => {
-        Object.assign(state, loadedState);
-      }),
-    resetGame: () =>
-      set(() => ({
-        ...initialState,
-        meta: { ...initialState.meta, createdAt: Date.now() },
-      })),
-    updateSaveName: (name: string) =>
-      set((state) => {
-        state.meta.saveName = name;
-        state.meta.updatedAt = Date.now();
-      }),
+
+    newGame: () => {
+      const newState = createNewGame();
+      set(() => ({ ...newState } as GameStore));
+    },
+
+    setState: (fn) => set(produce(fn)),
   }))
 );
