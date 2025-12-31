@@ -1,0 +1,48 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.maestro.game",
+  "productName": "Maestro Football Manager",
+  "copyright": "Copyright © 2025",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
+  "extraMetadata": {
+    "main": "dist-electron/main.js"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "build/icon.ico",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Maestro FM"
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "icon": "build/icon.icns",
+    "category": "public.app-category.games",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "build/icon.png",
+    "category": "Game",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "publish": null
+}

@@ -2,24 +2,35 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { produce } from "immer";
 import { GameState } from "../core/models/gameState";
+import { advanceOneDay, TimeAdvanceResult } from "../core/systems/TimeSystem";
 import {
-  advanceOneDay,
-  TimeAdvanceResult,
-} from "../core/systems/TimeSystem";
-import { saveGameToDisk, loadGameFromDisk } from "../data/fileSystem";
+  saveGameToDisk,
+  loadGameFromDisk,
+  listSaveFiles,
+  deleteSaveFile,
+  getSaveInfo,
+  SaveResult,
+  SaveInfo,
+} from "../data/fileSystem";
 import { createNewGame } from "../data/initialSetup";
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
-  saveGame: (saveName: string) => Promise<boolean>;
+  saveGame: (saveName: string) => Promise<SaveResult>;
   loadGame: (saveName: string) => Promise<boolean>;
+  listSaves: () => Promise<string[]>;
+  deleteSave: (saveName: string) => Promise<SaveResult>;
+  getSaveInfo: (saveName: string) => Promise<SaveInfo | null>;
   newGame: () => void;
+  resetGame: () => void;
   setState: (fn: (state: GameState) => void) => void;
+  enableAutoSave: (intervalMinutes: number) => void;
+  disableAutoSave: () => void;
 }
 
 type GameStore = GameState & GameActions;
 
-const initialState: GameState = {
+const createInitialState = (): GameState => ({
   meta: {
     version: "1.0.0",
     saveName: "New Game",
@@ -70,11 +81,13 @@ const initialState: GameState = {
   news: {},
   scheduledEvents: {},
   gameEvents: {},
-};
+});
+
+let autoSaveInterval: NodeJS.Timeout | null = null;
 
 export const useGameStore = create<GameStore>()(
   immer((set, get) => ({
-    ...initialState,
+    ...createInitialState(),
 
     advanceDay: () => {
       let result: TimeAdvanceResult = {
@@ -88,11 +101,16 @@ export const useGameStore = create<GameStore>()(
         result = advanceOneDay(state);
       });
 
+      console.log(
+        `📅 Dia avançado para ${new Date(result.newDate).toLocaleDateString()}`
+      );
+
       return result;
     },
 
     saveGame: async (saveName: string) => {
       const state = get();
+
       const stateCopy = { ...state };
       const dataToSave = Object.fromEntries(
         Object.entries(stateCopy).filter(
@@ -103,30 +121,110 @@ export const useGameStore = create<GameStore>()(
       dataToSave.meta.saveName = saveName;
       dataToSave.meta.updatedAt = Date.now();
 
-      const success = await saveGameToDisk(saveName, dataToSave);
+      console.log(`💾 Salvando jogo: ${saveName}...`);
 
-      if (success) {
+      const result = await saveGameToDisk(saveName, dataToSave);
+
+      if (result.success) {
         set((state) => {
           state.meta.saveName = saveName;
+          state.meta.updatedAt = Date.now();
         });
+        console.log("✅ Save concluído com sucesso");
+      } else {
+        console.error("❌ Falha ao salvar:", result.error);
       }
-      return success;
+
+      return result;
     },
 
     loadGame: async (saveName: string) => {
+      console.log(`📂 Carregando jogo: ${saveName}...`);
+
       const loadedState = await loadGameFromDisk(saveName);
+
       if (loadedState) {
-        set(() => loadedState as GameStore);
+        set(() => ({ ...loadedState } as GameStore));
+        console.log("✅ Load concluído com sucesso");
         return true;
       }
+
+      console.error("❌ Falha ao carregar save");
       return false;
     },
 
+    listSaves: async () => {
+      return await listSaveFiles();
+    },
+
+    deleteSave: async (saveName: string) => {
+      console.log(`🗑️ Deletando save: ${saveName}...`);
+      const result = await deleteSaveFile(saveName);
+
+      if (result.success) {
+        console.log("✅ Save deletado com sucesso");
+      } else {
+        console.error("❌ Erro ao deletar:", result.error);
+      }
+
+      return result;
+    },
+
+    getSaveInfo: async (saveName: string) => {
+      return await getSaveInfo(saveName);
+    },
+
     newGame: () => {
+      console.log("🎮 Criando novo jogo...");
       const newState = createNewGame();
       set(() => ({ ...newState } as GameStore));
+      console.log("✅ Novo jogo criado com sucesso");
+    },
+
+    resetGame: () => {
+      console.log("🔄 Resetando jogo...");
+      set(() => ({ ...createInitialState() } as GameStore));
+      console.log("✅ Jogo resetado");
     },
 
     setState: (fn) => set(produce(fn)),
+
+    enableAutoSave: (intervalMinutes: number) => {
+      if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+      }
+
+      const state = get();
+      const saveName = state.meta.saveName || "autosave";
+
+      console.log(`⏰ Auto-save habilitado (${intervalMinutes} minutos)`);
+
+      autoSaveInterval = setInterval(async () => {
+        console.log("💾 Executando auto-save...");
+        const result = await get().saveGame(`${saveName}_autosave`);
+
+        if (result.success) {
+          console.log("✅ Auto-save concluído");
+        } else {
+          console.error("❌ Auto-save falhou:", result.error);
+        }
+      }, intervalMinutes * 60 * 1000);
+    },
+
+    disableAutoSave: () => {
+      if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+        autoSaveInterval = null;
+        console.log("⏰ Auto-save desabilitado");
+      }
+    },
   }))
 );
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", () => {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+    }
+  });
+}
