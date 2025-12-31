@@ -1,6 +1,6 @@
-// src/electron-env.d.ts
+/// <reference types="vite/client" />
 
-export interface IElectronAPI {
+interface IElectronAPI {
   saveGame: (
     filename: string,
     data: string
@@ -11,8 +11,6 @@ export interface IElectronAPI {
   listSaves: () => Promise<string[]>;
 }
 
-declare global {
-  interface Window {
-    electronAPI: IElectronAPI;
-  }
+interface Window {
+  electronAPI: IElectronAPI;
 }

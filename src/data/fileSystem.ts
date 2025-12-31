@@ -5,20 +5,25 @@ export const saveGameToDisk = async (
   state: GameState
 ): Promise<boolean> => {
   if (!window.electronAPI) {
-    console.error("Electron API não disponível");
+    console.warn("Tentativa de salvar fora do Electron (Modo Web?)");
     return false;
   }
 
-  const serializedState = JSON.stringify(state);
+  try {
+    const serializedState = JSON.stringify(state);
 
-  const result = await window.electronAPI.saveGame(saveName, serializedState);
+    const result = await window.electronAPI.saveGame(saveName, serializedState);
 
-  if (!result.success) {
-    console.error(result.error);
+    if (!result.success) {
+      console.error("Erro no Processo Principal:", result.error);
+      return false;
+    }
+
+    return true;
+  } catch (e) {
+    console.error("Erro ao serializar o estado:", e);
     return false;
   }
-
-  return true;
 };
 
 export const loadGameFromDisk = async (
@@ -31,9 +36,14 @@ export const loadGameFromDisk = async (
   if (result.success && result.data) {
     try {
       const state: GameState = JSON.parse(result.data);
+
+      if (!state.meta || !state.clubs || !state.players) {
+        throw new Error("Estrutura do Save inválida");
+      }
+
       return state;
     } catch (e) {
-      console.error("Save corrompido (JSON inválido)", e);
+      console.error("Save corrompido (JSON inválido ou incompleto)", e);
       return null;
     }
   }
