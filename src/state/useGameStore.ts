@@ -110,7 +110,6 @@ export const useGameStore = create<GameStore>()(
 
     saveGame: async (saveName: string) => {
       const state = get();
-
       const stateCopy = { ...state };
       const dataToSave = Object.fromEntries(
         Object.entries(stateCopy).filter(
@@ -118,8 +117,11 @@ export const useGameStore = create<GameStore>()(
         )
       ) as unknown as GameState;
 
-      dataToSave.meta.saveName = saveName;
-      dataToSave.meta.updatedAt = Date.now();
+      dataToSave.meta = {
+        ...state.meta,
+        saveName: saveName,
+        updatedAt: Date.now(),
+      };
 
       console.log(`💾 Salvando jogo: ${saveName}...`);
 

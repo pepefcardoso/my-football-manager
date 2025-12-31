@@ -1,25 +1,35 @@
-import { MainLayout } from "./ui/layouts/MainLayout";
 import { useUIStore } from "./state/useUIStore";
+import { MainLayout } from "./ui/layouts/MainLayout";
+import { MainMenuScreen } from "./ui/screens/MainMenuScreen";
+import { NewGameSetupScreen } from "./ui/screens/NewGameSetupScreen";
 
-const DashboardScreen = () => <div className="p-4 bg-background-secondary rounded-lg border border-background-tertiary">Bem-vindo ao Maestro Manager.</div>;
-const SquadScreen = () => <div className="text-text-secondary">Lista de Jogadores (Em breve)</div>;
-const TacticsScreen = () => <div className="text-text-secondary">Prancheta Tática (Em breve)</div>;
+const DashboardScreen = () => <div className="p-4">Dashboard Principal</div>;
+const SquadScreen = () => <div className="p-4">Elenco</div>;
+const TacticsScreen = () => <div className="p-4">Táticas</div>;
 
 function App() {
   const currentView = useUIStore((state) => state.currentView);
 
-  const renderView = () => {
+  if (currentView === "MAIN_MENU") {
+    return <MainMenuScreen />;
+  }
+
+  if (currentView === "NEW_GAME_SETUP") {
+    return <NewGameSetupScreen />;
+  }
+
+  const renderGameView = () => {
     switch (currentView) {
       case "DASHBOARD": return <DashboardScreen />;
       case "SQUAD": return <SquadScreen />;
       case "TACTICS": return <TacticsScreen />;
-      default: return <div className="text-text-muted">Funcionalidade em desenvolvimento: {currentView}</div>;
+      default: return <div className="text-text-muted p-8">Funcionalidade {currentView} em desenvolvimento.</div>;
     }
   };
 
   return (
     <MainLayout>
-      {renderView()}
+      {renderGameView()}
     </MainLayout>
   );
 }

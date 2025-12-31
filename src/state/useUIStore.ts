@@ -1,6 +1,8 @@
 import { create } from "zustand";
 
 export type GameView =
+  | "MAIN_MENU"
+  | "NEW_GAME_SETUP"
   | "DASHBOARD"
   | "SQUAD"
   | "TACTICS"
@@ -17,7 +19,7 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  currentView: "DASHBOARD",
+  currentView: "MAIN_MENU",
   sidebarOpen: true,
 
   setView: (view) => set({ currentView: view }),
