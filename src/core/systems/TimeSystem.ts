@@ -4,6 +4,7 @@ import { processDailyEconomy } from "./EconomySystem";
 import { processDailyRecovery } from "./RecoverySystem";
 import { processDailyTraining } from "./TrainingSystem";
 import { processScheduledMatches } from "./MatchSystem";
+import { updateCompetitionStandings } from "./CompetitionSystem";
 
 export interface TimeAdvanceResult {
   newDate: number;
@@ -33,6 +34,13 @@ export function advanceOneDay(state: GameState): TimeAdvanceResult {
 
   const trainingResult = processDailyTraining(state);
   const matchResult = processScheduledMatches(state);
+
+  if (matchResult.matchesToday.length > 0) {
+    updateCompetitionStandings(state, matchResult.matchesToday);
+    console.log(
+      `[CompetitionSystem] Tabelas atualizadas para ${matchResult.matchesToday.length} jogos.`
+    );
+  }
 
   console.log(
     `[TimeSystem] Dia avançado: ${new Date(newDate).toLocaleDateString()}`,

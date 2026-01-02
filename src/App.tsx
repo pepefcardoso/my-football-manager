@@ -4,6 +4,7 @@ import { MainMenuScreen } from "./ui/screens/MainMenuScreen";
 import { NewGameSetupScreen } from "./ui/screens/NewGameSetupScreen";
 import { DashboardScreen } from "./ui/screens/DashboardScreen";
 import { SquadScreen } from "./ui/screens/SquadScreen";
+import { CompetitionsScreen } from "./ui/screens/CompetitionsScreen";
 
 const TacticsScreen = () => <div className="p-4">Táticas (Em breve)</div>;
 
@@ -23,6 +24,7 @@ function App() {
       case "DASHBOARD": return <DashboardScreen />;
       case "SQUAD": return <SquadScreen />;
       case "TACTICS": return <TacticsScreen />;
+      case "COMPETITIONS": return <CompetitionsScreen />;
       default: return <div className="text-text-muted p-8">Funcionalidade {currentView} em desenvolvimento.</div>;
     }
   };

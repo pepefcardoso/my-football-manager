@@ -58,6 +58,7 @@ const createInitialState = (): GameState => ({
   seasons: {},
   competitions: {},
   competitionSeasons: {},
+  clubCompetitionSeasons: {},
   competitionFases: {},
   competitionGroups: {},
   classificationRules: {},

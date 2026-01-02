@@ -2,7 +2,10 @@ import { v4 as uuidv4 } from "uuid";
 import { GameState } from "../core/models/gameState";
 import { Nation } from "../core/models/geo";
 import { Contract } from "../core/models/contract";
-import { ClubFactory, PlayerFactory } from "../core/utils/generators";
+import { ClubFactory, PlayerFactory, rng } from "../core/utils/generators";
+import {
+  ClubCompetitionSeason,
+} from "../core/models/competition";
 
 const BRAZIL_CLUBS_DATA = [
   {
@@ -155,6 +158,7 @@ const createEmptyState = (): GameState => ({
   seasons: {},
   competitions: {},
   competitionSeasons: {},
+  clubCompetitionSeasons: {},
   competitionFases: {},
   competitionGroups: {},
   classificationRules: {},
@@ -191,6 +195,7 @@ export const createNewGame = (): GameState => {
 
   let firstClubId = "";
   let totalPlayers = 0;
+  const createdClubIds: string[] = [];
 
   BRAZIL_CLUBS_DATA.forEach((clubData, index) => {
     const bundle = ClubFactory.createClub(
@@ -202,6 +207,7 @@ export const createNewGame = (): GameState => {
     );
 
     if (index === 0) firstClubId = bundle.club.id;
+    createdClubIds.push(bundle.club.id);
 
     state.clubs[bundle.club.id] = bundle.club;
     state.clubInfras[bundle.club.id] = bundle.infra;
@@ -237,6 +243,180 @@ export const createNewGame = (): GameState => {
     });
   });
 
+  const seasonId = uuidv4();
+  const competitionId = uuidv4();
+  const compSeasonId = uuidv4();
+  const faseId = uuidv4();
+  const groupId = uuidv4();
+
+  const currentYear = new Date().getFullYear();
+
+  state.seasons[seasonId] = {
+    id: seasonId,
+    year: currentYear,
+    beginning: state.meta.currentDate,
+    ending: state.meta.currentDate + 1000 * 60 * 60 * 24 * 30 * 6,
+    active: true,
+  };
+  state.meta.activeSeasonId = seasonId;
+
+  state.competitions[competitionId] = {
+    id: competitionId,
+    name: "Brasileirão Série A",
+    nickname: "Brasileirão",
+    type: "LEAGUE",
+    hierarchyLevel: 1,
+    standardFormatType: "LEAGUE",
+    standingsPriority: "POINTS",
+  };
+
+  state.competitionSeasons[compSeasonId] = {
+    id: compSeasonId,
+    competitionId,
+    seasonId,
+    tieBreakingCriteria1: "WINS",
+    tieBreakingCriteria2: "GOAL_DIFFERENCE",
+    tieBreakingCriteria3: "GOALS_SCORED",
+    tieBreakingCriteria4: "HEAD_TO_HEAD",
+  };
+
+  state.competitionFases[faseId] = {
+    id: faseId,
+    competitionSeasonId: compSeasonId,
+    name: "Temporada Regular",
+    orderIndex: 1,
+    type: "LEAGUE",
+    isTwoLeggedKnockout: false,
+    isFinalSingleGame: false,
+  };
+
+  state.competitionGroups[groupId] = {
+    id: groupId,
+    competitionFaseId: faseId,
+    name: "Série A",
+  };
+
+  createdClubIds.forEach((clubId) => {
+    const ccsId = uuidv4();
+    const ccs: ClubCompetitionSeason = {
+      id: ccsId,
+      competitionSeasonId: compSeasonId,
+      clubId: clubId,
+    };
+    state.clubCompetitionSeasons[ccsId] = ccs;
+
+    const standingId = uuidv4();
+    state.standings[standingId] = {
+      id: standingId,
+      competitionGroupId: groupId,
+      clubCompetitionSeasonId: ccsId,
+      points: 0,
+      gamesPlayed: 0,
+      wins: 0,
+      draws: 0,
+      defeats: 0,
+      goalsScored: 0,
+      goalsConceded: 0,
+      goalsBalance: 0,
+    };
+  });
+
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  for (let i = 0; i < 5; i++) {
+    const clubsShuffled = [...createdClubIds].sort(() => 0.5 - Math.random());
+
+    for (let j = 0; j < clubsShuffled.length; j += 2) {
+      if (j + 1 >= clubsShuffled.length) break;
+
+      const homeId = clubsShuffled[j];
+      const awayId = clubsShuffled[j + 1];
+      const matchId = uuidv4();
+
+      const homeGoals = Math.floor(rng.normal(1.5, 1));
+      const awayGoals = Math.floor(rng.normal(1.0, 1));
+      const finalHome = Math.max(0, homeGoals);
+      const finalAway = Math.max(0, awayGoals);
+
+      const matchDate = state.meta.currentDate - (5 - i) * ONE_DAY * 7;
+
+      state.matches[matchId] = {
+        id: matchId,
+        competitionGroupId: groupId,
+        stadiumId: state.clubInfras[homeId].stadiumId,
+        homeClubId: homeId,
+        awayClubId: awayId,
+        homeGoals: finalHome,
+        awayGoals: finalAway,
+        homePenalties: null,
+        awayPenalties: null,
+        roundNumber: i + 1,
+        datetime: matchDate,
+        status: "FINISHED",
+        attendance: rng.range(10000, 50000),
+        ticketRevenue: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const updateStanding = (cId: string, gp: number, gc: number) => {
+        const s = Object.values(state.standings).find((st) => {
+          const ccs = state.clubCompetitionSeasons[st.clubCompetitionSeasonId];
+          return ccs.clubId === cId;
+        });
+        if (s) {
+          s.gamesPlayed++;
+          s.goalsScored += gp;
+          s.goalsConceded += gc;
+          s.goalsBalance += gp - gc;
+          if (gp > gc) {
+            s.wins++;
+            s.points += 3;
+          } else if (gp === gc) {
+            s.draws++;
+            s.points += 1;
+          } else {
+            s.defeats++;
+          }
+        }
+      };
+
+      updateStanding(homeId, finalHome, finalAway);
+      updateStanding(awayId, finalAway, finalHome);
+    }
+  }
+
+  for (let i = 0; i < 3; i++) {
+    const clubsShuffled = [...createdClubIds].sort(() => 0.5 - Math.random());
+    for (let j = 0; j < clubsShuffled.length; j += 2) {
+      if (j + 1 >= clubsShuffled.length) break;
+      const homeId = clubsShuffled[j];
+      const awayId = clubsShuffled[j + 1];
+      const matchId = uuidv4();
+
+      const matchDate = state.meta.currentDate + (i + 1) * ONE_DAY * 3;
+
+      state.matches[matchId] = {
+        id: matchId,
+        competitionGroupId: groupId,
+        stadiumId: state.clubInfras[homeId].stadiumId,
+        homeClubId: homeId,
+        awayClubId: awayId,
+        homeGoals: 0,
+        awayGoals: 0,
+        homePenalties: null,
+        awayPenalties: null,
+        roundNumber: 6 + i,
+        datetime: matchDate,
+        status: "SCHEDULED",
+        attendance: 0,
+        ticketRevenue: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+    }
+  }
+
   const humanManagerId = uuidv4();
   const userClubId = firstClubId;
 
@@ -264,7 +444,8 @@ export const createNewGame = (): GameState => {
     `✅ Novo Jogo Criado em ${endTime - startTime}ms\n` +
       `   - Clubes: ${Object.keys(state.clubs).length}\n` +
       `   - Jogadores: ${totalPlayers}\n` +
-      `   - Contratos: ${Object.keys(state.contracts).length}`
+      `   - Competições: ${Object.keys(state.competitions).length}\n` +
+      `   - Partidas Geradas: ${Object.keys(state.matches).length}`
   );
 
   return state;

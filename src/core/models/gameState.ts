@@ -39,6 +39,7 @@ export interface GameState {
   seasons: Record<ID, Competition.Season>;
   competitions: Record<ID, Competition.Competition>;
   competitionSeasons: Record<ID, Competition.CompetitionSeason>;
+  clubCompetitionSeasons: Record<ID, Competition.ClubCompetitionSeason>;
   competitionFases: Record<ID, Competition.CompetitionFase>;
   competitionGroups: Record<ID, Competition.CompetitionGroup>;
   classificationRules: Record<ID, Competition.ClassificationRule>;

@@ -10,6 +10,7 @@ import {
     TrendingUp,
     Building2,
     Settings,
+    Trophy,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -68,6 +69,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         { view: "DASHBOARD", label: "Visão Geral", icon: LayoutDashboard },
         { view: "SQUAD", label: "Elenco", icon: Users },
         { view: "TACTICS", label: "Táticas", icon: ClipboardList },
+        { view: "COMPETITIONS", label: "Competições", icon: Trophy },
         { view: "CALENDAR", label: "Calendário", icon: Calendar },
         { view: "MARKET", label: "Transferências", icon: TrendingUp },
         { view: "CLUB_INFRA", label: "Clube", icon: Building2 },

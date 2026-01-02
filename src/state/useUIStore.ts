@@ -7,6 +7,7 @@ export type GameView =
   | "SQUAD"
   | "TACTICS"
   | "CALENDAR"
+  | "COMPETITIONS"
   | "MARKET"
   | "CLUB_INFRA"
   | "SETTINGS";
