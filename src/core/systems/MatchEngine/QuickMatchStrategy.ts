@@ -20,7 +20,6 @@ export class QuickMatchStrategy implements IMatchSimulationStrategy {
     const diff = finalHomeStrength - awayStrength;
     let homeGoals = Math.max(0, Math.floor(rng.normal(1.5 + diff / 20, 1)));
     let awayGoals = Math.max(0, Math.floor(rng.normal(1.0 - diff / 20, 1)));
-
     const events: MatchEvent[] = [];
 
     for (let i = 0; i < homeGoals; i++) {
@@ -57,8 +56,8 @@ export class QuickMatchStrategy implements IMatchSimulationStrategy {
       homeScore: homeGoals,
       awayScore: awayGoals,
       stats: {
-        homePossession: 50 + diff / 2,
-        awayPossession: 50 - diff / 2,
+        homePossession: Math.min(80, Math.max(20, 50 + diff / 2)),
+        awayPossession: Math.min(80, Math.max(20, 50 - diff / 2)),
       },
       events,
       playerStats,
@@ -69,7 +68,10 @@ export class QuickMatchStrategy implements IMatchSimulationStrategy {
     if (!players.length) return 0;
 
     return (
-      players.reduce((acc, p) => acc + (p.overall || 70), 0) / players.length
+      players.reduce((acc, p) => {
+        const strength = p._tempOverall || p.overall || 70;
+        return acc + strength;
+      }, 0) / players.length
     );
   }
 
@@ -79,6 +81,7 @@ export class QuickMatchStrategy implements IMatchSimulationStrategy {
     sufferingTeam: TeamMatchContext,
     minute: number
   ): MatchEvent {
+    // Escolhe quem marcou (TODO: ponderar por posição/atributo finalização)
     const scorer = rng.pick(scoringTeam.startingXI);
 
     return {
@@ -108,9 +111,9 @@ export class QuickMatchStrategy implements IMatchSimulationStrategy {
       clubId: team.clubId,
       isStarter: true,
       positionPlayedId: player.primaryPositionId,
-      minutesPlayed: 90,
+      minutesPlayed: 90, // TODO: Implementar substituições
       rating: rng.range(60, won ? 90 : 80) / 10,
-      goals: 0, // TODO: cruzar com os eventos
+      goals: 0, // Será atualizado pelo MatchSystem ao processar eventos
       assists: 0,
       shotsOnTarget: rng.range(0, 3),
       shotsOffTarget: rng.range(0, 2),
