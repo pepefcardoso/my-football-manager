@@ -93,17 +93,13 @@ export const useGameStore = create<GameStore>()(
       let result: TimeAdvanceResult = {
         newDate: 0,
         matchesToday: [],
-        eventsProcessed: [],
-        economyProcessed: false,
+        events: [],
+        stats: { expensesProcessed: 0, playersRecovered: 0 },
       };
 
       set((state) => {
         result = advanceOneDay(state);
       });
-
-      console.log(
-        `📅 Dia avançado para ${new Date(result.newDate).toLocaleDateString()}`
-      );
 
       return result;
     },
