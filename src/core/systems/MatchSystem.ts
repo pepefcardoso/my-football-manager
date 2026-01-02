@@ -12,6 +12,19 @@ export interface MatchSystemResult {
   matchesToday: Match[];
 }
 
+export const simulateSingleMatch = (
+  state: GameState,
+  match: Match,
+  homeContext: TeamMatchContext,
+  awayContext: TeamMatchContext
+): MatchEngineResult => {
+  const result = matchEngine.simulate(match, homeContext, awayContext);
+
+  applyMatchResults(state, match, result);
+
+  return result;
+};
+
 export const processScheduledMatches = (
   state: GameState
 ): MatchSystemResult => {
@@ -29,24 +42,34 @@ export const processScheduledMatches = (
       matchDate.getTime() === currentDayTime &&
       match.status === "SCHEDULED"
     ) {
-      const homeContext = buildTeamContext(state, match.homeClubId);
-      const awayContext = buildTeamContext(state, match.awayClubId);
-      const result = matchEngine.simulate(match, homeContext, awayContext);
+      const isUserMatch =
+        match.homeClubId === state.meta.userClubId ||
+        match.awayClubId === state.meta.userClubId;
 
-      applyMatchResults(state, match, result);
-
-      matchesToday.push(match);
+      if (!isUserMatch) {
+        const homeContext = buildTeamContext(state, match.homeClubId);
+        const awayContext = buildTeamContext(state, match.awayClubId);
+        const result = simulateSingleMatch(
+          state,
+          match,
+          homeContext,
+          awayContext
+        );
+        matchesToday.push(match);
+      }
     }
   }
 
   return { matchesToday };
 };
 
-const buildTeamContext = (
+export const buildTeamContext = (
   state: GameState,
-  clubId: string
+  clubId: string,
+  customLineup?: { startingXI: string[]; bench: string[] }
 ): TeamMatchContext => {
   const club = state.clubs[clubId];
+
   const activePlayerIds = Object.values(
     state.contracts as Record<string, Contract>
   )
@@ -55,6 +78,7 @@ const buildTeamContext = (
         c.clubId === clubId && c.active && c.endDate > state.meta.currentDate
     )
     .map((c) => c.playerId);
+
   const squad = activePlayerIds
     .map((id) => state.players[id])
     .filter((p) => !!p)
@@ -63,11 +87,20 @@ const buildTeamContext = (
       _tempOverall: calculateSimpleOverall(p),
     }));
 
-  squad.sort((a, b) => b._tempOverall - a._tempOverall);
+  let startingXI: Player[] = [];
+  let bench: Player[] = [];
 
-  // TODO: No futuro, respeitar posições (GK, DEF, MID, ATT)
-  const startingXI = squad.slice(0, 11);
-  const bench = squad.slice(11, 18);
+  if (customLineup) {
+    startingXI = customLineup.startingXI
+      .map((id) => state.players[id])
+      .filter(Boolean);
+    bench = customLineup.bench.map((id) => state.players[id]).filter(Boolean);
+  } else {
+    squad.sort((a, b) => b._tempOverall - a._tempOverall);
+    startingXI = squad.slice(0, 11);
+    bench = squad.slice(11, 18);
+  }
+
   const tactics = state.teamTactics[clubId] || {
     id: "default",
     clubId: clubId,
@@ -98,12 +131,11 @@ const applyMatchResults = (
   state.matchEvents[match.id] = result.events;
   result.playerStats.forEach((stat) => {
     state.playerMatchStats[stat.id] = stat;
-
-    // TODO: Atualizar stats acumulados da temporada (SeasonStats) aqui
-    // updateSeasonStats(state, stat);
   });
 };
 
 const calculateSimpleOverall = (p: Player): number => {
-  return (p.finishing + p.passing + p.defending + p.speed + p.technique) / 5;
+  return Math.floor(
+    (p.finishing + p.passing + p.defending + p.speed + p.technique) / 5
+  );
 };

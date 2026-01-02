@@ -3,6 +3,7 @@ import { useGameStore } from "../../state/useGameStore";
 import { formatMoney, formatDate, formatDateTime } from "../../core/utils/formatters";
 import { Button } from "../components/Button";
 import { Play, Calendar, TrendingUp, Trophy, AlertCircle } from "lucide-react";
+import { useUIStore } from "../../state/useUIStore";
 
 export const DashboardScreen: React.FC = () => {
     const {
@@ -12,6 +13,7 @@ export const DashboardScreen: React.FC = () => {
         matches,
         advanceDay
     } = useGameStore();
+    const { setView } = useUIStore();
 
     const userClubId = meta.userClubId;
 
@@ -115,7 +117,15 @@ export const DashboardScreen: React.FC = () => {
                     )}
 
                     <div className="mt-4 pt-2 border-t border-background-tertiary">
-                        <Button variant="secondary" size="sm" className="w-full">Preparar Equipa</Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setView("MATCH_PREPARATION")}
+                            disabled={!nextMatch}
+                        >
+                            Preparar Equipa
+                        </Button>
                     </div>
                 </div>
 
