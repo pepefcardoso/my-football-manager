@@ -100,7 +100,7 @@ export const MatchPreparationScreen: React.FC = () => {
             );
         });
 
-        setView("DASHBOARD");
+        setView("MATCH_LIVE");
     };
 
     const PlayerRow = ({ id, actionLabel, onAction }: { id: string, actionLabel: string, onAction: () => void }) => {

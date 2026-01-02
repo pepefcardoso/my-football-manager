@@ -11,6 +11,7 @@ export type GameView =
   | "MARKET"
   | "CLUB_INFRA"
   | "MATCH_PREPARATION"
+  | "MATCH_LIVE"
   | "SETTINGS";
 
 interface UIState {
