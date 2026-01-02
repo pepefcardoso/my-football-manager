@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useUIStore, GameView } from "../../state/useUIStore";
+import { useGameStore } from "../../state/useGameStore";
+import { formatDate } from "../../core/utils/formatters";
 import {
     LayoutDashboard,
     Users,
@@ -36,6 +38,31 @@ const NavItem: React.FC<NavItemProps> = ({ view, label, icon: Icon, isActive, on
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { currentView, setView } = useUIStore();
+    const { meta, matches, clubs } = useGameStore();
+    const userClubId = meta.userClubId;
+
+    const nextMatchInfo = useMemo(() => {
+        if (!userClubId) return "Carregando...";
+
+        const allMatches = Object.values(matches);
+        const upcomingMatches = allMatches.filter(
+            (m) =>
+                m.status === "SCHEDULED" &&
+                (m.homeClubId === userClubId || m.awayClubId === userClubId) &&
+                m.datetime >= meta.currentDate
+        );
+
+        upcomingMatches.sort((a, b) => a.datetime - b.datetime);
+        const nextMatch = upcomingMatches[0];
+
+        if (!nextMatch) return "Sem jogos agendados";
+
+        const isHome = nextMatch.homeClubId === userClubId;
+        const opponentId = isHome ? nextMatch.awayClubId : nextMatch.homeClubId;
+        const opponentName = clubs[opponentId]?.name || "Desconhecido";
+
+        return `vs ${opponentName} (${isHome ? 'C' : 'F'})`;
+    }, [matches, userClubId, meta.currentDate, clubs]);
 
     const navItems: { view: GameView; label: string; icon: any }[] = [
         { view: "DASHBOARD", label: "Visão Geral", icon: LayoutDashboard },
@@ -79,9 +106,11 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                     </h2>
 
                     <div className="flex items-center space-x-4">
-                        <span className="text-text-secondary text-sm">Próximo Jogo: vs Benfica (C)</span>
-                        <div className="px-4 py-2 bg-background-tertiary rounded text-sm font-mono">
-                            01/07/2024
+                        <span className="text-text-secondary text-sm">
+                            Próximo Jogo: <span className="font-medium text-text-primary">{nextMatchInfo}</span>
+                        </span>
+                        <div className="px-4 py-2 bg-background-tertiary rounded text-sm font-mono text-text-primary">
+                            {formatDate(meta.currentDate)}
                         </div>
                     </div>
                 </header>

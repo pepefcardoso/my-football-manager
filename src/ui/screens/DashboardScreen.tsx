@@ -1,0 +1,184 @@
+import React, { useMemo } from "react";
+import { useGameStore } from "../../state/useGameStore";
+import { formatMoney, formatDate, formatDateTime } from "../../core/utils/formatters";
+import { Button } from "../components/Button";
+import { Play, Calendar, TrendingUp, Trophy, AlertCircle } from "lucide-react";
+
+export const DashboardScreen: React.FC = () => {
+    const {
+        meta,
+        clubs,
+        clubFinances,
+        matches,
+        advanceDay
+    } = useGameStore();
+
+    const userClubId = meta.userClubId;
+
+    const nextMatch = useMemo(() => {
+        if (!userClubId) return null;
+
+        const allMatches = Object.values(matches);
+        const myMatches = allMatches.filter(
+            (m) =>
+                m.status === "SCHEDULED" &&
+                (m.homeClubId === userClubId || m.awayClubId === userClubId) &&
+                m.datetime >= meta.currentDate
+        );
+        myMatches.sort((a, b) => a.datetime - b.datetime);
+        return myMatches[0] || null;
+    }, [matches, userClubId, meta.currentDate]);
+
+    if (!userClubId) return <div className="p-8">Carregando dados do clube...</div>;
+
+    const userClub = clubs[userClubId];
+    const userFinances = clubFinances[userClubId];
+
+    const getOpponent = (match: any) => {
+        const opponentId = match.homeClubId === userClubId ? match.awayClubId : match.homeClubId;
+        return clubs[opponentId];
+    };
+
+    const isHomeGame = nextMatch?.homeClubId === userClubId;
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-300">
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-background-secondary p-6 rounded-lg border border-background-tertiary shadow-lg">
+                <div className="flex items-center space-x-4 mb-4 md:mb-0">
+                    <div
+                        className="w-16 h-16 rounded-full bg-background border-2 flex items-center justify-center text-2xl font-bold"
+                        style={{ borderColor: userClub.primaryColor, color: userClub.primaryColor }}
+                    >
+                        {userClub.badgePath ? (
+                            <img src={userClub.badgePath} alt={userClub.name} className="w-full h-full object-contain rounded-full" />
+                        ) : (
+                            userClub.name.substring(0, 1)
+                        )}
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-text-primary">{userClub.name}</h1>
+                        <div className="text-sm text-text-secondary flex items-center space-x-2">
+                            <Calendar size={14} />
+                            <span>{formatDate(meta.currentDate)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center space-x-4">
+                    <div className="text-right mr-4 hidden md:block">
+                        <div className="text-xs text-text-muted uppercase tracking-wider">Próximo Evento</div>
+                        <div className="text-sm font-medium text-text-primary">
+                            {nextMatch ? "Dia de Jogo" : "Treino"}
+                        </div>
+                    </div>
+                    <Button
+                        size="lg"
+                        icon={Play}
+                        onClick={advanceDay}
+                        className="shadow-lg shadow-primary/20"
+                    >
+                        Avançar Dia
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                <div className="bg-background-secondary p-5 rounded-lg border border-background-tertiary shadow-md flex flex-col">
+                    <div className="flex items-center justify-between mb-4 border-b border-background-tertiary pb-2">
+                        <h3 className="font-bold text-text-secondary uppercase text-xs tracking-wider flex items-center">
+                            <Trophy size={14} className="mr-2" /> Próxima Partida
+                        </h3>
+                        {nextMatch && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-background text-text-muted">
+                                {isHomeGame ? "(C)" : "(F)"}
+                            </span>
+                        )}
+                    </div>
+
+                    {nextMatch ? (
+                        <div className="flex-1 flex flex-col justify-center items-center text-center space-y-2">
+                            <div className="text-sm text-text-muted">Contra</div>
+                            <div className="text-xl font-bold text-text-primary truncate w-full">
+                                {getOpponent(nextMatch)?.name}
+                            </div>
+                            <div className="text-sm text-primary font-mono bg-primary/10 px-3 py-1 rounded">
+                                {formatDateTime(nextMatch.datetime)}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col justify-center items-center text-text-muted">
+                            <AlertCircle size={24} className="mb-2 opacity-50" />
+                            <span>Sem jogos agendados</span>
+                        </div>
+                    )}
+
+                    <div className="mt-4 pt-2 border-t border-background-tertiary">
+                        <Button variant="secondary" size="sm" className="w-full">Preparar Equipa</Button>
+                    </div>
+                </div>
+
+                <div className="bg-background-secondary p-5 rounded-lg border border-background-tertiary shadow-md">
+                    <div className="flex items-center justify-between mb-4 border-b border-background-tertiary pb-2">
+                        <h3 className="font-bold text-text-secondary uppercase text-xs tracking-wider flex items-center">
+                            <Trophy size={14} className="mr-2" /> Status do Clube
+                        </h3>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                            <div className="flex justify-between text-sm mb-1">
+                                <span className="text-text-secondary">Reputação</span>
+                                <span className="text-text-primary font-mono">{userClub.reputation}</span>
+                            </div>
+                            <div className="h-2 bg-background-tertiary rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-yellow-500 transition-all duration-500"
+                                    style={{ width: `${(userClub.reputation / 10000) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <div className="flex justify-between text-sm mb-1">
+                                <span className="text-text-secondary">Torcida</span>
+                                <span className="text-text-primary font-mono">
+                                    {(userClub.fanBaseCurrent / 1000).toFixed(1)}k
+                                </span>
+                            </div>
+                            <div className="h-2 bg-background-tertiary rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-blue-500 transition-all duration-500"
+                                    style={{ width: `${(userClub.fanBaseCurrent / userClub.fanBaseMax) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-background-secondary p-5 rounded-lg border border-background-tertiary shadow-md">
+                    <div className="flex items-center justify-between mb-4 border-b border-background-tertiary pb-2">
+                        <h3 className="font-bold text-text-secondary uppercase text-xs tracking-wider flex items-center">
+                            <TrendingUp size={14} className="mr-2" /> Finanças
+                        </h3>
+                    </div>
+
+                    <div className="flex flex-col justify-center h-32 space-y-1">
+                        <span className="text-sm text-text-muted">Saldo Atual</span>
+                        <span className={`text-2xl font-mono font-bold ${userFinances.balanceCurrent >= 0 ? 'text-status-success' : 'text-status-danger'
+                            }`}>
+                            {formatMoney(userFinances.balanceCurrent)}
+                        </span>
+
+                        <div className="pt-4 flex justify-between items-center text-xs">
+                            <span className="text-text-muted">Dívida:</span>
+                            <span className="text-status-warning font-mono">
+                                {formatMoney(userFinances.debtHistorical)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+};
