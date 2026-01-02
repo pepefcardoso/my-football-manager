@@ -3,9 +3,9 @@ import { MainLayout } from "./ui/layouts/MainLayout";
 import { MainMenuScreen } from "./ui/screens/MainMenuScreen";
 import { NewGameSetupScreen } from "./ui/screens/NewGameSetupScreen";
 import { DashboardScreen } from "./ui/screens/DashboardScreen";
+import { SquadScreen } from "./ui/screens/SquadScreen";
 
-const SquadScreen = () => <div className="p-4">Elenco</div>;
-const TacticsScreen = () => <div className="p-4">Táticas</div>;
+const TacticsScreen = () => <div className="p-4">Táticas (Em breve)</div>;
 
 function App() {
   const currentView = useUIStore((state) => state.currentView);
