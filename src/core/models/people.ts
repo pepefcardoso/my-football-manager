@@ -1,4 +1,4 @@
-import { ID, Timestamp, Attribute, Foot } from "./types";
+import { ID, Timestamp, Attribute, Foot, Money } from "./types";
 
 export interface Manager {
   id: ID;
@@ -7,6 +7,8 @@ export interface Manager {
   birthDate: Timestamp;
   isHuman: boolean;
   reputation: number;
+  careerHistory: ManagerCareerRecord[];
+  titles: TitleRecord[];
   preferredStyle: string;
   preferredFormation: string;
   createdAt: Timestamp;
@@ -36,7 +38,7 @@ export interface Player {
   determination: Attribute;
   potential: Attribute;
   proneToInjury: Attribute;
-
+  marketValue: Money;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -49,4 +51,27 @@ export interface Staff {
   function: string;
   overall: Attribute;
   potential: Attribute;
+}
+
+export interface ManagerCareerRecord {
+  id: ID;
+  managerId: ID;
+  clubId: ID;
+  clubName: string;
+  startDate: Timestamp;
+  endDate: Timestamp | null;
+  gamesManaged: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  trophiesWon: string[];
+}
+
+export interface TitleRecord {
+  id: ID;
+  seasonId: ID;
+  competitionId: ID;
+  winnerClubId: ID;
+  runnerUpClubId: ID;
+  managerId: ID;
 }

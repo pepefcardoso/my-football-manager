@@ -25,7 +25,17 @@ export interface MatchEvent {
   period: Period;
   minute: number;
   extraMinute: number;
-  type: "GOAL" | "CARD_YELLOW" | "CARD_RED" | "SUBSTITUTION" | "INJURY";
+  description: string;
+  type:
+    | "GOAL"
+    | "CARD_YELLOW"
+    | "CARD_RED"
+    | "SUBSTITUTION"
+    | "INJURY"
+    | "VAR_CHECK"
+    | "VAR_DECISION"
+    | "OFFSIDE"
+    | "FOUL";
   clubId: ID;
   playerId: ID;
   targetPlayerId: ID | null;

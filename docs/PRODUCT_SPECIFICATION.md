@@ -191,12 +191,11 @@ Objetivos da Diretoria (Temporada 2024):
 ### 3.5. Pedir Demissão
 
 **Flow:**
-
 1. Clica em "Pedir Demissão"
 2. Modal de confirmação: "Tem certeza? Você ficará desempregado."
 3. Se confirmar:
    - Status: "Desempregado"
-   - Clube contrata interino (manager IA aleatório)
+   - Clube contrata interino (**manager IA aleatório placeholder**)
    - Jogador entra em modo "Aguardando Propostas"
 4. **Tempo de Espera:** Variável (depende da IA e situação dos clubes)
 5. **Aceleração:** Pode simular dias até receber proposta
@@ -291,13 +290,14 @@ Objetivos da Diretoria (Temporada 2024):
 
 **Quando:** Primeiro dia da nova temporada  
 **Quantidade:**
-
 - Nível 1: 5 jogadores
 - Nível 100: 30 jogadores
 - Fórmula: `5 + (nível * 0.25)`
 
 **Distribuição:** Aleatória entre posições (GK, DEF, MID, ATT)  
 **Qualidade:** Nível da Academia afeta Overall e Potential dos jogadores
+
+**Salário:** Fixo e simbólico (baixo) - não negociável até promoção
 
 #### 4.3.3. Tabela de Jovens
 
@@ -459,6 +459,7 @@ const monthly_interest = debt_historical * 0.01; // 1% ao mês = 12% ao ano
 #### 6.4.3. Pagamento Antecipado
 
 - Disponível **durante a temporada** (se saldo positivo)
+- Componente: "Pagar Parte da Dívida"
 - Reduz `debt_historical` imediatamente
 - Não cobra penalidade
 
@@ -838,6 +839,29 @@ graph TD
 
 **Rejeição:** Jogador pode recusar mesmo com clube aceitando
 
+### 9.4.4. Validade da Lista de Scouting
+
+**Scout Geral:**
+- Lista válida por **7 dias**
+- Após expirar: Precisa fazer novo scout para atualizar
+
+**Scout Específico:**
+- Knowledge do jogador: **Permanente** (não expira)
+- Pode refazer para aumentar knowledge gradualmente
+
+**Revelação Gradual (Scout Específico):**
+- Knowledge sobe aos poucos: 25 → 45 → 65 → 85 → 100
+- Cada scout adicional aumenta ~20-25 pontos
+
+### 9.4.5. Influência de Olheiros
+
+**Overall do Olheiro:**
+- **Alto (80+):** Scout termina em 3-4 dias + Lista com 20 jogadores
+- **Médio (60-79):** Scout termina em 5-6 dias + Lista com 15 jogadores
+- **Baixo (<60):** Scout termina em 7-8 dias + Lista com 10 jogadores
+
+**Múltiplos Olheiros:** Diminishing returns (mesmo sistema de staff)
+
 ### 9.5. Negociações de Venda
 
 **Sistema de Notificações:**
@@ -940,7 +964,6 @@ interface Stadium {
 #### 10.3.2. Limites de Capacidade
 
 **Fórmula:**
-
 ```typescript
 const max_stadium_capacity = Math.min(
   club.fan_base_current / 3,
@@ -949,9 +972,12 @@ const max_stadium_capacity = Math.min(
 ```
 
 **Exemplos:**
-
 - Fan Base: 150.000 → Max Capacity: 50.000
 - Fan Base: 600.000 → Max Capacity: 95.000 (teto global)
+
+**Crescimento Dinâmico:**
+- Se a base de torcida crescer **durante a temporada**, libera mais expansão
+- Sempre respeitando o limite global de 95.000
 
 #### 10.3.3. Expansão de Estádio
 
@@ -1186,11 +1212,16 @@ const max_stadium_capacity = Math.min(
 ```
 
 **Regras:**
-
 - **Máximo:** 5 substituições
 - **Janelas:** 3 oportunidades (1º tempo, 2º tempo, prorrogação)
-- **Intervalo:** Não consome janela
+- **⚠️ IMPORTANTE:** Intervalo **NÃO consome janela**
 - **Contador:** "Janelas Restantes: X/3" visível
+
+**Exemplo:**
+- 2 subs no 1º tempo → 1 janela usada
+- 2 subs no intervalo → 0 janelas (grátis)
+- 1 sub no 2º tempo → 1 janela usada
+- **Total:** 2 janelas de 3 usadas
 
 #### 11.2.4. Outras Partidas Paralelas
 

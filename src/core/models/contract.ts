@@ -43,6 +43,7 @@ export interface TransferOffer {
   contractYears: number;
   type: string;
   rejectionReason: string | null;
+  expiresAt: Timestamp;
 }
 
 export interface PlayerLoan {

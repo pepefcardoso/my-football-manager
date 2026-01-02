@@ -1,5 +1,32 @@
 import { ID, Timestamp, Money, Attribute } from "./types";
 
+export type CompetitionObjective =
+  | "CHAMPION"
+  | "PROMOTION"
+  | "TOP_4"
+  | "TOP_6"
+  | "MID_TABLE"
+  | "AVOID_RELEGATION";
+
+export type CupObjective =
+  | "WIN"
+  | "FINAL"
+  | "SEMI_FINAL"
+  | "QUARTER_FINAL"
+  | "ROUND_OF_16"
+  | "NOT_IMPORTANT";
+
+export type InfrastructureType =
+  | "STADIUM_EXPANSION"
+  | "STADIUM_UPGRADE"
+  | "STADIUM_PITCH_UPGRADE"
+  | "NEW_STADIUM"
+  | "YOUTH_ACADEMY_UPGRADE"
+  | "TRAINING_CENTER_UPGRADE"
+  | "MEDICAL_CENTER_UPGRADE"
+  | "DATA_ANALYSIS_CENTER_UPGRADE"
+  | "ADMINISTRATION_UPGRADE";
+
 export interface Club {
   id: ID;
   dateFounded: Timestamp;
@@ -40,6 +67,15 @@ export interface ClubFinances {
   debtInterestRate: number;
   accumulatedManagementBalance: Money;
   monthlyMembershipRevenue: Money;
+  activeMarketingCampaign?: MarketingCampaign;
+}
+
+export interface MarketingCampaign {
+  type: "FAN_BASE_GROWTH" | "MERCHANDISE_SALES" | "SPONSORSHIP_ATTRACTION";
+  startDate: Timestamp;
+  endDate: Timestamp;
+  cost: Money;
+  effectiveness: Attribute;
 }
 
 export interface Sponsorship {
@@ -70,10 +106,10 @@ export interface ClubRelationship {
   clubId: ID;
   boardConfidence: Attribute;
   fanApproval: Attribute;
-  leagueObjective: string;
-  nationalCupObjective: string;
-  stateLeagueObjective: string;
-  continentalCupObjective: string;
+  leagueObjective: CompetitionObjective;
+  nationalCupObjective: CupObjective;
+  stateLeagueObjective: CupObjective;
+  continentalCupObjective: CupObjective;
   financialPatience: Attribute;
 }
 
@@ -98,6 +134,18 @@ export interface FinancialEntry {
   seasonId: ID;
   date: Timestamp;
   amount: Money;
-  category: string; // 'WAGES', 'TICKETS', 'TRANSFERS', 'SPONSORS'
+  category: "WAGES" | "TICKETS" | "TRANSFERS" | "SPONSORS";
   description: string;
+}
+
+export interface ConstructionProject {
+  id: ID;
+  clubId: ID;
+  type: InfrastructureType;
+  startDate: Timestamp;
+  finishDate: Timestamp;
+  cost: Money;
+  targetCapacity?: number;
+  targetLevel?: Attribute;
+  status: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 }
