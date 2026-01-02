@@ -72,34 +72,64 @@ export const NewGameSetupScreen: React.FC = () => {
                             </div>
 
                             <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-                                {Object.values(clubs).map((club) => (
-                                    <button
-                                        key={club.id}
-                                        onClick={() => setSelectedClubId(club.id)}
-                                        className={`w-full group flex items-center justify-between p-4 rounded-lg border transition-all duration-200 ${selectedClubId === club.id
-                                            ? "bg-primary/10 border-primary text-text-primary shadow-[0_0_15px_rgba(59,130,246,0.15)]"
-                                            : "bg-background border-background-tertiary text-text-secondary hover:bg-background-tertiary hover:border-text-muted"
-                                            }`}
-                                    >
-                                        <div className="flex items-center space-x-4">
-                                            <div className="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center font-bold text-text-muted">
-                                                {club.name.substring(0, 1)}
-                                            </div>
-                                            <div className="text-left">
-                                                <div className={`font-bold ${selectedClubId === club.id ? 'text-primary' : 'text-text-primary'}`}>
-                                                    {club.name}
-                                                </div>
-                                                <div className="text-xs text-text-muted">
-                                                    Reputação: {club.reputation} | Estádio: {club.reputation}
-                                                </div>
-                                            </div>
-                                        </div>
+                                {Object.values(clubs).map((club) => {
+                                    const isSelected = selectedClubId === club.id;
 
-                                        {selectedClubId === club.id && (
-                                            <CheckCircle size={20} className="text-primary animate-in zoom-in duration-200" />
-                                        )}
-                                    </button>
-                                ))}
+                                    return (
+                                        <button
+                                            key={club.id}
+                                            onClick={() => setSelectedClubId(club.id)}
+                                            className={`w-full group flex items-center justify-between p-4 rounded-lg border transition-all duration-200 relative overflow-hidden ${isSelected
+                                                ? "bg-primary/10 border-primary text-text-primary shadow-[0_0_15px_rgba(59,130,246,0.15)]"
+                                                : "bg-background border-background-tertiary text-text-secondary hover:bg-background-tertiary hover:border-text-muted"
+                                                }`}
+                                        >
+                                            {isSelected && (
+                                                <div
+                                                    className="absolute left-0 top-0 bottom-0 w-1"
+                                                    style={{ backgroundColor: club.secondaryColor }}
+                                                />
+                                            )}
+
+                                            <div className="flex items-center space-x-4 pl-2">
+                                                <div
+                                                    className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-2 shadow-sm overflow-hidden p-1 transition-transform group-hover:scale-110"
+                                                    style={{ borderColor: club.primaryColor }}
+                                                >
+                                                    {club.badgePath ? (
+                                                        <img
+                                                            src={club.badgePath}
+                                                            alt={club.name}
+                                                            className="w-full h-full object-contain"
+                                                            onError={(e) => {
+                                                                e.currentTarget.style.display = 'none';
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <span className="font-bold text-background-secondary text-lg">
+                                                            {club.name.substring(0, 1)}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className="text-left">
+                                                    <div className={`font-bold text-lg ${isSelected ? 'text-primary' : 'text-text-primary'}`}>
+                                                        {club.name}
+                                                    </div>
+                                                    <div className="text-xs text-text-muted flex items-center space-x-2">
+                                                        <span>Reputação: <span className="text-text-secondary">{club.reputation}</span></span>
+                                                        <span>•</span>
+                                                        <span>Torcida: <span className="text-text-secondary">{(club.fanBaseCurrent / 1000).toFixed(0)}k</span></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {isSelected && (
+                                                <CheckCircle size={24} className="text-primary animate-in zoom-in duration-200" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -107,8 +137,17 @@ export const NewGameSetupScreen: React.FC = () => {
             </div>
 
             <footer className="flex-none p-6 border-t border-background-tertiary bg-background-secondary flex justify-end items-center space-x-4 z-20">
-                <div className="text-sm text-text-muted mr-auto">
-                    {selectedClubId ? `Clube selecionado: ${clubs[selectedClubId].name}` : "Nenhum clube selecionado"}
+                <div className="text-sm text-text-muted mr-auto flex items-center">
+                    {selectedClubId ? (
+                        <>
+                            <span className="mr-2">Clube selecionado:</span>
+                            <span className="font-bold text-text-primary" style={{ color: clubs[selectedClubId].primaryColor }}>
+                                {clubs[selectedClubId].name}
+                            </span>
+                        </>
+                    ) : (
+                        "Nenhum clube selecionado"
+                    )}
                 </div>
                 <Button
                     size="lg"
