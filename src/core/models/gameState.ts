@@ -61,6 +61,7 @@ export interface GameState {
   positions: Record<ID, Tactics.Position>;
   teamTactics: Record<ID, Tactics.TeamTactics>;
   news: Record<ID, Events.NewsItem>;
+  notifications: Record<ID, Events.Notification>;
   scheduledEvents: Record<ID, Events.ScheduledEvent>;
   gameEvents: Record<ID, Events.GameEvent>;
 }

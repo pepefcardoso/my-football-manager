@@ -1,11 +1,18 @@
 import { ID, Timestamp, Money } from "./types";
 
 export type NotificationType = "CRITICAL" | "IMPORTANT" | "INFO";
-export type NotificationActionType =
-  | "GO_TO_PLAYER"
-  | "GO_TO_MATCH"
-  | "OPEN_NEGOTIATION"
-  | "NONE";
+
+export type EntityType =
+  | "PLAYER"
+  | "CLUB"
+  | "MATCH"
+  | "COMPETITION"
+  | "TRANSFER_OFFER";
+
+export interface RelatedEntity {
+  type: EntityType;
+  id: ID;
+}
 
 export interface NewsItem {
   id: ID;
@@ -44,12 +51,28 @@ export interface ScheduledEvent {
 export interface Notification {
   id: ID;
   managerId: ID;
-  date: Timestamp;
   type: NotificationType;
   title: string;
   message: string;
+  date: Timestamp;
   isRead: boolean;
-  expiresAt: Timestamp;
-  actionType: NotificationActionType;
-  actionPayload: string;
+  relatedEntity?: RelatedEntity;
+  expiresAt?: Timestamp;
+}
+
+export interface InjuryNotification extends Notification {
+  type: "CRITICAL";
+  relatedEntity: {
+    type: "PLAYER";
+    id: ID;
+  };
+}
+
+export interface TransferOfferNotification extends Notification {
+  type: "IMPORTANT";
+  relatedEntity: {
+    type: "TRANSFER_OFFER";
+    id: ID;
+  };
+  offerValue: Money;
 }
