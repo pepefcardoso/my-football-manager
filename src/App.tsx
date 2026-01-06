@@ -8,6 +8,7 @@ import { CompetitionsScreen } from "./ui/screens/CompetitionsScreen";
 import { MatchPreparationScreen } from "./ui/screens/MatchPreparationScreen";
 import { MatchLiveScreen } from "./ui/screens/MatchLiveScreen";
 import { MatchResultScreen } from "./ui/screens/MatchResultScreen";
+import { CalendarScreen } from "./ui/screens/CalendarScreen";
 
 const TacticsScreen = () => <div className="p-4">Táticas (Em breve)</div>;
 
@@ -31,6 +32,7 @@ function App() {
       case "MATCH_PREPARATION": return <MatchPreparationScreen />;
       case "MATCH_LIVE": return <MatchLiveScreen />;
       case "MATCH_RESULT": return <MatchResultScreen />;
+      case "CALENDAR": return <CalendarScreen />;
       default: return <div className="text-text-muted p-8">Funcionalidade {currentView} em desenvolvimento.</div>;
     }
   };
