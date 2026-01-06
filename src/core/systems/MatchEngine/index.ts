@@ -1,5 +1,5 @@
 import { Match } from "../../models/match";
-import { QuickMatchStrategy } from "./QuickMatchStrategy";
+import { DetailedMatchStrategy } from "./DetailedMatchStrategy";
 import {
   IMatchSimulationStrategy,
   MatchEngineResult,
@@ -10,8 +10,7 @@ class MatchEngine {
   private strategy: IMatchSimulationStrategy;
 
   constructor() {
-    // TODO: Futuramente podemos ler de Settings: if (settings.fullSim) use DetailedStrategy
-    this.strategy = new QuickMatchStrategy();
+    this.strategy = new DetailedMatchStrategy();
   }
 
   public setStrategy(strategy: IMatchSimulationStrategy) {
@@ -24,7 +23,7 @@ class MatchEngine {
     away: TeamMatchContext
   ): MatchEngineResult {
     console.log(
-      `[MatchEngine] Simulando ${home.clubName} vs ${away.clubName}...`
+      `[MatchEngine] Simulando ${home.clubName} vs ${away.clubName} com ${this.strategy.constructor.name}...`
     );
     return this.strategy.simulate(match, home, away);
   }

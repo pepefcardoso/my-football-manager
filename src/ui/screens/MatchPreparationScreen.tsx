@@ -44,7 +44,6 @@ export const MatchPreparationScreen: React.FC = () => {
     };
 
     const [lineup, setLineup] = useState(getSuggestedLineup);
-
     const { starters, bench, reserves } = lineup;
 
     const handleAutoPick = () => {
@@ -59,7 +58,6 @@ export const MatchPreparationScreen: React.FC = () => {
         if (target === 'starter') {
             if (newStarters.length >= 11) {
                 const playerOrigin = starters.includes(playerId) ? 'starter' : bench.includes(playerId) ? 'bench' : 'reserve';
-
                 if (playerOrigin !== 'starter') {
                     const removedId = newStarters.pop();
                     if (removedId) {
@@ -80,6 +78,7 @@ export const MatchPreparationScreen: React.FC = () => {
 
     const handlePlayMatch = () => {
         if (!nextMatch || !meta.userClubId) return;
+
         if (starters.length !== 11) {
             alert("Você precisa selecionar exatamente 11 titulares!");
             return;
@@ -157,6 +156,7 @@ export const MatchPreparationScreen: React.FC = () => {
                         icon={Play}
                         onClick={handlePlayMatch}
                         disabled={starters.length !== 11}
+                        className="shadow-lg shadow-primary/20"
                     >
                         Iniciar Partida
                     </Button>
@@ -164,7 +164,6 @@ export const MatchPreparationScreen: React.FC = () => {
             </div>
 
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 overflow-hidden">
-
                 <div className="bg-background-secondary rounded-lg border border-background-tertiary flex flex-col h-full overflow-hidden">
                     <div className="p-3 border-b border-background-tertiary bg-primary/10 flex justify-between items-center">
                         <h3 className="font-bold text-primary flex items-center"><Shirt size={16} className="mr-2" /> Titulares</h3>

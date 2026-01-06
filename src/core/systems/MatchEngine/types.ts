@@ -20,7 +20,14 @@ export interface MatchEngineResult {
   stats: {
     homePossession: number;
     awayPossession: number;
-    // TODO: chutes, escanteios, etc.
+    homeShots: number;
+    awayShots: number;
+    homeShotsOnTarget: number;
+    awayShotsOnTarget: number;
+    homeFouls: number;
+    awayFouls: number;
+    homeCorners: number;
+    awayCorners: number;
   };
   events: MatchEvent[];
   playerStats: PlayerMatchStats[];
