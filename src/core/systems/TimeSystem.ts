@@ -43,15 +43,6 @@ export function advanceOneDay(state: GameState): TimeAdvanceResult {
 
   processDailyNotifications(state);
 
-  console.log(
-    `[TimeSystem] Dia avançado: ${new Date(newDate).toLocaleDateString()}`,
-    {
-      expenses: economyResult.dailyExpenses,
-      recovered: recoveryResult.recoveredPlayers.length,
-      matches: matchResult.matchesToday.length,
-    }
-  );
-
   return {
     newDate,
     matchesToday: matchResult.matchesToday,
@@ -65,4 +56,31 @@ export function advanceOneDay(state: GameState): TimeAdvanceResult {
 
 export function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("pt-BR");
+}
+
+export function getNextSimulationTarget(
+  state: GameState
+): { date: number; match: Match | null } | null {
+  const userClubId = state.meta.userClubId;
+  if (!userClubId) return null;
+
+  const allMatches = Object.values(state.matches);
+  const futureMatches = allMatches.filter(
+    (m) =>
+      m.status === "SCHEDULED" &&
+      (m.homeClubId === userClubId || m.awayClubId === userClubId) &&
+      m.datetime > state.meta.currentDate
+  );
+
+  futureMatches.sort((a, b) => a.datetime - b.datetime);
+
+  if (futureMatches.length === 0) return null;
+
+  const nextMatch = futureMatches[0];
+  const targetDate = new Date(nextMatch.datetime).setHours(0, 0, 0, 0);
+
+  return {
+    date: targetDate,
+    match: nextMatch,
+  };
 }

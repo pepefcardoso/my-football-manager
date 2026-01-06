@@ -1,37 +1,70 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
-import { Calendar, MapPin, Trophy, Shield, Star, Clock } from "lucide-react";
+import { Calendar, MapPin, Trophy, Shield, Star, Clock, FastForward, CheckCircle } from "lucide-react";
 import { Button } from "../components/Button";
+import { formatDate as formatGameDate } from "../../core/systems/TimeSystem";
 
 export const CalendarScreen: React.FC = () => {
-    const { meta, matches, clubs, competitions, competitionGroups, competitionFases, competitionSeasons } = useGameStore();
+    const { meta, matches, clubs, competitions, competitionGroups, competitionFases, competitionSeasons, advanceDay } = useGameStore();
     const { setView } = useUIStore();
     const userClubId = meta.userClubId;
-
-    const upcomingMatches = useMemo(() => {
-        if (!userClubId) return [];
-
+    const [isSimulating, setIsSimulating] = useState(false);
+    const [simulatedDays, setSimulatedDays] = useState(0);
+    const [simulationLogs, setSimulationLogs] = useState<string[]>([]);
+    const [showSummary, setShowSummary] = useState(false);
+    const stopSimulationRef = useRef(false);
+    const nextMatchTarget = useMemo(() => {
+        if (!userClubId) return null;
         const allMatches = Object.values(matches);
-
-        const userMatches = allMatches.filter(
+        const futureMatches = allMatches.filter(
             (m) =>
-                (m.homeClubId === userClubId || m.awayClubId === userClubId) &&
                 m.status === "SCHEDULED" &&
-                m.datetime >= meta.currentDate
-        );
+                (m.homeClubId === userClubId || m.awayClubId === userClubId) &&
+                m.datetime > meta.currentDate
+        ).sort((a, b) => a.datetime - b.datetime);
 
-        return userMatches.sort((a, b) => a.datetime - b.datetime).slice(0, 10);
+        return futureMatches[0] || null;
     }, [matches, userClubId, meta.currentDate]);
+    const startSimulation = async () => {
+        if (!nextMatchTarget) return;
+
+        setIsSimulating(true);
+        setShowSummary(false);
+        setSimulatedDays(0);
+        setSimulationLogs([]);
+        stopSimulationRef.current = false;
+
+        const targetDate = new Date(nextMatchTarget.datetime).setHours(0, 0, 0, 0);
+
+        let currentDate = meta.currentDate;
+        let daysCount = 0;
+
+        while (currentDate < targetDate && !stopSimulationRef.current) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            const result = advanceDay();
+            currentDate = result.newDate;
+            daysCount++;
+
+            if (result.events.length > 0) {
+                setSimulationLogs(prev => [...prev, ...result.events.map(e => `[${formatGameDate(result.newDate)}] ${e}`)]);
+            }
+
+            setSimulatedDays(daysCount);
+        }
+
+        setIsSimulating(false);
+        setShowSummary(true);
+    };
+
+    const cancelSimulation = () => {
+        stopSimulationRef.current = true;
+    };
 
     const formatDate = (timestamp: number) => {
         return new Intl.DateTimeFormat('pt-BR', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
         }).format(new Date(timestamp));
     };
 
@@ -51,10 +84,23 @@ export const CalendarScreen: React.FC = () => {
         return null;
     };
 
+    const upcomingMatches = useMemo(() => {
+        if (!userClubId) return [];
+        const allMatches = Object.values(matches);
+        const userMatches = allMatches.filter(
+            (m) =>
+                (m.homeClubId === userClubId || m.awayClubId === userClubId) &&
+                m.status === "SCHEDULED" &&
+                m.datetime >= meta.currentDate
+        );
+        return userMatches.sort((a, b) => a.datetime - b.datetime).slice(0, 10);
+    }, [matches, userClubId, meta.currentDate]);
+
     if (!userClubId) return null;
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-300 h-full flex flex-col">
+        <div className="space-y-6 animate-in fade-in duration-300 h-full flex flex-col relative">
+
             <div className="flex items-center justify-between bg-background-secondary p-6 rounded-lg border border-background-tertiary shadow-sm flex-none">
                 <div className="flex items-center space-x-4">
                     <div className="p-3 bg-primary/10 rounded-full text-primary">
@@ -65,6 +111,18 @@ export const CalendarScreen: React.FC = () => {
                         <p className="text-text-secondary text-sm">Próximos compromissos</p>
                     </div>
                 </div>
+
+                {nextMatchTarget && (
+                    <Button
+                        variant="primary"
+                        icon={FastForward}
+                        onClick={startSimulation}
+                        disabled={isSimulating}
+                        className="shadow-lg shadow-primary/20"
+                    >
+                        Simular até Próximo Jogo
+                    </Button>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4 scroll-smooth">
@@ -161,6 +219,82 @@ export const CalendarScreen: React.FC = () => {
                     })
                 )}
             </div>
+
+            {isSimulating && (
+                <div className="absolute inset-0 z-50 bg-background/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <div className="bg-background-secondary p-8 rounded-xl border border-background-tertiary shadow-2xl max-w-md w-full text-center">
+                        <div className="mb-6 relative">
+                            <div className="w-16 h-16 rounded-full border-4 border-background-tertiary border-t-primary animate-spin mx-auto"></div>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xs font-mono font-bold">{simulatedDays}d</span>
+                            </div>
+                        </div>
+
+                        <h2 className="text-xl font-bold text-text-primary mb-2">Simulando...</h2>
+                        <p className="text-text-secondary mb-6">
+                            Avançando até {nextMatchTarget ? formatDate(nextMatchTarget.datetime) : 'próximo evento'}
+                        </p>
+
+                        <div className="bg-background p-3 rounded border border-background-tertiary mb-6 h-32 overflow-y-auto text-left custom-scrollbar">
+                            <div className="space-y-1">
+                                {simulationLogs.length === 0 && <span className="text-xs text-text-muted italic">Processando rotinas diárias...</span>}
+                                {simulationLogs.slice(-5).map((log, i) => (
+                                    <div key={i} className="text-xs text-text-secondary border-b border-background-tertiary/30 last:border-0 pb-1">
+                                        {log}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <Button variant="danger" onClick={cancelSimulation} className="w-full">
+                            Cancelar
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {showSummary && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-background-secondary border border-background-tertiary rounded-lg shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-background-tertiary flex justify-between items-center bg-background/50">
+                            <h3 className="text-lg font-bold text-text-primary flex items-center">
+                                <CheckCircle className="mr-2 text-status-success" size={20} />
+                                Simulação Concluída
+                            </h3>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="flex justify-between items-center bg-background p-3 rounded border border-background-tertiary">
+                                <span className="text-text-secondary">Dias Simulados</span>
+                                <span className="font-mono font-bold text-xl text-primary">{simulatedDays}</span>
+                            </div>
+
+                            <div>
+                                <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Resumo de Eventos</h4>
+                                {simulationLogs.length > 0 ? (
+                                    <div className="bg-background p-3 rounded border border-background-tertiary max-h-40 overflow-y-auto custom-scrollbar">
+                                        {simulationLogs.map((log, i) => (
+                                            <div key={i} className="text-xs text-text-muted mb-1 last:mb-0">
+                                                {log}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-text-muted italic">Nenhum evento importante ocorreu.</p>
+                                )}
+                            </div>
+
+                            <div className="text-xs text-center text-text-secondary bg-primary/5 p-2 rounded">
+                                O time está descansado e pronto para a partida.
+                            </div>
+                        </div>
+                        <div className="p-4 bg-background/50 border-t border-background-tertiary flex justify-end">
+                            <Button onClick={() => { setShowSummary(false); setView("MATCH_PREPARATION"); }}>
+                                Fechar e Preparar Time
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
