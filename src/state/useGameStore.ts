@@ -13,6 +13,10 @@ import {
   SaveInfo,
 } from "../data/fileSystem";
 import { createNewGame } from "../data/initialSetup";
+import {
+  deleteNotification,
+  markAsRead,
+} from "../core/systems/NotificationSystem";
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
@@ -26,6 +30,8 @@ interface GameActions {
   setState: (fn: (state: GameState) => void) => void;
   enableAutoSave: (intervalMinutes: number) => void;
   disableAutoSave: () => void;
+  markNotificationAsRead: (id: string) => void;
+  deleteNotification: (id: string) => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -82,6 +88,7 @@ const createInitialState = (): GameState => ({
   news: {},
   scheduledEvents: {},
   gameEvents: {},
+  notifications: {},
 });
 
 let autoSaveInterval: NodeJS.Timeout | null = null;
@@ -216,6 +223,18 @@ export const useGameStore = create<GameStore>()(
         autoSaveInterval = null;
         console.log("⏰ Auto-save desabilitado");
       }
+    },
+
+    markNotificationAsRead: (id: string) => {
+      set((state) => {
+        markAsRead(state, id);
+      });
+    },
+
+    deleteNotification: (id: string) => {
+      set((state) => {
+        deleteNotification(state, id);
+      });
     },
   }))
 );
