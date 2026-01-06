@@ -3,6 +3,7 @@ import { useUIStore, GameView } from "../../state/useUIStore";
 import { useGameStore } from "../../state/useGameStore";
 import { formatDate } from "../../core/utils/formatters";
 import { NotificationCenter } from "../components/NotificationCenter";
+import { LoadingOverlay } from "../components/LoadingOverlay";
 import {
     LayoutDashboard,
     Users,
@@ -39,7 +40,15 @@ const NavItem: React.FC<NavItemProps> = ({ label, icon: Icon, isActive, onClick 
 );
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { currentView, setView } = useUIStore();
+    const {
+        currentView,
+        setView,
+        isProcessing,
+        processingMessage,
+        processingProgress,
+        processingType
+    } = useUIStore();
+
     const { meta, matches, clubs } = useGameStore();
     const userClubId = meta.userClubId;
 
@@ -79,6 +88,13 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
     return (
         <div className="flex h-screen bg-background text-text-primary overflow-hidden font-sans">
+            <LoadingOverlay
+                isVisible={isProcessing}
+                message={processingMessage}
+                progress={processingProgress}
+                type={processingType}
+            />
+
             <aside className="w-64 bg-background-secondary border-r border-background-tertiary flex flex-col shadow-xl z-10">
                 <div className="p-6 flex items-center justify-center border-b border-background-tertiary">
                     <h1 className="text-2xl font-bold tracking-wider text-primary">MAESTRO</h1>

@@ -7,6 +7,15 @@ import { processScheduledMatches } from "./MatchSystem";
 import { updateCompetitionStandings } from "./CompetitionSystem";
 import { processDailyNotifications } from "./NotificationSystem";
 
+export const DAILY_PROCESSING_STAGES = [
+  "Processando finanças e economia...",
+  "Gerenciando recuperação física...",
+  "Aplicando treinos diários...",
+  "Simulando partidas agendadas...",
+  "Atualizando tabelas e competições...",
+  "Verificando notificações...",
+];
+
 export interface TimeAdvanceResult {
   newDate: number;
   matchesToday: Match[];
@@ -34,7 +43,7 @@ export function advanceOneDay(state: GameState): TimeAdvanceResult {
   if (recoveryResult.logs.length > 0)
     aggregatedEvents.push(...recoveryResult.logs);
 
-  const trainingResult = processDailyTraining(state);
+  processDailyTraining(state);
   const matchResult = processScheduledMatches(state);
 
   if (matchResult.matchesToday.length > 0) {

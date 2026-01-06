@@ -4,6 +4,7 @@ import { formatMoney, formatDate, formatDateTime } from "../../core/utils/format
 import { Button } from "../components/Button";
 import { Play, Calendar, TrendingUp, Trophy, AlertCircle } from "lucide-react";
 import { useUIStore } from "../../state/useUIStore";
+import { DAILY_PROCESSING_STAGES } from "../../core/systems/TimeSystem";
 
 export const DashboardScreen: React.FC = () => {
     const {
@@ -11,11 +12,48 @@ export const DashboardScreen: React.FC = () => {
         clubs,
         clubFinances,
         matches,
-        advanceDay
+        advanceDay,
+        saveGame
     } = useGameStore();
-    const { setView } = useUIStore();
+
+    const { setView, startProcessing, stopProcessing, isProcessing } = useUIStore();
 
     const userClubId = meta.userClubId;
+
+    const handleAdvanceDay = async () => {
+        if (isProcessing) return;
+
+        startProcessing("Iniciando novo dia...", "loading");
+
+        for (const stage of DAILY_PROCESSING_STAGES) {
+            startProcessing(stage);
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        advanceDay();
+
+        startProcessing("Salvando progresso...", "loading");
+
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        try {
+            const result = await saveGame(meta.saveName);
+
+            if (result.success) {
+                startProcessing("Dia finalizado com sucesso!", "success");
+            } else {
+                alert(`Erro ao salvar: ${result.error}`);
+                stopProcessing();
+                return;
+            }
+        } catch (error) {
+            console.error(error);
+            stopProcessing();
+            return;
+        }
+
+        stopProcessing(1000);
+    };
 
     const nextMatch = useMemo(() => {
         if (!userClubId) return null;
@@ -77,10 +115,11 @@ export const DashboardScreen: React.FC = () => {
                     <Button
                         size="lg"
                         icon={Play}
-                        onClick={advanceDay}
+                        onClick={handleAdvanceDay}
+                        disabled={isProcessing}
                         className="shadow-lg shadow-primary/20"
                     >
-                        Avançar Dia
+                        {isProcessing ? "Processando..." : "Avançar Dia"}
                     </Button>
                 </div>
             </div>
@@ -122,7 +161,7 @@ export const DashboardScreen: React.FC = () => {
                             size="sm"
                             className="w-full"
                             onClick={() => setView("MATCH_PREPARATION")}
-                            disabled={!nextMatch}
+                            disabled={!nextMatch || isProcessing}
                         >
                             Preparar Equipa
                         </Button>
