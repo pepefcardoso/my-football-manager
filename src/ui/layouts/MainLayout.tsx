@@ -13,6 +13,7 @@ import {
     Building2,
     Settings,
     Trophy,
+    UserCircle,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -83,6 +84,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         { view: "CALENDAR", label: "Calendário", icon: Calendar },
         { view: "MARKET", label: "Transferências", icon: TrendingUp },
         { view: "CLUB_INFRA", label: "Clube", icon: Building2 },
+        { view: "MANAGER_PROFILE", label: "Meu Perfil", icon: UserCircle },
         { view: "SETTINGS", label: "Opções", icon: Settings },
     ];
 
