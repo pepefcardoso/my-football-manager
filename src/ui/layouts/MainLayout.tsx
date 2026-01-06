@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useUIStore, GameView } from "../../state/useUIStore";
 import { useGameStore } from "../../state/useGameStore";
 import { formatDate } from "../../core/utils/formatters";
+import { NotificationCenter } from "../components/NotificationCenter";
 import {
     LayoutDashboard,
     Users,
@@ -22,7 +23,7 @@ interface NavItemProps {
     onClick: () => void;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ view, label, icon: Icon, isActive, onClick }) => (
+const NavItem: React.FC<NavItemProps> = ({ label, icon: Icon, isActive, onClick }) => (
     <button
         onClick={onClick}
         className={clsx(
@@ -102,17 +103,23 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             </aside>
 
             <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden relative">
-                <header className="h-16 bg-background-secondary/80 backdrop-blur border-b border-background-tertiary flex items-center justify-between px-6">
+                <header className="h-16 bg-background-secondary/80 backdrop-blur border-b border-background-tertiary flex items-center justify-between px-6 z-20">
                     <h2 className="text-lg font-semibold text-text-primary">
                         {navItems.find(i => i.view === currentView)?.label}
                     </h2>
 
-                    <div className="flex items-center space-x-4">
-                        <span className="text-text-secondary text-sm">
+                    <div className="flex items-center space-x-6">
+                        <span className="text-text-secondary text-sm hidden md:inline">
                             Próximo Jogo: <span className="font-medium text-text-primary">{nextMatchInfo}</span>
                         </span>
-                        <div className="px-4 py-2 bg-background-tertiary rounded text-sm font-mono text-text-primary">
-                            {formatDate(meta.currentDate)}
+
+                        <div className="h-6 w-px bg-background-tertiary hidden md:block"></div>
+
+                        <div className="flex items-center space-x-4">
+                            <NotificationCenter />
+                            <div className="px-4 py-2 bg-background-tertiary rounded text-sm font-mono text-text-primary shadow-inner">
+                                {formatDate(meta.currentDate)}
+                            </div>
                         </div>
                     </div>
                 </header>
