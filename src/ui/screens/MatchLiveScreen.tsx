@@ -262,7 +262,7 @@ export const MatchLiveScreen: React.FC = () => {
                         {currentMinute >= 94 ? (
                             <div className="space-y-4 animate-in zoom-in duration-300">
                                 <h2 className="text-2xl font-bold text-text-primary">Fim de Jogo</h2>
-                                <Button size="lg" icon={ArrowLeft} onClick={() => setView("DASHBOARD")}>Voltar ao Menu</Button>
+                                <Button size="lg" icon={ArrowLeft} onClick={() => setView("MATCH_RESULT")}>Ver Resultados</Button>
                             </div>
                         ) : (
                             <div className="text-text-muted opacity-50">
