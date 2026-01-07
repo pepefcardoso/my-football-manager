@@ -16,6 +16,17 @@ export const MATCH_CONFIG = {
     INJURY_BASE: 0.05,
     FOUL_BASE: 4.0,
     ATTACK_BASE: 15.0,
+    YELLOW_CARD: 10.0,
+    RED_CARD: 1.0,
+    ASSIST: 70.0,
+  },
+  THRESHOLDS: {
+    GOAL: 12,
+    SAVE: -10,
+  },
+  MOMENTUM: {
+    AFTER_GOAL_HOME: 40,
+    AFTER_GOAL_AWAY: 60,
   },
   STOPPAGE_TIME: {
     MIN_H1: 0,

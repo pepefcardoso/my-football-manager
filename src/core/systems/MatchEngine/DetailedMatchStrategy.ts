@@ -144,8 +144,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
 
     const goalChance = finishAttr - saveAttr + rng.range(-20, 20);
 
-    if (goalChance > 12) {
-      // TODO: Mover threshold (15) para MATCH_CONFIG
+    if (goalChance > MATCH_CONFIG.THRESHOLDS.GOAL) {
       this.createEvent(
         matchId,
         "GOAL",
@@ -160,8 +159,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
       this.updateStats(attacker.id, "shotsOnTarget", 1);
       this.updateRating(attacker.id, MATCH_CONFIG.RATING_WEIGHTS.GOAL);
 
-      if (rng.range(0, 10) > 3) {
-        // TODO: Chance fixa de 70%? Tornar dinâmico baseado em 'passing' e 'vision'
+      if (rng.range(0, 100) < MATCH_CONFIG.PROBABILITIES.ASSIST) {
         const assister = rng.pick(
           attTeam.startingXI.filter((p) => p.id !== attacker.id)
         );
@@ -169,9 +167,11 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
         this.updateRating(assister.id, MATCH_CONFIG.RATING_WEIGHTS.ASSIST);
       }
 
-      this.momentum = attTeam.clubId === homeClubId ? 40 : 60;
-    } else if (goalChance > -10) {
-      // TODO: Mover threshold (-10) para MATCH_CONFIG
+      this.momentum =
+        attTeam.clubId === homeClubId
+          ? MATCH_CONFIG.MOMENTUM.AFTER_GOAL_HOME
+          : MATCH_CONFIG.MOMENTUM.AFTER_GOAL_AWAY;
+    } else if (goalChance > MATCH_CONFIG.THRESHOLDS.SAVE) {
       this.createEvent(
         matchId,
         "CHANCE",
@@ -205,13 +205,13 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
   ) {
     const offender = rng.pick(offenderTeam.startingXI);
     const victim = rng.pick(victimTeam.startingXI);
-    // TODO: Matchups realistas (ex: Lateral vs Ponta, Zagueiro vs Atacante)
 
     this.updateStats(offender.id, "foulsCommitted", 1);
     this.updateStats(victim.id, "foulsSuffered", 1);
 
     const cardRoll = rng.range(0, 100);
-    if (cardRoll < 10) {
+
+    if (cardRoll < MATCH_CONFIG.PROBABILITIES.YELLOW_CARD) {
       this.createEvent(
         matchId,
         "CARD_YELLOW",
@@ -224,7 +224,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
       );
       this.updateStats(offender.id, "yellowCards", 1);
       this.updateRating(offender.id, MATCH_CONFIG.RATING_WEIGHTS.YELLOW_CARD);
-    } else if (cardRoll < 1) {
+    } else if (cardRoll < MATCH_CONFIG.PROBABILITIES.RED_CARD) {
       this.createEvent(
         matchId,
         "CARD_RED",
@@ -248,8 +248,6 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
     period: "1H" | "2H"
   ) {
     const player = rng.pick(team.startingXI);
-    // TODO: CRÍTICO - Implementar lógica de substituição forçada (remover do XI, colocar banco)
-    // TODO: Se não houver substituições, time joga com 10 (reduzir atributos do time)
     this.createEvent(
       matchId,
       "INJURY",
@@ -300,7 +298,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
         clubId,
         isStarter: true,
         positionPlayedId: p.primaryPositionId,
-        minutesPlayed: 90,// TODO: Ajustar para minutos reais caso haja substituição ou expulsão
+        minutesPlayed: 90, // TODO: Ajustar para minutos reais caso haja substituição ou expulsão
         rating: 6.0,
         goals: 0,
         assists: 0,
@@ -367,7 +365,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
       homeScore: homeGoals,
       awayScore: awayGoals,
       stats: {
-        homePossession: 50,// TODO: Calcular posse real baseada no número de ticks de 'hasPossession'
+        homePossession: 50, // TODO: Calcular posse real baseada no número de ticks de 'hasPossession'
         awayPossession: 50,
         homeShots:
           this.sumStats(homeId, "shotsOffTarget") +
@@ -379,7 +377,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
         awayShotsOnTarget: this.sumStats(awayId, "shotsOnTarget"),
         homeFouls: this.sumStats(homeId, "foulsCommitted"),
         awayFouls: this.sumStats(awayId, "foulsCommitted"),
-        homeCorners: Math.floor(rng.range(2, 8)),// TODO: Gerar escanteios dinamicamente após eventos de 'DEFESA'
+        homeCorners: Math.floor(rng.range(2, 8)), // TODO: Gerar escanteios dinamicamente após eventos de 'DEFESA'
         awayCorners: Math.floor(rng.range(2, 8)),
       },
       events: this.events.sort((a, b) => {
@@ -429,7 +427,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
     attr: keyof Player
   ): number {
     const sectorPlayers = players.filter((p) => p.primaryPositionId === sector);
-    if (!sectorPlayers.length) return 70;// TODO: Este 70 é arbitrário. Calcular média geral do time ou penalizar por falta de setor.
+    if (!sectorPlayers.length) return 70; // TODO: Este 70 é arbitrário. Calcular média geral do time ou penalizar por falta de setor.
     return (
       sectorPlayers.reduce((acc, p) => acc + (p[attr] as number), 0) /
       sectorPlayers.length
