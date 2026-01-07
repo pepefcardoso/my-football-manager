@@ -5,6 +5,7 @@ import { buildTeamContext, simulateSingleMatch } from "../../core/systems/MatchS
 import { calculateOverall, formatPosition, getAttributeColorClass } from "../../core/utils/playerUtils";
 import { Button } from "../components/Button";
 import { ArrowLeft, Play, Shirt, RefreshCw } from "lucide-react";
+import { GameState } from "../../core/models/gameState";
 
 export const MatchPreparationScreen: React.FC = () => {
     const { meta, matches, contracts, players, playerStates, clubs, setState } = useGameStore();
@@ -19,7 +20,7 @@ export const MatchPreparationScreen: React.FC = () => {
     }, [matches, meta.userClubId]);
 
     const opponentId = nextMatch ? (nextMatch.homeClubId === meta.userClubId ? nextMatch.awayClubId : nextMatch.homeClubId) : null;
-    const opponent = opponentId ? clubs[opponentId] : null;
+    const opponent = opponentId ? opponentId ? clubs[opponentId] : null : null;
 
     const getSuggestedLineup = () => {
         if (!meta.userClubId) return { starters: [], bench: [], reserves: [] };
@@ -27,10 +28,14 @@ export const MatchPreparationScreen: React.FC = () => {
         const clubPlayerIds = Object.values(contracts)
             .filter(c => c.clubId === meta.userClubId && c.active)
             .map(c => c.playerId);
-
+            
         const mockState = {
-            clubs, contracts, players, teamTactics: {}, meta
-        } as any;
+            clubs,
+            contracts,
+            players,
+            teamTactics: {},
+            meta
+        } as unknown as GameState;
 
         const context = buildTeamContext(mockState, meta.userClubId);
 

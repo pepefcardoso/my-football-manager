@@ -2,6 +2,7 @@ import { GameState } from "../models/gameState";
 import { Player } from "../models/people";
 import { rng } from "../utils/generators";
 import { PlayerCalculations } from "../models/player";
+import { PlayerSeasonStats } from "../models/stats";
 
 const TRAINING_CONFIG = {
   AGE_YOUNG_CAP: 21,
@@ -14,6 +15,26 @@ const TRAINING_CONFIG = {
   INFRA_LEVEL_5_THRESHOLD: 80,
   INFRA_LEVEL_1_THRESHOLD: 20,
 };
+
+const TRAINABLE_ATTRIBUTES = [
+  "finishing",
+  "passing",
+  "crossing",
+  "technique",
+  "defending",
+  "speed",
+  "stamina",
+  "intelligence",
+] as const;
+
+const PHYSICAL_ATTRIBUTES = ["speed", "stamina", "force"] as const;
+
+export type TrainableAttribute = (typeof TRAINABLE_ATTRIBUTES)[number];
+export type PhysicalAttribute = (typeof PHYSICAL_ATTRIBUTES)[number];
+
+export function isTrainableAttribute(key: string): key is TrainableAttribute {
+  return TRAINABLE_ATTRIBUTES.includes(key as TrainableAttribute);
+}
 
 export interface TrainingResult {
   improvedAttributes: number;
@@ -32,7 +53,9 @@ const calculateInfrastructureBonus = (trainingLevel: number): number => {
   return 0;
 };
 
-const getRecentPlaytimeMultiplier = (playerSeasonStats: any): number => {
+const getRecentPlaytimeMultiplier = (
+  playerSeasonStats: PlayerSeasonStats | undefined
+): number => {
   return playerSeasonStats && playerSeasonStats.gamesPlayed > 0
     ? 1 + TRAINING_CONFIG.PLAYTIME_BONUS
     : 1.0;
@@ -114,22 +137,12 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
 };
 
 const applyGrowthToAttributes = (player: Player, amount: number): boolean => {
-  const attributes: (keyof Player)[] = [
-    "finishing",
-    "passing",
-    "crossing",
-    "technique",
-    "defending",
-    "speed",
-    "stamina",
-    "intelligence",
-  ];
+  const targetAttr: TrainableAttribute = rng.pick([...TRAINABLE_ATTRIBUTES]);
 
-  const targetAttr = rng.pick(attributes);
-  const currentValue = player[targetAttr] as number;
+  const currentValue = player[targetAttr];
 
   if (currentValue < 99) {
-    (player[targetAttr] as number) += amount;
+    player[targetAttr] = currentValue + amount;
     player.overall = PlayerCalculations.calculateOverall(player);
     return true;
   }
@@ -145,13 +158,13 @@ const processRegression = (
   const decayChance = (age - 30) * 5;
 
   if (rng.range(0, 100) < decayChance) {
-    const physicals: (keyof Player)[] = ["speed", "stamina", "force"];
-    const target = rng.pick(physicals);
-    const val = player[target] as number;
+    const target: PhysicalAttribute = rng.pick([...PHYSICAL_ATTRIBUTES]);
+
+    const val = player[target];
 
     if (val > 10) {
       const loss = TRAINING_CONFIG.REGRESSION_RATE;
-      (player[target] as number) -= loss;
+      player[target] = val - loss;
 
       if (isUserPlayer && rng.range(0, 100) < 10) {
         logs.push(`📉 ${player.name} perdeu rendimento físico devido à idade.`);
