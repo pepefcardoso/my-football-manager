@@ -129,6 +129,7 @@ const applyGrowthToAttributes = (player: Player, amount: number): boolean => {
 
   if (currentValue < 99) {
     (player[targetAttr] as number) += amount;
+    player.overall = calculateSimpleOverall(player);
     return true;
   }
   return false;

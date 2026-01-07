@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { Player } from "../../core/models/people";
-import { calculateOverall, formatPosition, getAttributeColorClass } from "../../core/utils/playerUtils";
+import { getAttributeColorClass } from "../../core/utils/playerUtils";
 import { PlayerDetailModal } from "../components/PlayerDetailModal";
 import { Users, Filter } from "lucide-react";
 
@@ -22,7 +22,7 @@ export const SquadScreen: React.FC = () => {
 
                 return {
                     ...player,
-                    overall: calculateOverall(player),
+                    overall: player.overall,
                     state: state || { fitness: 100, morale: 80, matchReadiness: 100 },
                     wage: contract.monthlyWage
                 };

@@ -106,6 +106,7 @@ export class PlayerFactory {
       intelligence: generateAttr(age > 28 ? 10 : -5),
       determination: generateAttr(0),
       potential: 0,
+      overall: 0,
       proneToInjury: rng.range(1, 20),
       marketValue: 0,
       createdAt: Date.now(),
@@ -113,6 +114,7 @@ export class PlayerFactory {
     };
 
     const currentAbility = this.calculateOverall(player);
+    player.overall = currentAbility;
     player.potential = Math.min(99, currentAbility + potentialBonus);
     player.marketValue = this.calculateValue(
       currentAbility,

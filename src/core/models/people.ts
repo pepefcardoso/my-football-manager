@@ -36,6 +36,7 @@ export interface Player {
   stamina: Attribute;
   intelligence: Attribute;
   determination: Attribute;
+  overall: number;
   potential: Attribute;
   proneToInjury: Attribute;
   marketValue: Money;
