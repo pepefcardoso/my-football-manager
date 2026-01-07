@@ -3,6 +3,7 @@ import { User, Shield, CheckCircle, ArrowLeft } from "lucide-react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { Button } from "../components/Button";
+import { ClubBadge } from "../components/ClubBadge";
 
 export const NewGameSetupScreen: React.FC = () => {
     const { clubs, setState, meta, saveGame } = useGameStore();
@@ -96,20 +97,11 @@ export const NewGameSetupScreen: React.FC = () => {
                                                     className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-2 shadow-sm overflow-hidden p-1 transition-transform group-hover:scale-110"
                                                     style={{ borderColor: club.primaryColor }}
                                                 >
-                                                    {club.badgePath ? (
-                                                        <img
-                                                            src={club.badgePath}
-                                                            alt={club.name}
-                                                            className="w-full h-full object-contain"
-                                                            onError={(e) => {
-                                                                e.currentTarget.style.display = 'none';
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <span className="font-bold text-background-secondary text-lg">
-                                                            {club.name.substring(0, 1)}
-                                                        </span>
-                                                    )}
+                                                    <ClubBadge
+                                                        badgeId={club.badgeId}
+                                                        clubName={club.name}
+                                                        className="w-full h-full"
+                                                    />
                                                 </div>
 
                                                 <div className="text-left">

@@ -189,7 +189,7 @@ export class ClubFactory {
     nationId: ID,
     reputation: number,
     colors: { primary: string; secondary: string },
-    badgePath: string
+    badgeId: string
   ): ClubBundle {
     const clubId = uuidv4();
     const isBigClub = reputation > 7000;
@@ -203,9 +203,8 @@ export class ClubFactory {
       nationId,
       primaryColor: colors.primary,
       secondaryColor: colors.secondary,
-      badgePath: badgePath,
-      kitHomePath: "",
-      kitAwayPath: "",
+      badgeId: badgeId,
+      kitId: "",
       fanBaseCurrent: Math.floor(reputation * rng.range(10, 50)),
       fanBaseMax: Math.floor(reputation * 60),
       fanBaseMin: Math.floor(reputation * 5),

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
+import { ClubBadge } from "./ClubBadge";
 import {
     Trophy, MapPin, Calendar, Users,
     History, Info, Search, Shield
@@ -230,11 +231,11 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({ clubId, isOpen
                         className="w-24 h-24 rounded-full bg-white flex items-center justify-center border-4 shadow-lg p-2"
                         style={{ borderColor: club.primaryColor }}
                     >
-                        {club.badgePath ? (
-                            <img src={club.badgePath} alt={club.name} className="w-full h-full object-contain" />
-                        ) : (
-                            <span className="text-3xl font-bold text-black">{club.nickname.substring(0, 2)}</span>
-                        )}
+                        <ClubBadge
+                            badgeId={club.badgeId}
+                            clubName={club.name}
+                            className="w-full h-full"
+                        />
                     </div>
                     <div>
                         <h2 className="text-3xl font-bold text-text-primary tracking-tight">{club.name}</h2>

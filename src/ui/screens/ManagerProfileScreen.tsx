@@ -4,6 +4,7 @@ import { useUIStore } from "../../state/useUIStore";
 import { formatDate, formatMoney } from "../../core/utils/formatters";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
+import { ClubBadge } from "../components/ClubBadge";
 import {
     User, Briefcase, Trophy, History,
     Award, ChevronDown, ChevronUp, AlertTriangle, LogOut
@@ -113,13 +114,11 @@ export const ManagerProfileScreen: React.FC = () => {
                 {currentClub && (
                     <div className="flex flex-col items-center">
                         <div className="w-16 h-16 bg-white rounded-full p-1 border-2 border-background-tertiary mb-1">
-                            {currentClub.badgePath ? (
-                                <img src={currentClub.badgePath} className="w-full h-full object-contain" alt={currentClub.name} />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center font-bold text-black">
-                                    {currentClub.nickname.substring(0, 2)}
-                                </div>
-                            )}
+                            <ClubBadge
+                                badgeId={currentClub.badgeId}
+                                clubName={currentClub.name}
+                                className="w-full h-full"
+                            />
                         </div>
                         <span className="text-xs font-bold text-text-primary">{currentClub.name}</span>
                     </div>

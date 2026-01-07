@@ -12,121 +12,121 @@ const BRAZIL_CLUBS_DATA = [
     name: "Flamengo",
     reputation: 9500,
     colors: { primary: "#C4161C", secondary: "#000000" },
-    badge: "/badges/fla.png",
+    badgeId: "/badges/fla.png",
   },
   {
     name: "Palmeiras",
     reputation: 9400,
     colors: { primary: "#006437", secondary: "#FFFFFF" },
-    badge: "/badges/pal.png",
+    badgeId: "/badges/pal.png",
   },
   {
     name: "Atlético-MG",
     reputation: 8700,
     colors: { primary: "#000000", secondary: "#FFFFFF" },
-    badge: "/badges/cam.png",
+    badgeId: "/badges/cam.png",
   },
   {
     name: "São Paulo",
     reputation: 8800,
     colors: { primary: "#C4161C", secondary: "#FFFFFF" },
-    badge: "/badges/sao.png",
+    badgeId: "/badges/sao.png",
   },
   {
     name: "Fluminense",
     reputation: 8200,
     colors: { primary: "#8A1325", secondary: "#054F33" },
-    badge: "/badges/flu.png",
+    badgeId: "/badges/flu.png",
   },
   {
     name: "Grêmio",
     reputation: 8300,
     colors: { primary: "#0D80BF", secondary: "#000000" },
-    badge: "/badges/gre.png",
+    badgeId: "/badges/gre.png",
   },
   {
     name: "Red Bull Bragantino",
     reputation: 7400,
     colors: { primary: "#FFFFFF", secondary: "#C4161C" },
-    badge: "/badges/rbb.png",
+    badgeId: "/badges/rbb.png",
   },
   {
     name: "Athletico-PR",
     reputation: 7700,
     colors: { primary: "#C4161C", secondary: "#000000" },
-    badge: "/badges/cap.png",
+    badgeId: "/badges/cap.png",
   },
   {
     name: "Botafogo",
     reputation: 8100,
     colors: { primary: "#000000", secondary: "#FFFFFF" },
-    badge: "/badges/bot.png",
+    badgeId: "/badges/bot.png",
   },
   {
     name: "Internacional",
     reputation: 8400,
     colors: { primary: "#C4161C", secondary: "#FFFFFF" },
-    badge: "/badges/int.png",
+    badgeId: "/badges/int.png",
   },
   {
     name: "Fortaleza",
     reputation: 7600,
     colors: { primary: "#103176", secondary: "#C4161C" },
-    badge: "/badges/for.png",
+    badgeId: "/badges/for.png",
   },
   {
     name: "Corinthians",
     reputation: 8600,
     colors: { primary: "#FFFFFF", secondary: "#000000" },
-    badge: "/badges/cor.png",
+    badgeId: "/badges/cor.png",
   },
   {
     name: "Cruzeiro",
     reputation: 7900,
     colors: { primary: "#00479C", secondary: "#FFFFFF" },
-    badge: "/badges/cru.png",
+    badgeId: "/badges/cru.png",
   },
   {
     name: "Vasco da Gama",
     reputation: 7800,
     colors: { primary: "#000000", secondary: "#FFFFFF" },
-    badge: "/badges/vas.png",
+    badgeId: "/badges/vas.png",
   },
   {
     name: "Bahia",
     reputation: 7500,
     colors: { primary: "#005BAA", secondary: "#C4161C" },
-    badge: "/badges/bah.png",
+    badgeId: "/badges/bah.png",
   },
   {
     name: "Santos",
     reputation: 8000,
     colors: { primary: "#FFFFFF", secondary: "#000000" },
-    badge: "/badges/san.png",
+    badgeId: "/badges/san.png",
   },
   {
     name: "Sport",
     reputation: 7000,
     colors: { primary: "#C4161C", secondary: "#000000" },
-    badge: "/badges/spt.png",
+    badgeId: "/badges/spt.png",
   },
   {
     name: "Ceará",
     reputation: 7100,
     colors: { primary: "#000000", secondary: "#FFFFFF" },
-    badge: "/badges/cea.png",
+    badgeId: "/badges/cea.png",
   },
   {
     name: "Vitória",
     reputation: 6900,
     colors: { primary: "#C4161C", secondary: "#000000" },
-    badge: "/badges/vit.png",
+    badgeId: "/badges/vit.png",
   },
   {
     name: "Juventude",
     reputation: 6800,
     colors: { primary: "#006437", secondary: "#FFFFFF" },
-    badge: "/badges/juv.png",
+    badgeId: "/badges/juv.png",
   },
 ];
 
@@ -182,6 +182,7 @@ const createEmptyState = (): GameState => ({
   news: {},
   scheduledEvents: {},
   gameEvents: {},
+  notifications: {},
 });
 
 export const createNewGame = (): GameState => {
@@ -203,7 +204,7 @@ export const createNewGame = (): GameState => {
       brazilId,
       clubData.reputation,
       clubData.colors,
-      clubData.badge
+      clubData.badgeId
     );
 
     if (index === 0) firstClubId = bundle.club.id;

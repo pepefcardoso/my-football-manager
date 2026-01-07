@@ -3,6 +3,7 @@ import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { Calendar, MapPin, Trophy, Shield, Star, Clock, FastForward, CheckCircle } from "lucide-react";
 import { Button } from "../components/Button";
+import { ClubBadge } from "../components/ClubBadge";
 import { simulationSystem } from "../../core/systems/SimulationSystem";
 
 export const CalendarScreen: React.FC = () => {
@@ -138,10 +139,12 @@ export const CalendarScreen: React.FC = () => {
                     upcomingMatches.map((match, index) => {
                         const isHome = match.homeClubId === userClubId;
                         const opponentId = isHome ? match.awayClubId : match.homeClubId;
-                        const opponent = clubs[opponentId] || { name: 'Desconhecido', nickname: '??', reputation: 0, badgePath: null };
+                        const opponent = clubs[opponentId] || { name: 'Desconhecido', nickname: '??', reputation: 0, badgeId: undefined };
                         const isNextMatch = index === 0;
                         const importance = getMatchImportance(match, opponent);
                         const ImportanceIcon = importance?.icon ?? null;
+                        const homeTeam = clubs[match.homeClubId];
+                        const awayTeam = clubs[match.awayClubId];
 
                         return (
                             <div
@@ -177,24 +180,34 @@ export const CalendarScreen: React.FC = () => {
 
                                 <div className="flex-1 flex items-center justify-center space-x-6 w-full md:w-auto border-t md:border-t-0 border-b md:border-b-0 border-background-tertiary py-4 md:py-0 my-2 md:my-0 bg-background/30 md:bg-transparent rounded md:rounded-none">
                                     <div className="text-right hidden md:block w-1/3">
-                                        <div className="font-bold text-text-primary text-lg">{isHome ? clubs[userClubId].name : opponent.name}</div>
+                                        <div className="font-bold text-text-primary text-lg">{homeTeam.name}</div>
                                         {isHome && <div className="text-xs text-primary font-bold">VOCÊ</div>}
                                     </div>
 
                                     <div className="flex items-center space-x-4">
                                         <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center bg-background ${isHome ? 'border-primary' : 'border-background-tertiary'}`}>
-                                            {isHome && clubs[userClubId].badgePath ? <img src={clubs[userClubId].badgePath} className="w-8 h-8 object-contain" alt="badge" /> : <span className="font-bold">{(clubs[userClubId].nickname || '').substring(0, 2)}</span>}
+                                            <ClubBadge
+                                                badgeId={homeTeam.badgeId}
+                                                clubName={homeTeam.name}
+                                                className="w-8 h-8"
+                                                size="md"
+                                            />
                                         </div>
 
                                         <span className="font-mono text-xl text-text-muted font-bold">VS</span>
 
                                         <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center bg-background ${!isHome ? 'border-primary' : 'border-background-tertiary'}`}>
-                                            {!isHome && opponent.badgePath ? <img src={opponent.badgePath} className="w-8 h-8 object-contain" alt="badge" /> : <span className="font-bold">{(opponent.nickname || '').substring(0, 2)}</span>}
+                                            <ClubBadge
+                                                badgeId={awayTeam.badgeId}
+                                                clubName={awayTeam.name}
+                                                className="w-8 h-8"
+                                                size="md"
+                                            />
                                         </div>
                                     </div>
 
                                     <div className="text-left hidden md:block w-1/3">
-                                        <div className="font-bold text-text-primary text-lg">{!isHome ? clubs[userClubId].name : opponent.name}</div>
+                                        <div className="font-bold text-text-primary text-lg">{awayTeam.name}</div>
                                         {!isHome && <div className="text-xs text-primary font-bold">VOCÊ</div>}
                                     </div>
                                 </div>

@@ -36,15 +36,12 @@ export interface Club {
   nationId: ID;
   primaryColor: string;
   secondaryColor: string;
-  badgePath: string;
-  kitHomePath: string;
-  kitAwayPath: string;
-
+  badgeId: string;
+  kitId: string;
   fanBaseCurrent: number;
   fanBaseMax: number;
   fanBaseMin: number;
   reputation: number;
-
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

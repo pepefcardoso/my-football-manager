@@ -3,6 +3,7 @@ import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { MatchEvent } from "../../core/models/match";
 import { Button } from "../components/Button";
+import { ClubBadge } from "../components/ClubBadge";
 import { DynamicPitchView } from "../components/DynamicPitchView";
 import {
     Play, Pause, SkipForward,
@@ -148,7 +149,11 @@ export const MatchLiveScreen: React.FC = () => {
                 <div className="flex justify-between items-center max-w-5xl mx-auto">
                     <div className="flex items-center space-x-4 w-1/3">
                         <div className="w-16 h-16 rounded-full bg-white p-1 border-2" style={{ borderColor: homeClub.primaryColor }}>
-                            {homeClub.badgePath ? <img src={homeClub.badgePath} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center font-bold text-black">{homeClub.nickname}</div>}
+                            <ClubBadge
+                                badgeId={homeClub.badgeId}
+                                clubName={homeClub.name}
+                                className="w-full h-full"
+                            />
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-text-primary">{homeClub.name}</h2>
@@ -170,7 +175,11 @@ export const MatchLiveScreen: React.FC = () => {
                             <p className="text-sm text-text-secondary">Visitante</p>
                         </div>
                         <div className="w-16 h-16 rounded-full bg-white p-1 border-2" style={{ borderColor: awayClub.primaryColor }}>
-                            {awayClub.badgePath ? <img src={awayClub.badgePath} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center font-bold text-black">{awayClub.nickname}</div>}
+                            <ClubBadge
+                                badgeId={awayClub.badgeId}
+                                clubName={awayClub.name}
+                                className="w-full h-full"
+                            />
                         </div>
                     </div>
                 </div>

@@ -3,6 +3,7 @@ import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { formatDate } from "../../core/utils/formatters";
 import { Button } from "../components/Button";
+import { ClubBadge } from "../components/ClubBadge";
 import {
     Trophy, ArrowRight, Activity, Shield,
     AlertTriangle, BarChart2, Star
@@ -99,10 +100,11 @@ export const MatchResultScreen: React.FC = () => {
                 <div className="max-w-4xl mx-auto flex justify-between items-center">
                     <div className="flex flex-col items-center w-1/3">
                         <div className="w-20 h-20 rounded-full bg-white p-1 border-4 mb-2 shadow-xl" style={{ borderColor: homeClub.primaryColor }}>
-                            {homeClub.badgePath ?
-                                <img src={homeClub.badgePath} className="w-full h-full object-contain" /> :
-                                <div className="w-full h-full flex items-center justify-center font-bold text-black text-2xl">{homeClub.name[0]}</div>
-                            }
+                            <ClubBadge
+                                badgeId={homeClub.badgeId}
+                                clubName={homeClub.name}
+                                className="w-full h-full"
+                            />
                         </div>
                         <h2 className="text-xl font-bold text-text-primary text-center leading-tight">{homeClub.name}</h2>
                         {isUserHome && <span className="text-xs bg-primary px-2 py-0.5 rounded text-white mt-1">VOCÊ</span>}
@@ -120,10 +122,11 @@ export const MatchResultScreen: React.FC = () => {
 
                     <div className="flex flex-col items-center w-1/3">
                         <div className="w-20 h-20 rounded-full bg-white p-1 border-4 mb-2 shadow-xl" style={{ borderColor: awayClub.primaryColor }}>
-                            {awayClub.badgePath ?
-                                <img src={awayClub.badgePath} className="w-full h-full object-contain" /> :
-                                <div className="w-full h-full flex items-center justify-center font-bold text-black text-2xl">{awayClub.name[0]}</div>
-                            }
+                            <ClubBadge
+                                badgeId={awayClub.badgeId}
+                                clubName={awayClub.name}
+                                className="w-full h-full"
+                            />
                         </div>
                         <h2 className="text-xl font-bold text-text-primary text-center leading-tight">{awayClub.name}</h2>
                         {!isUserHome && <span className="text-xs bg-primary px-2 py-0.5 rounded text-white mt-1">VOCÊ</span>}

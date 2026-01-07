@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { Trophy, Calendar, Filter, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { ClubDetailModal } from "../components/ClubDetailModal";
+import { ClubBadge } from "../components/ClubBadge";
 import { formatDate } from "../../core/utils/formatters";
 
 type CompetitionView = "TABLE" | "RESULTS";
@@ -58,7 +59,7 @@ export const CompetitionsScreen: React.FC = () => {
                     ...standing,
                     clubName: club?.name || "Desconhecido",
                     clubId: club?.id,
-                    clubBadge: club?.badgePath,
+                    clubBadgeId: club?.badgeId,
                     isUser: club?.id === userClubId
                 };
             })
@@ -131,8 +132,8 @@ export const CompetitionsScreen: React.FC = () => {
                     <button
                         onClick={() => setActiveView("TABLE")}
                         className={`px-4 py-2 rounded text-sm font-medium transition-all ${activeView === "TABLE"
-                                ? "bg-primary text-white shadow-sm"
-                                : "text-text-secondary hover:text-text-primary hover:bg-white/5"
+                            ? "bg-primary text-white shadow-sm"
+                            : "text-text-secondary hover:text-text-primary hover:bg-white/5"
                             }`}
                     >
                         Classificação
@@ -140,8 +141,8 @@ export const CompetitionsScreen: React.FC = () => {
                     <button
                         onClick={() => setActiveView("RESULTS")}
                         className={`px-4 py-2 rounded text-sm font-medium transition-all ${activeView === "RESULTS"
-                                ? "bg-primary text-white shadow-sm"
-                                : "text-text-secondary hover:text-text-primary hover:bg-white/5"
+                            ? "bg-primary text-white shadow-sm"
+                            : "text-text-secondary hover:text-text-primary hover:bg-white/5"
                             }`}
                     >
                         Resultados
@@ -186,9 +187,14 @@ export const CompetitionsScreen: React.FC = () => {
                                             {index + 1}º
                                         </td>
                                         <td className="p-4 font-medium text-text-primary flex items-center">
-                                            {row.clubBadge && (
-                                                <img src={row.clubBadge} alt="" className="w-6 h-6 mr-3 object-contain" />
-                                            )}
+                                            <div className="w-6 h-6 mr-3">
+                                                <ClubBadge
+                                                    badgeId={row.clubBadgeId}
+                                                    clubName={row.clubName}
+                                                    className="w-full h-full"
+                                                    size="sm"
+                                                />
+                                            </div>
                                             {row.clubName}
                                             {row.isUser && <span className="ml-2 text-[10px] bg-primary text-white px-1.5 py-0.5 rounded shadow-sm">VOCÊ</span>}
                                         </td>
@@ -241,8 +247,8 @@ export const CompetitionsScreen: React.FC = () => {
                             <button
                                 onClick={() => setOnlyMyGames(!onlyMyGames)}
                                 className={`flex items-center px-3 py-1.5 rounded text-sm transition-colors border ${onlyMyGames
-                                        ? "bg-primary/10 border-primary text-primary"
-                                        : "bg-transparent border-background-tertiary text-text-secondary hover:border-text-muted"
+                                    ? "bg-primary/10 border-primary text-primary"
+                                    : "bg-transparent border-background-tertiary text-text-secondary hover:border-text-muted"
                                     }`}
                             >
                                 <Filter size={14} className="mr-2" />
@@ -289,7 +295,11 @@ export const CompetitionsScreen: React.FC = () => {
                                                             {homeClub.name}
                                                         </span>
                                                         <div className="w-8 h-8 rounded-full border border-background-tertiary p-0.5 bg-white">
-                                                            {homeClub.badgePath ? <img src={homeClub.badgePath} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center text-black text-xs font-bold">{homeClub.nickname.substring(0, 2)}</div>}
+                                                            <ClubBadge
+                                                                badgeId={homeClub.badgeId}
+                                                                clubName={homeClub.name}
+                                                                className="w-full h-full"
+                                                            />
                                                         </div>
                                                     </div>
 
@@ -310,7 +320,11 @@ export const CompetitionsScreen: React.FC = () => {
                                                         onClick={() => setSelectedClubId(awayClub.id)}
                                                     >
                                                         <div className="w-8 h-8 rounded-full border border-background-tertiary p-0.5 bg-white">
-                                                            {awayClub.badgePath ? <img src={awayClub.badgePath} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center text-black text-xs font-bold">{awayClub.nickname.substring(0, 2)}</div>}
+                                                            <ClubBadge
+                                                                badgeId={awayClub.badgeId}
+                                                                clubName={awayClub.name}
+                                                                className="w-full h-full"
+                                                            />
                                                         </div>
                                                         <span className={`font-bold ${isPlayed && match.awayGoals > match.homeGoals ? 'text-text-primary' : 'text-text-secondary'}`}>
                                                             {awayClub.name}

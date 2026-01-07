@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { formatMoney, formatDate, formatDateTime } from "../../core/utils/formatters";
 import { Button } from "../components/Button";
+import { ClubBadge } from "../components/ClubBadge";
 import { Play, Calendar, TrendingUp, Trophy, AlertCircle } from "lucide-react";
 import { useUIStore } from "../../state/useUIStore";
 import { DAILY_PROCESSING_STAGES } from "../../core/systems/TimeSystem";
@@ -87,14 +88,14 @@ export const DashboardScreen: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-background-secondary p-6 rounded-lg border border-background-tertiary shadow-lg">
                 <div className="flex items-center space-x-4 mb-4 md:mb-0">
                     <div
-                        className="w-16 h-16 rounded-full bg-background border-2 flex items-center justify-center text-2xl font-bold"
-                        style={{ borderColor: userClub.primaryColor, color: userClub.primaryColor }}
+                        className="w-16 h-16 rounded-full bg-background border-2 p-1"
+                        style={{ borderColor: userClub.primaryColor }}
                     >
-                        {userClub.badgePath ? (
-                            <img src={userClub.badgePath} alt={userClub.name} className="w-full h-full object-contain rounded-full" />
-                        ) : (
-                            userClub.name.substring(0, 1)
-                        )}
+                        <ClubBadge
+                            badgeId={userClub.badgeId}
+                            clubName={userClub.name}
+                            className="w-full h-full"
+                        />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-text-primary">{userClub.name}</h1>
