@@ -144,7 +144,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
 
     const goalChance = finishAttr - saveAttr + rng.range(-20, 20);
 
-    if (goalChance > 15) {
+    if (goalChance > 12) {
       // TODO: Mover threshold (15) para MATCH_CONFIG
       this.createEvent(
         matchId,

@@ -15,7 +15,7 @@ export const MATCH_CONFIG = {
   PROBABILITIES: {
     INJURY_BASE: 0.05,
     FOUL_BASE: 4.0,
-    ATTACK_BASE: 12.0,
+    ATTACK_BASE: 15.0,
   },
   STOPPAGE_TIME: {
     MIN_H1: 0,
