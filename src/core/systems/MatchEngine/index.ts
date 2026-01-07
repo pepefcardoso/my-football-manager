@@ -5,6 +5,7 @@ import {
   MatchEngineResult,
   TeamMatchContext,
 } from "./types";
+import { logger } from "../../utils/logger";
 
 class MatchEngine {
   private strategy: IMatchSimulationStrategy;
@@ -22,8 +23,8 @@ class MatchEngine {
     home: TeamMatchContext,
     away: TeamMatchContext
   ): MatchEngineResult {
-    console.log(
-      `[MatchEngine] Simulando ${home.clubName} vs ${away.clubName} com ${this.strategy.constructor.name}...`
+    logger.info("MatchEngine",
+      `Simulando ${home.clubName} vs ${away.clubName} com ${this.strategy.constructor.name}...`
     );
     return this.strategy.simulate(match, home, away);
   }

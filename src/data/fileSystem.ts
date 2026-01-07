@@ -1,4 +1,5 @@
 import { GameState } from "../core/models/gameState";
+import { logger } from "../core/utils/Logger";
 
 interface SaveMetadata {
   version: string;
@@ -95,10 +96,10 @@ function saveToWebStorage(saveName: string, state: GameState): boolean {
       })
     );
 
-    console.log("[Web Storage] Save realizado com sucesso");
+    logger.info("WebStorage", "Save realizado com sucesso");
     return true;
   } catch (error) {
-    console.error("[Web Storage] Erro ao salvar:", error);
+    logger.error("WebStorage", "Erro ao salvar", error);
     return false;
   }
 }
@@ -109,20 +110,20 @@ function loadFromWebStorage(saveName: string): GameState | null {
     const data = localStorage.getItem(key);
 
     if (!data) {
-      console.warn("[Web Storage] Save não encontrado:", saveName);
+      logger.warn("WebStorage", `Save não encontrado: ${saveName}`);
       return null;
     }
 
     const parsed = JSON.parse(data);
 
     if (!validateGameState(parsed)) {
-      console.error("[Web Storage] Save inválido ou corrompido");
+      logger.error("WebStorage", "Save inválido ou corrompido");
       return null;
     }
 
     return parsed;
   } catch (error) {
-    console.error("[Web Storage] Erro ao carregar:", error);
+    logger.error("WebStorage", "Erro ao carregar", error);
     return null;
   }
 }
@@ -149,7 +150,7 @@ export async function saveGameToDisk(
   state: GameState
 ): Promise<SaveResult> {
   if (!isElectron()) {
-    console.warn("⚠️ Rodando em modo Web - usando localStorage");
+    logger.warn("FileSystem", "Rodando em modo Web - usando localStorage");
     const success = saveToWebStorage(saveName, state);
     return {
       success,
@@ -163,21 +164,17 @@ export async function saveGameToDisk(
     const result = await window.electronAPI.saveGame(saveName, serializedState);
 
     if (result.success) {
-      console.log("✅ Save realizado com sucesso");
-      if (result.metadata) {
-        console.log(
-          `📊 Tamanho: ${formatBytes(
-            result.metadata.size
-          )} | Checksum: ${result.metadata.checksum.substring(0, 8)}...`
-        );
-      }
+      logger.info("FileSystem", "Save realizado com sucesso", {
+        size: result.metadata ? formatBytes(result.metadata.size) : "N/A",
+        checksum: result.metadata?.checksum.substring(0, 8) + "...",
+      });
     } else {
-      console.error("❌ Erro ao salvar:", result.error);
+      logger.error("FileSystem", "Erro ao salvar", result.error);
     }
 
     return result;
   } catch (error) {
-    console.error("❌ Exceção ao salvar:", error);
+    logger.error("FileSystem", "Exceção ao salvar", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Erro desconhecido",
@@ -189,7 +186,7 @@ export async function loadGameFromDisk(
   saveName: string
 ): Promise<GameState | null> {
   if (!isElectron()) {
-    console.warn("⚠️ Rodando em modo Web - usando localStorage");
+    logger.warn("FileSystem", "Rodando em modo Web - usando localStorage");
     return loadFromWebStorage(saveName);
   }
 
@@ -197,29 +194,25 @@ export async function loadGameFromDisk(
     const result = await window.electronAPI.loadGame(saveName);
 
     if (!result.success || !result.data) {
-      console.error("❌ Erro ao carregar:", result.error);
+      logger.error("FileSystem", "Erro ao carregar", result.error);
       return null;
     }
 
     const parsed = JSON.parse(result.data);
 
     if (!validateGameState(parsed)) {
-      console.error("❌ Save inválido ou corrompido");
+      logger.error("FileSystem", "Save inválido ou corrompido");
       return null;
     }
 
-    console.log("✅ Load realizado com sucesso");
-    if (result.metadata) {
-      console.log(
-        `📊 Versão: ${result.metadata.version} | Data: ${formatDate(
-          result.metadata.timestamp
-        )}`
-      );
-    }
+    logger.info("FileSystem", "Load realizado com sucesso", {
+      version: result.metadata?.version,
+      date: result.metadata ? formatDate(result.metadata.timestamp) : "N/A",
+    });
 
     return parsed;
   } catch (error) {
-    console.error("❌ Exceção ao carregar:", error);
+    logger.error("FileSystem", "Exceção ao carregar", error);
     return null;
   }
 }
@@ -232,7 +225,7 @@ export async function listSaveFiles(): Promise<string[]> {
   try {
     return await window.electronAPI.listSaves();
   } catch (error) {
-    console.error("❌ Erro ao listar saves:", error);
+    logger.error("FileSystem", "Erro ao listar saves", error);
     return [];
   }
 }
@@ -252,7 +245,7 @@ export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
   try {
     return await window.electronAPI.deleteSave(saveName);
   } catch (error) {
-    console.error("❌ Erro ao deletar:", error);
+    logger.error("FileSystem", "Erro ao deletar", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Erro desconhecido",
@@ -296,21 +289,21 @@ export async function getSaveInfo(saveName: string): Promise<SaveInfo | null> {
       readableDate: formatDate(metadata.timestamp),
     };
   } catch (error) {
-    console.error("❌ Erro ao obter info:", error);
+    logger.error("FileSystem", "Erro ao obter info", error);
     return null;
   }
 }
 
 export async function openSavesFolder(): Promise<void> {
   if (!isElectron()) {
-    console.warn("⚠️ Função disponível apenas no Electron");
+    logger.warn("FileSystem", "Função disponível apenas no Electron");
     return;
   }
 
   try {
     await window.electronAPI.openSavesFolder();
   } catch (error) {
-    console.error("❌ Erro ao abrir pasta:", error);
+    logger.error("FileSystem", "Erro ao abrir pasta", error);
   }
 }
 

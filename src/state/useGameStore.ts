@@ -17,6 +17,7 @@ import {
   deleteNotification,
   markAsRead,
 } from "../core/systems/NotificationSystem";
+import { logger } from "../core/utils/Logger";
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
@@ -127,7 +128,7 @@ export const useGameStore = create<GameStore>()(
         updatedAt: Date.now(),
       };
 
-      console.log(`💾 Salvando jogo: ${saveName}...`);
+      logger.info("GameStore", `💾 Salvando jogo: ${saveName}...`);
 
       const result = await saveGameToDisk(saveName, dataToSave);
 
@@ -136,26 +137,26 @@ export const useGameStore = create<GameStore>()(
           state.meta.saveName = saveName;
           state.meta.updatedAt = Date.now();
         });
-        console.log("✅ Save concluído com sucesso");
+        logger.info("GameStore", "✅ Save concluído com sucesso");
       } else {
-        console.error("❌ Falha ao salvar:", result.error);
+        logger.error("GameStore", "❌ Falha ao salvar", result.error);
       }
 
       return result;
     },
 
     loadGame: async (saveName: string) => {
-      console.log(`📂 Carregando jogo: ${saveName}...`);
+      logger.info("GameStore", `📂 Carregando jogo: ${saveName}...`);
 
       const loadedState = await loadGameFromDisk(saveName);
 
       if (loadedState) {
         set(() => ({ ...loadedState } as GameStore));
-        console.log("✅ Load concluído com sucesso");
+        logger.info("GameStore", "✅ Load concluído com sucesso");
         return true;
       }
 
-      console.error("❌ Falha ao carregar save");
+      logger.error("GameStore", "❌ Falha ao carregar save");
       return false;
     },
 
@@ -164,13 +165,13 @@ export const useGameStore = create<GameStore>()(
     },
 
     deleteSave: async (saveName: string) => {
-      console.log(`🗑️ Deletando save: ${saveName}...`);
+      logger.info("GameStore", `🗑️ Deletando save: ${saveName}...`);
       const result = await deleteSaveFile(saveName);
 
       if (result.success) {
-        console.log("✅ Save deletado com sucesso");
+        logger.info("GameStore", "✅ Save deletado com sucesso");
       } else {
-        console.error("❌ Erro ao deletar:", result.error);
+        logger.error("GameStore", "❌ Erro ao deletar", result.error);
       }
 
       return result;
@@ -181,16 +182,16 @@ export const useGameStore = create<GameStore>()(
     },
 
     newGame: () => {
-      console.log("🎮 Criando novo jogo...");
+      logger.info("GameStore", "🎮 Criando novo jogo...");
       const newState = createNewGame();
       set(() => ({ ...newState } as GameStore));
-      console.log("✅ Novo jogo criado com sucesso");
+      logger.info("GameStore", "✅ Novo jogo criado com sucesso");
     },
 
     resetGame: () => {
-      console.log("🔄 Resetando jogo...");
+      logger.info("GameStore", "🔄 Resetando jogo...");
       set(() => ({ ...createInitialState() } as GameStore));
-      console.log("✅ Jogo resetado");
+      logger.info("GameStore", "✅ Jogo resetado");
     },
 
     setState: (fn) => set(produce(fn)),
@@ -203,16 +204,19 @@ export const useGameStore = create<GameStore>()(
       const state = get();
       const saveName = state.meta.saveName || "autosave";
 
-      console.log(`⏰ Auto-save habilitado (${intervalMinutes} minutos)`);
+      logger.info(
+        "GameStore",
+        `⏰ Auto-save habilitado (${intervalMinutes} minutos)`
+      );
 
       autoSaveInterval = setInterval(async () => {
-        console.log("💾 Executando auto-save...");
+        logger.info("GameStore", "💾 Executando auto-save...");
         const result = await get().saveGame(`${saveName}_autosave`);
 
         if (result.success) {
-          console.log("✅ Auto-save concluído");
+          logger.info("GameStore", "✅ Auto-save concluído");
         } else {
-          console.error("❌ Auto-save falhou:", result.error);
+          logger.error("GameStore", "❌ Auto-save falhou", result.error);
         }
       }, intervalMinutes * 60 * 1000);
     },
@@ -221,7 +225,7 @@ export const useGameStore = create<GameStore>()(
       if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
-        console.log("⏰ Auto-save desabilitado");
+        logger.info("GameStore", "⏰ Auto-save desabilitado");
       }
     },
 
