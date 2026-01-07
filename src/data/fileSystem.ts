@@ -160,76 +160,82 @@ export async function saveGameToDisk(
   saveName: string,
   state: GameState
 ): Promise<SaveResult> {
-  if (!isElectron()) {
-    logger.warn("FileSystem", "Rodando em modo Web - usando localStorage");
-    const success = saveToWebStorage(saveName, state);
-    return {
-      success,
-      error: success ? undefined : "Erro ao salvar no localStorage",
-    };
-  }
-
-  try {
-    const serializedState = serializeGameState(state);
-
-    const result = await getElectronAPI().saveGame(saveName, serializedState);
-
-    if (result.success) {
-      logger.info("FileSystem", "Save realizado com sucesso", {
-        size: result.metadata ? formatBytes(result.metadata.size) : "N/A",
-        checksum: result.metadata?.checksum.substring(0, 8) + "...",
-      });
-    } else {
-      logger.error("FileSystem", "Erro ao salvar", result.error);
+  return logger.timeAsync("FileSystem", `Save Game (${saveName})`, async () => {
+    if (!isElectron()) {
+      logger.warn("FileSystem", "Rodando em modo Web - usando localStorage");
+      const success = saveToWebStorage(saveName, state);
+      return {
+        success,
+        error: success ? undefined : "Erro ao salvar no localStorage",
+      };
     }
 
-    return result;
-  } catch (error) {
-    logger.error("FileSystem", "Exceção ao salvar", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Erro desconhecido",
-    };
-  }
+    try {
+      const serializedState = serializeGameState(state);
+
+      const result = await getElectronAPI().saveGame(saveName, serializedState);
+
+      if (result.success) {
+        logger.info("FileSystem", "Save gravado em disco", {
+          size: result.metadata ? formatBytes(result.metadata.size) : "N/A",
+          checksum: result.metadata?.checksum.substring(0, 8) + "...",
+        });
+      } else {
+        logger.error("FileSystem", "Erro ao salvar em disco", result.error);
+      }
+
+      return result;
+    } catch (error) {
+      logger.error("FileSystem", "Exceção crítica ao salvar", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Erro desconhecido",
+      };
+    }
+  });
 }
 
 export async function loadGameFromDisk(
   saveName: string
 ): Promise<GameState | null> {
-  if (!isElectron()) {
-    logger.warn("FileSystem", "Rodando em modo Web - usando localStorage");
-    return loadFromWebStorage(saveName);
-  }
-
-  try {
-    const result = await getElectronAPI().loadGame(saveName);
-
-    if (!result.success || !result.data) {
-      logger.error("FileSystem", "Erro ao carregar", result.error);
-      return null;
+  return logger.timeAsync("FileSystem", `Load Game (${saveName})`, async () => {
+    if (!isElectron()) {
+      logger.warn("FileSystem", "Rodando em modo Web - usando localStorage");
+      return loadFromWebStorage(saveName);
     }
 
-    const parsedRaw = JSON.parse(result.data);
-    const validatedState = parseAndValidateGameState(parsedRaw);
+    try {
+      const result = await getElectronAPI().loadGame(saveName);
 
-    if (!validatedState) {
-      logger.error(
-        "FileSystem",
-        "Save inválido ou corrompido (Schema Mismatch)"
-      );
+      if (!result.success || !result.data) {
+        logger.error("FileSystem", "Erro ao carregar do disco", result.error);
+        return null;
+      }
+
+      const parsedRaw = JSON.parse(result.data);
+      const validatedState = parseAndValidateGameState(parsedRaw);
+
+      if (!validatedState) {
+        logger.error(
+          "FileSystem",
+          "Save inválido ou corrompido (Schema Mismatch)"
+        );
+        return null;
+      }
+
+      logger.debug("FileSystem", "Metadados do Save", {
+        version: result.metadata?.version,
+        timestamp: result.metadata
+          ? formatDate(result.metadata.timestamp)
+          : "N/A",
+      });
+
+      return validatedState;
+    } catch (error) {
+      logger.error("FileSystem", "Exceção crítica ao carregar", error);
       return null;
     }
-
-    logger.info("FileSystem", "Load realizado com sucesso", {
-      version: result.metadata?.version,
-      date: result.metadata ? formatDate(result.metadata.timestamp) : "N/A",
-    });
-
-    return validatedState;
-  } catch (error) {
-    logger.error("FileSystem", "Exceção ao carregar", error);
-    return null;
-  }
+  });
 }
 
 export async function listSaveFiles(): Promise<string[]> {

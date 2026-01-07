@@ -52,6 +52,50 @@ class LoggerService {
     this.log("ERROR", context, message, data);
   }
 
+  public time<T>(context: string, operation: string, fn: () => T): T {
+    const start = performance.now();
+    try {
+      const result = fn();
+      const duration = performance.now() - start;
+      this.info(context, `${operation} concluído`, {
+        duration: `${duration.toFixed(2)}ms`,
+      });
+      return result;
+    } catch (error) {
+      const duration = performance.now() - start;
+      this.error(
+        context,
+        `${operation} falhou após ${duration.toFixed(2)}ms`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  public async timeAsync<T>(
+    context: string,
+    operation: string,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    const start = performance.now();
+    try {
+      const result = await fn();
+      const duration = performance.now() - start;
+      this.info(context, `${operation} concluído`, {
+        duration: `${duration.toFixed(2)}ms`,
+      });
+      return result;
+    } catch (error) {
+      const duration = performance.now() - start;
+      this.error(
+        context,
+        `${operation} falhou após ${duration.toFixed(2)}ms`,
+        error
+      );
+      throw error;
+    }
+  }
+
   public getHistory(): LogEntry[] {
     return [...this.logs];
   }
@@ -60,36 +104,19 @@ class LoggerService {
     const time = new Date(entry.timestamp).toLocaleTimeString();
     const prefix = `[${time}] [${entry.context}]`;
 
-    switch (entry.level) {
-      case "DEBUG":
-        console.debug(
-          `%c${prefix} ${entry.message}`,
-          "color: gray",
-          entry.data || ""
-        );
-        break;
-      case "INFO":
-        console.info(
-          `%c${prefix} ${entry.message}`,
-          "color: #3b82f6",
-          entry.data || ""
-        );
-        break;
-      case "WARN":
-        console.warn(
-          `%c${prefix} ${entry.message}`,
-          "color: #f59e0b",
-          entry.data || ""
-        );
-        break;
-      case "ERROR":
-        console.error(
-          `%c${prefix} ${entry.message}`,
-          "color: #ef4444; font-weight: bold",
-          entry.data || ""
-        );
-        break;
-    }
+    const styles = {
+      DEBUG: "color: #9ca3af",
+      INFO: "color: #3b82f6; font-weight: bold",
+      WARN: "color: #f59e0b; font-weight: bold",
+      ERROR:
+        "color: #ef4444; font-weight: bold; background: #fee2e2; padding: 2px 4px; rounded: 2px",
+    };
+
+    const style = styles[entry.level];
+
+    const dataOutput = entry.data ? entry.data : "";
+
+    console.log(`%c${prefix} ${entry.message}`, style, dataOutput);
   }
 }
 

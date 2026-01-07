@@ -1,4 +1,5 @@
 import { TimeAdvanceResult, formatDate } from "./TimeSystem";
+import { logger } from "../utils/Logger";
 
 export interface SimulationCallbacks {
   onProgress: (daysSimulated: number, logs: string[]) => void;
@@ -19,12 +20,16 @@ class SimulationSystem {
     let daysSimulated = 0;
     let now = currentDate;
 
-    console.log(
-      `[SimulationSystem] Iniciando simulação até ${formatDate(targetDate)}`
-    );
+    logger.info("SimulationSystem", `Iniciando simulação`, {
+      from: formatDate(currentDate),
+      to: formatDate(targetDate),
+    });
+
+    const startTime = performance.now();
 
     while (now < targetDate && this._isSimulating) {
       if (callbacks.shouldStop()) {
+        logger.warn("SimulationSystem", "Simulação interrompida pelo usuário");
         this._isSimulating = false;
         break;
       }
@@ -43,10 +48,20 @@ class SimulationSystem {
       callbacks.onProgress(daysSimulated, formattedLogs);
     }
 
+    const totalTime = performance.now() - startTime;
+    logger.info("SimulationSystem", "Simulação finalizada", {
+      daysSimulated,
+      totalTimeMs: totalTime.toFixed(0),
+      avgTimePerDay: (totalTime / (daysSimulated || 1)).toFixed(2) + "ms",
+    });
+
     this._isSimulating = false;
   }
 
   public cancel(): void {
+    if (this._isSimulating) {
+      logger.info("SimulationSystem", "Sinal de cancelamento recebido");
+    }
     this._isSimulating = false;
   }
 
