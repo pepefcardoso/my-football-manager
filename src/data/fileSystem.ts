@@ -1,5 +1,6 @@
 import { GameState } from "../core/models/gameState";
 import { logger } from "../core/utils/Logger";
+import { GameStateSchema } from "./schemas/gameStateSchema";
 
 interface SaveMetadata {
   version: string;
@@ -29,8 +30,12 @@ interface SaveInfo {
   readableDate: string;
 }
 
+function getElectronAPI() {
+  return (window as any).electronAPI;
+}
+
 function isElectron(): boolean {
-  return typeof window !== "undefined" && window.electronAPI !== undefined;
+  return typeof window !== "undefined" && getElectronAPI() !== undefined;
 }
 
 function formatBytes(bytes: number): string {
@@ -67,17 +72,19 @@ function serializeGameState(state: GameState): string {
   return JSON.stringify(cleanState);
 }
 
-function validateGameState(state: unknown): state is GameState {
-  if (!state || typeof state !== "object") return false;
+function parseAndValidateGameState(data: unknown): GameState | null {
+  const result = GameStateSchema.safeParse(data);
 
-  const s = state as any;
+  if (!result.success) {
+    logger.error("FileSystem", "Falha na validação do Schema (Zod)", {
+      errors: result.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .slice(0, 5),
+    });
+    return null;
+  }
 
-  if (!s.meta || typeof s.meta !== "object") return false;
-  if (!s.clubs || typeof s.clubs !== "object") return false;
-  if (!s.players || typeof s.players !== "object") return false;
-  if (!s.managers || typeof s.managers !== "object") return false;
-
-  return true;
+  return result.data as unknown as GameState;
 }
 
 const WEB_STORAGE_KEY_PREFIX = "maestro_save_";
@@ -114,14 +121,18 @@ function loadFromWebStorage(saveName: string): GameState | null {
       return null;
     }
 
-    const parsed = JSON.parse(data);
+    const parsedRaw = JSON.parse(data);
+    const validatedState = parseAndValidateGameState(parsedRaw);
 
-    if (!validateGameState(parsed)) {
-      logger.error("WebStorage", "Save inválido ou corrompido");
+    if (!validatedState) {
+      logger.error(
+        "WebStorage",
+        "Save inválido ou corrompido (Schema Mismatch)"
+      );
       return null;
     }
 
-    return parsed;
+    return validatedState;
   } catch (error) {
     logger.error("WebStorage", "Erro ao carregar", error);
     return null;
@@ -161,7 +172,7 @@ export async function saveGameToDisk(
   try {
     const serializedState = serializeGameState(state);
 
-    const result = await window.electronAPI.saveGame(saveName, serializedState);
+    const result = await getElectronAPI().saveGame(saveName, serializedState);
 
     if (result.success) {
       logger.info("FileSystem", "Save realizado com sucesso", {
@@ -191,17 +202,21 @@ export async function loadGameFromDisk(
   }
 
   try {
-    const result = await window.electronAPI.loadGame(saveName);
+    const result = await getElectronAPI().loadGame(saveName);
 
     if (!result.success || !result.data) {
       logger.error("FileSystem", "Erro ao carregar", result.error);
       return null;
     }
 
-    const parsed = JSON.parse(result.data);
+    const parsedRaw = JSON.parse(result.data);
+    const validatedState = parseAndValidateGameState(parsedRaw);
 
-    if (!validateGameState(parsed)) {
-      logger.error("FileSystem", "Save inválido ou corrompido");
+    if (!validatedState) {
+      logger.error(
+        "FileSystem",
+        "Save inválido ou corrompido (Schema Mismatch)"
+      );
       return null;
     }
 
@@ -210,7 +225,7 @@ export async function loadGameFromDisk(
       date: result.metadata ? formatDate(result.metadata.timestamp) : "N/A",
     });
 
-    return parsed;
+    return validatedState;
   } catch (error) {
     logger.error("FileSystem", "Exceção ao carregar", error);
     return null;
@@ -223,7 +238,7 @@ export async function listSaveFiles(): Promise<string[]> {
   }
 
   try {
-    return await window.electronAPI.listSaves();
+    return await getElectronAPI().listSaves();
   } catch (error) {
     logger.error("FileSystem", "Erro ao listar saves", error);
     return [];
@@ -237,13 +252,13 @@ export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
       localStorage.removeItem(key);
       localStorage.removeItem(`${key}_meta`);
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: "Erro ao deletar do localStorage" };
     }
   }
 
   try {
-    return await window.electronAPI.deleteSave(saveName);
+    return await getElectronAPI().deleteSave(saveName);
   } catch (error) {
     logger.error("FileSystem", "Erro ao deletar", error);
     return {
@@ -279,7 +294,7 @@ export async function getSaveInfo(saveName: string): Promise<SaveInfo | null> {
   }
 
   try {
-    const metadata = await window.electronAPI.getSaveInfo(saveName);
+    const metadata = await getElectronAPI().getSaveInfo(saveName);
     if (!metadata) return null;
 
     return {
@@ -301,7 +316,7 @@ export async function openSavesFolder(): Promise<void> {
   }
 
   try {
-    await window.electronAPI.openSavesFolder();
+    await getElectronAPI().openSavesFolder();
   } catch (error) {
     logger.error("FileSystem", "Erro ao abrir pasta", error);
   }
