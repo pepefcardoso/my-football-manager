@@ -3,17 +3,20 @@ import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { Calendar, MapPin, Trophy, Shield, Star, Clock, FastForward, CheckCircle } from "lucide-react";
 import { Button } from "../components/Button";
-import { formatDate as formatGameDate } from "../../core/systems/TimeSystem";
+import { simulationSystem } from "../../core/systems/SimulationSystem";
 
 export const CalendarScreen: React.FC = () => {
     const { meta, matches, clubs, competitions, competitionGroups, competitionFases, competitionSeasons, advanceDay } = useGameStore();
     const { setView } = useUIStore();
     const userClubId = meta.userClubId;
+
     const [isSimulating, setIsSimulating] = useState(false);
     const [simulatedDays, setSimulatedDays] = useState(0);
     const [simulationLogs, setSimulationLogs] = useState<string[]>([]);
     const [showSummary, setShowSummary] = useState(false);
+
     const stopSimulationRef = useRef(false);
+
     const nextMatchTarget = useMemo(() => {
         if (!userClubId) return null;
         const allMatches = Object.values(matches);
@@ -26,6 +29,7 @@ export const CalendarScreen: React.FC = () => {
 
         return futureMatches[0] || null;
     }, [matches, userClubId, meta.currentDate]);
+
     const startSimulation = async () => {
         if (!nextMatchTarget) return;
 
@@ -37,22 +41,20 @@ export const CalendarScreen: React.FC = () => {
 
         const targetDate = new Date(nextMatchTarget.datetime).setHours(0, 0, 0, 0);
 
-        let currentDate = meta.currentDate;
-        let daysCount = 0;
-
-        while (currentDate < targetDate && !stopSimulationRef.current) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-
-            const result = advanceDay();
-            currentDate = result.newDate;
-            daysCount++;
-
-            if (result.events.length > 0) {
-                setSimulationLogs(prev => [...prev, ...result.events.map(e => `[${formatGameDate(result.newDate)}] ${e}`)]);
+        await simulationSystem.simulateUntilDate(
+            meta.currentDate,
+            targetDate,
+            {
+                advanceDayFn: () => advanceDay(),
+                shouldStop: () => stopSimulationRef.current,
+                onProgress: (days, newLogs) => {
+                    setSimulatedDays(days);
+                    if (newLogs.length > 0) {
+                        setSimulationLogs(prev => [...prev, ...newLogs]);
+                    }
+                }
             }
-
-            setSimulatedDays(daysCount);
-        }
+        );
 
         setIsSimulating(false);
         setShowSummary(true);
@@ -60,6 +62,7 @@ export const CalendarScreen: React.FC = () => {
 
     const cancelSimulation = () => {
         stopSimulationRef.current = true;
+        simulationSystem.cancel();
     };
 
     const formatDate = (timestamp: number) => {
