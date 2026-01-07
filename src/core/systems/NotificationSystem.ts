@@ -5,6 +5,7 @@ import {
   NotificationType,
   RelatedEntity,
 } from "../models/events";
+import { eventBus } from "../events/EventBus";
 import { ID } from "../models/types";
 
 export const generateNotification = (
@@ -122,4 +123,89 @@ const checkExpiringContracts = (state: GameState): void => {
 export const processDailyNotifications = (state: GameState): void => {
   checkExpiringContracts(state);
   cleanOldNotifications(state);
+};
+
+export const setupNotificationListeners = (): void => {
+  eventBus.clear();
+
+  eventBus.on("PLAYER_RECOVERED", (state, payload) => {
+    const player = state.players[payload.playerId];
+    if (!player) return;
+
+    generateNotification(
+      state,
+      "IMPORTANT",
+      "Retorno de Lesão",
+      `${player.name} recuperou-se totalmente (${payload.injuryName}) e voltou aos treinos.`,
+      { type: "PLAYER", id: payload.playerId }
+    );
+  });
+
+  eventBus.on("PLAYER_INJURY_OCCURRED", (state, payload) => {
+    const player = state.players[payload.playerId];
+    if (!player) return;
+
+    generateNotification(
+      state,
+      "CRITICAL",
+      "Lesão Confirmada",
+      `${player.name} sofreu uma lesão (${payload.injuryName}) e ficará fora por cerca de ${payload.daysOut} dias.`,
+      { type: "PLAYER", id: payload.playerId }
+    );
+  });
+
+  eventBus.on("PLAYER_DEVELOPMENT_BOOST", (state, payload) => {
+    const player = state.players[payload.playerId];
+    if (!player) return;
+
+    const attrName =
+      payload.attribute.charAt(0).toUpperCase() + payload.attribute.slice(1);
+
+    generateNotification(
+      state,
+      "INFO",
+      "Destaque no Treino",
+      `${
+        player.name
+      } impressionou a equipa técnica e melhorou o seu atributo de ${attrName} (+${payload.value.toFixed(
+        2
+      )}).`,
+      { type: "PLAYER", id: payload.playerId }
+    );
+  });
+
+  eventBus.on("MATCH_FINISHED", (state, payload) => {
+    const match = state.matches[payload.matchId];
+    if (!match) return;
+
+    const userClubId = state.meta.userClubId;
+    if (match.homeClubId !== userClubId && match.awayClubId !== userClubId) {
+      return;
+    }
+
+    const homeClub = state.clubs[match.homeClubId];
+    const awayClub = state.clubs[match.awayClubId];
+
+    const title =
+      match.homeClubId === userClubId
+        ? `Resultado: vs ${awayClub.name}`
+        : `Resultado: vs ${homeClub.name}`;
+
+    const outcomeEmoji =
+      (match.homeClubId === userClubId &&
+        payload.homeScore > payload.awayScore) ||
+      (match.awayClubId === userClubId && payload.awayScore > payload.homeScore)
+        ? "✅ Vitória!"
+        : payload.homeScore === payload.awayScore
+        ? "⚖️ Empate"
+        : "❌ Derrota";
+
+    generateNotification(
+      state,
+      "INFO",
+      title,
+      `${outcomeEmoji} O jogo terminou: ${homeClub.name} ${payload.homeScore} x ${payload.awayScore} ${awayClub.name}.`,
+      { type: "MATCH", id: payload.matchId }
+    );
+  });
 };

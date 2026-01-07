@@ -3,6 +3,7 @@ import { Player } from "../models/people";
 import { rng } from "../utils/generators";
 import { PlayerCalculations } from "../models/player";
 import { PlayerSeasonStats } from "../models/stats";
+import { eventBus } from "../events/EventBus";
 
 const TRAINING_CONFIG = {
   AGE_YOUNG_CAP: 21,
@@ -116,9 +117,14 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
     );
 
     if (pointsToDistribute > 0.01) {
-      const improved = applyGrowthToAttributes(player, pointsToDistribute);
-      if (improved) {
+      const improvedAttribute = applyGrowthToAttributes(
+        player,
+        pointsToDistribute
+      );
+
+      if (improvedAttribute) {
         totalImprovements++;
+
         if (
           contract.clubId === state.meta.userClubId &&
           pointsToDistribute > 0.5
@@ -126,8 +132,16 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
           logs.push(
             `📈 ${
               player.name
-            } evoluiu bem nos treinos (+${pointsToDistribute.toFixed(2)})`
+            } evoluiu bem nos treinos (+${pointsToDistribute.toFixed(
+              2
+            )} em ${improvedAttribute})`
           );
+
+          eventBus.emit(state, "PLAYER_DEVELOPMENT_BOOST", {
+            playerId: player.id,
+            attribute: improvedAttribute,
+            value: pointsToDistribute,
+          });
         }
       }
     }
@@ -136,7 +150,10 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
   return { improvedAttributes: totalImprovements, logs };
 };
 
-const applyGrowthToAttributes = (player: Player, amount: number): boolean => {
+const applyGrowthToAttributes = (
+  player: Player,
+  amount: number
+): TrainableAttribute | null => {
   const targetAttr: TrainableAttribute = rng.pick([...TRAINABLE_ATTRIBUTES]);
 
   const currentValue = player[targetAttr];
@@ -144,9 +161,9 @@ const applyGrowthToAttributes = (player: Player, amount: number): boolean => {
   if (currentValue < 99) {
     player[targetAttr] = currentValue + amount;
     player.overall = PlayerCalculations.calculateOverall(player);
-    return true;
+    return targetAttr;
   }
-  return false;
+  return null;
 };
 
 const processRegression = (
@@ -167,7 +184,9 @@ const processRegression = (
       player[target] = val - loss;
 
       if (isUserPlayer && rng.range(0, 100) < 10) {
-        logs.push(`📉 ${player.name} perdeu rendimento físico devido à idade.`);
+        logs.push(
+          `📉 ${player.name} perdeu rendimento físico (${target}) devido à idade.`
+        );
       }
     }
   }

@@ -1,5 +1,6 @@
+import { v4 as uuidv4 } from "uuid";
 import { GameState } from "../models/gameState";
-import { Match } from "../models/match";
+import { Match, MatchEvent } from "../models/match";
 import { Contract } from "../models/contract";
 import { Player } from "../models/people";
 import { PlayerCalculations } from "../models/player";
@@ -8,6 +9,9 @@ import {
   TeamMatchContext,
   MatchEngineResult,
 } from "./MatchEngine";
+import { eventBus } from "../events/EventBus";
+import { rng } from "../utils/generators";
+import { PlayerInjury } from "../models/stats";
 
 export interface MatchSystemResult {
   matchesToday: Match[];
@@ -128,5 +132,55 @@ const applyMatchResults = (
   state.matchEvents[match.id] = result.events;
   result.playerStats.forEach((stat) => {
     state.playerMatchStats[stat.id] = stat;
+  });
+  processMatchInjuries(state, result.events);
+  eventBus.emit(state, "MATCH_FINISHED", {
+    matchId: match.id,
+    homeScore: result.homeScore,
+    awayScore: result.awayScore,
+  });
+};
+
+const processMatchInjuries = (state: GameState, events: MatchEvent[]) => {
+  const injuryEvents = events.filter((e) => e.type === "INJURY");
+
+  injuryEvents.forEach((event) => {
+    const severityRoll = rng.range(1, 100);
+    let severity = "Leve";
+    let daysOut = rng.range(3, 10);
+
+    if (severityRoll > 90) {
+      severity = "Grave";
+      daysOut = rng.range(60, 180);
+    } else if (severityRoll > 70) {
+      severity = "Moderada";
+      daysOut = rng.range(14, 45);
+    }
+
+    const injuryId = uuidv4();
+    const returnDate = state.meta.currentDate + daysOut * 24 * 60 * 60 * 1000;
+
+    const injury: PlayerInjury = {
+      id: injuryId,
+      playerId: event.playerId,
+      name: "Lesão em Jogo",
+      severity,
+      startDate: state.meta.currentDate,
+      estimatedReturnDate: returnDate,
+    };
+
+    state.playerInjuries[injuryId] = injury;
+
+    if (state.playerStates[event.playerId]) {
+      state.playerStates[event.playerId].fitness = 50;
+      state.playerStates[event.playerId].matchReadiness = 0;
+    }
+
+    eventBus.emit(state, "PLAYER_INJURY_OCCURRED", {
+      playerId: event.playerId,
+      injuryName: "Lesão durante a partida",
+      severity,
+      daysOut,
+    });
   });
 };

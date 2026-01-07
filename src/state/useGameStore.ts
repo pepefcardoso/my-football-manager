@@ -17,8 +17,11 @@ import { createNewGame } from "../data/initialSetup";
 import {
   deleteNotification,
   markAsRead,
+  setupNotificationListeners
 } from "../core/systems/NotificationSystem";
-import { logger } from "../core/utils/logger";
+import { logger } from "../core/utils/Logger";
+
+setupNotificationListeners();
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;

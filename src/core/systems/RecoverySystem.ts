@@ -1,5 +1,5 @@
 import { GameState } from "../models/gameState";
-import { generateNotification } from "./NotificationSystem";
+import { eventBus } from "../events/EventBus";
 
 const RECOVERY_CONFIG = {
   BASE_RATE: 10,
@@ -39,7 +39,7 @@ const getInfraBonus = (state: GameState, clubId: string): number => {
 
   if (infra.medicalCenterLevel >= 40) return 0.1;
 
-  return 0; // Nível 1-2
+  return 0;
 };
 
 const getAgeModifier = (age: number): number => {
@@ -100,13 +100,11 @@ export const processDailyRecovery = (state: GameState): RecoveryResult => {
 
       if (contract) {
         logs.push(logMsg);
-        generateNotification(
-          state,
-          "IMPORTANT",
-          "Retorno de Lesão",
-          `${injury.name} recuperou-se totalmente e voltou aos treinos. Cuidado com o ritmo de jogo!`,
-          { type: "PLAYER", id: injury.playerId }
-        );
+
+        eventBus.emit(state, "PLAYER_RECOVERED", {
+          playerId: injury.playerId,
+          injuryName: injury.name || "Lesão",
+        });
       }
 
       delete state.playerInjuries[injuryId];
