@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { produce } from "immer";
 import { GameState } from "../core/models/gameState";
-import { advanceOneDay, TimeAdvanceResult } from "../core/systems/TimeSystem";
+import { TimeAdvanceResult } from "../core/systems/TimeSystem";
+import { advanceDayAction } from "./actions/timeActions";
 import {
   saveGameToDisk,
   loadGameFromDisk,
@@ -17,7 +18,7 @@ import {
   deleteNotification,
   markAsRead,
 } from "../core/systems/NotificationSystem";
-import { logger } from "../core/utils/Logger";
+import { logger } from "../core/utils/logger";
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
@@ -97,22 +98,7 @@ let autoSaveInterval: NodeJS.Timeout | null = null;
 export const useGameStore = create<GameStore>()(
   immer((set, get) => ({
     ...createInitialState(),
-
-    advanceDay: () => {
-      let result: TimeAdvanceResult = {
-        newDate: 0,
-        matchesToday: [],
-        events: [],
-        stats: { expensesProcessed: 0, playersRecovered: 0 },
-      };
-
-      set((state) => {
-        result = advanceOneDay(state);
-      });
-
-      return result;
-    },
-
+    advanceDay: () => advanceDayAction(set),
     saveGame: async (saveName: string) => {
       const state = get();
       const stateCopy = { ...state };
