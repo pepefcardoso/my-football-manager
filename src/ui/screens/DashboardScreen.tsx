@@ -5,7 +5,7 @@ import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 import { Play, Calendar, TrendingUp, Trophy, AlertCircle } from "lucide-react";
 import { useUIStore } from "../../state/useUIStore";
-import { DAILY_PROCESSING_STAGES } from "../../core/systems/TimeSystem";
+import { executeGameDay } from "../../core/systems/GameLoopSystem";
 
 export const DashboardScreen: React.FC = () => {
     const {
@@ -24,36 +24,20 @@ export const DashboardScreen: React.FC = () => {
     const handleAdvanceDay = async () => {
         if (isProcessing) return;
 
-        startProcessing("Iniciando novo dia...", "loading");
-
-        for (const stage of DAILY_PROCESSING_STAGES) {
-            startProcessing(stage);
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
-
-        advanceDay();
-
-        startProcessing("Salvando progresso...", "loading");
-
-        await new Promise(resolve => setTimeout(resolve, 200));
-
         try {
-            const result = await saveGame(meta.saveName);
+            await executeGameDay({
+                saveName: meta.saveName,
+                onProgress: (message, type) => startProcessing(message, type),
+                onAdvance: advanceDay,
+                onSave: saveGame
+            });
 
-            if (result.success) {
-                startProcessing("Dia finalizado com sucesso!", "success");
-            } else {
-                alert(`Erro ao salvar: ${result.error}`);
-                stopProcessing();
-                return;
-            }
+            stopProcessing(1000);
         } catch (error) {
             console.error(error);
             stopProcessing();
-            return;
+            alert(`Erro ao processar o dia: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
         }
-
-        stopProcessing(1000);
     };
 
     const nextMatch = useMemo(() => {

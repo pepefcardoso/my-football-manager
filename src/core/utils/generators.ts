@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Club, ClubFinances, ClubInfra } from "../models/club";
 import { Player } from "../models/people";
 import { Foot, ID } from "../models/types";
+import { PlayerCalculations } from "../models/player";
 
 class SeededRNG {
   private seed: number;
@@ -117,7 +118,7 @@ export class PlayerFactory {
       updatedAt: Date.now(),
     };
 
-    const currentAbility = this.calculateOverall(player);
+    const currentAbility = PlayerCalculations.calculateOverall(player);
     player.overall = currentAbility;
     player.potential = Math.min(99, currentAbility + potentialBonus);
     player.marketValue = this.calculateValue(
@@ -127,27 +128,6 @@ export class PlayerFactory {
     );
 
     return player;
-  }
-
-  private static calculateOverall(p: Player): number {
-    const attrs = [
-      p.crossing,
-      p.finishing,
-      p.passing,
-      p.technique,
-      p.defending,
-      p.speed,
-      p.force,
-      p.stamina,
-      p.intelligence,
-    ];
-    if (p.primaryPositionId === "GK") {
-      attrs.push(p.gkReflexes, p.gkRushingOut, p.gkDistribution);
-    }
-
-    attrs.sort((a, b) => b - a);
-    const top5 = attrs.slice(0, 5);
-    return Math.floor(top5.reduce((a, b) => a + b, 0) / 5);
   }
 
   private static calculateValue(

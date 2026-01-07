@@ -1,6 +1,7 @@
 import { GameState } from "../models/gameState";
 import { Player } from "../models/people";
 import { rng } from "../utils/generators";
+import { PlayerCalculations } from "../models/player";
 
 const TRAINING_CONFIG = {
   AGE_YOUNG_CAP: 21,
@@ -65,11 +66,11 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
       continue;
     }
 
-    const currentOverall = calculateSimpleOverall(player);
+    const currentOverall = PlayerCalculations.calculateOverall(player);
     const growthMargin = Math.max(0, player.potential - currentOverall);
 
     if (growthMargin <= 0) continue;
-    
+
     let growthFactor = TRAINING_CONFIG.GROWTH_BASE_RATE;
 
     if (age < TRAINING_CONFIG.AGE_YOUNG_CAP) {
@@ -129,7 +130,7 @@ const applyGrowthToAttributes = (player: Player, amount: number): boolean => {
 
   if (currentValue < 99) {
     (player[targetAttr] as number) += amount;
-    player.overall = calculateSimpleOverall(player);
+    player.overall = PlayerCalculations.calculateOverall(player);
     return true;
   }
   return false;
@@ -157,8 +158,4 @@ const processRegression = (
       }
     }
   }
-};
-
-const calculateSimpleOverall = (p: Player): number => {
-  return (p.finishing + p.passing + p.speed + p.defending + p.technique) / 5;
 };

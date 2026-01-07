@@ -2,6 +2,7 @@ import { GameState } from "../models/gameState";
 import { Match } from "../models/match";
 import { Contract } from "../models/contract";
 import { Player } from "../models/people";
+import { PlayerCalculations } from "../models/player";
 import {
   matchEngine,
   TeamMatchContext,
@@ -49,12 +50,8 @@ export const processScheduledMatches = (
       if (!isUserMatch) {
         const homeContext = buildTeamContext(state, match.homeClubId);
         const awayContext = buildTeamContext(state, match.awayClubId);
-        const result = simulateSingleMatch(
-          state,
-          match,
-          homeContext,
-          awayContext
-        );
+        simulateSingleMatch(state, match, homeContext, awayContext);
+
         matchesToday.push(match);
       }
     }
@@ -84,7 +81,7 @@ export const buildTeamContext = (
     .filter((p) => !!p)
     .map((p) => ({
       ...p,
-      _tempOverall: calculateSimpleOverall(p),
+      _tempOverall: PlayerCalculations.calculateOverall(p),
     }));
 
   let startingXI: Player[] = [];
@@ -132,10 +129,4 @@ const applyMatchResults = (
   result.playerStats.forEach((stat) => {
     state.playerMatchStats[stat.id] = stat;
   });
-};
-
-const calculateSimpleOverall = (p: Player): number => {
-  return Math.floor(
-    (p.finishing + p.passing + p.defending + p.speed + p.technique) / 5
-  );
 };
