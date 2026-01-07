@@ -6,7 +6,11 @@ import { Foot, ID } from "../models/types";
 class SeededRNG {
   private seed: number;
 
-  constructor(seed: number) {
+  constructor(seed?: number) {
+    this.seed = seed ?? Date.now();
+  }
+
+  public setSeed(seed: number) {
     this.seed = seed;
   }
 
@@ -31,7 +35,7 @@ class SeededRNG {
   }
 }
 
-export const rng = new SeededRNG(12345);
+export const rng = new SeededRNG();
 
 const NAMES = [
   "Silva",

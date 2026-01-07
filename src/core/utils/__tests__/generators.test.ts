@@ -1,7 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { PlayerFactory } from "../generators";
+import { describe, it, expect, beforeEach } from "vitest";
+import { PlayerFactory, rng } from "../generators";
 
 describe("PlayerFactory", () => {
+  beforeEach(() => {
+    rng.setSeed(12345);
+  });
+
   it("should create a player with valid attributes range (1-99)", () => {
     // Arrange & Act
     const players = Array.from({ length: 50 }).map(() =>
