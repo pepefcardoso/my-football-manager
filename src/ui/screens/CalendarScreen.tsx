@@ -5,6 +5,7 @@ import { Calendar, MapPin, Trophy, Shield, Star, Clock, FastForward, CheckCircle
 import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 import { simulationSystem } from "../../core/systems/SimulationSystem";
+import { logger } from "../../core/utils/Logger";
 
 export const CalendarScreen: React.FC = () => {
     const { meta, advanceDay } = useGameStore();
@@ -13,12 +14,11 @@ export const CalendarScreen: React.FC = () => {
     const { competitions, groups, fases, competitionSeasons } = useGameStore(s => s.competitions);
     const { setView } = useUIStore();
     const userClubId = meta.userClubId;
-
     const [isSimulating, setIsSimulating] = useState(false);
     const [simulatedDays, setSimulatedDays] = useState(0);
     const [simulationLogs, setSimulationLogs] = useState<string[]>([]);
     const [showSummary, setShowSummary] = useState(false);
-
+    const simulationMutex = useRef(false);
     const stopSimulationRef = useRef(false);
 
     const nextMatchTarget = useMemo(() => {
@@ -35,36 +35,52 @@ export const CalendarScreen: React.FC = () => {
     }, [matches, userClubId, meta.currentDate]);
 
     const startSimulation = async () => {
-        if (!nextMatchTarget) return;
+        if (simulationMutex.current || !nextMatchTarget) return;
+
+        simulationMutex.current = true;
+        stopSimulationRef.current = false;
 
         setIsSimulating(true);
         setShowSummary(false);
         setSimulatedDays(0);
         setSimulationLogs([]);
-        stopSimulationRef.current = false;
 
         const targetDate = new Date(nextMatchTarget.datetime).setHours(0, 0, 0, 0);
 
-        await simulationSystem.simulateUntilDate(
-            meta.currentDate,
-            targetDate,
-            {
-                advanceDayFn: () => advanceDay(),
-                shouldStop: () => stopSimulationRef.current,
-                onProgress: (days, newLogs) => {
-                    setSimulatedDays(days);
-                    if (newLogs.length > 0) {
-                        setSimulationLogs(prev => [...prev, ...newLogs]);
+        try {
+            logger.info("CalendarScreen", "Iniciando fluxo de simulação via UI");
+
+            await simulationSystem.simulateUntilDate(
+                meta.currentDate,
+                targetDate,
+                {
+                    advanceDayFn: () => advanceDay(),
+                    shouldStop: () => stopSimulationRef.current,
+                    onProgress: (days, newLogs) => {
+                        setSimulatedDays(days);
+                        if (newLogs.length > 0) {
+                            setSimulationLogs(prev => [...prev, ...newLogs]);
+                        }
                     }
                 }
-            }
-        );
+            );
 
-        setIsSimulating(false);
-        setShowSummary(true);
+            if (!stopSimulationRef.current) {
+                setShowSummary(true);
+            }
+
+        } catch (error) {
+            logger.error("CalendarScreen", "Erro crítico durante simulação", error);
+            setSimulationLogs(prev => [...prev, "❌ ERRO CRÍTICO NA SIMULAÇÃO: " + (error as Error).message]);
+        } finally {
+            simulationMutex.current = false;
+            setIsSimulating(false);
+            logger.info("CalendarScreen", "Mutex de simulação liberado");
+        }
     };
 
     const cancelSimulation = () => {
+        logger.warn("CalendarScreen", "Usuário solicitou cancelamento da simulação");
         stopSimulationRef.current = true;
         simulationSystem.cancel();
     };
@@ -125,9 +141,9 @@ export const CalendarScreen: React.FC = () => {
                         icon={FastForward}
                         onClick={startSimulation}
                         disabled={isSimulating}
-                        className="shadow-lg shadow-primary/20"
+                        className={`shadow-lg shadow-primary/20 ${isSimulating ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                        Simular até Próximo Jogo
+                        {isSimulating ? "Simulando..." : "Simular até Próximo Jogo"}
                     </Button>
                 )}
             </div>
@@ -224,7 +240,7 @@ export const CalendarScreen: React.FC = () => {
                                     )}
 
                                     {isNextMatch ? (
-                                        <Button size="sm" onClick={() => setView("MATCH_PREPARATION")}>
+                                        <Button size="sm" onClick={() => setView("MATCH_PREPARATION")} disabled={isSimulating}>
                                             Preparar Equipa
                                         </Button>
                                     ) : (
@@ -291,11 +307,14 @@ export const CalendarScreen: React.FC = () => {
                                 <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Resumo de Eventos</h4>
                                 {simulationLogs.length > 0 ? (
                                     <div className="bg-background p-3 rounded border border-background-tertiary max-h-40 overflow-y-auto custom-scrollbar">
-                                        {simulationLogs.map((log, i) => (
-                                            <div key={i} className="text-xs text-text-muted mb-1 last:mb-0">
-                                                {log}
-                                            </div>
-                                        ))}
+                                        {simulationLogs.map((log, i) => {
+                                            const isNegative = log.includes("lesão") || log.includes("negativo") || log.includes("perdeu");
+                                            return (
+                                                <div key={i} className={`text-xs mb-1 last:mb-0 ${isNegative ? 'text-status-warning' : 'text-text-muted'}`}>
+                                                    {log}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <p className="text-sm text-text-muted italic">Nenhum evento importante ocorreu.</p>
