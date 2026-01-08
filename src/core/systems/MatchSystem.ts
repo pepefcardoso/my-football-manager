@@ -38,8 +38,11 @@ export const processScheduledMatches = (
   currentDateStart.setHours(0, 0, 0, 0);
   const currentDayTime = currentDateStart.getTime();
 
-  for (const matchId in state.matches) {
+  for (const matchId in state.matches.matches) {
     const match = state.matches.matches[matchId];
+
+    if (!match) continue;
+
     const matchDate = new Date(match.datetime);
     matchDate.setHours(0, 0, 0, 0);
 
