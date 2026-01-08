@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { buildTeamContext, simulateSingleMatch } from "../../core/systems/MatchSystem";
+import { TacticsSystem } from "../../core/systems/TacticsSystem";
 import { calculateOverall, formatPosition, getAttributeColorClass } from "../../core/utils/playerUtils";
 import { Button } from "../components/Button";
 import { ArrowLeft, Play, Shirt, RefreshCw } from "lucide-react";
-import { GameState } from "../../core/models/gameState";
 
 export const MatchPreparationScreen: React.FC = () => {
     const { meta, matches, contracts, players, playerStates, clubs, setState } = useGameStore();
@@ -20,39 +20,29 @@ export const MatchPreparationScreen: React.FC = () => {
     }, [matches, meta.userClubId]);
 
     const opponentId = nextMatch ? (nextMatch.homeClubId === meta.userClubId ? nextMatch.awayClubId : nextMatch.homeClubId) : null;
-    const opponent = opponentId ? opponentId ? clubs[opponentId] : null : null;
-
-    const getSuggestedLineup = () => {
-        if (!meta.userClubId) return { starters: [], bench: [], reserves: [] };
-
-        const clubPlayerIds = Object.values(contracts)
-            .filter(c => c.clubId === meta.userClubId && c.active)
-            .map(c => c.playerId);
-            
-        const mockState = {
-            clubs,
-            contracts,
+    const opponent = opponentId ? clubs[opponentId] : null;
+    const initialLineup = useMemo(() => {
+        return TacticsSystem.suggestOptimalLineup(
+            meta.userClubId,
             players,
-            teamTactics: {},
-            meta
-        } as unknown as GameState;
+            contracts
+        );
+    }, [meta.userClubId, players, contracts]);
+    const [lineup, setLineup] = useState(initialLineup);
 
-        const context = buildTeamContext(mockState, meta.userClubId);
+    useEffect(() => {
+        setLineup(initialLineup);
+    }, [initialLineup]);
 
-        const starters = context.startingXI.map(p => p.id);
-        const bench = context.bench.map(p => p.id);
-
-        const usedIds = new Set([...starters, ...bench]);
-        const reserves = clubPlayerIds.filter(id => !usedIds.has(id));
-
-        return { starters, bench, reserves };
-    };
-
-    const [lineup, setLineup] = useState(getSuggestedLineup);
     const { starters, bench, reserves } = lineup;
 
     const handleAutoPick = () => {
-        setLineup(getSuggestedLineup());
+        const optimized = TacticsSystem.suggestOptimalLineup(
+            meta.userClubId,
+            players,
+            contracts
+        );
+        setLineup(optimized);
     };
 
     const movePlayer = (playerId: string, target: 'starter' | 'bench' | 'reserve') => {
@@ -63,6 +53,7 @@ export const MatchPreparationScreen: React.FC = () => {
         if (target === 'starter') {
             if (newStarters.length >= 11) {
                 const playerOrigin = starters.includes(playerId) ? 'starter' : bench.includes(playerId) ? 'bench' : 'reserve';
+
                 if (playerOrigin !== 'starter') {
                     const removedId = newStarters.pop();
                     if (removedId) {
@@ -114,22 +105,22 @@ export const MatchPreparationScreen: React.FC = () => {
         const ovr = calculateOverall(player);
 
         return (
-            <div className="flex items-center justify-between p-2 bg-background border border-background-tertiary rounded mb-1 hover:border-primary/50 transition-colors">
+            <div className="flex items-center justify-between p-2 bg-background border border-background-tertiary rounded mb-1 hover:border-primary/50 transition-colors group">
                 <div className="flex items-center space-x-3">
                     <span className="w-8 text-xs font-bold text-text-secondary bg-background-tertiary px-1 rounded text-center">
                         {formatPosition(player.primaryPositionId)}
                     </span>
                     <div>
-                        <div className="text-sm font-medium text-text-primary">{player.name}</div>
+                        <div className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">{player.name}</div>
                         <div className="text-xs text-text-muted flex space-x-2">
                             <span>OVR: <span className={getAttributeColorClass(ovr)}>{ovr}</span></span>
-                            <span>Cond: {state?.fitness}%</span>
+                            <span>Cond: <span className={state?.fitness < 70 ? 'text-status-danger' : 'text-text-secondary'}>{state?.fitness}%</span></span>
                         </div>
                     </div>
                 </div>
                 <button
                     onClick={onAction}
-                    className="text-xs bg-background-tertiary hover:bg-primary hover:text-white px-2 py-1 rounded transition-colors"
+                    className="text-xs bg-background-tertiary hover:bg-primary hover:text-white px-2 py-1 rounded transition-colors opacity-0 group-hover:opacity-100"
                 >
                     {actionLabel}
                 </button>
@@ -137,11 +128,11 @@ export const MatchPreparationScreen: React.FC = () => {
         );
     };
 
-    if (!nextMatch || !opponent) return <div className="p-8">Nenhuma partida agendada.</div>;
+    if (!nextMatch || !opponent) return <div className="p-8 text-center text-text-muted">Nenhuma partida agendada.</div>;
 
     return (
         <div className="h-full flex flex-col animate-in fade-in duration-300">
-            <div className="flex justify-between items-center p-6 bg-background-secondary border-b border-background-tertiary">
+            <div className="flex justify-between items-center p-6 bg-background-secondary border-b border-background-tertiary shadow-sm z-10">
                 <div className="flex items-center space-x-4">
                     <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => setView("DASHBOARD")}>Voltar</Button>
                     <div>
@@ -151,8 +142,8 @@ export const MatchPreparationScreen: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-4">
                     <div className="text-right mr-4">
-                        <div className="text-xs text-text-muted">Titulares</div>
-                        <div className={`text-lg font-bold ${starters.length === 11 ? 'text-status-success' : 'text-status-danger'}`}>
+                        <div className="text-xs text-text-muted uppercase tracking-wider">Titulares</div>
+                        <div className={`text-2xl font-mono font-bold ${starters.length === 11 ? 'text-status-success' : 'text-status-danger'}`}>
                             {starters.length}/11
                         </div>
                     </div>
@@ -168,47 +159,49 @@ export const MatchPreparationScreen: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 overflow-hidden">
-                <div className="bg-background-secondary rounded-lg border border-background-tertiary flex flex-col h-full overflow-hidden">
-                    <div className="p-3 border-b border-background-tertiary bg-primary/10 flex justify-between items-center">
-                        <h3 className="font-bold text-primary flex items-center"><Shirt size={16} className="mr-2" /> Titulares</h3>
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 overflow-hidden bg-background">
+                <div className="bg-background-secondary rounded-lg border border-background-tertiary flex flex-col h-full overflow-hidden shadow-sm">
+                    <div className="p-3 border-b border-background-tertiary bg-primary/5 flex justify-between items-center">
+                        <h3 className="font-bold text-primary flex items-center uppercase text-xs tracking-wider"><Shirt size={14} className="mr-2" /> Titulares</h3>
                         <span className="text-xs text-text-muted">{starters.length} selecionados</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
-                        {starters.length === 0 && <div className="text-center text-text-muted py-8">Nenhum jogador selecionado</div>}
+                        {starters.length === 0 && <div className="text-center text-text-muted py-8 text-sm italic">Nenhum jogador selecionado</div>}
                         {starters.map(id => (
-                            <PlayerRow key={id} id={id} actionLabel="Mover para Banco" onAction={() => movePlayer(id, 'bench')} />
+                            <PlayerRow key={id} id={id} actionLabel="Mover p/ Banco" onAction={() => movePlayer(id, 'bench')} />
                         ))}
                     </div>
                 </div>
 
-                <div className="bg-background-secondary rounded-lg border border-background-tertiary flex flex-col h-full overflow-hidden">
+                <div className="bg-background-secondary rounded-lg border border-background-tertiary flex flex-col h-full overflow-hidden shadow-sm">
                     <div className="p-3 border-b border-background-tertiary bg-background-tertiary/20 flex justify-between items-center">
-                        <h3 className="font-bold text-text-secondary">Banco de Reservas</h3>
+                        <h3 className="font-bold text-text-secondary uppercase text-xs tracking-wider">Banco de Reservas</h3>
                         <span className="text-xs text-text-muted">{bench.length} / 7</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
                         {bench.map(id => (
                             <PlayerRow key={id} id={id} actionLabel="Tornar Titular" onAction={() => movePlayer(id, 'starter')} />
                         ))}
-                        {bench.length === 0 && <div className="text-center text-text-muted py-8 text-xs">Banco vazio</div>}
+                        {bench.length === 0 && <div className="text-center text-text-muted py-8 text-xs italic">Banco vazio</div>}
                     </div>
                 </div>
 
-                <div className="bg-background-secondary rounded-lg border border-background-tertiary flex flex-col h-full overflow-hidden">
+                <div className="bg-background-secondary rounded-lg border border-background-tertiary flex flex-col h-full overflow-hidden shadow-sm">
                     <div className="p-3 border-b border-background-tertiary bg-background-tertiary/20 flex justify-between items-center">
-                        <h3 className="font-bold text-text-muted">Não Relacionados</h3>
+                        <h3 className="font-bold text-text-muted uppercase text-xs tracking-wider">Não Relacionados</h3>
                         <button
-                            className="text-xs text-primary hover:underline flex items-center transition-colors"
+                            className="text-xs text-primary hover:text-primary-hover hover:underline flex items-center transition-colors font-medium"
                             onClick={handleAutoPick}
+                            title="Restaurar melhor escalação automática"
                         >
-                            <RefreshCw size={12} className="mr-1" /> Auto-completar
+                            <RefreshCw size={12} className="mr-1" /> Auto-seleção
                         </button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
                         {reserves.map(id => (
                             <PlayerRow key={id} id={id} actionLabel="Relacionar" onAction={() => movePlayer(id, 'bench')} />
                         ))}
+                        {reserves.length === 0 && <div className="text-center text-text-muted py-8 text-xs italic">Todos os jogadores relacionados</div>}
                     </div>
                 </div>
             </div>
