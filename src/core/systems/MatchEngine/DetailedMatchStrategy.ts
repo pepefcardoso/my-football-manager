@@ -4,301 +4,54 @@ import {
   MatchEngineResult,
   TeamMatchContext,
 } from "./types";
-import { Match, MatchEvent, PlayerMatchStats } from "../../models/match";
+import { Match, PlayerMatchStats } from "../../models/match";
 import { Player } from "../../models/people";
 import { rng } from "../../utils/generators";
 import { MATCH_CONFIG } from "../../constants/matchEngine";
+import { SimulationContext } from "./interfaces";
+import { CommandFactory } from "./CommandFactory";
 
 export class DetailedMatchStrategy implements IMatchSimulationStrategy {
-  private events: MatchEvent[] = [];
-  private playerStatsMap: Record<string, PlayerMatchStats> = {};
-  private momentum = 50;
-
   simulate(
     match: Match,
     home: TeamMatchContext,
     away: TeamMatchContext
   ): MatchEngineResult {
-    this.resetState();
-    this.initializePlayerStats(match.id, home, away);
+    const ctx: SimulationContext = this.createContext(match, home, away);
 
-    const stoppageTimeH1 = rng.range(
+    const stoppageH1 = rng.range(
       MATCH_CONFIG.STOPPAGE_TIME.MIN_H1,
       MATCH_CONFIG.STOPPAGE_TIME.MAX_H1
     );
-    this.simulatePeriod(1, 45, stoppageTimeH1, match.id, home, away, "1H");
+    this.runPeriod(ctx, 1, 45, stoppageH1, "1H");
 
-    const stoppageTimeH2 = rng.range(
+    const stoppageH2 = rng.range(
       MATCH_CONFIG.STOPPAGE_TIME.MIN_H2,
       MATCH_CONFIG.STOPPAGE_TIME.MAX_H2
     );
-    this.simulatePeriod(46, 90, stoppageTimeH2, match.id, home, away, "2H");
+    this.runPeriod(ctx, 46, 90, stoppageH2, "2H");
 
-    this.calculateFinalRatings(home, away);
-    this.determineMVP();
+    this.finalizeStats(ctx);
 
-    return this.buildResult(match.id, home.clubId, away.clubId);
+    return this.buildResult(match, ctx);
   }
 
-  private resetState() {
-    this.events = [];
-    this.playerStatsMap = {};
-    this.momentum = 50;
-  }
-
-  private simulatePeriod(
-    startMinute: number,
-    endMinute: number,
-    extraTime: number,
-    matchId: string,
-    home: TeamMatchContext,
-    away: TeamMatchContext,
-    periodLabel: "1H" | "2H"
-  ) {
-    const totalMinutes = endMinute - startMinute + 1 + extraTime;
-
-    for (let i = 0; i < totalMinutes; i++) {
-      let currentMinute = startMinute + i;
-      let extraMinute = 0;
-
-      if (currentMinute > endMinute) {
-        extraMinute = currentMinute - endMinute;
-        currentMinute = endMinute;
-      }
-
-      this.processMinute(
-        matchId,
-        home,
-        away,
-        currentMinute,
-        extraMinute,
-        periodLabel
-      );
-    }
-  }
-
-  private processMinute(
-    matchId: string,
-    home: TeamMatchContext,
-    away: TeamMatchContext,
-    minute: number,
-    extraMinute: number,
-    period: "1H" | "2H"
-  ) {
-    const homeMid = this.getSectorAverage(home.startingXI, "MID", "passing");
-    const awayMid = this.getSectorAverage(away.startingXI, "MID", "passing");
-
-    const momentumFactor = (this.momentum - 50) * 0.5;
-    const homeChance = 50 + (homeMid - awayMid) + momentumFactor;
-
-    const hasPossession = rng.range(0, 100) < homeChance ? home : away;
-    const defense = hasPossession === home ? away : home;
-
-    if (hasPossession === home)
-      this.momentum = Math.min(100, this.momentum + 0.5);
-    else this.momentum = Math.max(0, this.momentum - 0.5);
-
-    const actionRoll = rng.range(0, 1000) / 10;
-
-    if (actionRoll < MATCH_CONFIG.PROBABILITIES.INJURY_BASE) {
-      this.handleInjury(matchId, hasPossession, minute, extraMinute, period);
-    } else if (actionRoll < MATCH_CONFIG.PROBABILITIES.FOUL_BASE) {
-      this.handleFoul(
-        matchId,
-        defense,
-        hasPossession,
-        minute,
-        extraMinute,
-        period
-      );
-    } else if (actionRoll < MATCH_CONFIG.PROBABILITIES.ATTACK_BASE) {
-      this.handleAttackingChance(
-        matchId,
-        hasPossession,
-        defense,
-        minute,
-        extraMinute,
-        period,
-        home.clubId
-      );
-    }
-  }
-
-  private handleAttackingChance(
-    matchId: string,
-    attTeam: TeamMatchContext,
-    defTeam: TeamMatchContext,
-    minute: number,
-    extraMinute: number,
-    period: "1H" | "2H",
-    homeClubId: string
-  ) {
-    const attacker = rng.pick(attTeam.startingXI); // TODO: Ponderar escolha baseada na posição (ATT/MID > DEF) e Táticas
-    const keeper =
-      defTeam.startingXI.find((p) => p.primaryPositionId === "GK") ||
-      defTeam.startingXI[0];
-
-    const finishAttr = (attacker.finishing + attacker.technique) / 2;
-    const saveAttr = (keeper.gkReflexes + keeper.gkDistribution) / 2;
-    // TODO: Complexidade de fórmula: incluir Distância, Angulo, Stamina e Moral
-
-    const goalChance = finishAttr - saveAttr + rng.range(-20, 20);
-
-    if (goalChance > MATCH_CONFIG.THRESHOLDS.GOAL) {
-      this.createEvent(
-        matchId,
-        "GOAL",
-        attTeam.clubId,
-        attacker.id,
-        `Gol de ${attacker.name}!`,
-        minute,
-        extraMinute,
-        period
-      );
-      this.updateStats(attacker.id, "goals", 1);
-      this.updateStats(attacker.id, "shotsOnTarget", 1);
-      this.updateRating(attacker.id, MATCH_CONFIG.RATING_WEIGHTS.GOAL);
-
-      if (rng.range(0, 100) < MATCH_CONFIG.PROBABILITIES.ASSIST) {
-        const assister = rng.pick(
-          attTeam.startingXI.filter((p) => p.id !== attacker.id)
-        );
-        this.updateStats(assister.id, "assists", 1);
-        this.updateRating(assister.id, MATCH_CONFIG.RATING_WEIGHTS.ASSIST);
-      }
-
-      this.momentum =
-        attTeam.clubId === homeClubId
-          ? MATCH_CONFIG.MOMENTUM.AFTER_GOAL_HOME
-          : MATCH_CONFIG.MOMENTUM.AFTER_GOAL_AWAY;
-    } else if (goalChance > MATCH_CONFIG.THRESHOLDS.SAVE) {
-      this.createEvent(
-        matchId,
-        "CHANCE",
-        attTeam.clubId,
-        attacker.id,
-        `Defesaça de ${keeper.name} em chute de ${attacker.name}!`,
-        minute,
-        extraMinute,
-        period
-      );
-      this.updateStats(attacker.id, "shotsOnTarget", 1);
-      this.updateRating(
-        attacker.id,
-        MATCH_CONFIG.RATING_WEIGHTS.SHOT_ON_TARGET
-      );
-      this.updateStats(keeper.id, "saves", 1);
-      this.updateRating(keeper.id, MATCH_CONFIG.RATING_WEIGHTS.SAVE);
-    } else {
-      this.updateStats(attacker.id, "shotsOffTarget", 1);
-      this.updateRating(attacker.id, MATCH_CONFIG.RATING_WEIGHTS.ERROR);
-    }
-  }
-
-  private handleFoul(
-    matchId: string,
-    offenderTeam: TeamMatchContext,
-    victimTeam: TeamMatchContext,
-    minute: number,
-    extraMinute: number,
-    period: "1H" | "2H"
-  ) {
-    const offender = rng.pick(offenderTeam.startingXI);
-    const victim = rng.pick(victimTeam.startingXI);
-
-    this.updateStats(offender.id, "foulsCommitted", 1);
-    this.updateStats(victim.id, "foulsSuffered", 1);
-
-    const cardRoll = rng.range(0, 100);
-
-    if (cardRoll < MATCH_CONFIG.PROBABILITIES.YELLOW_CARD) {
-      this.createEvent(
-        matchId,
-        "CARD_YELLOW",
-        offenderTeam.clubId,
-        offender.id,
-        `Cartão Amarelo para ${offender.name}`,
-        minute,
-        extraMinute,
-        period
-      );
-      this.updateStats(offender.id, "yellowCards", 1);
-      this.updateRating(offender.id, MATCH_CONFIG.RATING_WEIGHTS.YELLOW_CARD);
-    } else if (cardRoll < MATCH_CONFIG.PROBABILITIES.RED_CARD) {
-      this.createEvent(
-        matchId,
-        "CARD_RED",
-        offenderTeam.clubId,
-        offender.id,
-        `Vermelho direto para ${offender.name}!`,
-        minute,
-        extraMinute,
-        period
-      );
-      this.updateStats(offender.id, "redCard", true);
-      this.updateRating(offender.id, MATCH_CONFIG.RATING_WEIGHTS.RED_CARD);
-    }
-  }
-
-  private handleInjury(
-    matchId: string,
-    team: TeamMatchContext,
-    minute: number,
-    extraMinute: number,
-    period: "1H" | "2H"
-  ) {
-    const player = rng.pick(team.startingXI);
-    this.createEvent(
-      matchId,
-      "INJURY",
-      team.clubId,
-      player.id,
-      `${player.name} sentiu uma lesão e precisará sair.`,
-      minute,
-      extraMinute,
-      period
-    );
-  }
-
-  private createEvent(
-    matchId: string,
-    type: string,
-    clubId: string,
-    playerId: string,
-    description: string,
-    minute: number,
-    extraMinute: number,
-    period: "1H" | "2H"
-  ) {
-    this.events.push({
-      id: uuidv4(),
-      matchId,
-      period,
-      minute,
-      extraMinute,
-      type: type as any,
-      clubId,
-      playerId,
-      description,
-      targetPlayerId: null,
-      createdAt: Date.now(),
-    });
-  }
-
-  private initializePlayerStats(
-    matchId: string,
+  private createContext(
+    match: Match,
     home: TeamMatchContext,
     away: TeamMatchContext
-  ) {
-    const initPlayer = (p: Player, clubId: string) => {
-      this.playerStatsMap[p.id] = {
+  ): SimulationContext {
+    const statsMap: Record<string, PlayerMatchStats> = {};
+
+    const initStats = (p: Player, clubId: string) => {
+      statsMap[p.id] = {
         id: uuidv4(),
-        matchId,
+        matchId: match.id,
         playerId: p.id,
         clubId,
         isStarter: true,
         positionPlayedId: p.primaryPositionId,
-        minutesPlayed: 90, // TODO: Ajustar para minutos reais caso haja substituição ou expulsão
+        minutesPlayed: 90,
         rating: 6.0,
         goals: 0,
         assists: 0,
@@ -313,124 +66,120 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
         wasMvp: false,
       };
     };
-    home.startingXI.forEach((p) => initPlayer(p, home.clubId));
-    away.startingXI.forEach((p) => initPlayer(p, away.clubId));
-  }
 
-  private calculateFinalRatings(
-    home: TeamMatchContext,
-    away: TeamMatchContext
-  ) {
-    const processTeam = (team: TeamMatchContext, goalsConceded: number) => {
-      team.startingXI.forEach((p) => {
-        const stats = this.playerStatsMap[p.id];
-        if (
-          goalsConceded === 0 &&
-          (p.primaryPositionId === "GK" || p.primaryPositionId === "DEF")
-        ) {
-          stats.rating += MATCH_CONFIG.RATING_WEIGHTS.CLEANSHEET;
-        }
-        stats.rating = Math.max(3.0, Math.min(10.0, stats.rating));
-        stats.rating += rng.normal(0, 0.2);
-      });
+    home.startingXI.forEach((p) => initStats(p, home.clubId));
+    away.startingXI.forEach((p) => initStats(p, away.clubId));
+
+    return {
+      matchId: match.id,
+      home,
+      away,
+      currentMinute: 0,
+      extraMinute: 0,
+      period: "1H",
+      momentum: 50,
+      events: [],
+      playerStats: statsMap,
+      hasPossession: home,
+      defendingTeam: away,
     };
-    processTeam(home, this.countGoals(away.clubId));
-    processTeam(away, this.countGoals(home.clubId));
   }
 
-  private determineMVP() {
-    let bestRating = -1;
+  private runPeriod(
+    ctx: SimulationContext,
+    start: number,
+    end: number,
+    extra: number,
+    periodLabel: "1H" | "2H"
+  ) {
+    ctx.period = periodLabel;
+    const totalMinutes = end - start + 1 + extra;
+
+    for (let i = 0; i < totalMinutes; i++) {
+      const absoluteMinute = start + i;
+      ctx.currentMinute = absoluteMinute > end ? end : absoluteMinute;
+      ctx.extraMinute = absoluteMinute > end ? absoluteMinute - end : 0;
+
+      this.updatePossession(ctx);
+
+      const command = CommandFactory.getNextCommand(ctx);
+      command.execute(ctx);
+    }
+  }
+
+  private updatePossession(ctx: SimulationContext) {
+    const homePassing = this.getSectorAvg(ctx.home.startingXI, "passing");
+    const awayPassing = this.getSectorAvg(ctx.away.startingXI, "passing");
+
+    const momentumFactor = (ctx.momentum - 50) * 0.5;
+
+    const homeChance = 50 + (homePassing - awayPassing) + momentumFactor;
+
+    if (rng.range(0, 100) < homeChance) {
+      ctx.hasPossession = ctx.home;
+      ctx.defendingTeam = ctx.away;
+    } else {
+      ctx.hasPossession = ctx.away;
+      ctx.defendingTeam = ctx.home;
+    }
+  }
+
+  private finalizeStats(ctx: SimulationContext) {
+    const allStats = Object.values(ctx.playerStats);
+
+    let bestRating = 0;
     let mvpId = "";
-    Object.values(this.playerStatsMap).forEach((stat) => {
+
+    allStats.forEach((stat) => {
+      stat.rating = Math.max(3, Math.min(10, stat.rating + rng.normal(0, 0.3)));
       if (stat.rating > bestRating) {
         bestRating = stat.rating;
         mvpId = stat.id;
       }
     });
-    if (mvpId && this.playerStatsMap[mvpId]) {
-      this.playerStatsMap[mvpId].wasMvp = true;
+
+    if (mvpId && ctx.playerStats[mvpId]) {
+      ctx.playerStats[mvpId].wasMvp = true;
     }
   }
 
-  private buildResult(
-    matchId: string,
-    homeId: string,
-    awayId: string
-  ): MatchEngineResult {
-    const homeGoals = this.countGoals(homeId);
-    const awayGoals = this.countGoals(awayId);
+  private buildResult(match: Match, ctx: SimulationContext): MatchEngineResult {
+    const homeGoals = ctx.events.filter(
+      (e) => e.type === "GOAL" && e.clubId === ctx.home.clubId
+    ).length;
+    const awayGoals = ctx.events.filter(
+      (e) => e.type === "GOAL" && e.clubId === ctx.away.clubId
+    ).length;
 
     return {
-      matchId,
+      matchId: match.id,
       homeScore: homeGoals,
       awayScore: awayGoals,
       stats: {
-        homePossession: 50, // TODO: Calcular posse real baseada no número de ticks de 'hasPossession'
-        awayPossession: 50,
-        homeShots:
-          this.sumStats(homeId, "shotsOffTarget") +
-          this.sumStats(homeId, "shotsOnTarget"),
-        awayShots:
-          this.sumStats(awayId, "shotsOffTarget") +
-          this.sumStats(awayId, "shotsOnTarget"),
-        homeShotsOnTarget: this.sumStats(homeId, "shotsOnTarget"),
-        awayShotsOnTarget: this.sumStats(awayId, "shotsOnTarget"),
-        homeFouls: this.sumStats(homeId, "foulsCommitted"),
-        awayFouls: this.sumStats(awayId, "foulsCommitted"),
-        homeCorners: Math.floor(rng.range(2, 8)), // TODO: Gerar escanteios dinamicamente após eventos de 'DEFESA'
-        awayCorners: Math.floor(rng.range(2, 8)),
+        homePossession: Math.round(ctx.momentum),
+        awayPossession: 100 - Math.round(ctx.momentum),
+        homeShots: 0,
+        awayShots: 0,
+        homeShotsOnTarget: 0,
+        awayShotsOnTarget: 0,
+        homeFouls: 0,
+        awayFouls: 0,
+        homeCorners: 0,
+        awayCorners: 0,
       },
-      events: this.events.sort((a, b) => {
-        if (a.minute !== b.minute) return a.minute - b.minute;
-        return a.extraMinute - b.extraMinute;
-      }),
-      playerStats: Object.values(this.playerStatsMap),
+      events: ctx.events,
+      playerStats: Object.values(ctx.playerStats),
     };
   }
 
-  private updateStats(
-    playerId: string,
-    field: keyof PlayerMatchStats,
-    value: any
-  ) {
-    if (this.playerStatsMap[playerId]) {
-      const target = this.playerStatsMap[playerId] as any;
+  private getSectorAvg(players: Player[], attr: keyof Player): number {
+    if (players.length === 0) return 50;
 
-      if (typeof target[field] === "number") {
-        target[field] += value;
-      } else {
-        target[field] = value;
-      }
-    }
-  }
+    const sum = players.reduce((acc, player) => {
+      const value = player[attr];
+      return acc + (typeof value === "number" ? value : 0);
+    }, 0);
 
-  private updateRating(playerId: string, value: number) {
-    if (this.playerStatsMap[playerId]) {
-      this.playerStatsMap[playerId].rating += value;
-    }
-  }
-
-  private countGoals(clubId: string): number {
-    return this.events.filter((e) => e.type === "GOAL" && e.clubId === clubId)
-      .length;
-  }
-
-  private sumStats(clubId: string, field: keyof PlayerMatchStats): number {
-    return Object.values(this.playerStatsMap)
-      .filter((s) => s.clubId === clubId)
-      .reduce((acc, s) => acc + (s[field] as number), 0);
-  }
-
-  private getSectorAverage(
-    players: Player[],
-    sector: string,
-    attr: keyof Player
-  ): number {
-    const sectorPlayers = players.filter((p) => p.primaryPositionId === sector);
-    if (!sectorPlayers.length) return 70; // TODO: Este 70 é arbitrário. Calcular média geral do time ou penalizar por falta de setor.
-    return (
-      sectorPlayers.reduce((acc, p) => acc + (p[attr] as number), 0) /
-      sectorPlayers.length
-    );
+    return sum / players.length;
   }
 }
