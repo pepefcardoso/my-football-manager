@@ -10,6 +10,7 @@ import { MatchLiveScreen } from "./ui/screens/MatchLiveScreen";
 import { MatchResultScreen } from "./ui/screens/MatchResultScreen";
 import { CalendarScreen } from "./ui/screens/CalendarScreen";
 import { ManagerProfileScreen } from "./ui/screens/ManagerProfileScreen";
+import { GameErrorBoundary } from "./ui/components/GameErrorBoundary";
 
 const TacticsScreen = () => <div className="p-4">Táticas (Em breve)</div>;
 
@@ -38,10 +39,11 @@ function App() {
       default: return <div className="text-text-muted p-8">Funcionalidade {currentView} em desenvolvimento.</div>;
     }
   };
-
   return (
     <MainLayout>
-      {renderGameView()}
+      <GameErrorBoundary>
+        {renderGameView()}
+      </GameErrorBoundary>
     </MainLayout>
   );
 }

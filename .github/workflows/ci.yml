@@ -2,9 +2,9 @@ name: Maestro CI Pipeline
 
 on:
   push:
-    branches: ["main", "develop"]
+    branches: ["main", "refactor"]
   pull_request:
-    branches: ["main", "develop"]
+    branches: ["main", "refactor"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
