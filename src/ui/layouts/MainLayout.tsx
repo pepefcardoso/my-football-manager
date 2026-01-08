@@ -4,6 +4,7 @@ import { useGameStore } from "../../state/useGameStore";
 import { formatDate } from "../../core/utils/formatters";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { LoadingOverlay } from "../components/LoadingOverlay";
+import { useNotificationListener } from "../hooks/useNotificationListener";
 import {
     LayoutDashboard,
     Users,
@@ -14,8 +15,51 @@ import {
     Settings,
     Trophy,
     UserCircle,
+    X,
+    AlertCircle,
+    Info,
+    AlertTriangle
 } from "lucide-react";
 import { clsx } from "clsx";
+
+const ToastContainer: React.FC = () => {
+    const { toasts, removeToast } = useNotificationListener();
+
+    if (toasts.length === 0) return null;
+
+    return (
+        <div className="fixed bottom-6 right-6 z-[100] flex flex-col space-y-2 pointer-events-none">
+            {toasts.map((toast) => {
+                let bgClass = "bg-background-secondary border-background-tertiary";
+                let icon = <Info size={16} className="text-blue-400" />;
+
+                if (toast.type === "CRITICAL") {
+                    bgClass = "bg-red-950/90 border-red-800 text-red-100";
+                    icon = <AlertCircle size={16} className="text-red-500" />;
+                } else if (toast.type === "IMPORTANT") {
+                    bgClass = "bg-yellow-950/90 border-yellow-800 text-yellow-100";
+                    icon = <AlertTriangle size={16} className="text-yellow-500" />;
+                }
+
+                return (
+                    <div
+                        key={toast.id}
+                        className={`pointer-events-auto flex items-center p-4 rounded shadow-2xl border ${bgClass} min-w-[300px] animate-in slide-in-from-right-10 duration-300`}
+                    >
+                        <div className="mr-3">{icon}</div>
+                        <div className="flex-1 font-medium text-sm">{toast.title}</div>
+                        <button
+                            onClick={() => removeToast(toast.id)}
+                            className="ml-3 opacity-60 hover:opacity-100 transition-opacity"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
 
 interface NavItemProps {
     view: GameView;
@@ -96,6 +140,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                 progress={processingProgress}
                 type={processingType}
             />
+
+            <ToastContainer />
 
             <aside className="w-64 bg-background-secondary border-r border-background-tertiary flex flex-col shadow-xl z-10">
                 <div className="p-6 flex items-center justify-center border-b border-background-tertiary">

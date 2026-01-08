@@ -8,7 +8,7 @@ import {
 import { eventBus } from "../events/EventBus";
 import { ID } from "../models/types";
 
-export const generateNotification = (
+const createNotificationObject = (
   state: GameState,
   type: NotificationType,
   title: string,
@@ -21,7 +21,7 @@ export const generateNotification = (
   const currentDate = state.meta.currentDate;
   const expirationDate = currentDate + expiresInDays * 24 * 60 * 60 * 1000;
 
-  const notification: Notification = {
+  return {
     id,
     managerId,
     type,
@@ -32,8 +32,26 @@ export const generateNotification = (
     relatedEntity,
     expiresAt: expirationDate,
   };
+};
 
-  state.notifications[id] = notification;
+export const generateNotification = (
+  state: GameState,
+  type: NotificationType,
+  title: string,
+  message: string,
+  relatedEntity?: RelatedEntity,
+  expiresInDays: number = 7
+): Notification => {
+  const notification = createNotificationObject(
+    state,
+    type,
+    title,
+    message,
+    relatedEntity,
+    expiresInDays
+  );
+
+  state.notifications[notification.id] = notification;
 
   const keys = Object.keys(state.notifications);
   if (keys.length > 100) {
@@ -42,6 +60,8 @@ export const generateNotification = (
     )[0];
     delete state.notifications[oldestKey];
   }
+
+  eventBus.emit(state, "NOTIFICATION_CREATED", { notification });
 
   return notification;
 };

@@ -1,4 +1,5 @@
 import { ID, Money } from "../models/types";
+import { Notification } from "../models/events";
 
 export interface GameEventMap {
   PLAYER_INJURY_OCCURRED: {
@@ -31,6 +32,10 @@ export interface GameEventMap {
     contractId: ID;
     playerId: ID;
     daysRemaining: number;
+  };
+
+  NOTIFICATION_CREATED: {
+    notification: Notification;
   };
 }
 
