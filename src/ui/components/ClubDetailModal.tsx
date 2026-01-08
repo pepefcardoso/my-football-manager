@@ -19,15 +19,25 @@ type TabType = "INFO" | "HISTORY" | "SQUAD";
 
 export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({ clubId, isOpen, onClose }) => {
     const {
-        clubs, clubInfras, stadiums, nations, cities,
-        contracts, players, meta, scoutingKnowledge
+        clubs, infras, stadiums
+    } = useGameStore(s => s.clubs);
+    const {
+        nations, cities
+    } = useGameStore(s => s.world);
+    const {
+        contracts, scoutingKnowledge
+    } = useGameStore(s => s.market);
+    const { players
+    } = useGameStore(s => s.people);
+    const {
+        meta
     } = useGameStore();
 
     const [activeTab, setActiveTab] = useState<TabType>("INFO");
 
     const club = useMemo(() => clubId ? clubs[clubId] : null, [clubId, clubs]);
 
-    const infra = useMemo(() => clubId ? clubInfras[clubId] : null, [clubId, clubInfras]);
+    const infra = useMemo(() => clubId ? infras[clubId] : null, [clubId, infras]);
     const stadium = useMemo(() => infra ? stadiums[infra.stadiumId] : null, [infra, stadiums]);
     const nation = useMemo(() => club ? nations[club.nationId] : null, [club, nations]);
     const city = useMemo(() => club ? cities[club.cityId] : null, [club, cities]);

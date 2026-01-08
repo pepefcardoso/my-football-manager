@@ -10,12 +10,16 @@ import { executeGameDay } from "../../core/systems/GameLoopSystem";
 export const DashboardScreen: React.FC = () => {
     const {
         meta,
-        clubs,
-        clubFinances,
-        matches,
         advanceDay,
         saveGame
     } = useGameStore();
+    const {
+        clubs,
+        finances,
+    } = useGameStore(s => s.clubs);
+    const {
+        matches,
+    } = useGameStore(s => s.matches);
 
     const { setView, startProcessing, stopProcessing, isProcessing } = useUIStore();
 
@@ -57,7 +61,7 @@ export const DashboardScreen: React.FC = () => {
     if (!userClubId) return <div className="p-8">Carregando dados do clube...</div>;
 
     const userClub = clubs[userClubId];
-    const userFinances = clubFinances[userClubId];
+    const userFinances = finances[userClubId];
 
     const getOpponent = (match: any) => {
         const opponentId = match.homeClubId === userClubId ? match.awayClubId : match.homeClubId;

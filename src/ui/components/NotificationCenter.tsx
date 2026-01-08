@@ -18,11 +18,13 @@ export const NotificationCenter: React.FC = () => {
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const {
-        notifications,
         markNotificationAsRead,
         deleteNotification,
         setState
     } = useGameStore();
+    const {
+        notifications
+    } = useGameStore(s => s.system);
 
     const { setView } = useUIStore();
 
@@ -48,7 +50,7 @@ export const NotificationCenter: React.FC = () => {
 
     const handleMarkAllAsRead = () => {
         setState((state) => {
-            Object.values(state.notifications).forEach(n => {
+            Object.values(state.system.notifications).forEach(n => {
                 n.isRead = true;
             });
         });

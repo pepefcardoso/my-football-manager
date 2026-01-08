@@ -8,7 +8,11 @@ import { Button } from "../components/Button";
 import { ArrowLeft, Play, Shirt, RefreshCw } from "lucide-react";
 
 export const MatchPreparationScreen: React.FC = () => {
-    const { meta, matches, contracts, players, playerStates, clubs, setState } = useGameStore();
+    const { meta, setState } = useGameStore();
+    const { matches } = useGameStore(s => s.matches);
+    const { contracts } = useGameStore(s => s.market);
+    const { players, playerStates } = useGameStore(s => s.people);
+    const { clubs } = useGameStore(s => s.clubs);
     const { setView } = useUIStore();
 
     const nextMatch = useMemo(() => {
@@ -89,7 +93,7 @@ export const MatchPreparationScreen: React.FC = () => {
             const opponentId = nextMatch.homeClubId === meta.userClubId ? nextMatch.awayClubId : nextMatch.homeClubId;
             const opponentContext = buildTeamContext(state, opponentId);
 
-            simulateSingleMatch(state, state.matches[nextMatch.id],
+            simulateSingleMatch(state, state.matches.matches[nextMatch.id],
                 nextMatch.homeClubId === meta.userClubId ? userContext : opponentContext,
                 nextMatch.homeClubId === meta.userClubId ? opponentContext : userContext
             );

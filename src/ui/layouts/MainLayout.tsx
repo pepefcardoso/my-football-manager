@@ -94,7 +94,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         processingType
     } = useUIStore();
 
-    const { meta, matches, clubs } = useGameStore();
+    const { meta } = useGameStore();
+    const { matches } = useGameStore(s => s.matches);
+    const { clubs } = useGameStore(s => s.clubs);
     const userClubId = meta.userClubId;
 
     const nextMatchInfo = useMemo(() => {

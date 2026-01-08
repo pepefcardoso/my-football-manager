@@ -59,7 +59,10 @@ const EventRow: React.FC<EventRowProps> = ({ event, isHome, playerName }) => {
 };
 
 export const MatchLiveScreen: React.FC = () => {
-    const { meta, matches, clubs, players, matchEvents, playerMatchStats } = useGameStore();
+    const { meta } = useGameStore();
+    const { matches, events, playerStats } = useGameStore(s => s.matches);
+    const { clubs } = useGameStore(s => s.clubs);
+    const { players } = useGameStore(s => s.people);
     const { setView } = useUIStore();
 
     const [currentMinute, setCurrentMinute] = useState(0);
@@ -75,23 +78,23 @@ export const MatchLiveScreen: React.FC = () => {
             .sort((a, b) => b.updatedAt - a.updatedAt)[0];
     }, [matches, meta.userClubId]);
 
-    const events = useMemo(() => currentMatch ? matchEvents[currentMatch.id] || [] : [], [currentMatch, matchEvents]);
+    const matchEvents = useMemo(() => currentMatch ? events[currentMatch.id] || [] : [], [currentMatch, events]);
     const homeClub = currentMatch ? clubs[currentMatch.homeClubId] : null;
     const awayClub = currentMatch ? clubs[currentMatch.awayClubId] : null;
 
     const { homeStarters, awayStarters } = useMemo(() => {
         if (!currentMatch) return { homeStarters: [], awayStarters: [] };
 
-        const allStats = Object.values(playerMatchStats).filter(s => s.matchId === currentMatch.id && s.isStarter);
+        const allStats = Object.values(playerStats).filter(s => s.matchId === currentMatch.id && s.isStarter);
         return {
             homeStarters: allStats.filter(s => s.clubId === currentMatch.homeClubId),
             awayStarters: allStats.filter(s => s.clubId === currentMatch.awayClubId)
         };
-    }, [currentMatch, playerMatchStats]);
+    }, [currentMatch, playerStats]);
 
     const visibleEvents = useMemo(() => {
-        return events.filter(e => e.minute <= currentMinute).sort((a, b) => b.minute - a.minute);
-    }, [events, currentMinute]);
+        return matchEvents.filter(e => e.minute <= currentMinute).sort((a, b) => b.minute - a.minute);
+    }, [matchEvents, currentMinute]);
 
     const liveScore = useMemo(() => {
         const homeGoals = visibleEvents.filter(e => e.type === "GOAL" && e.clubId === homeClub?.id).length;

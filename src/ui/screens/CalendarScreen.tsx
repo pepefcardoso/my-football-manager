@@ -7,7 +7,10 @@ import { ClubBadge } from "../components/ClubBadge";
 import { simulationSystem } from "../../core/systems/SimulationSystem";
 
 export const CalendarScreen: React.FC = () => {
-    const { meta, matches, clubs, competitions, competitionGroups, competitionFases, competitionSeasons, advanceDay } = useGameStore();
+    const { meta, advanceDay } = useGameStore();
+    const { matches } = useGameStore(s => s.matches);
+    const { clubs } = useGameStore(s => s.clubs);
+    const { competitions, groups, fases, competitionSeasons } = useGameStore(s => s.competitions);
     const { setView } = useUIStore();
     const userClubId = meta.userClubId;
 
@@ -73,9 +76,9 @@ export const CalendarScreen: React.FC = () => {
     };
 
     const getCompetitionName = (match: any) => {
-        const group = competitionGroups[match.competitionGroupId];
+        const group = groups[match.competitionGroupId];
         if (!group) return "Amistoso";
-        const fase = competitionFases[group.competitionFaseId];
+        const fase = fases[group.competitionFaseId];
         const compSeason = competitionSeasons[fase.competitionSeasonId];
         const comp = competitions[compSeason.competitionId];
         return comp.nickname || comp.name;

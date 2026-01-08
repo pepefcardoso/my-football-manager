@@ -30,7 +30,10 @@ const StatBar: React.FC<{ label: string; homeValue: number; awayValue: number }>
 };
 
 export const MatchResultScreen: React.FC = () => {
-    const { meta, matches, clubs, matchEvents, playerMatchStats, players } = useGameStore();
+    const { meta } = useGameStore();
+    const { matches, events, playerStats } = useGameStore(s => s.matches);
+    const { clubs } = useGameStore(s => s.clubs);
+    const { players } = useGameStore(s => s.people);
     const { setView } = useUIStore();
     const [tab, setTab] = useState<'HOME' | 'AWAY'>('HOME');
 
@@ -46,14 +49,14 @@ export const MatchResultScreen: React.FC = () => {
     const awayClub = match ? clubs[match.awayClubId] : undefined;
     const isUserHome = match && meta.userClubId ? match.homeClubId === meta.userClubId : false;
 
-    const events = useMemo(() => match ? (matchEvents[match.id] || []) : [], [matchEvents, match]);
+    const matchEvents = useMemo(() => match ? (events[match.id] || []) : [], [events, match]);
 
-    const stats = useMemo(() => match ? Object.values(playerMatchStats).filter(s => s.matchId === match.id) : [], [playerMatchStats, match]);
+    const stats = useMemo(() => match ? Object.values(playerStats).filter(s => s.matchId === match.id) : [], [playerStats, match]);
 
     const mvpStat = useMemo(() => stats.length ? stats.reduce((prev, current) => (prev.rating > current.rating) ? prev : current, stats[0]) : null, [stats]);
     const mvpPlayer = useMemo(() => mvpStat ? players[mvpStat.playerId] : null, [mvpStat, players]);
 
-    const injuries = useMemo(() => events.filter(e => e.type === "INJURY"), [events]);
+    const injuries = useMemo(() => matchEvents.filter(e => e.type === "INJURY"), [matchEvents]);
 
     const teamStats = useMemo(() => {
         if (!homeClub || !awayClub) return {
@@ -169,10 +172,10 @@ export const MatchResultScreen: React.FC = () => {
                             </div>
                             <div className="space-y-3 relative">
                                 <div className="absolute left-4 top-2 bottom-2 w-px bg-background-tertiary"></div>
-                                {events.filter(e => ['GOAL', 'CARD_RED', 'INJURY'].includes(e.type)).length === 0 && (
+                                {matchEvents.filter(e => ['GOAL', 'CARD_RED', 'INJURY'].includes(e.type)).length === 0 && (
                                     <div className="text-text-muted text-sm text-center py-2">Jogo sem incidentes maiores.</div>
                                 )}
-                                {events.filter(e => ['GOAL', 'CARD_RED', 'INJURY'].includes(e.type)).sort((a, b) => a.minute - b.minute).map(event => (
+                                {matchEvents.filter(e => ['GOAL', 'CARD_RED', 'INJURY'].includes(e.type)).sort((a, b) => a.minute - b.minute).map(event => (
                                     <div key={event.id} className="flex items-start relative pl-8">
                                         <div className="absolute left-2 top-1 w-4 h-4 rounded-full bg-background border-2 border-background-tertiary z-10"></div>
                                         <div className="flex-1">

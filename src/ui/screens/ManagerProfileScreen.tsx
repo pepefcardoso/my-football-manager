@@ -42,13 +42,21 @@ const Section: React.FC<{
 export const ManagerProfileScreen: React.FC = () => {
     const {
         meta,
-        managers,
-        clubManagers,
-        clubs,
-        clubRelationships,
-        nations,
         setState
     } = useGameStore();
+    const {
+        managers
+    } = useGameStore(s => s.people);
+    const {
+        clubManagers
+    } = useGameStore(s => s.market);
+    const {
+        clubs,
+        relationships,
+    } = useGameStore(s => s.clubs);
+    const {
+        nations
+    } = useGameStore(s => s.world);
     const { setView } = useUIStore();
 
     const [isResignModalOpen, setIsResignModalOpen] = useState(false);
@@ -65,8 +73,8 @@ export const ManagerProfileScreen: React.FC = () => {
     }, [manager, meta.userClubId, clubManagers]);
 
     const relationship = useMemo(() =>
-        meta.userClubId ? clubRelationships[meta.userClubId] : null
-        , [meta.userClubId, clubRelationships]);
+        meta.userClubId ? relationships[meta.userClubId] : null
+        , [meta.userClubId, relationships]);
 
     const currentClub = useMemo(() =>
         meta.userClubId ? clubs[meta.userClubId] : null

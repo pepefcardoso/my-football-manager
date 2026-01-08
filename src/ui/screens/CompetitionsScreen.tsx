@@ -9,13 +9,19 @@ type CompetitionView = "TABLE" | "RESULTS";
 
 export const CompetitionsScreen: React.FC = () => {
     const {
-        meta,
+        meta
+    } = useGameStore();
+    const {
         standings,
         clubCompetitionSeasons,
-        clubs,
-        competitionGroups,
+        groups,
+    } = useGameStore(s => s.competitions);
+    const {
+        clubs
+    } = useGameStore(s => s.clubs);
+    const {
         matches
-    } = useGameStore();
+    } = useGameStore(s => s.matches);
 
     const userClubId = meta.userClubId;
     const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
@@ -39,14 +45,14 @@ export const CompetitionsScreen: React.FC = () => {
         if (!userStanding) return null;
 
         const groupId = userStanding.competitionGroupId;
-        const group = competitionGroups[groupId];
+        const group = groups[groupId];
 
         return {
             groupId,
             groupName: group?.name || "Liga Nacional",
             standings: Object.values(standings).filter(s => s.competitionGroupId === groupId)
         };
-    }, [userClubId, standings, clubCompetitionSeasons, competitionGroups]);
+    }, [userClubId, standings, clubCompetitionSeasons, groups]);
 
     const tableData = useMemo(() => {
         if (!activeCompetitionData) return [];

@@ -6,7 +6,8 @@ import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 
 export const NewGameSetupScreen: React.FC = () => {
-    const { clubs, setState, meta, saveGame } = useGameStore();
+    const { setState, meta, saveGame } = useGameStore();
+    const { clubs } = useGameStore(s => s.clubs);
     const { setView } = useUIStore();
 
     const [managerName, setManagerName] = useState("José Manager");
@@ -17,12 +18,12 @@ export const NewGameSetupScreen: React.FC = () => {
 
         setState((state) => {
             const humanId = state.meta.currentUserManagerId;
-            if (state.managers[humanId]) {
-                state.managers[humanId].name = managerName;
+            if (state.people.managers[humanId]) {
+                state.people.managers[humanId].name = managerName;
             }
 
             state.meta.userClubId = selectedClubId;
-            state.meta.saveName = `${managerName} - ${state.clubs[selectedClubId].name}`;
+            state.meta.saveName = `${managerName} - ${state.clubs.clubs[selectedClubId].name}`;
         });
 
         await saveGame(`${managerName} - ${clubs[selectedClubId].name}`);

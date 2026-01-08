@@ -6,7 +6,9 @@ import { PlayerDetailModal } from "../components/PlayerDetailModal";
 import { Users, Filter } from "lucide-react";
 
 export const SquadScreen: React.FC = () => {
-    const { players, contracts, playerStates, meta } = useGameStore();
+    const { meta } = useGameStore();
+    const { players, playerStates } = useGameStore(s => s.people);
+    const { contracts } = useGameStore(s => s.market);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
     const squadList = useMemo(() => {
