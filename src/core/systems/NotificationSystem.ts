@@ -56,7 +56,8 @@ export const generateNotification = (
   const keys = Object.keys(state.system.notifications);
   if (keys.length > 100) {
     const oldestKey = keys.sort(
-      (a, b) => state.system.notifications[a].date - state.system.notifications[b].date
+      (a, b) =>
+        state.system.notifications[a].date - state.system.notifications[b].date
     )[0];
     delete state.system.notifications[oldestKey];
   }
@@ -145,87 +146,99 @@ export const processDailyNotifications = (state: GameState): void => {
   cleanOldNotifications(state);
 };
 
+let notificationListenersCleanup: Array<() => void> = [];
+
 export const setupNotificationListeners = (): void => {
-  eventBus.clear();
+  notificationListenersCleanup.forEach((unsubscribe) => unsubscribe());
+  notificationListenersCleanup = [];
 
-  eventBus.on("PLAYER_RECOVERED", (state, payload) => {
-    const player = state.people.players[payload.playerId];
-    if (!player) return;
+  notificationListenersCleanup.push(
+    eventBus.on("PLAYER_RECOVERED", (state, payload) => {
+      const player = state.people.players[payload.playerId];
+      if (!player) return;
 
-    generateNotification(
-      state,
-      "IMPORTANT",
-      "Retorno de Lesão",
-      `${player.name} recuperou-se totalmente (${payload.injuryName}) e voltou aos treinos.`,
-      { type: "PLAYER", id: payload.playerId }
-    );
-  });
+      generateNotification(
+        state,
+        "IMPORTANT",
+        "Retorno de Lesão",
+        `${player.name} recuperou-se totalmente (${payload.injuryName}) e voltou aos treinos.`,
+        { type: "PLAYER", id: payload.playerId }
+      );
+    })
+  );
 
-  eventBus.on("PLAYER_INJURY_OCCURRED", (state, payload) => {
-    const player = state.people.players[payload.playerId];
-    if (!player) return;
+  notificationListenersCleanup.push(
+    eventBus.on("PLAYER_INJURY_OCCURRED", (state, payload) => {
+      const player = state.people.players[payload.playerId];
+      if (!player) return;
 
-    generateNotification(
-      state,
-      "CRITICAL",
-      "Lesão Confirmada",
-      `${player.name} sofreu uma lesão (${payload.injuryName}) e ficará fora por cerca de ${payload.daysOut} dias.`,
-      { type: "PLAYER", id: payload.playerId }
-    );
-  });
+      generateNotification(
+        state,
+        "CRITICAL",
+        "Lesão Confirmada",
+        `${player.name} sofreu uma lesão (${payload.injuryName}) e ficará fora por cerca de ${payload.daysOut} dias.`,
+        { type: "PLAYER", id: payload.playerId }
+      );
+    })
+  );
 
-  eventBus.on("PLAYER_DEVELOPMENT_BOOST", (state, payload) => {
-    const player = state.people.players[payload.playerId];
-    if (!player) return;
+  notificationListenersCleanup.push(
+    eventBus.on("PLAYER_DEVELOPMENT_BOOST", (state, payload) => {
+      const player = state.people.players[payload.playerId];
+      if (!player) return;
 
-    const attrName =
-      payload.attribute.charAt(0).toUpperCase() + payload.attribute.slice(1);
+      const attrName =
+        payload.attribute.charAt(0).toUpperCase() + payload.attribute.slice(1);
 
-    generateNotification(
-      state,
-      "INFO",
-      "Destaque no Treino",
-      `${
-        player.name
-      } impressionou a equipa técnica e melhorou o seu atributo de ${attrName} (+${payload.value.toFixed(
-        2
-      )}).`,
-      { type: "PLAYER", id: payload.playerId }
-    );
-  });
+      generateNotification(
+        state,
+        "INFO",
+        "Destaque no Treino",
+        `${
+          player.name
+        } impressionou a equipa técnica e melhorou o seu atributo de ${attrName} (+${payload.value.toFixed(
+          2
+        )}).`,
+        { type: "PLAYER", id: payload.playerId }
+      );
+    })
+  );
 
-  eventBus.on("MATCH_FINISHED", (state, payload) => {
-    const match = state.matches.matches[payload.matchId];
-    if (!match) return;
+  notificationListenersCleanup.push(
+    eventBus.on("MATCH_FINISHED", (state, payload) => {
+      const match = state.matches.matches[payload.matchId];
+      if (!match) return;
 
-    const userClubId = state.meta.userClubId;
-    if (match.homeClubId !== userClubId && match.awayClubId !== userClubId) {
-      return;
-    }
+      const userClubId = state.meta.userClubId;
+      if (match.homeClubId !== userClubId && match.awayClubId !== userClubId) {
+        return;
+      }
 
-    const homeClub = state.clubs.clubs[match.homeClubId];
-    const awayClub = state.clubs.clubs[match.awayClubId];
+      const homeClub = state.clubs.clubs[match.homeClubId];
+      const awayClub = state.clubs.clubs[match.awayClubId];
 
-    const title =
-      match.homeClubId === userClubId
-        ? `Resultado: vs ${awayClub.name}`
-        : `Resultado: vs ${homeClub.name}`;
+      const title =
+        match.homeClubId === userClubId
+          ? `Resultado: vs ${awayClub.name}`
+          : `Resultado: vs ${homeClub.name}`;
 
-    const outcomeEmoji =
-      (match.homeClubId === userClubId &&
-        payload.homeScore > payload.awayScore) ||
-      (match.awayClubId === userClubId && payload.awayScore > payload.homeScore)
-        ? "✅ Vitória!"
-        : payload.homeScore === payload.awayScore
-        ? "⚖️ Empate"
-        : "❌ Derrota";
+      const outcomeEmoji =
+        (match.homeClubId === userClubId &&
+          payload.homeScore > payload.awayScore) ||
+        (match.awayClubId === userClubId &&
+          payload.awayScore > payload.homeScore)
+          ? "✅ Vitória!"
+          : payload.homeScore === payload.awayScore
+          ? "⚖️ Empate"
+          : "❌ Derrota";
 
-    generateNotification(
-      state,
-      "INFO",
-      title,
-      `${outcomeEmoji} O jogo terminou: ${homeClub.name} ${payload.homeScore} x ${payload.awayScore} ${awayClub.name}.`,
-      { type: "MATCH", id: payload.matchId }
-    );
-  });
+      generateNotification(
+        state,
+        "INFO",
+        title,
+        `${outcomeEmoji} O jogo terminou: ${homeClub.name} ${payload.homeScore} x ${payload.awayScore} ${awayClub.name}.`,
+        { type: "MATCH", id: payload.matchId }
+      );
+    })
+  );
 };

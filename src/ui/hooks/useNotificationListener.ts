@@ -27,15 +27,17 @@ export const useNotificationListener = () => {
 
       setToasts((prev) => [...prev, newToast]);
 
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== newToast.id));
       }, 5000);
+
+      return () => clearTimeout(timer);
     };
 
-    eventBus.on("NOTIFICATION_CREATED", handleNotification);
+    const unsubscribe = eventBus.on("NOTIFICATION_CREATED", handleNotification);
 
     return () => {
-      eventBus.off("NOTIFICATION_CREATED", handleNotification);
+      unsubscribe();
     };
   }, []);
 
