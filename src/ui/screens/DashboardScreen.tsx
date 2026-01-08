@@ -1,33 +1,35 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { useGameStore } from "../../state/useGameStore";
+import { useUIStore } from "../../state/useUIStore";
+import { useShallow } from "zustand/react/shallow";
 import { formatMoney, formatDate, formatDateTime } from "../../core/utils/formatters";
 import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 import { Play, Calendar, TrendingUp, Trophy, AlertCircle } from "lucide-react";
-import { useUIStore } from "../../state/useUIStore";
 import { executeGameDay } from "../../core/systems/GameLoopSystem";
+import {
+    selectUserClubId,
+    selectCurrentDate,
+    selectClubById,
+    selectClubFinances,
+    selectNextMatchForClub
+} from "../../state/selectors";
 
 export const DashboardScreen: React.FC = () => {
-    const {
-        meta,
-        advanceDay,
-        saveGame
-    } = useGameStore();
-    const {
-        clubs,
-        finances,
-    } = useGameStore(s => s.clubs);
-    const {
-        matches,
-    } = useGameStore(s => s.matches);
-
+    const { advanceDay, saveGame, meta } = useGameStore();
     const { setView, startProcessing, stopProcessing, isProcessing } = useUIStore();
-
-    const userClubId = meta.userClubId;
+    const userClubId = useGameStore(selectUserClubId);
+    const currentDate = useGameStore(selectCurrentDate);
+    const userClub = useGameStore(selectClubById(userClubId));
+    const userFinances = useGameStore(selectClubFinances(userClubId));
+    const nextMatch = useGameStore(useShallow(selectNextMatchForClub(userClubId)));
+    const opponentId = nextMatch
+        ? (nextMatch.homeClubId === userClubId ? nextMatch.awayClubId : nextMatch.homeClubId)
+        : null;
+    const opponent = useGameStore(selectClubById(opponentId));
 
     const handleAdvanceDay = async () => {
         if (isProcessing) return;
-
         try {
             await executeGameDay({
                 saveName: meta.saveName,
@@ -35,61 +37,30 @@ export const DashboardScreen: React.FC = () => {
                 onAdvance: advanceDay,
                 onSave: saveGame
             });
-
             stopProcessing(1000);
         } catch (error) {
             console.error(error);
             stopProcessing();
-            alert(`Erro ao processar o dia: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+            alert(`Erro: ${error instanceof Error ? error.message : "Desconhecido"}`);
         }
     };
 
-    const nextMatch = useMemo(() => {
-        if (!userClubId) return null;
-
-        const allMatches = Object.values(matches);
-        const myMatches = allMatches.filter(
-            (m) =>
-                m.status === "SCHEDULED" &&
-                (m.homeClubId === userClubId || m.awayClubId === userClubId) &&
-                m.datetime >= meta.currentDate
-        );
-        myMatches.sort((a, b) => a.datetime - b.datetime);
-        return myMatches[0] || null;
-    }, [matches, userClubId, meta.currentDate]);
-
-    if (!userClubId) return <div className="p-8">Carregando dados do clube...</div>;
-
-    const userClub = clubs[userClubId];
-    const userFinances = finances[userClubId];
-
-    const getOpponent = (match: any) => {
-        const opponentId = match.homeClubId === userClubId ? match.awayClubId : match.homeClubId;
-        return clubs[opponentId];
-    };
+    if (!userClub || !userFinances) return <div className="p-8">Carregando dados do clube...</div>;
 
     const isHomeGame = nextMatch?.homeClubId === userClubId;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
-
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-background-secondary p-6 rounded-lg border border-background-tertiary shadow-lg">
                 <div className="flex items-center space-x-4 mb-4 md:mb-0">
-                    <div
-                        className="w-16 h-16 rounded-full bg-background border-2 p-1"
-                        style={{ borderColor: userClub.primaryColor }}
-                    >
-                        <ClubBadge
-                            badgeId={userClub.badgeId}
-                            clubName={userClub.name}
-                            className="w-full h-full"
-                        />
+                    <div className="w-16 h-16 rounded-full bg-background border-2 p-1" style={{ borderColor: userClub.primaryColor }}>
+                        <ClubBadge badgeId={userClub.badgeId} clubName={userClub.name} className="w-full h-full" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-text-primary">{userClub.name}</h1>
                         <div className="text-sm text-text-secondary flex items-center space-x-2">
                             <Calendar size={14} />
-                            <span>{formatDate(meta.currentDate)}</span>
+                            <span>{formatDate(currentDate)}</span>
                         </div>
                     </div>
                 </div>
@@ -127,11 +98,11 @@ export const DashboardScreen: React.FC = () => {
                         )}
                     </div>
 
-                    {nextMatch ? (
+                    {nextMatch && opponent ? (
                         <div className="flex-1 flex flex-col justify-center items-center text-center space-y-2">
                             <div className="text-sm text-text-muted">Contra</div>
                             <div className="text-xl font-bold text-text-primary truncate w-full">
-                                {getOpponent(nextMatch)?.name}
+                                {opponent.name}
                             </div>
                             <div className="text-sm text-primary font-mono bg-primary/10 px-3 py-1 rounded">
                                 {formatDateTime(nextMatch.datetime)}
@@ -170,24 +141,16 @@ export const DashboardScreen: React.FC = () => {
                                 <span className="text-text-primary font-mono">{userClub.reputation}</span>
                             </div>
                             <div className="h-2 bg-background-tertiary rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-yellow-500 transition-all duration-500"
-                                    style={{ width: `${(userClub.reputation / 10000) * 100}%` }}
-                                />
+                                <div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${(userClub.reputation / 10000) * 100}%` }} />
                             </div>
                         </div>
                         <div>
                             <div className="flex justify-between text-sm mb-1">
                                 <span className="text-text-secondary">Torcida</span>
-                                <span className="text-text-primary font-mono">
-                                    {(userClub.fanBaseCurrent / 1000).toFixed(1)}k
-                                </span>
+                                <span className="text-text-primary font-mono">{(userClub.fanBaseCurrent / 1000).toFixed(1)}k</span>
                             </div>
                             <div className="h-2 bg-background-tertiary rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-blue-500 transition-all duration-500"
-                                    style={{ width: `${(userClub.fanBaseCurrent / userClub.fanBaseMax) * 100}%` }}
-                                />
+                                <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${(userClub.fanBaseCurrent / userClub.fanBaseMax) * 100}%` }} />
                             </div>
                         </div>
                     </div>
@@ -199,23 +162,17 @@ export const DashboardScreen: React.FC = () => {
                             <TrendingUp size={14} className="mr-2" /> Finanças
                         </h3>
                     </div>
-
                     <div className="flex flex-col justify-center h-32 space-y-1">
                         <span className="text-sm text-text-muted">Saldo Atual</span>
-                        <span className={`text-2xl font-mono font-bold ${userFinances.balanceCurrent >= 0 ? 'text-status-success' : 'text-status-danger'
-                            }`}>
+                        <span className={`text-2xl font-mono font-bold ${userFinances.balanceCurrent >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
                             {formatMoney(userFinances.balanceCurrent)}
                         </span>
-
                         <div className="pt-4 flex justify-between items-center text-xs">
                             <span className="text-text-muted">Dívida:</span>
-                            <span className="text-status-warning font-mono">
-                                {formatMoney(userFinances.debtHistorical)}
-                            </span>
+                            <span className="text-status-warning font-mono">{formatMoney(userFinances.debtHistorical)}</span>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     );
