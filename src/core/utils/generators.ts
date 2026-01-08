@@ -4,7 +4,15 @@ import { Player } from "../models/people";
 import { Foot, ID } from "../models/types";
 import { PlayerCalculations } from "../models/player";
 
-class SeededRNG {
+export interface IRNG {
+  setSeed(seed: number): void;
+  next(): number;
+  range(min: number, max: number): number;
+  pick<T>(array: T[]): T;
+  normal(mean: number, stdDev: number): number;
+}
+
+export class SeededRNG implements IRNG {
   private seed: number;
 
   constructor(seed?: number) {
@@ -15,20 +23,23 @@ class SeededRNG {
     this.seed = seed;
   }
 
-  next(): number {
+  public next(): number {
     const x = Math.sin(this.seed++) * 10000;
     return x - Math.floor(x);
   }
 
-  range(min: number, max: number): number {
+  public range(min: number, max: number): number {
     return Math.floor(this.next() * (max - min + 1)) + min;
   }
 
-  pick<T>(array: T[]): T {
+  public pick<T>(array: T[]): T {
+    if (array.length === 0) {
+      throw new Error("Cannot pick from an empty array");
+    }
     return array[this.range(0, array.length - 1)];
   }
 
-  normal(mean: number, stdDev: number): number {
+  public normal(mean: number, stdDev: number): number {
     const u = 1 - this.next();
     const v = 1 - this.next();
     const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
@@ -36,7 +47,44 @@ class SeededRNG {
   }
 }
 
-export const rng = new SeededRNG();
+class GlobalRNG implements IRNG {
+  private static instance: IRNG;
+
+  constructor() {
+    if (!GlobalRNG.instance) {
+      GlobalRNG.instance = new SeededRNG(Date.now());
+    }
+  }
+
+  public static setImplementation(implementation: IRNG) {
+    GlobalRNG.instance = implementation;
+  }
+
+  public static reset() {
+    GlobalRNG.instance = new SeededRNG(Date.now());
+  }
+
+  public setSeed(seed: number) {
+    GlobalRNG.instance.setSeed(seed);
+  }
+  public next() {
+    return GlobalRNG.instance.next();
+  }
+  public range(min: number, max: number) {
+    return GlobalRNG.instance.range(min, max);
+  }
+  public pick<T>(array: T[]) {
+    return GlobalRNG.instance.pick(array);
+  }
+  public normal(mean: number, stdDev: number) {
+    return GlobalRNG.instance.normal(mean, stdDev);
+  }
+}
+
+export const rng = new GlobalRNG();
+
+export const setGlobalRNG = (newRng: IRNG) =>
+  GlobalRNG.setImplementation(newRng);
 
 const NAMES = [
   "Silva",
@@ -80,6 +128,7 @@ export class PlayerFactory {
     const age = rng.range(16, 36);
     const isYoung = age < 23;
     const potentialBonus = isYoung ? rng.range(5, 20) : rng.range(0, 3);
+
     const generateAttr = (bonus: number = 0) => {
       const val = rng.normal(targetOverall + bonus, 5);
       return Math.max(1, Math.min(99, val));

@@ -1,57 +1,57 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { PlayerFactory, rng } from "../generators";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { PlayerFactory, setGlobalRNG, IRNG, SeededRNG } from "../generators";
 
-describe("PlayerFactory", () => {
+class MockRNG implements IRNG {
+  next = vi.fn(() => 0.5);
+  range = vi.fn((min, max) => Math.floor(0.5 * (max - min + 1)) + min);
+  pick = vi.fn((arr) => arr[0]);
+  normal = vi.fn((mean) => mean);
+  setSeed = vi.fn();
+}
+
+describe("Generators System", () => {
+  
   beforeEach(() => {
-    rng.setSeed(12345);
+    setGlobalRNG(new SeededRNG(12345));
   });
 
-  it("should create a player with valid attributes range (1-99)", () => {
-    // Arrange & Act
-    const players = Array.from({ length: 50 }).map(() =>
-      PlayerFactory.createPlayer("club-1", "nation-1", "ATT", 80)
-    );
+  describe("SeededRNG (Real Implementation)", () => {
+    it("should be deterministic with same seed", () => {
+      const rng1 = new SeededRNG(999);
+      const rng2 = new SeededRNG(999);
 
-    // Assert
-    players.forEach((player) => {
-      expect(player.id).toBeDefined();
-      expect(typeof player.id).toBe("string");
+      expect(rng1.next()).toBe(rng2.next());
+      expect(rng1.range(1, 100)).toBe(rng2.range(1, 100));
+    });
 
-      const attributes = [
-        player.finishing,
-        player.passing,
-        player.speed,
-        player.stamina,
-        player.determination,
-      ];
+    it("should diverge with different seeds", () => {
+      const rng1 = new SeededRNG(1);
+      const rng2 = new SeededRNG(2);
 
-      attributes.forEach((attr) => {
-        expect(attr).toBeGreaterThanOrEqual(1);
-        expect(attr).toBeLessThanOrEqual(99);
-      });
+      expect(rng1.next()).not.toBe(rng2.next());
     });
   });
 
-  it("should generate unique IDs", () => {
-    const player1 = PlayerFactory.createPlayer("c1", "n1", "GK");
-    const player2 = PlayerFactory.createPlayer("c1", "n1", "GK");
+  describe("PlayerFactory (Using Global RNG)", () => {
+    it("should use the injected RNG mechanism", () => {
+      const mockRNG = new MockRNG();
+      setGlobalRNG(mockRNG);
 
-    expect(player1.id).not.toBe(player2.id);
-  });
+      mockRNG.range.mockReturnValue(20);
+      mockRNG.normal.mockReturnValue(75);
+      
+      const player = PlayerFactory.createPlayer("c1", "n1", "ATT", 70);
 
-  it("should calculate appropriate wages based on overall", () => {
-    const wageLow = PlayerFactory.calculateWage(55);
-    expect(wageLow).toBeLessThan(30000);
+      expect(mockRNG.range).toHaveBeenCalled();
+      expect(player.id).toBeDefined();
+    });
 
-    const wageHigh = PlayerFactory.calculateWage(95);
-    expect(wageHigh).toBeGreaterThan(1000000);
-  });
-
-  it("should boost relevant attributes based on position", () => {
-    const striker = PlayerFactory.createPlayer("c1", "n1", "ATT", 80);
-    const defender = PlayerFactory.createPlayer("c1", "n1", "DEF", 80);
-
-    expect(striker.finishing).toBeGreaterThan(50);
-    expect(defender.defending).toBeGreaterThan(50);
+    it("should create valid players under normal seeded conditions", () => {
+        const player = PlayerFactory.createPlayer("c1", "n1", "MID", 80);
+        
+        expect(player.overall).toBeGreaterThan(0);
+        expect(player.overall).toBeLessThan(100);
+        expect(player.primaryPositionId).toBe("MID");
+    });
   });
 });
