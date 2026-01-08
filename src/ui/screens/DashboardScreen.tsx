@@ -141,7 +141,7 @@ export const DashboardScreen: React.FC = () => {
                                 <span className="text-text-primary font-mono">{userClub.reputation}</span>
                             </div>
                             <div className="h-2 bg-background-tertiary rounded-full overflow-hidden">
-                                <div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${(userClub.reputation / 10000) * 100}%` }} />
+                                <div className="h-full bg-primary transition-all duration-500" style={{ width: `${(userClub.fanBaseCurrent / userClub.fanBaseMax) * 100}%` }} />
                             </div>
                         </div>
                         <div>
@@ -150,7 +150,7 @@ export const DashboardScreen: React.FC = () => {
                                 <span className="text-text-primary font-mono">{(userClub.fanBaseCurrent / 1000).toFixed(1)}k</span>
                             </div>
                             <div className="h-2 bg-background-tertiary rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${(userClub.fanBaseCurrent / userClub.fanBaseMax) * 100}%` }} />
+                                <div className="h-full bg-primary transition-all duration-500" style={{ width: `${(userClub.fanBaseCurrent / userClub.fanBaseMax) * 100}%` }} />
                             </div>
                         </div>
                     </div>
