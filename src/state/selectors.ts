@@ -1,53 +1,107 @@
+import { createSelector } from "reselect";
 import { GameState } from "../core/models/gameState";
 import { ID } from "../core/models/types";
 
-export const selectUserClubId = (state: GameState) => state.meta.userClubId;
-export const selectCurrentDate = (state: GameState) => state.meta.currentDate;
-export const selectClubById = (clubId: ID | null) => (state: GameState) =>
-  clubId ? state.clubs.clubs[clubId] : undefined;
-export const selectClubFinances = (clubId: ID | null) => (state: GameState) =>
-  clubId ? state.clubs.finances[clubId] : undefined;
-export const selectClubInfra = (clubId: ID | null) => (state: GameState) =>
-  clubId ? state.clubs.infras[clubId] : undefined;
+const selectClubsDomain = (state: GameState) => state.clubs;
+const selectMetaDomain = (state: GameState) => state.meta;
+const selectContracts = (state: GameState) => state.market.contracts;
+const selectMatchesMap = (state: GameState) => state.matches.matches;
+const selectPlayers = (state: GameState) => state.people.players;
+const selectPlayerStates = (state: GameState) => state.people.playerStates;
+const selectCurrentDateRaw = (state: GameState) => state.meta.currentDate;
+const selectClubIdArg = (_: GameState, clubId: ID | null) => clubId;
+const selectPlayerIdArg = (_: GameState, playerId: ID) => playerId;
 
-export const selectNextMatchForClub =
-  (clubId: ID | null) => (state: GameState) => {
+export const selectUserClubId = createSelector(
+  [selectMetaDomain],
+  (meta) => meta.userClubId
+);
+
+export const selectCurrentDateMemo = createSelector(
+  [selectMetaDomain],
+  (meta) => meta.currentDate
+);
+
+const _selectClubById = createSelector(
+  [selectClubsDomain, selectClubIdArg],
+  (clubsDomain, clubId) => (clubId ? clubsDomain.clubs[clubId] : undefined)
+);
+
+const _selectClubFinances = createSelector(
+  [selectClubsDomain, selectClubIdArg],
+  (clubsDomain, clubId) => (clubId ? clubsDomain.finances[clubId] : undefined)
+);
+
+const _selectClubInfra = createSelector(
+  [selectClubsDomain, selectClubIdArg],
+  (clubsDomain, clubId) => (clubId ? clubsDomain.infras[clubId] : undefined)
+);
+
+const _selectClubPlayerIds = createSelector(
+  [selectContracts, selectClubIdArg],
+  (contracts, clubId) => {
+    if (!clubId) return [];
+
+    return Object.values(contracts)
+      .filter((c) => c.clubId === clubId && c.active)
+      .map((c) => c.playerId);
+  }
+);
+
+const _selectNextMatchForClub = createSelector(
+  [selectMatchesMap, selectCurrentDateRaw, selectClubIdArg],
+  (matchesMap, currentDate, clubId) => {
     if (!clubId) return null;
 
-    // TODO: Isso roda a cada render se não usarmos useShallow ou memoização adequada.
-    // Em uma app Data-Oriented, filtrar arrays grandes (O(n)) no seletor é aceitável
-    // SE usarmos useShallow na ponta.
-    const allMatches = Object.values(state.matches.matches);
+    const allMatches = Object.values(matchesMap);
+
     const upcomingMatches = allMatches.filter(
       (m) =>
         m.status === "SCHEDULED" &&
         (m.homeClubId === clubId || m.awayClubId === clubId) &&
-        m.datetime >= state.meta.currentDate
+        m.datetime >= currentDate
     );
+
+    if (upcomingMatches.length === 0) return null;
 
     upcomingMatches.sort((a, b) => a.datetime - b.datetime);
-    return upcomingMatches[0] || null;
-  };
 
-export const selectClubPlayerIds =
-  (clubId: ID | null) => (state: GameState) => {
-    if (!clubId) return [];
+    return upcomingMatches[0];
+  }
+);
 
-    return Object.values(state.market.contracts)
-      .filter((c) => c.clubId === clubId && c.active)
-      .map((c) => c.playerId);
-  };
-
-export const selectPlayerById = (playerId: ID) => (state: GameState) =>
-  state.people.players[playerId];
-
-export const selectPlayerStateById = (playerId: ID) => (state: GameState) =>
-  state.people.playerStates[playerId];
-
-export const selectContractByPlayerId =
-  (playerId: ID) => (state: GameState) => {
-    // TODO: Busca cara (O(n)), idealmente teríamos um índice reverso, mas seguimos a estrutura atual
-    return Object.values(state.market.contracts).find(
+const _selectContractByPlayerId = createSelector(
+  [selectContracts, selectPlayerIdArg],
+  (contracts, playerId) => {
+    return Object.values(contracts).find(
       (c) => c.playerId === playerId && c.active
     );
-  };
+  }
+);
+
+export const selectCurrentDate = selectCurrentDateMemo;
+
+export const selectClubById = (clubId: ID | null) => (state: GameState) =>
+  _selectClubById(state, clubId);
+
+export const selectClubFinances = (clubId: ID | null) => (state: GameState) =>
+  _selectClubFinances(state, clubId);
+
+export const selectClubInfra = (clubId: ID | null) => (state: GameState) =>
+  _selectClubInfra(state, clubId);
+
+export const selectClubPlayerIds = (clubId: ID | null) => (state: GameState) =>
+  _selectClubPlayerIds(state, clubId);
+
+export const selectNextMatchForClub =
+  (clubId: ID | null) => (state: GameState) =>
+    _selectNextMatchForClub(state, clubId);
+
+export const selectPlayerById = (playerId: ID) => (state: GameState) =>
+  selectPlayers(state)[playerId];
+
+export const selectPlayerStateById = (playerId: ID) => (state: GameState) =>
+  selectPlayerStates(state)[playerId];
+
+export const selectContractByPlayerId = (playerId: ID) => (state: GameState) =>
+  _selectContractByPlayerId(state, playerId);
