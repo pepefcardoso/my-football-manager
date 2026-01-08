@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { MatchEvent } from "../../core/models/match";
+import { MatchStatsCalculator } from "../../core/systems/MatchEngine/MatchStatsCalculator";
 import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 import { DynamicPitchView } from "../components/DynamicPitchView";
@@ -96,22 +97,10 @@ export const MatchLiveScreen: React.FC = () => {
         return matchEvents.filter(e => e.minute <= currentMinute).sort((a, b) => b.minute - a.minute);
     }, [matchEvents, currentMinute]);
 
-    const liveScore = useMemo(() => {
-        const homeGoals = visibleEvents.filter(e => e.type === "GOAL" && e.clubId === homeClub?.id).length;
-        const awayGoals = visibleEvents.filter(e => e.type === "GOAL" && e.clubId === awayClub?.id).length;
-        return { home: homeGoals, away: awayGoals };
+    const liveData = useMemo(() => {
+        if (!homeClub || !awayClub) return null;
+        return MatchStatsCalculator.calculate(visibleEvents, homeClub.id, awayClub.id);
     }, [visibleEvents, homeClub, awayClub]);
-
-    const liveStats = useMemo(() => {
-        const countType = (type: string, clubId: string) => visibleEvents.filter(e => e.type.includes(type) && e.clubId === clubId).length;
-
-        return {
-            homeCards: countType('CARD', homeClub?.id || ''),
-            awayCards: countType('CARD', awayClub?.id || ''),
-            homeShots: countType('SHOT', homeClub?.id || '') || (liveScore.home + Math.floor(currentMinute / 15)),
-            awayShots: countType('SHOT', awayClub?.id || '') || (liveScore.away + Math.floor(currentMinute / 20)),
-        };
-    }, [visibleEvents, homeClub, awayClub, currentMinute, liveScore]);
 
     useEffect(() => {
         let interval: ReturnType<typeof setInterval> | null = null;
@@ -139,12 +128,13 @@ export const MatchLiveScreen: React.FC = () => {
         };
     }, [isPlaying, speed]);
 
-
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
     }, [visibleEvents]);
 
-    if (!currentMatch || !homeClub || !awayClub) return <div className="p-8 text-center">Carregando partida...</div>;
+    if (!currentMatch || !homeClub || !awayClub || !liveData) return <div className="p-8 text-center">Carregando partida...</div>;
+
+    const { score, stats } = liveData;
 
     return (
         <div className="h-full flex flex-col bg-background animate-in fade-in duration-500">
@@ -165,7 +155,7 @@ export const MatchLiveScreen: React.FC = () => {
                     </div>
                     <div className="flex flex-col items-center w-1/3">
                         <div className="bg-black/40 rounded-lg px-6 py-2 border border-background-tertiary mb-2 backdrop-blur-sm">
-                            <span className="text-4xl font-mono font-bold text-white tracking-widest">{liveScore.home} - {liveScore.away}</span>
+                            <span className="text-4xl font-mono font-bold text-white tracking-widest">{score.home} - {score.away}</span>
                         </div>
                         <div className="flex items-center space-x-2 text-primary font-mono text-lg font-bold">
                             <Clock size={18} />
@@ -237,14 +227,14 @@ export const MatchLiveScreen: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-3 text-center text-sm items-center">
-                                <div className="font-bold text-xl">{liveStats.homeShots}</div>
+                                <div className="font-bold text-xl">{stats.homeShots}</div>
                                 <div className="text-text-muted text-xs uppercase">Chutes</div>
-                                <div className="font-bold text-xl">{liveStats.awayShots}</div>
+                                <div className="font-bold text-xl">{stats.awayShots}</div>
                             </div>
                             <div className="grid grid-cols-3 text-center text-sm items-center">
-                                <div className="font-bold text-xl text-status-warning">{liveStats.homeCards}</div>
+                                <div className="font-bold text-xl text-status-warning">{stats.homeCards}</div>
                                 <div className="text-text-muted text-xs uppercase">Cartões</div>
-                                <div className="font-bold text-xl text-status-warning">{liveStats.awayCards}</div>
+                                <div className="font-bold text-xl text-status-warning">{stats.awayCards}</div>
                             </div>
                         </div>
                     </div>

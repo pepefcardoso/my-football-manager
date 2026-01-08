@@ -35,7 +35,8 @@ export interface MatchEvent {
     | "VAR_CHECK"
     | "VAR_DECISION"
     | "OFFSIDE"
-    | "FOUL";
+    | "FOUL"
+    | "CHANCE";
   clubId: ID;
   playerId: ID;
   targetPlayerId: ID | null;
