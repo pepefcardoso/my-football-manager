@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { processDailyRecovery } from "../RecoverySystem";
 import { GameState } from "../../models/gameState";
-import * as NotificationSystem from "../NotificationSystem";
+import { eventBus } from "../../events/EventBus";
 
-vi.mock("../NotificationSystem", () => ({
-  generateNotification: vi.fn(),
+// Mock do EventBus para verificar se eventos são emitidos
+vi.mock("../../events/EventBus", () => ({
+  eventBus: {
+    emit: vi.fn(),
+  },
 }));
 
 describe("RecoverySystem", () => {
@@ -20,36 +23,42 @@ describe("RecoverySystem", () => {
         currentDate: new Date("2024-01-01").getTime(),
         userClubId: CLUB_ID,
       },
-      contracts: {
-        c1: { playerId: PLAYER_ID, clubId: CLUB_ID, active: true },
+      market: {
+        contracts: {
+          c1: { playerId: PLAYER_ID, clubId: CLUB_ID, active: true },
+        },
+        staffContracts: {},
       },
-      players: {
-        [PLAYER_ID]: {
-          id: PLAYER_ID,
-          birthDate: new Date("2000-01-01").getTime(),
+      people: {
+        players: {
+          [PLAYER_ID]: {
+            id: PLAYER_ID,
+            birthDate: new Date("2000-01-01").getTime(),
+          },
+        },
+        playerStates: {
+          [PLAYER_ID]: {
+            playerId: PLAYER_ID,
+            fitness: 50,
+            morale: 80,
+            matchReadiness: 100,
+          },
+        },
+        staff: {},
+        playerInjuries: {},
+      },
+      clubs: {
+        infras: {
+          [CLUB_ID]: { medicalCenterLevel: 20 },
         },
       },
-      playerStates: {
-        [PLAYER_ID]: {
-          playerId: PLAYER_ID,
-          fitness: 50,
-          morale: 80,
-          matchReadiness: 100,
-        },
+      system: {
+        notifications: {},
       },
-      staffContracts: {},
-      staff: {},
-      clubInfras: {
-        [CLUB_ID]: { medicalCenterLevel: 20 },
-      },
-      playerInjuries: {},
-      notifications: {},
     } as unknown as GameState;
   });
 
   it("should apply base recovery rate correctly", () => {
-    // ARRANGE
-
     // ACT
     processDailyRecovery(mockState);
 
@@ -77,7 +86,9 @@ describe("RecoverySystem", () => {
 
   it("should penalize recovery for older players (>32)", () => {
     // ARRANGE
-    mockState.people.players[PLAYER_ID].birthDate = new Date("1990-01-01").getTime();
+    mockState.people.players[PLAYER_ID].birthDate = new Date(
+      "1990-01-01"
+    ).getTime();
 
     // ACT
     processDailyRecovery(mockState);
@@ -112,12 +123,11 @@ describe("RecoverySystem", () => {
     expect(pState.fitness).toBe(90);
     expect(pState.matchReadiness).toBe(70);
 
-    expect(NotificationSystem.generateNotification).toHaveBeenCalledWith(
+    // Verifica se o evento foi emitido no EventBus
+    expect(eventBus.emit).toHaveBeenCalledWith(
       expect.anything(),
-      "IMPORTANT",
-      "Retorno de Lesão",
-      expect.stringContaining("recuperou-se"),
-      expect.objectContaining({ id: PLAYER_ID })
+      "PLAYER_RECOVERED",
+      expect.objectContaining({ playerId: PLAYER_ID })
     );
   });
 

@@ -23,7 +23,6 @@ const createMockGameState = (): GameState =>
       playerSecondaryPositions: {},
     },
     clubs: {
-      // Note o aninhamento: clubs.clubs
       clubs: { "club-1": { id: "club-1", name: "Test FC" } } as any,
       infras: {},
       finances: {},
@@ -204,9 +203,8 @@ describe("FileSystem Service", () => {
       });
 
       // Act
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      // NOTE: Logger uses console.log with CSS, not console.error
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const result = await FileSystem.loadGameFromDisk("corrupted-save");
 
       // Assert

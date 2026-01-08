@@ -39,6 +39,12 @@ describe("TimeSystem Core Logic", () => {
         currentDate: INITIAL_DATE,
         updatedAt: INITIAL_DATE,
       },
+      system: {
+        notifications: {},
+      },
+      market: {
+        contracts: {},
+      },
     } as unknown as GameState;
   });
 

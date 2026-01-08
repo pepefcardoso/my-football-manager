@@ -25,16 +25,26 @@ describe("TrainingSystem", () => {
         userClubId: CLUB_ID,
         activeSeasonId: "season-1",
       },
-      contracts: {
-        c1: { id: "c1", playerId: PLAYER_ID, clubId: CLUB_ID, active: true },
+      market: {
+        contracts: {
+          c1: { id: "c1", playerId: PLAYER_ID, clubId: CLUB_ID, active: true },
+        },
       },
-      players: {
-        [PLAYER_ID]: createMockPlayer(PLAYER_ID, 20),
+      people: {
+        players: {
+          [PLAYER_ID]: createMockPlayer(PLAYER_ID, 20),
+        },
       },
-      clubInfras: {
-        [CLUB_ID]: { trainingCenterLevel: 50 },
+      clubs: {
+        infras: {
+          [CLUB_ID]: { trainingCenterLevel: 50 },
+        },
       },
-      playerSeasonStats: {},
+      system: {
+        stats: {
+          playerSeason: {},
+        },
+      },
     } as unknown as GameState;
 
     (rng.range as any).mockReturnValue(0);
