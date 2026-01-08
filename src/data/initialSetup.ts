@@ -165,6 +165,7 @@ const createEmptyState = (): GameState => ({
     fases: {},
     groups: {},
     standings: {},
+    standingsLookup: {},
     rules: {
       classification: {},
       prizes: {},
@@ -341,6 +342,9 @@ export const createNewGame = (): GameState => {
         goalsConceded: 0,
         goalsBalance: 0,
       };
+
+      const lookupKey = `${groupId}_${clubId}`;
+      state.competitions.standingsLookup[lookupKey] = standingId;
     });
 
     const ONE_DAY = 24 * 60 * 60 * 1000;

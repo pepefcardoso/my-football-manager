@@ -1,25 +1,41 @@
 import { GameState } from "../models/gameState";
 import { Match } from "../models/match";
 import { CompetitionStandings } from "../models/competition";
+import { logger } from "../utils/Logger";
+
+export const getStandingIndexKey = (
+  groupId: string,
+  clubId: string
+): string => {
+  return `${groupId}_${clubId}`;
+};
 
 const findStanding = (
   state: GameState,
   groupId: string,
   clubId: string
 ): CompetitionStandings | undefined => {
-  return Object.values(state.competitions.standings).find((s) => {
-    if (s.competitionGroupId !== groupId) return false;
+  const key = getStandingIndexKey(groupId, clubId);
+  const standingId = state.competitions.standingsLookup[key];
 
-    const ccsEntry = state.competitions.clubCompetitionSeasons[s.clubCompetitionSeasonId];
+  if (!standingId) return undefined;
 
-    return ccsEntry && ccsEntry.clubId === clubId;
-  });
+  return state.competitions.standings[standingId];
 };
 
 export const updateCompetitionStandings = (
   state: GameState,
   matches: Match[]
 ): void => {
+  // TODO: Em produção, o índice deve ser garantido no load/initialSetup.
+  if (!state.competitions.standingsLookup) {
+    logger.warn(
+      "CompetitionSystem",
+      "Índice de standings ausente. Reconstruindo on-the-fly..."
+    );
+    rebuildStandingsIndex(state);
+  }
+
   matches.forEach((match) => {
     if (match.status !== "FINISHED") return;
     if (!match.competitionGroupId) return;
@@ -37,6 +53,7 @@ export const updateCompetitionStandings = (
 
     if (homeStanding)
       updateTeamStats(homeStanding, match.homeGoals, match.awayGoals);
+
     if (awayStanding)
       updateTeamStats(awayStanding, match.awayGoals, match.homeGoals);
   });
@@ -61,4 +78,19 @@ const updateTeamStats = (
   } else {
     standing.defeats += 1;
   }
+};
+
+export const rebuildStandingsIndex = (state: GameState): void => {
+  state.competitions.standingsLookup = {};
+
+  Object.values(state.competitions.standings).forEach((standing) => {
+    const ccs =
+      state.competitions.clubCompetitionSeasons[
+        standing.clubCompetitionSeasonId
+      ];
+    if (ccs) {
+      const key = getStandingIndexKey(standing.competitionGroupId, ccs.clubId);
+      state.competitions.standingsLookup[key] = standing.id;
+    }
+  });
 };

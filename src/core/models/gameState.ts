@@ -40,6 +40,8 @@ export interface ClubDomain {
   sponsorships: Record<ID, Club.Sponsorship>;
 }
 
+export type StandingsLookup = Record<string, ID>;
+
 export interface CompetitionDomain {
   seasons: Record<ID, Competition.Season>;
   competitions: Record<ID, Competition.Competition>;
@@ -48,6 +50,7 @@ export interface CompetitionDomain {
   fases: Record<ID, Competition.CompetitionFase>;
   groups: Record<ID, Competition.CompetitionGroup>;
   standings: Record<ID, Competition.CompetitionStandings>;
+  standingsLookup: StandingsLookup;
   rules: {
     classification: Record<ID, Competition.ClassificationRule>;
     prizes: Record<ID, Competition.PrizeRule>;
