@@ -66,16 +66,16 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
   let totalImprovements = 0;
   const logs: string[] = [];
 
-  for (const contractId in state.contracts) {
-    const contract = state.contracts[contractId];
+  for (const contractId in state.market.contracts) {
+    const contract = state.market.contracts[contractId];
     if (!contract.active) continue;
 
-    const player = state.players[contract.playerId];
+    const player = state.people.players[contract.playerId];
     if (!player) continue;
 
-    const clubInfra = state.clubInfras[contract.clubId];
+    const clubInfra = state.clubs.infras[contract.clubId];
     const age = getAge(player.birthDate, state.meta.currentDate);
-    const seasonStats = Object.values(state.playerSeasonStats).find(
+    const seasonStats = Object.values(state.system.stats.playerSeason).find(
       (s) =>
         s.playerId === player.id && s.seasonId === state.meta.activeSeasonId
     );

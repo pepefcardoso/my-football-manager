@@ -5,7 +5,7 @@ import { GameState } from "../../core/models/gameState";
 const createMockGameState = (): GameState =>
   ({
     meta: {
-      version: "1.0.0",
+      version: "2.0.0",
       saveName: "Test Save",
       currentDate: Date.now(),
       currentUserManagerId: "manager-1",
@@ -14,9 +14,61 @@ const createMockGameState = (): GameState =>
       createdAt: Date.now(),
       updatedAt: Date.now(),
     },
-    clubs: { "club-1": { id: "club-1", name: "Test FC" } } as any,
-    players: {},
-    managers: {},
+    people: {
+      managers: {},
+      players: {},
+      staff: {},
+      playerStates: {},
+      playerInjuries: {},
+      playerSecondaryPositions: {},
+    },
+    clubs: {
+      // Note o aninhamento: clubs.clubs
+      clubs: { "club-1": { id: "club-1", name: "Test FC" } } as any,
+      infras: {},
+      finances: {},
+      relationships: {},
+      rivalries: {},
+      stadiums: {},
+      sponsorships: {},
+    },
+    competitions: {
+      seasons: {},
+      competitions: {},
+      competitionSeasons: {},
+      clubCompetitionSeasons: {},
+      fases: {},
+      groups: {},
+      standings: {},
+      rules: { classification: {}, prizes: {} },
+    },
+    matches: {
+      matches: {},
+      events: {},
+      playerStats: {},
+      formations: {},
+      positions: {},
+      teamTactics: {},
+    },
+    market: {
+      contracts: {},
+      staffContracts: {},
+      clubManagers: {},
+      transferOffers: {},
+      loans: {},
+      scoutingKnowledge: {},
+    },
+    world: {
+      nations: {},
+      cities: {},
+    },
+    system: {
+      news: {},
+      notifications: {},
+      scheduledEvents: {},
+      financialEntries: {},
+      stats: { playerSeason: {} },
+    },
   } as GameState);
 
 const localStorageMock = (() => {

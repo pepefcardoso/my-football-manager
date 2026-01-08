@@ -7,10 +7,10 @@ const findStanding = (
   groupId: string,
   clubId: string
 ): CompetitionStandings | undefined => {
-  return Object.values(state.standings).find((s) => {
+  return Object.values(state.competitions.standings).find((s) => {
     if (s.competitionGroupId !== groupId) return false;
 
-    const ccsEntry = state.clubCompetitionSeasons[s.clubCompetitionSeasonId];
+    const ccsEntry = state.competitions.clubCompetitionSeasons[s.clubCompetitionSeasonId];
 
     return ccsEntry && ccsEntry.clubId === clubId;
   });

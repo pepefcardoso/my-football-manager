@@ -16,30 +16,30 @@ describe("TimeFlow Integration (The Game Loop)", () => {
     // ARRANGE
     const userClubId = state.meta.userClubId!;
     const initialDate = state.meta.currentDate;
-    const initialBalance = state.clubFinances[userClubId].balanceCurrent;
+    const initialBalance = state.clubs.finances[userClubId].balanceCurrent;
 
-    const playerIds = Object.keys(state.players);
+    const playerIds = Object.keys(state.people.players);
     const testPlayerId = playerIds[0];
 
-    if (!state.playerStates[testPlayerId]) {
-      state.playerStates[testPlayerId] = {
+    if (!state.people.playerStates[testPlayerId]) {
+      state.people.playerStates[testPlayerId] = {
         playerId: testPlayerId,
         fitness: 50,
         morale: 50,
         matchReadiness: 100,
       };
     }
-    state.playerStates[testPlayerId].fitness = 50;
+    state.people.playerStates[testPlayerId].fitness = 50;
 
     // ACT
     const result = advanceOneDay(state);
 
     // ASSERT
     expect(result.newDate).toBe(initialDate + ONE_DAY_MS);
-    expect(state.clubFinances[userClubId].balanceCurrent).toBeLessThan(
+    expect(state.clubs.finances[userClubId].balanceCurrent).toBeLessThan(
       initialBalance
     );
-    expect(state.playerStates[testPlayerId].fitness).toBeGreaterThan(50);
+    expect(state.people.playerStates[testPlayerId].fitness).toBeGreaterThan(50);
     expect(result.events.length).toBeGreaterThan(0);
     expect(result.events.some((e) => e.includes("Custos de manutenção"))).toBe(
       true

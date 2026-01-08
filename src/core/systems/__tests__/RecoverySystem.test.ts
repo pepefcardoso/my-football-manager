@@ -54,36 +54,36 @@ describe("RecoverySystem", () => {
     processDailyRecovery(mockState);
 
     // ASSERT
-    const pState = mockState.playerStates[PLAYER_ID];
+    const pState = mockState.people.playerStates[PLAYER_ID];
     expect(pState.fitness).toBe(60.5);
   });
 
   it("should boost recovery with high level medical staff", () => {
     // ARRANGE
-    mockState.staffContracts["s1"] = {
+    mockState.market.staffContracts["s1"] = {
       staffId: "staff1",
       clubId: CLUB_ID,
       active: true,
     } as any;
-    mockState.staff["staff1"] = { id: "staff1", overall: 90 } as any;
+    mockState.people.staff["staff1"] = { id: "staff1", overall: 90 } as any;
 
     // ACT
     processDailyRecovery(mockState);
 
     // ASSERT
-    const pState = mockState.playerStates[PLAYER_ID];
+    const pState = mockState.people.playerStates[PLAYER_ID];
     expect(pState.fitness).toBe(62);
   });
 
   it("should penalize recovery for older players (>32)", () => {
     // ARRANGE
-    mockState.players[PLAYER_ID].birthDate = new Date("1990-01-01").getTime();
+    mockState.people.players[PLAYER_ID].birthDate = new Date("1990-01-01").getTime();
 
     // ACT
     processDailyRecovery(mockState);
 
     // ASSERT
-    const pState = mockState.playerStates[PLAYER_ID];
+    const pState = mockState.people.playerStates[PLAYER_ID];
     expect(pState.fitness).toBe(59);
   });
 
@@ -92,7 +92,7 @@ describe("RecoverySystem", () => {
     const injuryId = "inj1";
     const returnDate = mockState.meta.currentDate;
 
-    mockState.playerInjuries[injuryId] = {
+    mockState.people.playerInjuries[injuryId] = {
       id: injuryId,
       playerId: PLAYER_ID,
       name: "Player 1",
@@ -105,10 +105,10 @@ describe("RecoverySystem", () => {
     const result = processDailyRecovery(mockState);
 
     // ASSERT
-    expect(mockState.playerInjuries[injuryId]).toBeUndefined();
+    expect(mockState.people.playerInjuries[injuryId]).toBeUndefined();
     expect(result.recoveredPlayers).toContain(PLAYER_ID);
 
-    const pState = mockState.playerStates[PLAYER_ID];
+    const pState = mockState.people.playerStates[PLAYER_ID];
     expect(pState.fitness).toBe(90);
     expect(pState.matchReadiness).toBe(70);
 
@@ -123,12 +123,12 @@ describe("RecoverySystem", () => {
 
   it("should cap fitness at 100", () => {
     // ARRANGE
-    mockState.playerStates[PLAYER_ID].fitness = 95;
+    mockState.people.playerStates[PLAYER_ID].fitness = 95;
 
     // ACT
     processDailyRecovery(mockState);
 
     // ASSERT
-    expect(mockState.playerStates[PLAYER_ID].fitness).toBe(100);
+    expect(mockState.people.playerStates[PLAYER_ID].fitness).toBe(100);
   });
 });

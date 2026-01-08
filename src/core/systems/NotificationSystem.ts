@@ -51,14 +51,14 @@ export const generateNotification = (
     expiresInDays
   );
 
-  state.notifications[notification.id] = notification;
+  state.system.notifications[notification.id] = notification;
 
-  const keys = Object.keys(state.notifications);
+  const keys = Object.keys(state.system.notifications);
   if (keys.length > 100) {
     const oldestKey = keys.sort(
-      (a, b) => state.notifications[a].date - state.notifications[b].date
+      (a, b) => state.system.notifications[a].date - state.system.notifications[b].date
     )[0];
-    delete state.notifications[oldestKey];
+    delete state.system.notifications[oldestKey];
   }
 
   eventBus.emit(state, "NOTIFICATION_CREATED", { notification });
@@ -67,8 +67,8 @@ export const generateNotification = (
 };
 
 export const markAsRead = (state: GameState, notificationId: ID): void => {
-  if (state.notifications[notificationId]) {
-    state.notifications[notificationId].isRead = true;
+  if (state.system.notifications[notificationId]) {
+    state.system.notifications[notificationId].isRead = true;
   }
 };
 
@@ -76,25 +76,25 @@ export const deleteNotification = (
   state: GameState,
   notificationId: ID
 ): void => {
-  if (state.notifications[notificationId]) {
-    delete state.notifications[notificationId];
+  if (state.system.notifications[notificationId]) {
+    delete state.system.notifications[notificationId];
   }
 };
 
 export const cleanOldNotifications = (state: GameState): void => {
   const currentDate = state.meta.currentDate;
 
-  for (const id in state.notifications) {
-    const notification = state.notifications[id];
+  for (const id in state.system.notifications) {
+    const notification = state.system.notifications[id];
 
     if (notification.expiresAt && currentDate > notification.expiresAt) {
-      delete state.notifications[id];
+      delete state.system.notifications[id];
       continue;
     }
 
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
     if (notification.isRead && currentDate - notification.date > thirtyDays) {
-      delete state.notifications[id];
+      delete state.system.notifications[id];
     }
   }
 };
@@ -106,15 +106,15 @@ const checkExpiringContracts = (state: GameState): void => {
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   const currentDate = state.meta.currentDate;
 
-  for (const contractId in state.contracts) {
-    const contract = state.contracts[contractId];
+  for (const contractId in state.market.contracts) {
+    const contract = state.market.contracts[contractId];
 
     if (contract.clubId !== userClubId || !contract.active) continue;
 
     const daysRemaining = Math.ceil(
       (contract.endDate - currentDate) / ONE_DAY_MS
     );
-    const player = state.players[contract.playerId];
+    const player = state.people.players[contract.playerId];
 
     if (!player) continue;
 
@@ -149,7 +149,7 @@ export const setupNotificationListeners = (): void => {
   eventBus.clear();
 
   eventBus.on("PLAYER_RECOVERED", (state, payload) => {
-    const player = state.players[payload.playerId];
+    const player = state.people.players[payload.playerId];
     if (!player) return;
 
     generateNotification(
@@ -162,7 +162,7 @@ export const setupNotificationListeners = (): void => {
   });
 
   eventBus.on("PLAYER_INJURY_OCCURRED", (state, payload) => {
-    const player = state.players[payload.playerId];
+    const player = state.people.players[payload.playerId];
     if (!player) return;
 
     generateNotification(
@@ -175,7 +175,7 @@ export const setupNotificationListeners = (): void => {
   });
 
   eventBus.on("PLAYER_DEVELOPMENT_BOOST", (state, payload) => {
-    const player = state.players[payload.playerId];
+    const player = state.people.players[payload.playerId];
     if (!player) return;
 
     const attrName =
@@ -195,7 +195,7 @@ export const setupNotificationListeners = (): void => {
   });
 
   eventBus.on("MATCH_FINISHED", (state, payload) => {
-    const match = state.matches[payload.matchId];
+    const match = state.matches.matches[payload.matchId];
     if (!match) return;
 
     const userClubId = state.meta.userClubId;
@@ -203,8 +203,8 @@ export const setupNotificationListeners = (): void => {
       return;
     }
 
-    const homeClub = state.clubs[match.homeClubId];
-    const awayClub = state.clubs[match.awayClubId];
+    const homeClub = state.clubs.clubs[match.homeClubId];
+    const awayClub = state.clubs.clubs[match.awayClubId];
 
     const title =
       match.homeClubId === userClubId

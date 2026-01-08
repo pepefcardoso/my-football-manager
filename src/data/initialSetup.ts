@@ -131,7 +131,7 @@ const BRAZIL_CLUBS_DATA = [
 
 const createEmptyState = (): GameState => ({
   meta: {
-    version: "1.0.0",
+    version: "2.0.0",
     saveName: "New Game",
     currentDate: Date.now(),
     currentUserManagerId: "",
@@ -140,48 +140,65 @@ const createEmptyState = (): GameState => ({
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
-  managers: {},
-  players: {},
-  staff: {},
-  scoutingKnowledge: {},
-  clubs: {},
-  clubInfras: {},
-  clubFinances: {},
-  clubRelationships: {},
-  clubRivalries: {},
-  financialEntries: {},
-  stadiums: {},
-  sponsorships: {},
-  nations: {},
-  cities: {},
-  seasons: {},
-  competitions: {},
-  competitionSeasons: {},
-  clubCompetitionSeasons: {},
-  competitionFases: {},
-  competitionGroups: {},
-  classificationRules: {},
-  prizeRules: {},
-  standings: {},
-  matches: {},
-  matchEvents: {},
-  contracts: {},
-  clubManagers: {},
-  staffContracts: {},
-  transferOffers: {},
-  playerLoans: {},
-  playerStates: {},
-  playerInjuries: {},
-  playerSeasonStats: {},
-  playerMatchStats: {},
-  playerSecondaryPositions: {},
-  formations: {},
-  positions: {},
-  teamTactics: {},
-  news: {},
-  scheduledEvents: {},
-  gameEvents: {},
-  notifications: {},
+  people: {
+    managers: {},
+    players: {},
+    staff: {},
+    playerStates: {},
+    playerInjuries: {},
+    playerSecondaryPositions: {},
+  },
+  clubs: {
+    clubs: {},
+    infras: {},
+    finances: {},
+    relationships: {},
+    rivalries: {},
+    stadiums: {},
+    sponsorships: {},
+  },
+  competitions: {
+    seasons: {},
+    competitions: {},
+    competitionSeasons: {},
+    clubCompetitionSeasons: {},
+    fases: {},
+    groups: {},
+    standings: {},
+    rules: {
+      classification: {},
+      prizes: {},
+    },
+  },
+  matches: {
+    matches: {},
+    events: {},
+    playerStats: {},
+    formations: {},
+    positions: {},
+    teamTactics: {},
+  },
+  market: {
+    contracts: {},
+    staffContracts: {},
+    clubManagers: {},
+    transferOffers: {},
+    loans: {},
+    scoutingKnowledge: {},
+  },
+  world: {
+    nations: {},
+    cities: {},
+  },
+  system: {
+    news: {},
+    notifications: {},
+    scheduledEvents: {},
+    financialEntries: {},
+    stats: {
+      playerSeason: {},
+    },
+  },
 });
 
 export const createNewGame = (): GameState => {
@@ -195,7 +212,7 @@ export const createNewGame = (): GameState => {
 
     const brazilId = uuidv4();
     const brazil: Nation = { id: brazilId, name: "Brasil" };
-    state.nations[brazilId] = brazil;
+    state.world.nations[brazilId] = brazil;
 
     let firstClubId = "";
     let totalPlayers = 0;
@@ -213,12 +230,12 @@ export const createNewGame = (): GameState => {
       if (index === 0) firstClubId = bundle.club.id;
       createdClubIds.push(bundle.club.id);
 
-      state.clubs[bundle.club.id] = bundle.club;
-      state.clubInfras[bundle.club.id] = bundle.infra;
-      state.clubFinances[bundle.club.id] = bundle.finances;
+      state.clubs.clubs[bundle.club.id] = bundle.club;
+      state.clubs.infras[bundle.club.id] = bundle.infra;
+      state.clubs.finances[bundle.club.id] = bundle.finances;
 
       bundle.players.forEach((player) => {
-        state.players[player.id] = player;
+        state.people.players[player.id] = player;
         totalPlayers++;
 
         const wage = PlayerFactory.calculateWage(70);
@@ -236,9 +253,10 @@ export const createNewGame = (): GameState => {
           isLoaned: false,
           active: true,
         };
-        state.contracts[contractId] = contract;
 
-        state.playerStates[player.id] = {
+        state.market.contracts[contractId] = contract;
+
+        state.people.playerStates[player.id] = {
           playerId: player.id,
           fitness: 100,
           morale: 80,
@@ -255,7 +273,7 @@ export const createNewGame = (): GameState => {
 
     const currentYear = new Date().getFullYear();
 
-    state.seasons[seasonId] = {
+    state.competitions.seasons[seasonId] = {
       id: seasonId,
       year: currentYear,
       beginning: state.meta.currentDate,
@@ -264,7 +282,7 @@ export const createNewGame = (): GameState => {
     };
     state.meta.activeSeasonId = seasonId;
 
-    state.competitions[competitionId] = {
+    state.competitions.competitions[competitionId] = {
       id: competitionId,
       name: "Brasileirão Série A",
       nickname: "Brasileirão",
@@ -274,7 +292,7 @@ export const createNewGame = (): GameState => {
       standingsPriority: "POINTS",
     };
 
-    state.competitionSeasons[compSeasonId] = {
+    state.competitions.competitionSeasons[compSeasonId] = {
       id: compSeasonId,
       competitionId,
       seasonId,
@@ -284,7 +302,7 @@ export const createNewGame = (): GameState => {
       tieBreakingCriteria4: "HEAD_TO_HEAD",
     };
 
-    state.competitionFases[faseId] = {
+    state.competitions.fases[faseId] = {
       id: faseId,
       competitionSeasonId: compSeasonId,
       name: "Temporada Regular",
@@ -294,7 +312,7 @@ export const createNewGame = (): GameState => {
       isFinalSingleGame: false,
     };
 
-    state.competitionGroups[groupId] = {
+    state.competitions.groups[groupId] = {
       id: groupId,
       competitionFaseId: faseId,
       name: "Série A",
@@ -307,10 +325,10 @@ export const createNewGame = (): GameState => {
         competitionSeasonId: compSeasonId,
         clubId: clubId,
       };
-      state.clubCompetitionSeasons[ccsId] = ccs;
+      state.competitions.clubCompetitionSeasons[ccsId] = ccs;
 
       const standingId = uuidv4();
-      state.standings[standingId] = {
+      state.competitions.standings[standingId] = {
         id: standingId,
         competitionGroupId: groupId,
         clubCompetitionSeasonId: ccsId,
@@ -344,10 +362,10 @@ export const createNewGame = (): GameState => {
 
         const matchDate = state.meta.currentDate - (5 - i) * ONE_DAY * 7;
 
-        state.matches[matchId] = {
+        state.matches.matches[matchId] = {
           id: matchId,
           competitionGroupId: groupId,
-          stadiumId: state.clubInfras[homeId].stadiumId,
+          stadiumId: state.clubs.infras[homeId].stadiumId,
           homeClubId: homeId,
           awayClubId: awayId,
           homeGoals: finalHome,
@@ -364,9 +382,11 @@ export const createNewGame = (): GameState => {
         };
 
         const updateStanding = (cId: string, gp: number, gc: number) => {
-          const s = Object.values(state.standings).find((st) => {
+          const s = Object.values(state.competitions.standings).find((st) => {
             const ccs =
-              state.clubCompetitionSeasons[st.clubCompetitionSeasonId];
+              state.competitions.clubCompetitionSeasons[
+                st.clubCompetitionSeasonId
+              ];
             return ccs.clubId === cId;
           });
           if (s) {
@@ -401,10 +421,10 @@ export const createNewGame = (): GameState => {
 
         const matchDate = state.meta.currentDate + (i + 1) * ONE_DAY * 3;
 
-        state.matches[matchId] = {
+        state.matches.matches[matchId] = {
           id: matchId,
           competitionGroupId: groupId,
-          stadiumId: state.clubInfras[homeId].stadiumId,
+          stadiumId: state.clubs.infras[homeId].stadiumId,
           homeClubId: homeId,
           awayClubId: awayId,
           homeGoals: 0,
@@ -425,7 +445,7 @@ export const createNewGame = (): GameState => {
     const humanManagerId = uuidv4();
     const userClubId = firstClubId;
 
-    state.managers[humanManagerId] = {
+    state.people.managers[humanManagerId] = {
       id: humanManagerId,
       name: "Treinador (Você)",
       nationId: brazilId,
@@ -445,10 +465,10 @@ export const createNewGame = (): GameState => {
     state.meta.saveName = "Novo Jogo - Brasileiro";
 
     logger.info("InitialSetup", "Geração de Entidades Concluída", {
-      clubs: Object.keys(state.clubs).length,
+      clubs: Object.keys(state.clubs.clubs).length,
       players: totalPlayers,
-      competitions: Object.keys(state.competitions).length,
-      matches: Object.keys(state.matches).length,
+      competitions: Object.keys(state.competitions.competitions).length,
+      matches: Object.keys(state.matches.matches).length,
     });
 
     return state;

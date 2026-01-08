@@ -12,8 +12,8 @@ export const processDailyEconomy = (state: GameState): EconomyResult => {
   const MAINTENANCE_COST_PER_LEVEL = 100;
   const userClubId = state.meta.userClubId;
 
-  for (const clubId in state.clubInfras) {
-    const infra = state.clubInfras[clubId];
+  for (const clubId in state.clubs.infras) {
+    const infra = state.clubs.infras[clubId];
     const totalLevels =
       infra.trainingCenterLevel +
       infra.youthAcademyLevel +
@@ -23,8 +23,8 @@ export const processDailyEconomy = (state: GameState): EconomyResult => {
 
     const dailyCost = totalLevels * MAINTENANCE_COST_PER_LEVEL;
 
-    if (state.clubFinances[clubId]) {
-      state.clubFinances[clubId].balanceCurrent -= dailyCost;
+    if (state.clubs.finances[clubId]) {
+      state.clubs.finances[clubId].balanceCurrent -= dailyCost;
       totalDailyExpenses += dailyCost;
 
       if (clubId === userClubId && dailyCost > 0) {

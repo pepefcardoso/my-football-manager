@@ -10,58 +10,90 @@ import * as Events from "./events";
 import * as Geo from "./geo";
 import * as Scouting from "./scouting";
 
-export interface GameState {
-  meta: {
-    version: string;
-    saveName: string;
-    currentDate: Timestamp;
-    currentUserManagerId: ID;
-    userClubId: ID | null;
-    activeSeasonId: ID;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
-  };
+export interface MetaState {
+  version: string;
+  saveName: string;
+  currentDate: Timestamp;
+  currentUserManagerId: ID;
+  userClubId: ID | null;
+  activeSeasonId: ID;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
 
+export interface PeopleDomain {
   managers: Record<ID, People.Manager>;
   players: Record<ID, People.Player>;
   staff: Record<ID, People.Staff>;
-  scoutingKnowledge: Record<string, Scouting.ScoutingKnowledge>;
+  playerStates: Record<ID, Stats.PlayerState>;
+  playerInjuries: Record<ID, Stats.PlayerInjury>;
+  playerSecondaryPositions: Record<string, Stats.PlayerSecondaryPosition[]>;
+}
+
+export interface ClubDomain {
   clubs: Record<ID, Club.Club>;
-  clubInfras: Record<ID, Club.ClubInfra>;
-  clubFinances: Record<ID, Club.ClubFinances>;
-  clubRelationships: Record<ID, Club.ClubRelationship>;
-  clubRivalries: Record<string, Club.ClubRivalry[]>;
-  financialEntries: Record<ID, Club.FinancialEntry>;
+  infras: Record<ID, Club.ClubInfra>;
+  finances: Record<ID, Club.ClubFinances>;
+  relationships: Record<ID, Club.ClubRelationship>;
+  rivalries: Record<string, Club.ClubRivalry[]>;
   stadiums: Record<ID, Club.Stadium>;
   sponsorships: Record<ID, Club.Sponsorship>;
-  nations: Record<ID, Geo.Nation>;
-  cities: Record<ID, Geo.City>;
+}
+
+export interface CompetitionDomain {
   seasons: Record<ID, Competition.Season>;
   competitions: Record<ID, Competition.Competition>;
   competitionSeasons: Record<ID, Competition.CompetitionSeason>;
   clubCompetitionSeasons: Record<ID, Competition.ClubCompetitionSeason>;
-  competitionFases: Record<ID, Competition.CompetitionFase>;
-  competitionGroups: Record<ID, Competition.CompetitionGroup>;
-  classificationRules: Record<ID, Competition.ClassificationRule>;
-  prizeRules: Record<ID, Competition.PrizeRule>;
+  fases: Record<ID, Competition.CompetitionFase>;
+  groups: Record<ID, Competition.CompetitionGroup>;
   standings: Record<ID, Competition.CompetitionStandings>;
+  rules: {
+    classification: Record<ID, Competition.ClassificationRule>;
+    prizes: Record<ID, Competition.PrizeRule>;
+  };
+}
+
+export interface MatchDomain {
   matches: Record<ID, Match.Match>;
-  matchEvents: Record<ID, Match.MatchEvent[]>;
-  contracts: Record<ID, Contract.Contract>;
-  clubManagers: Record<ID, Contract.ClubManager>;
-  staffContracts: Record<ID, Contract.StaffContract>;
-  transferOffers: Record<ID, Contract.TransferOffer>;
-  playerLoans: Record<ID, Contract.PlayerLoan>;
-  playerStates: Record<ID, Stats.PlayerState>;
-  playerInjuries: Record<ID, Stats.PlayerInjury>;
-  playerSeasonStats: Record<string, Stats.PlayerSeasonStats>;
-  playerMatchStats: Record<ID, Match.PlayerMatchStats>;
-  playerSecondaryPositions: Record<string, Stats.PlayerSecondaryPosition[]>;
+  events: Record<ID, Match.MatchEvent[]>;
+  playerStats: Record<ID, Match.PlayerMatchStats>;
   formations: Record<ID, Tactics.Formation>;
   positions: Record<ID, Tactics.Position>;
   teamTactics: Record<ID, Tactics.TeamTactics>;
+}
+
+export interface MarketDomain {
+  contracts: Record<ID, Contract.Contract>;
+  staffContracts: Record<ID, Contract.StaffContract>;
+  clubManagers: Record<ID, Contract.ClubManager>;
+  transferOffers: Record<ID, Contract.TransferOffer>;
+  loans: Record<ID, Contract.PlayerLoan>;
+  scoutingKnowledge: Record<string, Scouting.ScoutingKnowledge>;
+}
+
+export interface WorldDomain {
+  nations: Record<ID, Geo.Nation>;
+  cities: Record<ID, Geo.City>;
+}
+
+export interface SystemDomain {
   news: Record<ID, Events.NewsItem>;
   notifications: Record<ID, Events.Notification>;
   scheduledEvents: Record<ID, Events.ScheduledEvent>;
-  gameEvents: Record<ID, Events.GameEvent>;
+  financialEntries: Record<ID, Club.FinancialEntry>;
+  stats: {
+    playerSeason: Record<string, Stats.PlayerSeasonStats>;
+  };
+}
+
+export interface GameState {
+  meta: MetaState;
+  people: PeopleDomain;
+  clubs: ClubDomain;
+  competitions: CompetitionDomain;
+  matches: MatchDomain;
+  market: MarketDomain;
+  world: WorldDomain;
+  system: SystemDomain;
 }

@@ -19,7 +19,6 @@ describe("TrainingSystem", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Setup Estado Mínimo Viável
     mockState = {
       meta: {
         currentDate: new Date("2024-01-01").getTime(),
@@ -46,7 +45,7 @@ describe("TrainingSystem", () => {
 
   it("should boost growth for young players (<21)", () => {
     // ARRANGE
-    const youngPlayer = mockState.players[PLAYER_ID];
+    const youngPlayer = mockState.people.players[PLAYER_ID];
     youngPlayer.birthDate = getBirthDateFromAge(18);
     const initialFinishing = youngPlayer.finishing;
 
@@ -62,8 +61,8 @@ describe("TrainingSystem", () => {
   it("should trigger regression for veteran players (>30)", () => {
     // ARRANGE
     const veteranId = "vet-1";
-    mockState.players[veteranId] = createMockPlayer(veteranId, 34);
-    mockState.contracts["c2"] = {
+    mockState.people.players[veteranId] = createMockPlayer(veteranId, 34);
+    mockState.market.contracts["c2"] = {
       id: "c2",
       playerId: veteranId,
       clubId: CLUB_ID,
@@ -73,7 +72,7 @@ describe("TrainingSystem", () => {
     (rng.range as any).mockReturnValue(0);
     (rng.pick as any).mockReturnValue("speed");
 
-    const veteran = mockState.players[veteranId];
+    const veteran = mockState.people.players[veteranId];
     veteran.speed = 80;
 
     // ACT
@@ -86,7 +85,7 @@ describe("TrainingSystem", () => {
 
   it("should not improve player if potential is reached", () => {
     // ARRANGE
-    const player = mockState.players[PLAYER_ID];
+    const player = mockState.people.players[PLAYER_ID];
     player.potential = 70;
     player.finishing = 70;
     player.passing = 70;
@@ -103,9 +102,9 @@ describe("TrainingSystem", () => {
 
   it("should apply infrastructure bonus correctly", () => {
     // ARRANGE
-    const player = mockState.players[PLAYER_ID];
+    const player = mockState.people.players[PLAYER_ID];
     const initialAttr = player.finishing;
-    mockState.clubInfras[CLUB_ID].trainingCenterLevel = 90;
+    mockState.clubs.infras[CLUB_ID].trainingCenterLevel = 90;
 
     // ACT
     processDailyTraining(mockState);
@@ -117,7 +116,7 @@ describe("TrainingSystem", () => {
 
   it("should cap attributes at 99", () => {
     // ARRANGE
-    const player = mockState.players[PLAYER_ID];
+    const player = mockState.people.players[PLAYER_ID];
     player.finishing = 99;
 
     // ACT

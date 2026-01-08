@@ -39,7 +39,7 @@ export const processScheduledMatches = (
   const currentDayTime = currentDateStart.getTime();
 
   for (const matchId in state.matches) {
-    const match = state.matches[matchId];
+    const match = state.matches.matches[matchId];
     const matchDate = new Date(match.datetime);
     matchDate.setHours(0, 0, 0, 0);
 
@@ -69,10 +69,10 @@ export const buildTeamContext = (
   clubId: string,
   customLineup?: { startingXI: string[]; bench: string[] }
 ): TeamMatchContext => {
-  const club = state.clubs[clubId];
+  const club = state.clubs.clubs[clubId];
 
   const activePlayerIds = Object.values(
-    state.contracts as Record<string, Contract>
+    state.market.contracts as Record<string, Contract>
   )
     .filter(
       (c) =>
@@ -81,7 +81,7 @@ export const buildTeamContext = (
     .map((c) => c.playerId);
 
   const squad = activePlayerIds
-    .map((id) => state.players[id])
+    .map((id) => state.people.players[id])
     .filter((p) => !!p)
     .map((p) => ({
       ...p,
@@ -93,16 +93,18 @@ export const buildTeamContext = (
 
   if (customLineup) {
     startingXI = customLineup.startingXI
-      .map((id) => state.players[id])
+      .map((id) => state.people.players[id])
       .filter(Boolean);
-    bench = customLineup.bench.map((id) => state.players[id]).filter(Boolean);
+    bench = customLineup.bench
+      .map((id) => state.people.players[id])
+      .filter(Boolean);
   } else {
     squad.sort((a, b) => b._tempOverall - a._tempOverall);
     startingXI = squad.slice(0, 11);
     bench = squad.slice(11, 18);
   }
 
-  const tactics = state.teamTactics[clubId] || {
+  const tactics = state.matches.teamTactics[clubId] || {
     id: "default",
     clubId: clubId,
     formationId: "4-4-2",
@@ -129,9 +131,9 @@ const applyMatchResults = (
   match.homeGoals = result.homeScore;
   match.awayGoals = result.awayScore;
   match.status = "FINISHED";
-  state.matchEvents[match.id] = result.events;
+  state.matches.events[match.id] = result.events;
   result.playerStats.forEach((stat) => {
-    state.playerMatchStats[stat.id] = stat;
+    state.matches.playerStats[stat.id] = stat;
   });
   processMatchInjuries(state, result.events);
   eventBus.emit(state, "MATCH_FINISHED", {
@@ -169,11 +171,11 @@ const processMatchInjuries = (state: GameState, events: MatchEvent[]) => {
       estimatedReturnDate: returnDate,
     };
 
-    state.playerInjuries[injuryId] = injury;
+    state.people.playerInjuries[injuryId] = injury;
 
-    if (state.playerStates[event.playerId]) {
-      state.playerStates[event.playerId].fitness = 50;
-      state.playerStates[event.playerId].matchReadiness = 0;
+    if (state.people.playerStates[event.playerId]) {
+      state.people.playerStates[event.playerId].fitness = 50;
+      state.people.playerStates[event.playerId].matchReadiness = 0;
     }
 
     eventBus.emit(state, "PLAYER_INJURY_OCCURRED", {

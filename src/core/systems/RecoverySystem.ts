@@ -14,7 +14,7 @@ export interface RecoveryResult {
 }
 
 const getStaffBonus = (state: GameState, clubId: string): number => {
-  const staffContracts = Object.values(state.staffContracts).filter(
+  const staffContracts = Object.values(state.market.staffContracts).filter(
     (c) => c.clubId === clubId && c.active
   );
 
@@ -22,7 +22,7 @@ const getStaffBonus = (state: GameState, clubId: string): number => {
 
   let bestOverall = 0;
   staffContracts.forEach((c) => {
-    const staff = state.staff[c.staffId];
+    const staff = state.people.staff[c.staffId];
     if (staff && staff.overall > bestOverall) bestOverall = staff.overall;
   });
 
@@ -32,7 +32,7 @@ const getStaffBonus = (state: GameState, clubId: string): number => {
 };
 
 const getInfraBonus = (state: GameState, clubId: string): number => {
-  const infra = state.clubInfras[clubId];
+  const infra = state.clubs.infras[clubId];
   if (!infra) return 0;
 
   if (infra.medicalCenterLevel >= 80) return 0.2;
@@ -52,12 +52,12 @@ export const processDailyRecovery = (state: GameState): RecoveryResult => {
   const recoveredPlayers: string[] = [];
   const logs: string[] = [];
 
-  for (const id in state.playerStates) {
-    const pState = state.playerStates[id];
+  for (const id in state.people.playerStates) {
+    const pState = state.people.playerStates[id];
 
     if (pState.fitness >= 100) continue;
 
-    const contract = Object.values(state.contracts).find(
+    const contract = Object.values(state.market.contracts).find(
       (c) => c.playerId === id && c.active
     );
     if (!contract) {
@@ -68,7 +68,7 @@ export const processDailyRecovery = (state: GameState): RecoveryResult => {
       continue;
     }
 
-    const player = state.players[id];
+    const player = state.people.players[id];
     const age = player
       ? Math.floor((state.meta.currentDate - player.birthDate) / 31536000000)
       : 25;
@@ -83,15 +83,15 @@ export const processDailyRecovery = (state: GameState): RecoveryResult => {
     pState.fitness = Math.min(100, pState.fitness + totalRate);
   }
 
-  for (const injuryId in state.playerInjuries) {
-    const injury = state.playerInjuries[injuryId];
+  for (const injuryId in state.people.playerInjuries) {
+    const injury = state.people.playerInjuries[injuryId];
 
     if (state.meta.currentDate >= injury.estimatedReturnDate) {
       recoveredPlayers.push(injury.playerId);
 
       const logMsg = `🏥 ${injury.name} recebeu alta do Departamento Médico.`;
 
-      const contract = Object.values(state.contracts).find(
+      const contract = Object.values(state.market.contracts).find(
         (c) =>
           c.playerId === injury.playerId &&
           c.active &&
@@ -107,12 +107,12 @@ export const processDailyRecovery = (state: GameState): RecoveryResult => {
         });
       }
 
-      delete state.playerInjuries[injuryId];
+      delete state.people.playerInjuries[injuryId];
 
-      if (state.playerStates[injury.playerId]) {
-        state.playerStates[injury.playerId].fitness = 90;
+      if (state.people.playerStates[injury.playerId]) {
+        state.people.playerStates[injury.playerId].fitness = 90;
 
-        state.playerStates[injury.playerId].matchReadiness =
+        state.people.playerStates[injury.playerId].matchReadiness =
           RECOVERY_CONFIG.RELAPSE_RISK_READINESS;
       }
     }

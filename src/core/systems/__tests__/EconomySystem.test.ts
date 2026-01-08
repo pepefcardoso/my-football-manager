@@ -53,7 +53,7 @@ describe("EconomySystem (Unit)", () => {
 
     // ASSERT
     expect(result.dailyExpenses).toBe(expectedDailyCost);
-    expect(state.clubFinances[CLUB_ID].balanceCurrent).toBe(
+    expect(state.clubs.finances[CLUB_ID].balanceCurrent).toBe(
       initialBalance - expectedDailyCost
     );
   });
@@ -87,8 +87,8 @@ describe("EconomySystem (Unit)", () => {
 
     // ASSERT
     expect(result.dailyExpenses).toBe(1000 + 20000);
-    expect(state.clubFinances[clubA].balanceCurrent).toBe(49_000);
-    expect(state.clubFinances[clubB].balanceCurrent).toBe(980_000);
+    expect(state.clubs.finances[clubA].balanceCurrent).toBe(49_000);
+    expect(state.clubs.finances[clubB].balanceCurrent).toBe(980_000);
   });
 
   it("should verify that debt doesn't break calculation (allowing negative balance)", () => {
@@ -100,6 +100,6 @@ describe("EconomySystem (Unit)", () => {
     processDailyEconomy(state);
 
     // ASSERT
-    expect(state.clubFinances[CLUB_ID].balanceCurrent).toBe(-2000);
+    expect(state.clubs.finances[CLUB_ID].balanceCurrent).toBe(-2000);
   });
 });
