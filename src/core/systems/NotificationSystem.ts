@@ -5,7 +5,6 @@ import {
   NotificationType,
   RelatedEntity,
 } from "../models/events";
-import { eventBus } from "../events/EventBus";
 import { ID } from "../models/types";
 
 const createNotificationObject = (
@@ -62,8 +61,6 @@ export const generateNotification = (
     delete state.system.notifications[oldestKey];
   }
 
-  eventBus.emit(state, "NOTIFICATION_CREATED", { notification });
-
   return notification;
 };
 
@@ -100,9 +97,10 @@ export const cleanOldNotifications = (state: GameState): void => {
   }
 };
 
-const checkExpiringContracts = (state: GameState): void => {
+const checkExpiringContracts = (state: GameState): Notification[] => {
+  const generatedNotifications: Notification[] = [];
   const userClubId = state.meta.userClubId;
-  if (!userClubId) return;
+  if (!userClubId) return [];
 
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   const currentDate = state.meta.currentDate;
@@ -120,125 +118,33 @@ const checkExpiringContracts = (state: GameState): void => {
     if (!player) continue;
 
     if (daysRemaining === 30) {
-      generateNotification(
-        state,
-        "IMPORTANT",
-        "Contrato Expirando",
-        `O contrato de ${player.name} expira em 30 dias. Considere renovar.`,
-        { type: "PLAYER", id: player.id }
+      generatedNotifications.push(
+        generateNotification(
+          state,
+          "IMPORTANT",
+          "Contrato Expirando",
+          `O contrato de ${player.name} expira em 30 dias. Considere renovar.`,
+          { type: "PLAYER", id: player.id }
+        )
       );
     }
 
     if (daysRemaining === 7) {
-      generateNotification(
-        state,
-        "CRITICAL",
-        "Contrato no Fim",
-        `Última chamada! O contrato de ${player.name} termina em uma semana.`,
-        { type: "PLAYER", id: player.id }
+      generatedNotifications.push(
+        generateNotification(
+          state,
+          "CRITICAL",
+          "Contrato no Fim",
+          `Última chamada! O contrato de ${player.name} termina em uma semana.`,
+          { type: "PLAYER", id: player.id }
+        )
       );
     }
   }
+  return generatedNotifications;
 };
 
-export const processDailyNotifications = (state: GameState): void => {
-  checkExpiringContracts(state);
+export const processDailyNotifications = (state: GameState): Notification[] => {
   cleanOldNotifications(state);
-};
-
-let notificationListenersCleanup: Array<() => void> = [];
-
-export const setupNotificationListeners = (): void => {
-  notificationListenersCleanup.forEach((unsubscribe) => unsubscribe());
-  notificationListenersCleanup = [];
-
-  notificationListenersCleanup.push(
-    eventBus.on("PLAYER_RECOVERED", (state, payload) => {
-      const player = state.people.players[payload.playerId];
-      if (!player) return;
-
-      generateNotification(
-        state,
-        "IMPORTANT",
-        "Retorno de Lesão",
-        `${player.name} recuperou-se totalmente (${payload.injuryName}) e voltou aos treinos.`,
-        { type: "PLAYER", id: payload.playerId }
-      );
-    })
-  );
-
-  notificationListenersCleanup.push(
-    eventBus.on("PLAYER_INJURY_OCCURRED", (state, payload) => {
-      const player = state.people.players[payload.playerId];
-      if (!player) return;
-
-      generateNotification(
-        state,
-        "CRITICAL",
-        "Lesão Confirmada",
-        `${player.name} sofreu uma lesão (${payload.injuryName}) e ficará fora por cerca de ${payload.daysOut} dias.`,
-        { type: "PLAYER", id: payload.playerId }
-      );
-    })
-  );
-
-  notificationListenersCleanup.push(
-    eventBus.on("PLAYER_DEVELOPMENT_BOOST", (state, payload) => {
-      const player = state.people.players[payload.playerId];
-      if (!player) return;
-
-      const attrName =
-        payload.attribute.charAt(0).toUpperCase() + payload.attribute.slice(1);
-
-      generateNotification(
-        state,
-        "INFO",
-        "Destaque no Treino",
-        `${
-          player.name
-        } impressionou a equipa técnica e melhorou o seu atributo de ${attrName} (+${payload.value.toFixed(
-          2
-        )}).`,
-        { type: "PLAYER", id: payload.playerId }
-      );
-    })
-  );
-
-  notificationListenersCleanup.push(
-    eventBus.on("MATCH_FINISHED", (state, payload) => {
-      const match = state.matches.matches[payload.matchId];
-      if (!match) return;
-
-      const userClubId = state.meta.userClubId;
-      if (match.homeClubId !== userClubId && match.awayClubId !== userClubId) {
-        return;
-      }
-
-      const homeClub = state.clubs.clubs[match.homeClubId];
-      const awayClub = state.clubs.clubs[match.awayClubId];
-
-      const title =
-        match.homeClubId === userClubId
-          ? `Resultado: vs ${awayClub.name}`
-          : `Resultado: vs ${homeClub.name}`;
-
-      const outcomeEmoji =
-        (match.homeClubId === userClubId &&
-          payload.homeScore > payload.awayScore) ||
-        (match.awayClubId === userClubId &&
-          payload.awayScore > payload.homeScore)
-          ? "✅ Vitória!"
-          : payload.homeScore === payload.awayScore
-          ? "⚖️ Empate"
-          : "❌ Derrota";
-
-      generateNotification(
-        state,
-        "INFO",
-        title,
-        `${outcomeEmoji} O jogo terminou: ${homeClub.name} ${payload.homeScore} x ${payload.awayScore} ${awayClub.name}.`,
-        { type: "MATCH", id: payload.matchId }
-      );
-    })
-  );
+  return checkExpiringContracts(state);
 };

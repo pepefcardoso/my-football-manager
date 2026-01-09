@@ -1,4 +1,6 @@
+import { eventBus } from "../../core/events/EventBus";
 import { GameState } from "../../core/models/gameState";
+import { processDailyNotifications } from "../../core/systems/NotificationSystem";
 import {
   advanceOneDay,
   TimeAdvanceResult,
@@ -16,6 +18,12 @@ export const advanceDayAction = (
 
   set((state) => {
     result = advanceOneDay(state);
+
+    const newNotifications = processDailyNotifications(state);
+
+    newNotifications.forEach((notification) => {
+      eventBus.emit(state, "NOTIFICATION_CREATED", { notification });
+    });
   });
 
   return result;

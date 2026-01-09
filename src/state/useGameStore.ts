@@ -17,11 +17,11 @@ import { createNewGame } from "../data/initialSetup";
 import {
   deleteNotification,
   markAsRead,
-  setupNotificationListeners,
 } from "../core/systems/NotificationSystem";
 import { logger } from "../core/utils/Logger";
+import { setupNotificationBridge } from "./listeners/NotificationBinding";
 
-setupNotificationListeners();
+setupNotificationBridge();
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
@@ -77,6 +77,7 @@ const createInitialState = (): GameState => ({
     fases: {},
     groups: {},
     standings: {},
+    standingsLookup: {},
     rules: {
       classification: {},
       prizes: {},
