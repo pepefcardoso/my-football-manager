@@ -15,12 +15,10 @@ import {
     Settings,
     Trophy,
     UserCircle,
-    X,
-    AlertCircle,
-    Info,
-    AlertTriangle
+    X
 } from "lucide-react";
 import { clsx } from "clsx";
+import { getNotificationStyle } from "../utils/designTokens";
 
 const ToastContainer: React.FC = () => {
     const { toasts, removeToast } = useNotificationListener();
@@ -30,23 +28,24 @@ const ToastContainer: React.FC = () => {
     return (
         <div className="fixed bottom-6 right-6 z-[100] flex flex-col space-y-2 pointer-events-none">
             {toasts.map((toast) => {
-                let bgClass = "bg-background-secondary border-background-tertiary";
-                let icon = <Info size={16} className="text-blue-400" />;
-
-                if (toast.type === "CRITICAL") {
-                    bgClass = "bg-red-950/90 border-red-800 text-red-100";
-                    icon = <AlertCircle size={16} className="text-red-500" />;
-                } else if (toast.type === "IMPORTANT") {
-                    bgClass = "bg-yellow-950/90 border-yellow-800 text-yellow-100";
-                    icon = <AlertTriangle size={16} className="text-yellow-500" />;
-                }
+                const style = getNotificationStyle(toast.type);
 
                 return (
                     <div
                         key={toast.id}
-                        className={`pointer-events-auto flex items-center p-4 rounded shadow-2xl border ${bgClass} min-w-[300px] animate-in slide-in-from-right-10 duration-300`}
+                        className={`
+                            pointer-events-auto flex items-center p-4 rounded shadow-2xl border min-w-[300px] animate-in slide-in-from-right-10 duration-300
+                            ${style.backgroundColor} 
+                            ${style.borderColor}
+                            ${toast.type === 'INFO' ? 'text-text-primary' : 'text-white'}
+                        `}
                     >
-                        <div className="mr-3">{icon}</div>
+                        <div className="mr-3">
+                            <style.Icon
+                                size={16}
+                                className={toast.type === 'INFO' ? style.iconColor : 'text-white'}
+                            />
+                        </div>
                         <div className="flex-1 font-medium text-sm">{toast.title}</div>
                         <button
                             onClick={() => removeToast(toast.id)}

@@ -3,29 +3,16 @@ import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { NotificationType, Notification } from "../../core/models/events";
 import { formatDate } from "../../core/utils/formatters";
-import {
-    Bell,
-    Check,
-    Trash2,
-    AlertCircle,
-    Info,
-    AlertTriangle
-} from "lucide-react";
+import { getNotificationStyle } from "../utils/designTokens";
+import { Bell, Check, Trash2 } from "lucide-react";
 
 export const NotificationCenter: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [filter, setFilter] = useState<NotificationType | "ALL">("ALL");
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const {
-        markNotificationAsRead,
-        deleteNotification,
-        setState
-    } = useGameStore();
-    const {
-        notifications
-    } = useGameStore(s => s.system);
-
+    const { markNotificationAsRead, deleteNotification, setState } = useGameStore();
+    const { notifications } = useGameStore(s => s.system);
     const { setView } = useUIStore();
 
     useEffect(() => {
@@ -60,39 +47,15 @@ export const NotificationCenter: React.FC = () => {
         if (!notification.isRead) {
             markNotificationAsRead(notification.id);
         }
-
         if (notification.relatedEntity) {
             switch (notification.relatedEntity.type) {
-                case "PLAYER":
-                    setView("SQUAD");
-                    break;
-                case "MATCH":
-                    setView("CALENDAR");
-                    break;
-                case "TRANSFER_OFFER":
-                    setView("MARKET");
-                    break;
-                default:
-                    break;
+                case "PLAYER": setView("SQUAD"); break;
+                case "MATCH": setView("CALENDAR"); break;
+                case "TRANSFER_OFFER": setView("MARKET"); break;
+                default: break;
             }
         }
         setIsOpen(false);
-    };
-
-    const getIcon = (type: NotificationType) => {
-        switch (type) {
-            case "CRITICAL": return <AlertCircle size={16} className="text-status-danger" />;
-            case "IMPORTANT": return <AlertTriangle size={16} className="text-status-warning" />;
-            case "INFO": return <Info size={16} className="text-blue-400" />;
-        }
-    };
-
-    const getBorderColor = (type: NotificationType) => {
-        switch (type) {
-            case "CRITICAL": return "border-l-status-danger";
-            case "IMPORTANT": return "border-l-status-warning";
-            case "INFO": return "border-l-blue-400";
-        }
     };
 
     return (
@@ -133,11 +96,11 @@ export const NotificationCenter: React.FC = () => {
                                 key={type}
                                 onClick={() => setFilter(type)}
                                 className={`
-                  px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors
-                  ${filter === type
+                                    px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors
+                                    ${filter === type
                                         ? 'bg-primary text-white'
                                         : 'bg-background-tertiary text-text-secondary hover:text-text-primary'}
-                `}
+                                `}
                             >
                                 {type === "ALL" ? "Todas" : type}
                             </button>
@@ -152,48 +115,52 @@ export const NotificationCenter: React.FC = () => {
                             </div>
                         ) : (
                             <div className="divide-y divide-background-tertiary/50">
-                                {processedNotifications.map((notification) => (
-                                    <div
-                                        key={notification.id}
-                                        className={`
-                      relative group p-3 hover:bg-background-tertiary/30 transition-colors cursor-pointer border-l-4
-                      ${getBorderColor(notification.type)}
-                      ${notification.isRead ? 'opacity-70 hover:opacity-100' : 'bg-background-tertiary/10'}
-                    `}
-                                        onClick={() => handleNotificationClick(notification)}
-                                    >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <div className="flex items-center space-x-2">
-                                                {getIcon(notification.type)}
-                                                <span className={`text-sm font-bold ${notification.isRead ? 'text-text-secondary' : 'text-text-primary'}`}>
-                                                    {notification.title}
+                                {processedNotifications.map((notification) => {
+                                    const style = getNotificationStyle(notification.type);
+
+                                    return (
+                                        <div
+                                            key={notification.id}
+                                            className={`
+                                                relative group p-3 hover:bg-background-tertiary/30 transition-colors cursor-pointer border-l-4
+                                                border-l-${style.borderColor.replace('border-', '')} 
+                                                ${notification.isRead ? 'opacity-70 hover:opacity-100' : style.softBackgroundColor}
+                                            `}
+                                            onClick={() => handleNotificationClick(notification)}
+                                        >
+                                            <div className="flex justify-between items-start mb-1">
+                                                <div className="flex items-center space-x-2">
+                                                    <style.Icon size={16} className={style.iconColor} />
+                                                    <span className={`text-sm font-bold ${notification.isRead ? 'text-text-secondary' : 'text-text-primary'}`}>
+                                                        {notification.title}
+                                                    </span>
+                                                </div>
+                                                <span className="text-[10px] text-text-muted whitespace-nowrap ml-2">
+                                                    {formatDate(notification.date)}
                                                 </span>
                                             </div>
-                                            <span className="text-[10px] text-text-muted whitespace-nowrap ml-2">
-                                                {formatDate(notification.date)}
-                                            </span>
+
+                                            <p className="text-xs text-text-secondary leading-relaxed pr-6">
+                                                {notification.message}
+                                            </p>
+
+                                            {!notification.isRead && (
+                                                <div className="absolute top-4 right-3 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                                            )}
+
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteNotification(notification.id);
+                                                }}
+                                                className="absolute bottom-2 right-2 p-1.5 text-text-muted hover:text-status-danger hover:bg-status-danger/10 rounded transition-all opacity-0 group-hover:opacity-100"
+                                                title="Remover"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
                                         </div>
-
-                                        <p className="text-xs text-text-secondary leading-relaxed pr-6">
-                                            {notification.message}
-                                        </p>
-
-                                        {!notification.isRead && (
-                                            <div className="absolute top-4 right-3 w-2 h-2 bg-primary rounded-full animate-pulse" />
-                                        )}
-
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                deleteNotification(notification.id);
-                                            }}
-                                            className="absolute bottom-2 right-2 p-1.5 text-text-muted hover:text-status-danger hover:bg-status-danger/10 rounded transition-all opacity-0 group-hover:opacity-100"
-                                            title="Remover"
-                                        >
-                                            <Trash2 size={12} />
-                                        </button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
