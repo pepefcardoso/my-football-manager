@@ -122,15 +122,18 @@ export class PlayerFactory {
     clubId: ID,
     nationId: ID,
     position: "GK" | "DEF" | "MID" | "ATT",
-    targetOverall: number = 70
+    targetOverall: number = 70,
+    rngInstance: IRNG = rng
   ): Player {
     const id = uuidv4();
-    const age = rng.range(16, 36);
+    const age = rngInstance.range(16, 36);
     const isYoung = age < 23;
-    const potentialBonus = isYoung ? rng.range(5, 20) : rng.range(0, 3);
+    const potentialBonus = isYoung
+      ? rngInstance.range(5, 20)
+      : rngInstance.range(0, 3);
 
     const generateAttr = (bonus: number = 0) => {
-      const val = rng.normal(targetOverall + bonus, 5);
+      const val = rngInstance.normal(targetOverall + bonus, 5);
       return Math.max(1, Math.min(99, val));
     };
 
@@ -140,12 +143,12 @@ export class PlayerFactory {
 
     const player: Player = {
       id,
-      name: `${rng.pick(FIRST_NAMES)} ${rng.pick(NAMES)}`,
+      name: `${rngInstance.pick(FIRST_NAMES)} ${rngInstance.pick(NAMES)}`,
       nickname: "",
       nationId,
       birthDate: Date.now() - age * 365 * 24 * 60 * 60 * 1000,
       primaryPositionId: position,
-      preferredFoot: rng.next() > 0.8 ? "LEFT" : ("RIGHT" as Foot),
+      preferredFoot: rngInstance.next() > 0.8 ? "LEFT" : ("RIGHT" as Foot),
       crossing: generateAttr(isAtt ? 5 : 0),
       finishing: generateAttr(isAtt ? 10 : -10),
       passing: generateAttr(isDef ? -5 : 5),
@@ -161,7 +164,7 @@ export class PlayerFactory {
       determination: generateAttr(0),
       potential: 0,
       overall: 0,
-      proneToInjury: rng.range(1, 20),
+      proneToInjury: rngInstance.range(1, 20),
       marketValue: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -198,14 +201,14 @@ export class PlayerFactory {
     return Math.floor(baseValue * ageMultiplier * potentialMultiplier);
   }
 
-  static calculateWage(overall: number): number {
-    if (overall < 60) return rng.range(1_000, 20_000);
-    if (overall < 70) return rng.range(30_000, 80_000);
-    if (overall < 75) return rng.range(80_000, 150_000);
-    if (overall < 80) return rng.range(150_000, 300_000);
-    if (overall < 85) return rng.range(300_000, 600_000);
-    if (overall < 90) return rng.range(600_000, 1_200_000);
-    return rng.range(1_200_000, 2_500_000);
+  static calculateWage(overall: number, rngInstance: IRNG = rng): number {
+    if (overall < 60) return rngInstance.range(1_000, 20_000);
+    if (overall < 70) return rngInstance.range(30_000, 80_000);
+    if (overall < 75) return rngInstance.range(80_000, 150_000);
+    if (overall < 80) return rngInstance.range(150_000, 300_000);
+    if (overall < 85) return rngInstance.range(300_000, 600_000);
+    if (overall < 90) return rngInstance.range(600_000, 1_200_000);
+    return rngInstance.range(1_200_000, 2_500_000);
   }
 }
 
@@ -222,7 +225,8 @@ export class ClubFactory {
     nationId: ID,
     reputation: number,
     colors: { primary: string; secondary: string },
-    badgeId: string
+    badgeId: string,
+    rngInstance: IRNG = rng
   ): ClubBundle {
     const clubId = uuidv4();
     const isBigClub = reputation > 7000;
@@ -231,14 +235,15 @@ export class ClubFactory {
       id: clubId,
       name,
       nickname: name.substring(0, 3).toUpperCase(),
-      dateFounded: Date.now() - rng.range(50, 120) * 365 * 24 * 60 * 60 * 1000,
+      dateFounded:
+        Date.now() - rngInstance.range(50, 120) * 365 * 24 * 60 * 60 * 1000,
       cityId: uuidv4(),
       nationId,
       primaryColor: colors.primary,
       secondaryColor: colors.secondary,
       badgeId: badgeId,
       kitId: "",
-      fanBaseCurrent: Math.floor(reputation * rng.range(10, 50)),
+      fanBaseCurrent: Math.floor(reputation * rngInstance.range(10, 50)),
       fanBaseMax: Math.floor(reputation * 60),
       fanBaseMin: Math.floor(reputation * 5),
       reputation,
@@ -251,26 +256,26 @@ export class ClubFactory {
       clubId,
       stadiumId: uuidv4(),
       reserveStadiumId: uuidv4(),
-      youthAcademyLevel: Math.min(100, rng.normal(baseInfraLevel, 5)),
-      trainingCenterLevel: Math.min(100, rng.normal(baseInfraLevel, 5)),
+      youthAcademyLevel: Math.min(100, rngInstance.normal(baseInfraLevel, 5)),
+      trainingCenterLevel: Math.min(100, rngInstance.normal(baseInfraLevel, 5)),
       dataAnalysisCenterLevel: Math.min(
         100,
-        rng.normal(baseInfraLevel - 10, 5)
+        rngInstance.normal(baseInfraLevel - 10, 5)
       ),
-      medicalCenterLevel: Math.min(100, rng.normal(baseInfraLevel, 5)),
-      administrationLevel: Math.min(100, rng.normal(baseInfraLevel, 5)),
+      medicalCenterLevel: Math.min(100, rngInstance.normal(baseInfraLevel, 5)),
+      administrationLevel: Math.min(100, rngInstance.normal(baseInfraLevel, 5)),
     };
 
     const finances: ClubFinances = {
       clubId,
       balanceCurrent: isBigClub
-        ? rng.range(10_000_000, 50_000_000)
-        : rng.range(100_000, 2_000_000),
-      debtHistorical: isBigClub ? rng.range(0, 100_000_000) : 0,
+        ? rngInstance.range(10_000_000, 50_000_000)
+        : rngInstance.range(100_000, 2_000_000),
+      debtHistorical: isBigClub ? rngInstance.range(0, 100_000_000) : 0,
       debtInterestRate: 0.01,
       accumulatedManagementBalance: 0,
       monthlyMembershipRevenue: Math.floor(
-        club.fanBaseCurrent * rng.range(20, 50)
+        club.fanBaseCurrent * rngInstance.range(20, 50)
       ),
     };
 
@@ -279,19 +284,43 @@ export class ClubFactory {
 
     for (let i = 0; i < 3; i++)
       players.push(
-        PlayerFactory.createPlayer(clubId, nationId, "GK", targetOvr)
+        PlayerFactory.createPlayer(
+          clubId,
+          nationId,
+          "GK",
+          targetOvr,
+          rngInstance
+        )
       );
     for (let i = 0; i < 8; i++)
       players.push(
-        PlayerFactory.createPlayer(clubId, nationId, "DEF", targetOvr)
+        PlayerFactory.createPlayer(
+          clubId,
+          nationId,
+          "DEF",
+          targetOvr,
+          rngInstance
+        )
       );
     for (let i = 0; i < 8; i++)
       players.push(
-        PlayerFactory.createPlayer(clubId, nationId, "MID", targetOvr)
+        PlayerFactory.createPlayer(
+          clubId,
+          nationId,
+          "MID",
+          targetOvr,
+          rngInstance
+        )
       );
     for (let i = 0; i < 5; i++)
       players.push(
-        PlayerFactory.createPlayer(clubId, nationId, "ATT", targetOvr)
+        PlayerFactory.createPlayer(
+          clubId,
+          nationId,
+          "ATT",
+          targetOvr,
+          rngInstance
+        )
       );
 
     return { club, infra, finances, players };

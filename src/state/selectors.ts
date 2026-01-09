@@ -10,6 +10,7 @@ import { MatchEvent } from "../core/models/match";
 const selectClubsDomain = (state: GameState) => state.clubs;
 const selectMetaDomain = (state: GameState) => state.meta;
 const selectContracts = (state: GameState) => state.market.contracts;
+const selectMarketIndices = (state: GameState) => state.market;
 const selectMatchesMap = (state: GameState) => state.matches.matches;
 const selectPlayers = (state: GameState) => state.people.players;
 const selectPlayerStates = (state: GameState) => state.people.playerStates;
@@ -43,13 +44,10 @@ const _selectClubInfra = createSelector(
 );
 
 const _selectClubPlayerIds = createSelector(
-  [selectContracts, selectClubIdArg],
-  (contracts, clubId) => {
+  [selectMarketIndices, selectClubIdArg],
+  (market, clubId) => {
     if (!clubId) return [];
-
-    return Object.values(contracts)
-      .filter((c) => c.clubId === clubId && c.active)
-      .map((c) => c.playerId);
+    return market.clubSquadIndex[clubId] || [];
   }
 );
 
@@ -76,11 +74,14 @@ const _selectNextMatchForClub = createSelector(
 );
 
 const _selectContractByPlayerId = createSelector(
-  [selectContracts, selectPlayerIdArg],
-  (contracts, playerId) => {
-    return Object.values(contracts).find(
-      (c) => c.playerId === playerId && c.active
-    );
+  [selectContracts, selectMarketIndices, selectPlayerIdArg],
+  (contracts, market, playerId) => {
+    const contractId = market.playerContractIndex[playerId];
+    if (!contractId) return undefined;
+
+    const contract = contracts[contractId];
+
+    return contract && contract.active ? contract : undefined;
   }
 );
 
