@@ -2,10 +2,6 @@ import { GameState } from "../core/models/gameState";
 import { logger } from "../core/utils/Logger";
 import { GameStateSchema } from "./schemas/gameStateSchema";
 
-// ============================================================================
-// TYPES & INTERFACES
-// ============================================================================
-
 export interface SaveMetadata {
   version: string;
   timestamp: number;
@@ -33,10 +29,6 @@ export interface SaveInfo {
   readableSize: string;
   readableDate: string;
 }
-
-// ============================================================================
-// CONSTANTS & HELPERS
-// ============================================================================
 
 function getElectronAPI() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,7 +60,6 @@ function formatDate(timestamp: number): string {
 }
 
 function serializeGameState(state: GameState): string {
-  // Remove funções e dados transientes para garantir serialização limpa
   const cleanState = JSON.parse(
     JSON.stringify(state, (_key, value) => {
       if (typeof value === "function") {
@@ -99,43 +90,63 @@ function parseAndValidateGameState(data: unknown): GameState | null {
   return result.data as unknown as GameState;
 }
 
-// ============================================================================
-// PUBLIC API (STRICT ELECTRON ONLY)
-// ============================================================================
-
 export async function saveGameToDisk(
   saveName: string,
   state: GameState
 ): Promise<SaveResult> {
-  return logger.timeAsync("FileSystem", `Save Game (${saveName})`, async () => {
-    if (!isElectron()) {
-      const errorMsg =
-        "Ambiente Web não suportado para saves > 5MB. Use o App Desktop.";
-      logger.error("FileSystem", errorMsg);
-      return { success: false, error: errorMsg };
-    }
+  const mode = isElectron() ? "DISK" : "MEMORY";
 
-    const serializedState = serializeGameState(state);
+  state.meta.persistenceMode = mode;
 
-    try {
-      // IPC Call direto para o Main Process (Node.js fs)
-      const result = await getElectronAPI().saveGame(saveName, serializedState);
+  return logger.timeAsync(
+    "FileSystem",
+    `Save Game (${saveName}) [${mode}]`,
+    async () => {
+      const serializedState = serializeGameState(state);
+      const byteSize = new Blob([serializedState]).size;
 
-      if (result.success) {
-        logger.info("FileSystem", "✅ Save gravado em disco (Electron)", {
-          size: result.metadata ? formatBytes(result.metadata.size) : "N/A",
-          checksum: result.metadata?.checksum.substring(0, 8),
-        });
-      } else {
-        logger.error("FileSystem", "❌ Erro Electron Main", result.error);
+      if (mode === "MEMORY") {
+        logger.warn(
+          "FileSystem",
+          "⚠️ Save Volátil: Dados persistem apenas na RAM/Sessão."
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        return {
+          success: true,
+          metadata: {
+            version: state.meta.version,
+            timestamp: Date.now(),
+            checksum: "VOLATILE_MEMORY_HASH",
+            size: byteSize,
+            compressed: false,
+          },
+        };
       }
 
-      return result;
-    } catch (error) {
-      logger.error("FileSystem", "❌ Falha Crítica IPC Save", error);
-      return { success: false, error: (error as Error).message };
+      try {
+        const result = await getElectronAPI().saveGame(
+          saveName,
+          serializedState
+        );
+
+        if (result.success) {
+          logger.info("FileSystem", "✅ Save gravado em disco (Electron)", {
+            size: result.metadata ? formatBytes(result.metadata.size) : "N/A",
+            checksum: result.metadata?.checksum.substring(0, 8),
+          });
+        } else {
+          logger.error("FileSystem", "❌ Erro Electron Main", result.error);
+        }
+
+        return result;
+      } catch (error) {
+        logger.error("FileSystem", "❌ Falha Crítica IPC Save", error);
+        return { success: false, error: (error as Error).message };
+      }
     }
-  });
+  );
 }
 
 export async function loadGameFromDisk(
@@ -143,9 +154,9 @@ export async function loadGameFromDisk(
 ): Promise<GameState | null> {
   return logger.timeAsync("FileSystem", `Load Game (${saveName})`, async () => {
     if (!isElectron()) {
-      logger.error(
+      logger.warn(
         "FileSystem",
-        "Ambiente Web não suportado para carregar saves."
+        "Ambiente Web: Load de disco desativado. Inicie um Novo Jogo."
       );
       return null;
     }
@@ -160,23 +171,20 @@ export async function loadGameFromDisk(
 
       const rawData = result.data;
       const metadata = result.metadata;
-
-      // Parsing do JSON cru vindo do disco
       const parsedRaw = JSON.parse(rawData);
-
-      // Suporte a estrutura legacy ou wrapper { metadata, gameState }
       const stateToValidate = parsedRaw.gameState || parsedRaw;
-
-      // Validação estrita do Schema (Zod)
       const validatedState = parseAndValidateGameState(stateToValidate);
 
-      if (validatedState && metadata) {
-        logger.info(
-          "FileSystem",
-          `✅ Save carregado: v${metadata.version} (${formatBytes(
-            metadata.size
-          )})`
-        );
+      if (validatedState) {
+        validatedState.meta.persistenceMode = "DISK";
+        if (metadata) {
+          logger.info(
+            "FileSystem",
+            `✅ Save carregado: v${metadata.version} (${formatBytes(
+              metadata.size
+            )})`
+          );
+        }
       }
 
       return validatedState;
@@ -189,7 +197,6 @@ export async function loadGameFromDisk(
 
 export async function listSaveFiles(): Promise<string[]> {
   if (!isElectron()) {
-    logger.warn("FileSystem", "Listagem de saves indisponível (Ambiente Web).");
     return [];
   }
 
@@ -203,7 +210,7 @@ export async function listSaveFiles(): Promise<string[]> {
 
 export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
   if (!isElectron()) {
-    return { success: false, error: "Operação não suportada na Web." };
+    return { success: true };
   }
 
   try {
@@ -235,7 +242,10 @@ export async function getSaveInfo(saveName: string): Promise<SaveInfo | null> {
 
 export async function openSavesFolder(): Promise<void> {
   if (!isElectron()) {
-    console.warn("Acesso ao sistema de arquivos restrito ao Electron.");
+    logger.warn(
+      "FileSystem",
+      "Acesso ao sistema de arquivos restrito ao Electron."
+    );
     return;
   }
 

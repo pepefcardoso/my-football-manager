@@ -17,6 +17,7 @@ export interface MetaState {
   currentUserManagerId: ID;
   userClubId: ID | null;
   activeSeasonId: ID;
+  persistenceMode: "DISK" | "MEMORY";
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

@@ -180,6 +180,7 @@ export const MetaSchema = z
     currentUserManagerId: UserIdSchema,
     userClubId: ClubIdSchema.nullable().default(null),
     activeSeasonId: IDSchema,
+    persistenceMode: z.enum(["DISK", "MEMORY"]).default("DISK"),
     createdAt: TimestampSchema,
     updatedAt: TimestampSchema,
   })

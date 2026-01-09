@@ -43,13 +43,14 @@ interface GameActions {
 type GameStore = GameState & GameActions;
 
 const createInitialState = (): GameState => ({
-  meta: {
+meta: {
     version: "2.0.0",
     saveName: "New Game",
     currentDate: Date.now(),
     currentUserManagerId: "",
     userClubId: null,
     activeSeasonId: "",
+    persistenceMode: "DISK",
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
@@ -139,7 +140,7 @@ export const useGameStore = create<GameStore>()(
         updatedAt: Date.now(),
       };
 
-      logger.info("GameStore", `💾 Salvando jogo: ${saveName}...`);
+      logger.info("GameStore", `💾 Solicitando salvamento: ${saveName}...`);
 
       const result = await saveGameToDisk(saveName, dataToSave);
 
@@ -147,8 +148,13 @@ export const useGameStore = create<GameStore>()(
         set((state) => {
           state.meta.saveName = saveName;
           state.meta.updatedAt = Date.now();
+          if (!result.metadata?.checksum || result.metadata.checksum === "VOLATILE_MEMORY_HASH") {
+             state.meta.persistenceMode = "MEMORY";
+          }
         });
-        logger.info("GameStore", "✅ Save concluído com sucesso");
+        
+        const modeMsg = result.metadata?.checksum === "VOLATILE_MEMORY_HASH" ? "(RAM)" : "(Disco)";
+        logger.info("GameStore", `✅ Save concluído ${modeMsg}`);
       } else {
         logger.error("GameStore", "❌ Falha ao salvar", result.error);
       }

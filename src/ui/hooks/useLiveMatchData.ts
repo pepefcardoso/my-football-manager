@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useGameStore } from "../../state/useGameStore";
 import {
   selectLiveMatchStats,
@@ -32,24 +33,22 @@ export const useLiveMatchData = (
   matchId: string | null,
   currentMinute: number
 ): LiveMatchDataResult => {
-  const liveStats = useGameStore(
-    useCallback(
-      (state) => {
-        if (!matchId) return EMPTY_STATS;
-        return selectLiveMatchStats(state, matchId, currentMinute);
-      },
-      [matchId, currentMinute]
-    )
+  const liveStatsJson = useGameStore((state) => {
+    if (!matchId) return JSON.stringify(EMPTY_STATS);
+    const stats = selectLiveMatchStats(state, matchId, currentMinute);
+    return JSON.stringify(stats);
+  });
+
+  const liveStats = useMemo<LiveMatchStats>(
+    () => JSON.parse(liveStatsJson),
+    [liveStatsJson]
   );
 
   const visibleEvents = useGameStore(
-    useCallback(
-      (state) => {
-        if (!matchId) return [];
-        return selectMatchEventsUntilMinute(state, matchId, currentMinute);
-      },
-      [matchId, currentMinute]
-    )
+    useShallow((state) => {
+      if (!matchId) return [];
+      return selectMatchEventsUntilMinute(state, matchId, currentMinute);
+    })
   );
 
   return {
