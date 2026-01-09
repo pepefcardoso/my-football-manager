@@ -9,15 +9,13 @@ export const setupNotificationBridge = (): void => {
   cleanupFunctions.forEach((unsubscribe) => unsubscribe());
   cleanupFunctions = [];
 
-  const store = useGameStore;
-
   const createAndEmit = (
     type: "CRITICAL" | "IMPORTANT" | "INFO",
     title: string,
     message: string,
     relatedEntity?: { type: any; id: string }
   ) => {
-    store.getState().setState((state: GameState) => {
+    useGameStore.getState().setState((state: GameState) => {
       const notification = generateNotification(
         state,
         type,
@@ -31,7 +29,7 @@ export const setupNotificationBridge = (): void => {
   };
 
   cleanupFunctions.push(
-    eventBus.on("PLAYER_RECOVERED", (state, payload) => {
+    eventBus.on("PLAYER_RECOVERED", (_state, payload) => {
       createAndEmit(
         "IMPORTANT",
         "Retorno de Lesão",

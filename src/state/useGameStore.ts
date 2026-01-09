@@ -19,11 +19,8 @@ import {
   markAsRead,
 } from "../core/systems/NotificationSystem";
 import { logger } from "../core/utils/Logger";
-import { setupNotificationBridge } from "./listeners/NotificationBinding";
 import { rebuildIndices } from "../core/systems/MaintenanceSystem";
 import { TempLineup } from "../core/models/match";
-
-setupNotificationBridge();
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
