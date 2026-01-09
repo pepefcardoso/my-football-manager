@@ -10,56 +10,7 @@ export const getStandingIndexKey = (
   return `${groupId}_${clubId}`;
 };
 
-const findStanding = (
-  state: GameState,
-  groupId: string,
-  clubId: string
-): CompetitionStandings | undefined => {
-  const key = getStandingIndexKey(groupId, clubId);
-  const standingId = state.competitions.standingsLookup[key];
-
-  if (!standingId) return undefined;
-
-  return state.competitions.standings[standingId];
-};
-
-export const updateCompetitionStandings = (
-  state: GameState,
-  matches: Match[]
-): void => {
-  // TODO: Em produção, o índice deve ser garantido no load/initialSetup.
-  if (!state.competitions.standingsLookup) {
-    logger.warn(
-      "CompetitionSystem",
-      "Índice de standings ausente. Reconstruindo on-the-fly..."
-    );
-    rebuildStandingsIndex(state);
-  }
-
-  matches.forEach((match) => {
-    if (match.status !== "FINISHED") return;
-    if (!match.competitionGroupId) return;
-
-    const homeStanding = findStanding(
-      state,
-      match.competitionGroupId,
-      match.homeClubId
-    );
-    const awayStanding = findStanding(
-      state,
-      match.competitionGroupId,
-      match.awayClubId
-    );
-
-    if (homeStanding)
-      updateTeamStats(homeStanding, match.homeGoals, match.awayGoals);
-
-    if (awayStanding)
-      updateTeamStats(awayStanding, match.awayGoals, match.homeGoals);
-  });
-};
-
-const updateTeamStats = (
+const applyMatchResultToStanding = (
   standing: CompetitionStandings,
   goalsPro: number,
   goalsAgainst: number
@@ -80,17 +31,111 @@ const updateTeamStats = (
   }
 };
 
-export const rebuildStandingsIndex = (state: GameState): void => {
-  state.competitions.standingsLookup = {};
+const getOrRepairStanding = (
+  state: GameState,
+  groupId: string,
+  clubId: string
+): CompetitionStandings | undefined => {
+  if (!state.competitions.standingsLookup) {
+    state.competitions.standingsLookup = {};
+  }
 
-  Object.values(state.competitions.standings).forEach((standing) => {
-    const ccs =
-      state.competitions.clubCompetitionSeasons[
-        standing.clubCompetitionSeasonId
-      ];
-    if (ccs) {
-      const key = getStandingIndexKey(standing.competitionGroupId, ccs.clubId);
-      state.competitions.standingsLookup[key] = standing.id;
+  const key = getStandingIndexKey(groupId, clubId);
+  const cachedStandingId = state.competitions.standingsLookup[key];
+
+  if (cachedStandingId) {
+    const standing = state.competitions.standings[cachedStandingId];
+    if (standing) return standing;
+
+    delete state.competitions.standingsLookup[key];
+  }
+
+  logger.warn(
+    "CompetitionSystem",
+    `⚠️ Cache Miss para ${key}. Reparando índice incrementalmente...`
+  );
+
+  const standingEntry = Object.values(state.competitions.standings).find(
+    (s) => {
+      if (s.competitionGroupId !== groupId) return false;
+
+      const ccs =
+        state.competitions.clubCompetitionSeasons[s.clubCompetitionSeasonId];
+      return ccs && ccs.clubId === clubId;
     }
+  );
+
+  if (standingEntry) {
+    state.competitions.standingsLookup[key] = standingEntry.id;
+    return standingEntry;
+  }
+
+  logger.error(
+    "CompetitionSystem",
+    `❌ Erro Crítico: Tabela não encontrada para Club ${clubId} no Grupo ${groupId}`
+  );
+  return undefined;
+};
+
+export const updateCompetitionStandings = (
+  state: GameState,
+  matches: Match[]
+): void => {
+  let updatesCount = 0;
+
+  for (const match of matches) {
+    if (match.status !== "FINISHED") continue;
+    if (!match.competitionGroupId) continue;
+
+    const { competitionGroupId, homeClubId, awayClubId, homeGoals, awayGoals } =
+      match;
+
+    const homeStanding = getOrRepairStanding(
+      state,
+      competitionGroupId,
+      homeClubId
+    );
+    const awayStanding = getOrRepairStanding(
+      state,
+      competitionGroupId,
+      awayClubId
+    );
+
+    if (homeStanding) {
+      applyMatchResultToStanding(homeStanding, homeGoals, awayGoals);
+      updatesCount++;
+    }
+
+    if (awayStanding) {
+      applyMatchResultToStanding(awayStanding, awayGoals, homeGoals);
+      updatesCount++;
+    }
+  }
+
+  if (updatesCount > 0) {
+    logger.debug(
+      "CompetitionSystem",
+      `Tabelas atualizadas incrementalmente (${updatesCount} operações).`
+    );
+  }
+};
+
+export const rebuildStandingsIndex = (state: GameState): void => {
+  logger.time("CompetitionSystem", "Reconstrução Total de Índices", () => {
+    state.competitions.standingsLookup = {};
+
+    Object.values(state.competitions.standings).forEach((standing) => {
+      const ccs =
+        state.competitions.clubCompetitionSeasons[
+          standing.clubCompetitionSeasonId
+        ];
+      if (ccs) {
+        const key = getStandingIndexKey(
+          standing.competitionGroupId,
+          ccs.clubId
+        );
+        state.competitions.standingsLookup[key] = standing.id;
+      }
+    });
   });
 };
