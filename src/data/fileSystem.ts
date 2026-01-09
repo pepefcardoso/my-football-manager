@@ -2,7 +2,7 @@ import { GameState } from "../core/models/gameState";
 import { logger } from "../core/utils/Logger";
 import { GameStateSchema } from "./schemas/gameStateSchema";
 
-interface SaveMetadata {
+export interface SaveMetadata {
   version: string;
   timestamp: number;
   checksum: string;
@@ -10,20 +10,20 @@ interface SaveMetadata {
   compressed: boolean;
 }
 
-interface SaveResult {
+export interface SaveResult {
   success: boolean;
   error?: string;
   metadata?: SaveMetadata;
 }
 
-interface LoadResult {
+export interface LoadResult {
   success: boolean;
   data?: string;
   error?: string;
   metadata?: SaveMetadata;
 }
 
-interface SaveInfo {
+export interface SaveInfo {
   filename: string;
   metadata: SaveMetadata | null;
   readableSize: string;
@@ -40,11 +40,9 @@ function isElectron(): boolean {
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 Bytes";
-
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
@@ -68,7 +66,6 @@ function serializeGameState(state: GameState): string {
       return value;
     })
   );
-
   return JSON.stringify(cleanState);
 }
 
@@ -87,87 +84,16 @@ function parseAndValidateGameState(data: unknown): GameState | null {
   return result.data as unknown as GameState;
 }
 
-const WEB_STORAGE_KEY_PREFIX = "maestro_save_";
-
-function saveToWebStorage(saveName: string, state: GameState): boolean {
-  try {
-    const serialized = serializeGameState(state);
-    const key = WEB_STORAGE_KEY_PREFIX + saveName;
-
-    localStorage.setItem(key, serialized);
-    localStorage.setItem(
-      `${key}_meta`,
-      JSON.stringify({
-        timestamp: Date.now(),
-        size: serialized.length,
-      })
-    );
-
-    logger.info("WebStorage", "Save realizado com sucesso");
-    return true;
-  } catch (error) {
-    logger.error("WebStorage", "Erro ao salvar", error);
-    return false;
-  }
-}
-
-function loadFromWebStorage(saveName: string): GameState | null {
-  try {
-    const key = WEB_STORAGE_KEY_PREFIX + saveName;
-    const data = localStorage.getItem(key);
-
-    if (!data) {
-      logger.warn("WebStorage", `Save não encontrado: ${saveName}`);
-      return null;
-    }
-
-    const parsedRaw = JSON.parse(data);
-    const validatedState = parseAndValidateGameState(parsedRaw);
-
-    if (!validatedState) {
-      logger.error(
-        "WebStorage",
-        "Save inválido ou corrompido (Schema Mismatch)"
-      );
-      return null;
-    }
-
-    return validatedState;
-  } catch (error) {
-    logger.error("WebStorage", "Erro ao carregar", error);
-    return null;
-  }
-}
-
-function listWebStorageSaves(): string[] {
-  const saves: string[] = [];
-
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (
-      key &&
-      key.startsWith(WEB_STORAGE_KEY_PREFIX) &&
-      !key.endsWith("_meta")
-    ) {
-      saves.push(key.replace(WEB_STORAGE_KEY_PREFIX, ""));
-    }
-  }
-
-  return saves.sort((a, b) => b.localeCompare(a));
-}
-
 export async function saveGameToDisk(
   saveName: string,
   state: GameState
 ): Promise<SaveResult> {
   return logger.timeAsync("FileSystem", `Save Game (${saveName})`, async () => {
     if (!isElectron()) {
-      logger.warn("FileSystem", "Rodando em modo Web - usando localStorage");
-      const success = saveToWebStorage(saveName, state);
-      return {
-        success,
-        error: success ? undefined : "Erro ao salvar no localStorage",
-      };
+      const errorMsg =
+        "Ambiente Web não suporta persistência de Saves (Requer Electron).";
+      logger.error("FileSystem", errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     try {
@@ -200,8 +126,11 @@ export async function loadGameFromDisk(
 ): Promise<GameState | null> {
   return logger.timeAsync("FileSystem", `Load Game (${saveName})`, async () => {
     if (!isElectron()) {
-      logger.warn("FileSystem", "Rodando em modo Web - usando localStorage");
-      return loadFromWebStorage(saveName);
+      logger.error(
+        "FileSystem",
+        "Ambiente Web não suporta carregamento de arquivos."
+      );
+      return null;
     }
 
     try {
@@ -240,7 +169,7 @@ export async function loadGameFromDisk(
 
 export async function listSaveFiles(): Promise<string[]> {
   if (!isElectron()) {
-    return listWebStorageSaves();
+    return [];
   }
 
   try {
@@ -253,14 +182,7 @@ export async function listSaveFiles(): Promise<string[]> {
 
 export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
   if (!isElectron()) {
-    try {
-      const key = WEB_STORAGE_KEY_PREFIX + saveName;
-      localStorage.removeItem(key);
-      localStorage.removeItem(`${key}_meta`);
-      return { success: true };
-    } catch {
-      return { success: false, error: "Erro ao deletar do localStorage" };
-    }
+    return { success: false, error: "Não suportado na Web" };
   }
 
   try {
@@ -275,29 +197,7 @@ export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
 }
 
 export async function getSaveInfo(saveName: string): Promise<SaveInfo | null> {
-  if (!isElectron()) {
-    try {
-      const key = WEB_STORAGE_KEY_PREFIX + saveName;
-      const metaStr = localStorage.getItem(`${key}_meta`);
-      if (!metaStr) return null;
-
-      const meta = JSON.parse(metaStr);
-      return {
-        filename: saveName,
-        metadata: {
-          version: "web",
-          timestamp: meta.timestamp,
-          checksum: "",
-          size: meta.size,
-          compressed: false,
-        },
-        readableSize: formatBytes(meta.size),
-        readableDate: formatDate(meta.timestamp),
-      };
-    } catch {
-      return null;
-    }
-  }
+  if (!isElectron()) return null;
 
   try {
     const metadata = await getElectronAPI().getSaveInfo(saveName);
@@ -316,10 +216,7 @@ export async function getSaveInfo(saveName: string): Promise<SaveInfo | null> {
 }
 
 export async function openSavesFolder(): Promise<void> {
-  if (!isElectron()) {
-    logger.warn("FileSystem", "Função disponível apenas no Electron");
-    return;
-  }
+  if (!isElectron()) return;
 
   try {
     await getElectronAPI().openSavesFolder();
@@ -327,5 +224,3 @@ export async function openSavesFolder(): Promise<void> {
     logger.error("FileSystem", "Erro ao abrir pasta", error);
   }
 }
-
-export type { SaveMetadata, SaveResult, LoadResult, SaveInfo };

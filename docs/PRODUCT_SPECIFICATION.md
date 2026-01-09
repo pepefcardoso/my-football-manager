@@ -46,12 +46,14 @@ Maestro é um simulador de gestão de futebol single-player focado no mercado br
   - Propostas de transferência
   - Mensagens críticas da diretoria
 
-### 1.3. Sistema de Salvamento
+### 1.3. Sistema de Salvamento e Persistência
 
-- **Auto-Save:** Fim de cada dia (bloqueia interação, indicador centralizado)
-- **Save Manual:** Disponível a qualquer momento
-- **Limite:** 1 save por jogo (sobrescreve)
-- **Migração:** Saves compatíveis entre versões (changelog visível)
+* **Arquitetura:** Single Source of Truth (SSOT) em arquivos JSON locais.
+* **Restrição Técnica:** O uso de `localStorage` ou `sessionStorage` é **estritamente proibido** para dados de jogo (`GameState`) devido a limites de armazenamento e performance.
+* **Auto-Save:** Fim de cada dia (bloqueia interação, indicador centralizado).
+* **Save Manual:** Disponível a qualquer momento via Menu.
+* **Localização:** Pasta `userData` do Sistema Operacional (gerido pelo Electron).
+* **Segurança:** Validação de integridade via Checksum (SHA-256) no carregamento.
 
 ---
 
