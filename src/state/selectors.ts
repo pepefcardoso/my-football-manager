@@ -1,6 +1,11 @@
 import { createSelector } from "reselect";
 import { GameState } from "../core/models/gameState";
 import { ID } from "../core/models/types";
+import {
+  MatchStatsCalculator,
+  LiveMatchStats,
+} from "../core/systems/MatchEngine/MatchStatsCalculator";
+import { MatchEvent } from "../core/models/match";
 
 const selectClubsDomain = (state: GameState) => state.clubs;
 const selectMetaDomain = (state: GameState) => state.meta;
@@ -156,3 +161,49 @@ export const selectDashboardNextMatchInfo = createSelector(
     };
   }
 );
+
+const EMPTY_LIVE_STATS: LiveMatchStats = {
+  score: { home: 0, away: 0 },
+  stats: {
+    homeCards: 0,
+    awayCards: 0,
+    homeShots: 0,
+    awayShots: 0,
+    homeYellows: 0,
+    awayYellows: 0,
+    homeReds: 0,
+    awayReds: 0,
+    homePossession: 50,
+    awayPossession: 50,
+  },
+};
+
+export const selectMatchEventsUntilMinute = (
+  state: GameState,
+  matchId: ID,
+  minute: number
+): MatchEvent[] => {
+  const matchEvents = state.matches.events[matchId] || [];
+
+  return matchEvents
+    .filter((e) => e.minute <= minute)
+    .sort((a, b) => b.minute - a.minute);
+};
+
+export const selectLiveMatchStats = (
+  state: GameState,
+  matchId: ID,
+  minute: number
+): LiveMatchStats => {
+  const match = state.matches.matches[matchId];
+  if (!match) return EMPTY_LIVE_STATS;
+
+  const allEvents = state.matches.events[matchId] || [];
+  const eventsUntilNow = allEvents.filter((e) => e.minute <= minute);
+
+  return MatchStatsCalculator.calculate(
+    eventsUntilNow,
+    match.homeClubId,
+    match.awayClubId
+  );
+};
