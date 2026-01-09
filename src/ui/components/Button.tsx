@@ -20,7 +20,7 @@ export const Button: React.FC<ButtonProps> = ({
     const variants = {
         primary: "bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/20",
         secondary: "bg-background-tertiary hover:bg-background-tertiary/80 text-text-primary border border-white/10",
-        danger: "bg-status-danger hover:bg-red-600 text-white",
+        danger: "bg-status-danger hover:bg-status-danger/90 text-white shadow-lg shadow-status-danger/20",
         ghost: "bg-transparent hover:bg-white/5 text-text-secondary hover:text-text-primary",
     };
 

@@ -1,24 +1,180 @@
 import { z } from "zod";
 
-const createIdSchema = <T extends string>(brand: T) => z.string().brand(brand);
-
 const IDSchema = z.string().default("");
 const TimestampSchema = z.coerce.number().default(0);
 const MoneySchema = z.coerce.number().default(0);
 const AttributeSchema = z.coerce.number().min(1).max(100).catch(10);
-const FootSchema = z.union([z.literal("LEFT"), z.literal("RIGHT"), z.string()]);
+const FootSchema = z.union([
+  z.literal("LEFT"),
+  z.literal("RIGHT"),
+  z.literal("BOTH"),
+  z.string(),
+]);
 const PositionSchema = z.string().default("UNKNOWN");
-const MatchStatusSchema = z.string().default("SCHEDULED");
+const MatchStatusSchema = z
+  .enum(["SCHEDULED", "IN_PROGRESS", "FINISHED", "POSTPONED"])
+  .catch("SCHEDULED");
+const UserIdSchema = IDSchema;
+const ClubIdSchema = IDSchema;
+const PlayerIdSchema = IDSchema;
+const MatchIdSchema = IDSchema;
+const NationIdSchema = IDSchema;
 
-const UserIdSchema = createIdSchema("UserId");
-const ClubIdSchema = createIdSchema("ClubId");
-const PlayerIdSchema = createIdSchema("PlayerId");
-const MatchIdSchema = createIdSchema("MatchId");
-const NationIdSchema = createIdSchema("NationId");
+const SeasonSchema = z.object({
+  id: IDSchema,
+  year: z.number(),
+  beginning: TimestampSchema,
+  ending: TimestampSchema,
+  active: z.boolean(),
+});
+
+const CompetitionSchema = z.object({
+  id: IDSchema,
+  name: z.string(),
+  nickname: z.string(),
+  type: z.string(),
+  hierarchyLevel: z.number(),
+  standardFormatType: z.string(),
+  standingsPriority: z.string(),
+});
+
+const CompetitionSeasonSchema = z.object({
+  id: IDSchema,
+  competitionId: IDSchema,
+  seasonId: IDSchema,
+  tieBreakingCriteria1: z.string(),
+  tieBreakingCriteria2: z.string(),
+  tieBreakingCriteria3: z.string(),
+  tieBreakingCriteria4: z.string(),
+});
+
+const CompetitionFaseSchema = z.object({
+  id: IDSchema,
+  competitionSeasonId: IDSchema,
+  name: z.string(),
+  orderIndex: z.number(),
+  type: z.string(),
+  isTwoLeggedKnockout: z.boolean(),
+  isFinalSingleGame: z.boolean(),
+});
+
+const CompetitionGroupSchema = z.object({
+  id: IDSchema,
+  competitionFaseId: IDSchema,
+  name: z.string(),
+});
+
+const ClubCompetitionSeasonSchema = z.object({
+  id: IDSchema,
+  competitionSeasonId: IDSchema,
+  clubId: ClubIdSchema,
+});
+
+const CompetitionStandingSchema = z.object({
+  id: IDSchema,
+  competitionGroupId: IDSchema,
+  clubCompetitionSeasonId: IDSchema,
+  points: z.number().default(0),
+  gamesPlayed: z.number().default(0),
+  wins: z.number().default(0),
+  draws: z.number().default(0),
+  defeats: z.number().default(0),
+  goalsScored: z.number().default(0),
+  goalsConceded: z.number().default(0),
+  goalsBalance: z.number().default(0),
+});
+
+const ClassificationRuleSchema = z.object({
+  id: IDSchema,
+  competitionSeasonId: IDSchema,
+  competitionFaseId: IDSchema,
+  ruleType: z.string(),
+  startPosition: z.number(),
+  endPosition: z.number(),
+  slotQuantity: z.number(),
+  priorityOrder: z.number(),
+  destinyCompetitionId: IDSchema,
+  destinyStageKey: z.string(),
+});
+
+const PrizeRuleSchema = z.object({
+  id: IDSchema,
+  competitionSeasonId: IDSchema,
+  competitionFaseId: IDSchema.nullable(),
+  ruleType: z.string(),
+  position: z.number().nullable(),
+  amount: MoneySchema,
+});
+
+const ContractSchema = z.object({
+  id: IDSchema,
+  playerId: PlayerIdSchema,
+  clubId: ClubIdSchema,
+  startDate: TimestampSchema,
+  endDate: TimestampSchema,
+  monthlyWage: MoneySchema,
+  releaseClause: MoneySchema,
+  isLoaned: z.boolean().default(false),
+  active: z.boolean().default(true),
+});
+
+const StaffContractSchema = z.object({
+  id: IDSchema,
+  staffId: IDSchema,
+  clubId: ClubIdSchema,
+  monthlyWage: MoneySchema,
+  releaseClause: MoneySchema,
+  active: z.boolean().default(true),
+});
+
+const ClubManagerSchema = z.object({
+  id: IDSchema,
+  clubId: ClubIdSchema,
+  managerId: IDSchema,
+  monthlyWage: MoneySchema,
+  releaseClause: MoneySchema,
+  expirationDate: TimestampSchema,
+  createdAt: TimestampSchema,
+});
+
+const TransferOfferSchema = z.object({
+  id: IDSchema,
+  playerId: PlayerIdSchema,
+  buyingClubId: ClubIdSchema,
+  sellingClubId: ClubIdSchema,
+  offerDate: TimestampSchema,
+  status: z
+    .enum(["PENDING", "ACCEPTED", "REJECTED", "NEGOTIATING"])
+    .catch("PENDING"),
+  feeAmount: MoneySchema,
+  wageOffer: MoneySchema,
+  contractYears: z.number(),
+  type: z.string(),
+  rejectionReason: z.string().nullable().optional(),
+  expiresAt: TimestampSchema,
+});
+
+const PlayerLoanSchema = z.object({
+  id: IDSchema,
+  contractId: IDSchema,
+  originClubId: ClubIdSchema,
+  destinyClubId: ClubIdSchema,
+  expirationDate: TimestampSchema,
+  fee: MoneySchema,
+  wagePercentagePaidByDestiny: AttributeSchema,
+});
+
+const ScoutingKnowledgeSchema = z.object({
+  id: IDSchema,
+  observingClubId: ClubIdSchema,
+  targetPlayerId: PlayerIdSchema,
+  knowledgeLevel: AttributeSchema,
+  lastUpdated: TimestampSchema,
+});
 
 export const MetaSchema = z
   .object({
-    version: z.string().default("1.0.0"),
+    version: z.string().default("2.0.0"),
     saveName: z.string().default("New Save"),
     currentDate: TimestampSchema,
     currentUserManagerId: UserIdSchema,
@@ -117,18 +273,18 @@ export const GameStateSchema = z
     meta: MetaSchema,
 
     people: z.object({
-      managers: z.record(IDSchema, z.any()),
+      managers: z.record(IDSchema, z.any()), // TODO: Implementar ManagerSchema
       players: z.record(PlayerIdSchema, PlayerSchema).catch({}),
-      staff: z.record(IDSchema, z.any()),
-      playerStates: z.record(IDSchema, z.any()),
+      staff: z.record(IDSchema, z.any()), // TODO: Implementar StaffSchema
+      playerStates: z.record(IDSchema, z.any()), // TODO: Implementar PlayerStateSchema
       playerInjuries: z.record(IDSchema, z.any()),
       playerSecondaryPositions: z.record(z.string(), z.any()),
     }),
 
     clubs: z.object({
       clubs: z.record(ClubIdSchema, ClubSchema).catch({}),
-      infras: z.record(IDSchema, z.any()),
-      finances: z.record(IDSchema, z.any()),
+      infras: z.record(IDSchema, z.any()), // TODO: ClubInfraSchema
+      finances: z.record(IDSchema, z.any()), // TODO: ClubFinancesSchema
       relationships: z.record(IDSchema, z.any()),
       rivalries: z.record(z.string(), z.any()),
       stadiums: z.record(IDSchema, z.any()),
@@ -145,10 +301,34 @@ export const GameStateSchema = z
       tempLineup: TempLineupSchema,
     }),
 
-    competitions: z.any(),
-    market: z.any(),
-    world: z.any(),
-    system: z.any(),
+    competitions: z.object({
+      seasons: z.record(IDSchema, SeasonSchema),
+      competitions: z.record(IDSchema, CompetitionSchema),
+      competitionSeasons: z.record(IDSchema, CompetitionSeasonSchema),
+      clubCompetitionSeasons: z.record(IDSchema, ClubCompetitionSeasonSchema),
+      fases: z.record(IDSchema, CompetitionFaseSchema),
+      groups: z.record(IDSchema, CompetitionGroupSchema),
+      standings: z.record(IDSchema, CompetitionStandingSchema),
+      standingsLookup: z.record(z.string(), IDSchema),
+      rules: z.object({
+        classification: z.record(IDSchema, ClassificationRuleSchema),
+        prizes: z.record(IDSchema, PrizeRuleSchema),
+      }),
+    }),
+
+    market: z.object({
+      contracts: z.record(IDSchema, ContractSchema),
+      staffContracts: z.record(IDSchema, StaffContractSchema),
+      clubManagers: z.record(IDSchema, ClubManagerSchema),
+      transferOffers: z.record(IDSchema, TransferOfferSchema),
+      loans: z.record(IDSchema, PlayerLoanSchema),
+      scoutingKnowledge: z.record(z.string(), ScoutingKnowledgeSchema),
+      playerContractIndex: z.record(PlayerIdSchema, IDSchema),
+      clubSquadIndex: z.record(ClubIdSchema, z.array(PlayerIdSchema)),
+    }),
+
+    world: z.any(), // TODO: Tipar World Domain
+    system: z.any(), // TODO: Tipar System Domain
   })
   .passthrough();
 

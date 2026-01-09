@@ -254,8 +254,8 @@ export const MatchResultScreen: React.FC = () => {
                                                 <td className="p-3 font-medium flex items-center">
                                                     {player.name}
                                                     {stat.goals > 0 && <Trophy size={12} className="ml-2 text-status-success" />}
-                                                    {stat.redCard && <div className="w-2 h-3 bg-red-500 ml-2 rounded-[1px]" />}
-                                                    {stat.yellowCards > 0 && <div className="w-2 h-3 bg-yellow-500 ml-2 rounded-[1px]" />}
+                                                    {stat.redCard && <div className="w-2 h-3 bg-status-danger ml-2 rounded-[1px]" />}
+                                                    {stat.yellowCards > 0 && <div className="w-2 h-3 bg-status-warning ml-2 rounded-[1px]" />}
                                                 </td>
                                                 <td className={`p-3 text-center ${stat.goals > 0 ? 'text-text-primary font-bold' : 'text-text-muted'}`}>{stat.goals}</td>
                                                 <td className={`p-3 text-center ${stat.assists > 0 ? 'text-text-primary font-bold' : 'text-text-muted'}`}>{stat.assists}</td>

@@ -259,7 +259,7 @@ export const MatchLiveScreen: React.FC = () => {
                         </h3>
                         {!isFinished ? (
                             <span className="text-xs text-text-muted animate-pulse flex items-center">
-                                <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div> AO VIVO
+                                <div className="w-2 h-2 bg-status-danger rounded-full mr-1"></div> AO VIVO
                             </span>
                         ) : (
                             <span className="text-xs text-text-muted">FINALIZADO</span>

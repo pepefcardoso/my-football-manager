@@ -19,7 +19,7 @@ export const getNotificationStyle = (
         borderColor: "border-status-danger",
         textColor: "text-status-danger",
         iconColor: "text-status-danger",
-        backgroundColor: "bg-red-950/90",
+        backgroundColor: "bg-status-danger",
         softBackgroundColor: "bg-status-danger/10",
         Icon: AlertCircle,
       };
@@ -28,18 +28,18 @@ export const getNotificationStyle = (
         borderColor: "border-status-warning",
         textColor: "text-status-warning",
         iconColor: "text-status-warning",
-        backgroundColor: "bg-yellow-950/90",
+        backgroundColor: "bg-status-warning",
         softBackgroundColor: "bg-status-warning/10",
         Icon: AlertTriangle,
       };
     case "INFO":
     default:
       return {
-        borderColor: "border-blue-400",
+        borderColor: "border-primary",
         textColor: "text-text-primary",
-        iconColor: "text-blue-400",
+        iconColor: "text-primary",
         backgroundColor: "bg-background-secondary",
-        softBackgroundColor: "bg-blue-400/10",
+        softBackgroundColor: "bg-primary/10",
         Icon: Info,
       };
   }
