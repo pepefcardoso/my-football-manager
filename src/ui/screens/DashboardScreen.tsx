@@ -1,7 +1,6 @@
 import React from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
-import { useShallow } from "zustand/react/shallow";
 import { formatMoney, formatDate, formatDateTime } from "../../core/utils/formatters";
 import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
@@ -12,21 +11,20 @@ import {
     selectCurrentDate,
     selectClubById,
     selectClubFinances,
-    selectNextMatchForClub
+    selectDashboardNextMatchInfo
 } from "../../state/selectors";
 
 export const DashboardScreen: React.FC = () => {
     const { advanceDay, saveGame, meta } = useGameStore();
     const { setView, startProcessing, stopProcessing, isProcessing } = useUIStore();
+
     const userClubId = useGameStore(selectUserClubId);
     const currentDate = useGameStore(selectCurrentDate);
+
     const userClub = useGameStore(selectClubById(userClubId));
     const userFinances = useGameStore(selectClubFinances(userClubId));
-    const nextMatch = useGameStore(useShallow(selectNextMatchForClub(userClubId)));
-    const opponentId = nextMatch
-        ? (nextMatch.homeClubId === userClubId ? nextMatch.awayClubId : nextMatch.homeClubId)
-        : null;
-    const opponent = useGameStore(selectClubById(opponentId));
+
+    const nextMatchInfo = useGameStore(selectDashboardNextMatchInfo);
 
     const handleAdvanceDay = async () => {
         if (isProcessing) return;
@@ -46,8 +44,6 @@ export const DashboardScreen: React.FC = () => {
     };
 
     if (!userClub || !userFinances) return <div className="p-8">Carregando dados do clube...</div>;
-
-    const isHomeGame = nextMatch?.homeClubId === userClubId;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
@@ -69,7 +65,7 @@ export const DashboardScreen: React.FC = () => {
                     <div className="text-right mr-4 hidden md:block">
                         <div className="text-xs text-text-muted uppercase tracking-wider">Próximo Evento</div>
                         <div className="text-sm font-medium text-text-primary">
-                            {nextMatch ? "Dia de Jogo" : "Treino"}
+                            {nextMatchInfo ? "Dia de Jogo" : "Treino"}
                         </div>
                     </div>
                     <Button
@@ -91,21 +87,21 @@ export const DashboardScreen: React.FC = () => {
                         <h3 className="font-bold text-text-secondary uppercase text-xs tracking-wider flex items-center">
                             <Trophy size={14} className="mr-2" /> Próxima Partida
                         </h3>
-                        {nextMatch && (
+                        {nextMatchInfo && (
                             <span className="text-xs px-2 py-0.5 rounded bg-background text-text-muted">
-                                {isHomeGame ? "(C)" : "(F)"}
+                                {nextMatchInfo.locationLabel}
                             </span>
                         )}
                     </div>
 
-                    {nextMatch && opponent ? (
+                    {nextMatchInfo ? (
                         <div className="flex-1 flex flex-col justify-center items-center text-center space-y-2">
                             <div className="text-sm text-text-muted">Contra</div>
                             <div className="text-xl font-bold text-text-primary truncate w-full">
-                                {opponent.name}
+                                {nextMatchInfo.opponentName}
                             </div>
                             <div className="text-sm text-primary font-mono bg-primary/10 px-3 py-1 rounded">
-                                {formatDateTime(nextMatch.datetime)}
+                                {formatDateTime(nextMatchInfo.datetime)}
                             </div>
                         </div>
                     ) : (
@@ -121,7 +117,7 @@ export const DashboardScreen: React.FC = () => {
                             size="sm"
                             className="w-full"
                             onClick={() => setView("MATCH_PREPARATION")}
-                            disabled={!nextMatch || isProcessing}
+                            disabled={!nextMatchInfo || isProcessing}
                         >
                             Preparar Equipa
                         </Button>

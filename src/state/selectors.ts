@@ -105,3 +105,54 @@ export const selectPlayerStateById = (playerId: ID) => (state: GameState) =>
 
 export const selectContractByPlayerId = (playerId: ID) => (state: GameState) =>
   _selectContractByPlayerId(state, playerId);
+
+export interface NextMatchViewData {
+  matchId: string;
+  opponentId: string;
+  opponentName: string;
+  opponentBadgeId: string;
+  datetime: number;
+  isHome: boolean;
+  locationLabel: "(C)" | "(F)";
+  competitionGroupId: string;
+}
+
+export const selectDashboardNextMatchInfo = createSelector(
+  [selectUserClubId, selectMatchesMap, selectClubsDomain, selectCurrentDateRaw],
+  (
+    userClubId,
+    matchesMap,
+    clubsDomain,
+    currentDate
+  ): NextMatchViewData | null => {
+    if (!userClubId) return null;
+
+    const allMatches = Object.values(matchesMap);
+    const upcomingMatches = allMatches.filter(
+      (m) =>
+        m.status === "SCHEDULED" &&
+        (m.homeClubId === userClubId || m.awayClubId === userClubId) &&
+        m.datetime >= currentDate
+    );
+
+    if (upcomingMatches.length === 0) return null;
+
+    upcomingMatches.sort((a, b) => a.datetime - b.datetime);
+    const nextMatch = upcomingMatches[0];
+
+    const isHome = nextMatch.homeClubId === userClubId;
+    const opponentId = isHome ? nextMatch.awayClubId : nextMatch.homeClubId;
+    const opponentClub = clubsDomain.clubs[opponentId];
+
+    return {
+      matchId: nextMatch.id,
+      opponentId,
+      opponentName: opponentClub ? opponentClub.name : "Desconhecido",
+      opponentBadgeId: opponentClub ? opponentClub.badgeId : "generic",
+      datetime: nextMatch.datetime,
+      isHome,
+      locationLabel: isHome ? "(C)" : "(F)",
+      competitionGroupId: nextMatch.competitionGroupId,
+    };
+  }
+);
