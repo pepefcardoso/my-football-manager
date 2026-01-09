@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
-import { MatchEvent } from "../../core/models/match";
-import { MatchStatsCalculator } from "../../core/systems/MatchEngine/MatchStatsCalculator";
+import { useSafeMatchReplay } from "../hooks/useSafeMatchReplay";
 import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 import { DynamicPitchView } from "../components/DynamicPitchView";
 import {
-    Play, Pause, SkipForward,
-    ArrowLeft, Clock, Activity, Shield,
-    MessageSquare, AlertCircle, BarChart2
+    Play, Pause, SkipForward, ArrowLeft, Clock,
+    Activity, Shield, MessageSquare, AlertCircle, BarChart2, RefreshCw
 } from "lucide-react";
+import { MatchEvent } from "../../core/models/match";
 
 interface EventRowProps {
     event: MatchEvent;
@@ -66,9 +65,6 @@ export const MatchLiveScreen: React.FC = () => {
     const { players } = useGameStore(s => s.people);
     const { setView } = useUIStore();
 
-    const [currentMinute, setCurrentMinute] = useState(0);
-    const [isPlaying, setIsPlaying] = useState(true);
-    const [speed, setSpeed] = useState(1);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const currentMatch = useMemo(() => {
@@ -80,12 +76,26 @@ export const MatchLiveScreen: React.FC = () => {
     }, [matches, meta.userClubId]);
 
     const matchEvents = useMemo(() => currentMatch ? events[currentMatch.id] || [] : [], [currentMatch, events]);
+
+    const {
+        currentMinute,
+        isPlaying,
+        speed,
+        liveData,
+        error,
+        actions
+    } = useSafeMatchReplay({
+        matchId: currentMatch?.id || "",
+        homeClubId: currentMatch?.homeClubId || "",
+        awayClubId: currentMatch?.awayClubId || "",
+        events: matchEvents
+    });
+
     const homeClub = currentMatch ? clubs[currentMatch.homeClubId] : null;
     const awayClub = currentMatch ? clubs[currentMatch.awayClubId] : null;
 
     const { homeStarters, awayStarters } = useMemo(() => {
         if (!currentMatch) return { homeStarters: [], awayStarters: [] };
-
         const allStats = Object.values(playerStats).filter(s => s.matchId === currentMatch.id && s.isStarter);
         return {
             homeStarters: allStats.filter(s => s.clubId === currentMatch.homeClubId),
@@ -97,56 +107,42 @@ export const MatchLiveScreen: React.FC = () => {
         return matchEvents.filter(e => e.minute <= currentMinute).sort((a, b) => b.minute - a.minute);
     }, [matchEvents, currentMinute]);
 
-    const liveData = useMemo(() => {
-        if (!homeClub || !awayClub) return null;
-        return MatchStatsCalculator.calculate(visibleEvents, homeClub.id, awayClub.id);
-    }, [visibleEvents, homeClub, awayClub]);
-
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval> | null = null;
-
-        if (!isPlaying) return;
-
-        const tickRate = 1000 / speed;
-
-        interval = setInterval(() => {
-            setCurrentMinute(prev => {
-                const next = prev + 1;
-                if (next >= 94) {
-                    if (interval) {
-                        clearInterval(interval);
-                    }
-                    setIsPlaying(false);
-                    return 94;
-                }
-                return next;
-            });
-        }, tickRate);
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [isPlaying, speed]);
-
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
-    }, [visibleEvents]);
+    }, [visibleEvents.length]);
 
-    if (!currentMatch || !homeClub || !awayClub || !liveData) return <div className="p-8 text-center">Carregando partida...</div>;
+    if (!currentMatch || !homeClub || !awayClub || !liveData) {
+        return <div className="p-8 text-center text-text-muted">Carregando dados da partida...</div>;
+    }
 
     const { score, stats } = liveData;
 
     return (
-        <div className="h-full flex flex-col bg-background animate-in fade-in duration-500">
+        <div className="h-full flex flex-col bg-background animate-in fade-in duration-500 relative">
+
+            {error && (
+                <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-background-secondary border border-status-danger p-6 rounded-lg shadow-2xl max-w-md w-full text-center">
+                        <AlertCircle size={48} className="mx-auto text-status-danger mb-4" />
+                        <h3 className="text-lg font-bold text-text-primary mb-2">Erro na Simulação Visual</h3>
+                        <p className="text-sm text-text-secondary mb-6">{error}</p>
+                        <div className="flex gap-4 justify-center">
+                            <Button variant="secondary" icon={RefreshCw} onClick={actions.retry}>
+                                Tentar Continuar
+                            </Button>
+                            <Button variant="primary" icon={SkipForward} onClick={() => setView("MATCH_RESULT")}>
+                                Pular para Resultados
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <header className="flex-none bg-background-secondary border-b border-background-tertiary p-4 shadow-lg z-10">
                 <div className="flex justify-between items-center max-w-5xl mx-auto">
                     <div className="flex items-center space-x-4 w-1/3">
                         <div className="w-16 h-16 rounded-full bg-white p-1 border-2" style={{ borderColor: homeClub.primaryColor }}>
-                            <ClubBadge
-                                badgeId={homeClub.badgeId}
-                                clubName={homeClub.name}
-                                className="w-full h-full"
-                            />
+                            <ClubBadge badgeId={homeClub.badgeId} clubName={homeClub.name} className="w-full h-full" />
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-text-primary">{homeClub.name}</h2>
@@ -159,7 +155,9 @@ export const MatchLiveScreen: React.FC = () => {
                         </div>
                         <div className="flex items-center space-x-2 text-primary font-mono text-lg font-bold">
                             <Clock size={18} />
-                            <span className={currentMinute > 90 ? "animate-pulse text-status-warning" : ""}>{currentMinute > 90 ? `90+${currentMinute - 90}` : currentMinute}'</span>
+                            <span className={currentMinute > 90 ? "animate-pulse text-status-warning" : ""}>
+                                {currentMinute > 90 ? `90+${currentMinute - 90}` : currentMinute}'
+                            </span>
                         </div>
                     </div>
                     <div className="flex items-center justify-end space-x-4 w-1/3">
@@ -168,32 +166,35 @@ export const MatchLiveScreen: React.FC = () => {
                             <p className="text-sm text-text-secondary">Visitante</p>
                         </div>
                         <div className="w-16 h-16 rounded-full bg-white p-1 border-2" style={{ borderColor: awayClub.primaryColor }}>
-                            <ClubBadge
-                                badgeId={awayClub.badgeId}
-                                clubName={awayClub.name}
-                                className="w-full h-full"
-                            />
+                            <ClubBadge badgeId={awayClub.badgeId} clubName={awayClub.name} className="w-full h-full" />
                         </div>
                     </div>
                 </div>
             </header>
 
             <div className="flex-none bg-background border-b border-background-tertiary p-2 flex justify-center space-x-2">
-                <Button variant="secondary" size="sm" icon={isPlaying ? Pause : Play} onClick={() => setIsPlaying(!isPlaying)} disabled={currentMinute >= 94}>
+                <Button variant="secondary" size="sm" icon={isPlaying ? Pause : Play} onClick={actions.togglePlay} disabled={!!error || currentMinute >= 94}>
                     {isPlaying ? "Pausar" : "Continuar"}
                 </Button>
                 <div className="h-8 w-px bg-background-tertiary mx-2"></div>
                 {[1, 2, 4].map(s => (
-                    <Button key={s} variant={speed === s ? "primary" : "ghost"} size="sm" onClick={() => setSpeed(s)}>{s}x</Button>
+                    <Button
+                        key={s}
+                        variant={speed === s ? "primary" : "ghost"}
+                        size="sm"
+                        onClick={() => actions.setSpeed(s)}
+                        disabled={!!error}
+                    >
+                        {s}x
+                    </Button>
                 ))}
                 <div className="h-8 w-px bg-background-tertiary mx-2"></div>
-                <Button variant="danger" size="sm" icon={SkipForward} onClick={() => { setCurrentMinute(94); setIsPlaying(false); }} disabled={currentMinute >= 94}>
+                <Button variant="danger" size="sm" icon={SkipForward} onClick={actions.skipToFinish} disabled={!!error || currentMinute >= 94}>
                     Final
                 </Button>
             </div>
 
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 overflow-hidden max-w-7xl mx-auto w-full">
-
                 <div className="lg:col-span-4 flex flex-col space-y-4">
                     <div className="bg-background-secondary p-4 rounded-lg border border-background-tertiary shadow-lg">
                         <div className="flex justify-between items-center mb-3">
@@ -217,12 +218,12 @@ export const MatchLiveScreen: React.FC = () => {
                         <div className="space-y-4">
                             <div>
                                 <div className="flex justify-between text-xs text-text-muted mb-1">
-                                    <span>50%</span>
+                                    <span>{stats.homePossession}%</span>
                                     <span>Posse (Est.)</span>
-                                    <span>50%</span>
+                                    <span>{stats.awayPossession}%</span>
                                 </div>
                                 <div className="h-2 bg-background-tertiary rounded-full overflow-hidden flex">
-                                    <div className="bg-primary h-full" style={{ width: '50%' }}></div>
+                                    <div className="bg-primary h-full" style={{ width: `${stats.homePossession}%` }}></div>
                                 </div>
                             </div>
 

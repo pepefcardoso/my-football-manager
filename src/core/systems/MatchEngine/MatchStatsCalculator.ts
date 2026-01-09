@@ -15,6 +15,8 @@ export interface LiveMatchStats {
     awayYellows: number;
     homeReds: number;
     awayReds: number;
+    homePossession: number;
+    awayPossession: number;
   };
 }
 
@@ -35,6 +37,8 @@ export class MatchStatsCalculator {
         awayYellows: 0,
         homeReds: 0,
         awayReds: 0,
+        homePossession: 50,
+        awayPossession: 50,
       },
     };
 
@@ -43,10 +47,14 @@ export class MatchStatsCalculator {
       const isAway = event.clubId === awayClubId;
 
       if (event.type === "GOAL") {
-        if (isHome) result.score.home++;
-        if (isAway) result.score.away++;
-        if (isHome) result.stats.homeShots++;
-        if (isAway) result.stats.awayShots++;
+        if (isHome) {
+          result.score.home++;
+          result.stats.homeShots++;
+        }
+        if (isAway) {
+          result.score.away++;
+          result.stats.awayShots++;
+        }
       }
 
       if (event.type === "CARD_YELLOW" || event.type === "CARD_RED") {
