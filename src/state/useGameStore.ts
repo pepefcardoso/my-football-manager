@@ -21,6 +21,7 @@ import {
 import { logger } from "../core/utils/Logger";
 import { setupNotificationBridge } from "./listeners/NotificationBinding";
 import { rebuildIndices } from "../core/systems/MaintenanceSystem";
+import { TempLineup } from "../core/models/match";
 
 setupNotificationBridge();
 
@@ -38,6 +39,8 @@ interface GameActions {
   disableAutoSave: () => void;
   markNotificationAsRead: (id: string) => void;
   deleteNotification: (id: string) => void;
+  setTempLineup: (lineup: Omit<TempLineup, "lastUpdated">) => void;
+  clearTempLineup: () => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -91,6 +94,7 @@ const createInitialState = (): GameState => ({
     formations: {},
     positions: {},
     teamTactics: {},
+    tempLineup: null,
   },
   market: {
     contracts: {},
@@ -250,6 +254,21 @@ export const useGameStore = create<GameStore>()(
     deleteNotification: (id: string) => {
       set((state) => {
         deleteNotification(state, id);
+      });
+    },
+
+    setTempLineup: (lineupData) => {
+      set((state) => {
+        state.matches.tempLineup = {
+          ...lineupData,
+          lastUpdated: Date.now(),
+        };
+      });
+    },
+
+    clearTempLineup: () => {
+      set((state) => {
+        state.matches.tempLineup = null;
       });
     },
   }))

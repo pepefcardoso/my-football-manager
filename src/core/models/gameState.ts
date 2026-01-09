@@ -64,6 +64,7 @@ export interface MatchDomain {
   formations: Record<ID, Tactics.Formation>;
   positions: Record<ID, Tactics.Position>;
   teamTactics: Record<ID, Tactics.TeamTactics>;
+  tempLineup: Match.TempLineup | null;
 }
 
 export interface MarketDomain {

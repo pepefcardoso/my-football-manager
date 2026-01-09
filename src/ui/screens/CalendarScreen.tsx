@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
-import { Calendar, MapPin, Trophy, Shield, Star, Clock, FastForward, CheckCircle } from "lucide-react";
+import { Calendar, MapPin, Trophy, Clock, FastForward, CheckCircle } from "lucide-react";
 import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 import { simulationSystem } from "../../core/systems/SimulationSystem";
@@ -100,13 +100,6 @@ export const CalendarScreen: React.FC = () => {
         return comp.nickname || comp.name;
     };
 
-    const getMatchImportance = (match: any, opponent: any) => {
-        if (!opponent) return null;
-        if (opponent.reputation > 8000) return { label: "Clássico", color: "text-status-warning", icon: Star };
-        if (opponent.reputation > 6000) return { label: "Difícil", color: "text-text-primary", icon: Shield };
-        return null;
-    };
-
     const upcomingMatches = useMemo(() => {
         if (!userClubId) return [];
         const allMatches = Object.values(matches);
@@ -160,8 +153,6 @@ export const CalendarScreen: React.FC = () => {
                         const opponentId = isHome ? match.awayClubId : match.homeClubId;
                         const opponent = clubs[opponentId] || { name: 'Desconhecido', nickname: '??', reputation: 0, badgeId: undefined };
                         const isNextMatch = index === 0;
-                        const importance = getMatchImportance(match, opponent);
-                        const ImportanceIcon = importance?.icon ?? null;
                         const homeTeam = clubs[match.homeClubId];
                         const awayTeam = clubs[match.awayClubId];
 
@@ -176,12 +167,6 @@ export const CalendarScreen: React.FC = () => {
                                     }
                                 `}
                             >
-                                {isNextMatch && (
-                                    <div className="absolute -top-3 left-6 px-3 py-1 bg-primary text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm">
-                                        Próxima Partida
-                                    </div>
-                                )}
-
                                 <div className="flex flex-col md:w-1/4 mb-4 md:mb-0 text-center md:text-left">
                                     <div className="flex items-center justify-center md:justify-start text-text-secondary text-xs font-bold uppercase tracking-wider mb-1">
                                         <Trophy size={12} className="mr-1" />
@@ -232,13 +217,6 @@ export const CalendarScreen: React.FC = () => {
                                 </div>
 
                                 <div className="flex flex-col items-center md:items-end md:w-1/4 mt-4 md:mt-0 space-y-2">
-                                    {importance && (
-                                        <div className={`flex items-center text-xs font-bold uppercase tracking-wider ${importance.color} bg-background-tertiary/50 px-2 py-1 rounded`}>
-                                            {ImportanceIcon ? <ImportanceIcon size={12} className="mr-1" /> : null}
-                                            {importance.label}
-                                        </div>
-                                    )}
-
                                     {isNextMatch ? (
                                         <Button size="sm" onClick={() => setView("MATCH_PREPARATION")} disabled={isSimulating}>
                                             Preparar Equipa

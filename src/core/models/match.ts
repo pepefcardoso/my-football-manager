@@ -64,3 +64,10 @@ export interface PlayerMatchStats {
   saves: number;
   wasMvp: boolean;
 }
+
+export interface TempLineup {
+  starters: ID[];
+  bench: ID[];
+  reserves: ID[];
+  lastUpdated: number;
+}

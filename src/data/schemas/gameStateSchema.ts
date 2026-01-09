@@ -102,6 +102,16 @@ export const MatchSchema = z
   })
   .passthrough();
 
+const TempLineupSchema = z
+  .object({
+    starters: z.array(z.string()),
+    bench: z.array(z.string()),
+    reserves: z.array(z.string()),
+    lastUpdated: z.number(),
+  })
+  .nullable()
+  .optional();
+
 export const GameStateSchema = z
   .object({
     meta: MetaSchema,
@@ -132,6 +142,7 @@ export const GameStateSchema = z
       formations: z.record(IDSchema, z.any()),
       positions: z.record(IDSchema, z.any()),
       teamTactics: z.record(IDSchema, z.any()),
+      tempLineup: TempLineupSchema,
     }),
 
     competitions: z.any(),
