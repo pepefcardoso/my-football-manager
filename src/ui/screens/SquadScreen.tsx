@@ -25,10 +25,10 @@ const PlayerRow = React.memo(({ playerId, onClick }: { playerId: string, onClick
     return (
         <tr
             onClick={() => onClick(player.id)}
-            className="hover:bg-background-tertiary/40 cursor-pointer transition-colors group"
+            className="hover:bg-background-tertiary/40 cursor-pointer transition-colors duration-200 group"
         >
             <td className="p-4">
-                <div className="font-medium text-text-primary group-hover:text-primary transition-colors">
+                <div className="font-medium text-text-primary group-hover:text-primary transition-colors duration-200">
                     {player.name}
                 </div>
                 <div className="text-xs text-text-muted hidden md:block">

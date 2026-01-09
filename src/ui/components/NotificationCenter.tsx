@@ -62,7 +62,7 @@ export const NotificationCenter: React.FC = () => {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-2 text-text-secondary hover:text-text-primary hover:bg-background-tertiary rounded-full transition-colors relative"
+                className="p-2 text-text-secondary hover:text-text-primary hover:bg-background-tertiary rounded-full transition-colors duration-200" // Adicionado duration-200
             >
                 <Bell size={20} />
                 {unreadCount > 0 && (
@@ -96,10 +96,8 @@ export const NotificationCenter: React.FC = () => {
                                 key={type}
                                 onClick={() => setFilter(type)}
                                 className={`
-                                    px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors
-                                    ${filter === type
-                                        ? 'bg-primary text-white'
-                                        : 'bg-background-tertiary text-text-secondary hover:text-text-primary'}
+                                    px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors duration-200
+                                    ${filter === type ? '...' : '...'}
                                 `}
                             >
                                 {type === "ALL" ? "Todas" : type}
@@ -122,7 +120,7 @@ export const NotificationCenter: React.FC = () => {
                                         <div
                                             key={notification.id}
                                             className={`
-                                                relative group p-3 hover:bg-background-tertiary/30 transition-colors cursor-pointer border-l-4
+                                                relative group p-3 hover:bg-background-tertiary/30 transition-colors duration-200 cursor-pointer border-l-4
                                                 border-l-${style.borderColor.replace('border-', '')} 
                                                 ${notification.isRead ? 'opacity-70 hover:opacity-100' : style.softBackgroundColor}
                                             `}
@@ -153,7 +151,7 @@ export const NotificationCenter: React.FC = () => {
                                                     e.stopPropagation();
                                                     deleteNotification(notification.id);
                                                 }}
-                                                className="absolute bottom-2 right-2 p-1.5 text-text-muted hover:text-status-danger hover:bg-status-danger/10 rounded transition-all opacity-0 group-hover:opacity-100"
+                                                className="absolute bottom-2 right-2 p-1.5 text-text-muted hover:text-status-danger hover:bg-status-danger/10 rounded transition-all duration-200 opacity-0 group-hover:opacity-100"
                                                 title="Remover"
                                             >
                                                 <Trash2 size={12} />

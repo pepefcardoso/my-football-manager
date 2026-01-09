@@ -139,7 +139,7 @@ export const MatchPreparationScreen: React.FC = () => {
         const ovr = calculateOverall(player);
 
         return (
-            <div className="flex items-center justify-between p-2 bg-background border border-background-tertiary rounded mb-1 hover:border-primary/50 transition-colors group">
+            <div className="flex items-center justify-between p-2 bg-background border border-background-tertiary rounded mb-1 hover:border-primary/50 transition-colors duration-200 group">
                 <div className="flex items-center space-x-3">
                     <span className="w-8 text-xs font-bold text-text-secondary bg-background-tertiary px-1 rounded text-center">
                         {formatPosition(player.primaryPositionId)}
@@ -154,7 +154,7 @@ export const MatchPreparationScreen: React.FC = () => {
                 </div>
                 <button
                     onClick={onAction}
-                    className="text-xs bg-background-tertiary text-text-secondary hover:bg-primary hover:text-white px-2 py-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                    className="text-xs bg-background-tertiary text-text-secondary hover:bg-primary hover:text-white px-2 py-1 rounded transition-colors duration-200 opacity-0 group-hover:opacity-100"
                 >
                     {actionLabel}
                 </button>

@@ -213,7 +213,7 @@ export const MatchResultScreen: React.FC = () => {
                         <div className="flex border-b border-background-tertiary">
                             <button
                                 onClick={() => setTab('HOME')}
-                                className={`flex-1 py-3 text-sm font-bold uppercase tracking-wide transition-colors ${tab === 'HOME' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-text-secondary hover:bg-background-tertiary/50'}`}
+                                className={`flex-1 py-3 text-sm font-bold uppercase tracking-wide transition-colors duration-200 ...`}
                             >
                                 {homeClub.name}
                             </button>
@@ -249,7 +249,7 @@ export const MatchResultScreen: React.FC = () => {
                                         else if (stat.rating < 6.0) ratingColor = "text-status-danger";
 
                                         return (
-                                            <tr key={stat.id} className="hover:bg-background-tertiary/20 transition-colors">
+                                            <tr key={stat.id} className="hover:bg-background-tertiary/20 transition-colors duration-200">
                                                 <td className="p-3 text-text-muted text-xs font-mono">{stat.positionPlayedId}</td>
                                                 <td className="p-3 font-medium flex items-center">
                                                     {player.name}

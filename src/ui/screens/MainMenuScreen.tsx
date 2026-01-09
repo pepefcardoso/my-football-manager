@@ -90,7 +90,7 @@ export const MainMenuScreen: React.FC = () => {
                 ) : (
                     <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
                         {saveFiles.map((save) => (
-                            <div key={save} className="flex items-center justify-between p-3 bg-background border border-background-tertiary rounded hover:border-primary/50 transition-colors group">
+                            <div key={save} className="flex items-center justify-between p-3 bg-background border border-background-tertiary rounded hover:border-primary/50 transition-colors duration-200 group">
                                 <div className="flex items-center space-x-3">
                                     <HardDrive size={18} className="text-primary" />
                                     <span className="text-text-primary font-medium">{save}</span>
@@ -101,7 +101,7 @@ export const MainMenuScreen: React.FC = () => {
                                     </Button>
                                     <button
                                         onClick={() => handleDeleteSave(save)}
-                                        className="p-2 text-text-secondary hover:text-status-danger transition-colors"
+                                        className="p-2 text-text-secondary hover:text-status-danger transition-colors duration-200"
                                         title="Deletar Save"
                                     >
                                         <Trash2 size={16} />
