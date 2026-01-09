@@ -116,7 +116,7 @@ export const DashboardScreen: React.FC = () => {
                             variant="secondary"
                             size="sm"
                             className="w-full"
-                            onClick={() => setView("MATCH_PREPARATION")}
+                            onClick={() => nextMatchInfo && setView("MATCH_PREPARATION", nextMatchInfo.matchId)}
                             disabled={!nextMatchInfo || isProcessing}
                         >
                             Preparar Equipa

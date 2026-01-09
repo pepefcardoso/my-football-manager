@@ -31,19 +31,23 @@ export const MatchPreparationScreen: React.FC = () => {
     const { contracts } = useGameStore(s => s.market);
     const { players, playerStates } = useGameStore(s => s.people);
     const { clubs } = useGameStore(s => s.clubs);
-    const { setView } = useUIStore();
+    const { setView, activeMatchId } = useUIStore();
 
     const tempLineup = matchesDomain.tempLineup;
 
-    const nextMatch = useMemo(() => {
+    const currentMatch = useMemo(() => {
+        if (activeMatchId && matchesDomain.matches[activeMatchId]) {
+            return matchesDomain.matches[activeMatchId];
+        }
+
         if (!meta.userClubId) return null;
         const allMatches = Object.values(matchesDomain.matches);
         return allMatches
             .filter(m => m.status === "SCHEDULED" && (m.homeClubId === meta.userClubId || m.awayClubId === meta.userClubId))
             .sort((a, b) => a.datetime - b.datetime)[0];
-    }, [matchesDomain.matches, meta.userClubId]);
+    }, [matchesDomain.matches, meta.userClubId, activeMatchId]);
 
-    const opponentId = nextMatch ? (nextMatch.homeClubId === meta.userClubId ? nextMatch.awayClubId : nextMatch.homeClubId) : null;
+    const opponentId = currentMatch ? (currentMatch.homeClubId === meta.userClubId ? currentMatch.awayClubId : currentMatch.homeClubId) : null;
     const opponent = opponentId ? clubs[opponentId] : null;
 
     useEffect(() => {
@@ -102,7 +106,7 @@ export const MatchPreparationScreen: React.FC = () => {
     };
 
     const handlePlayMatch = () => {
-        if (!nextMatch || !meta.userClubId || !tempLineup) return;
+        if (!currentMatch || !meta.userClubId || !tempLineup) return;
 
         if (tempLineup.starters.length !== 11) {
             alert("Você precisa selecionar exatamente 11 titulares!");
@@ -114,17 +118,18 @@ export const MatchPreparationScreen: React.FC = () => {
                 startingXI: tempLineup.starters,
                 bench: tempLineup.bench
             });
-            const opponentId = nextMatch.homeClubId === meta.userClubId ? nextMatch.awayClubId : nextMatch.homeClubId;
-            const opponentContext = buildTeamContext(state, opponentId);
+            const oppId = currentMatch.homeClubId === meta.userClubId ? currentMatch.awayClubId : currentMatch.homeClubId;
+            const opponentContext = buildTeamContext(state, oppId);
 
-            simulateSingleMatch(state, state.matches.matches[nextMatch.id],
-                nextMatch.homeClubId === meta.userClubId ? userContext : opponentContext,
-                nextMatch.homeClubId === meta.userClubId ? opponentContext : userContext
+            simulateSingleMatch(state, state.matches.matches[currentMatch.id],
+                currentMatch.homeClubId === meta.userClubId ? userContext : opponentContext,
+                currentMatch.homeClubId === meta.userClubId ? opponentContext : userContext
             );
         });
 
         clearTempLineup();
-        setView("MATCH_LIVE");
+
+        setView("MATCH_LIVE", currentMatch.id);
     };
 
     const PlayerRow = ({ id, actionLabel, onAction }: { id: string, actionLabel: string, onAction: () => void }) => {
@@ -157,7 +162,7 @@ export const MatchPreparationScreen: React.FC = () => {
         );
     };
 
-    if (!nextMatch || !opponent) {
+    if (!currentMatch || !opponent) {
         return (
             <div className="h-full flex flex-col">
                 <div className="flex-none p-6 border-b border-background-tertiary">
@@ -167,7 +172,7 @@ export const MatchPreparationScreen: React.FC = () => {
                     <EmptyState
                         icon={CalendarX}
                         title="Sem Jogos Agendados"
-                        description="Você não tem partidas marcadas para os próximos dias. Avance o calendário."
+                        description="Você não tem partidas marcadas para os próximos dias ou o calendário foi finalizado."
                         actionLabel="Ir para Calendário"
                         onAction={() => setView("CALENDAR")}
                     />
@@ -209,7 +214,7 @@ export const MatchPreparationScreen: React.FC = () => {
                     <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => setView("DASHBOARD")}>Voltar</Button>
                     <div>
                         <h1 className="text-xl font-bold text-text-primary">Preparação de Jogo</h1>
-                        <p className="text-sm text-text-secondary">vs {opponent.name} ({nextMatch.homeClubId === meta.userClubId ? 'Casa' : 'Fora'})</p>
+                        <p className="text-sm text-text-secondary">vs {opponent.name} ({currentMatch.homeClubId === meta.userClubId ? 'Casa' : 'Fora'})</p>
                     </div>
                 </div>
                 <div className="flex items-center space-x-4">

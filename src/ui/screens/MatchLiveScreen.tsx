@@ -63,21 +63,19 @@ const EventRow: React.FC<EventRowProps> = ({ event, isHome, playerName }) => {
 };
 
 export const MatchLiveScreen: React.FC = () => {
-    const { meta } = useGameStore();
     const { matches, playerStats } = useGameStore(s => s.matches);
     const { clubs } = useGameStore(s => s.clubs);
     const { players } = useGameStore(s => s.people);
-    const { setView } = useUIStore();
+    const { setView, activeMatchId } = useUIStore();
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const currentMatch = useMemo(() => {
-        if (!meta.userClubId) return null;
-        const allMatches = Object.values(matches);
-        return allMatches
-            .filter(m => (m.homeClubId === meta.userClubId || m.awayClubId === meta.userClubId))
-            .sort((a, b) => b.updatedAt - a.updatedAt)[0];
-    }, [matches, meta.userClubId]);
+        if (activeMatchId && matches[activeMatchId]) {
+            return matches[activeMatchId];
+        }
+        return null;
+    }, [matches, activeMatchId]);
 
     const {
         currentMinute,

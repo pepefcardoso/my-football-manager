@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { GameState } from "../core/models/gameState";
 import { Nation } from "../core/models/geo";
 import { Contract } from "../core/models/contract";
-import { ClubFactory, PlayerFactory, rng } from "../core/utils/generators";
+import { ClubFactory, PlayerFactory } from "../core/utils/generators";
 import { ClubCompetitionSeason } from "../core/models/competition";
 import { logger } from "../core/utils/Logger";
 
@@ -178,6 +178,7 @@ const createEmptyState = (): GameState => ({
     formations: {},
     positions: {},
     teamTactics: {},
+    tempLineup: null,
   },
   market: {
     contracts: {},
@@ -203,6 +204,49 @@ const createEmptyState = (): GameState => ({
     },
   },
 });
+
+const generateRoundRobinSchedule = (
+  teamIds: string[]
+): { round: number; matches: { home: string; away: string }[] }[] => {
+  const n = teamIds.length;
+  const rounds: { round: number; matches: { home: string; away: string }[] }[] =
+    [];
+  const teams = [...teamIds];
+
+  if (n % 2 !== 0) teams.push("bye");
+
+  const numRounds = teams.length - 1;
+  const halfSize = teams.length / 2;
+
+  for (let r = 0; r < numRounds; r++) {
+    const roundMatches: { home: string; away: string }[] = [];
+
+    for (let i = 0; i < halfSize; i++) {
+      const home = teams[i];
+      const away = teams[teams.length - 1 - i];
+
+      if (r % 2 === 0) {
+        roundMatches.push({ home, away });
+      } else {
+        roundMatches.push({ home: away, away: home });
+      }
+    }
+
+    rounds.push({ round: r + 1, matches: roundMatches });
+
+    const rotated = teams.slice(1);
+    const last = rotated.pop();
+    if (last) rotated.unshift(last);
+    teams.splice(1, teams.length - 1, ...rotated);
+  }
+
+  const returnRounds = rounds.map((r) => ({
+    round: r.round + numRounds,
+    matches: r.matches.map((m) => ({ home: m.away, away: m.home })),
+  }));
+
+  return [...rounds, ...returnRounds];
+};
 
 export const createNewGame = (): GameState => {
   return logger.time("InitialSetup", "Criação de Novo Jogo", () => {
@@ -274,19 +318,18 @@ export const createNewGame = (): GameState => {
       });
     });
 
+    const currentYear = new Date().getFullYear();
     const seasonId = uuidv4();
     const competitionId = uuidv4();
     const compSeasonId = uuidv4();
     const faseId = uuidv4();
     const groupId = uuidv4();
 
-    const currentYear = new Date().getFullYear();
-
     state.competitions.seasons[seasonId] = {
       id: seasonId,
       year: currentYear,
       beginning: state.meta.currentDate,
-      ending: state.meta.currentDate + 1000 * 60 * 60 * 24 * 30 * 6,
+      ending: state.meta.currentDate + 1000 * 60 * 60 * 24 * 30 * 10,
       active: true,
     };
     state.meta.activeSeasonId = seasonId;
@@ -355,104 +398,47 @@ export const createNewGame = (): GameState => {
       state.competitions.standingsLookup[lookupKey] = standingId;
     });
 
+    const schedule = generateRoundRobinSchedule(createdClubIds);
     const ONE_DAY = 24 * 60 * 60 * 1000;
 
-    for (let i = 0; i < 5; i++) {
-      const clubsShuffled = [...createdClubIds].sort(() => 0.5 - Math.random());
+    const roundDate = new Date();
+    roundDate.setDate(roundDate.getDate() + ((7 - roundDate.getDay()) % 7));
+    roundDate.setHours(16, 0, 0, 0);
 
-      for (let j = 0; j < clubsShuffled.length; j += 2) {
-        if (j + 1 >= clubsShuffled.length) break;
+    schedule.forEach((roundData) => {
+      const isWednesday = roundDate.getDay() === 3;
+      roundDate.setTime(roundDate.getTime() + (isWednesday ? 4 : 3) * ONE_DAY);
 
-        const homeId = clubsShuffled[j];
-        const awayId = clubsShuffled[j + 1];
-        const matchId = uuidv4();
-
-        const homeGoals = Math.floor(rng.normal(1.5, 1));
-        const awayGoals = Math.floor(rng.normal(1.0, 1));
-        const finalHome = Math.max(0, homeGoals);
-        const finalAway = Math.max(0, awayGoals);
-
-        const matchDate = state.meta.currentDate - (5 - i) * ONE_DAY * 7;
-
-        state.matches.matches[matchId] = {
-          id: matchId,
-          competitionGroupId: groupId,
-          stadiumId: state.clubs.infras[homeId].stadiumId,
-          homeClubId: homeId,
-          awayClubId: awayId,
-          homeGoals: finalHome,
-          awayGoals: finalAway,
-          homePenalties: null,
-          awayPenalties: null,
-          roundNumber: i + 1,
-          datetime: matchDate,
-          status: "FINISHED",
-          attendance: rng.range(10000, 50000),
-          ticketRevenue: 0,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-
-        const updateStanding = (cId: string, gp: number, gc: number) => {
-          const s = Object.values(state.competitions.standings).find((st) => {
-            const ccs =
-              state.competitions.clubCompetitionSeasons[
-                st.clubCompetitionSeasonId
-              ];
-            return ccs.clubId === cId;
-          });
-          if (s) {
-            s.gamesPlayed++;
-            s.goalsScored += gp;
-            s.goalsConceded += gc;
-            s.goalsBalance += gp - gc;
-            if (gp > gc) {
-              s.wins++;
-              s.points += 3;
-            } else if (gp === gc) {
-              s.draws++;
-              s.points += 1;
-            } else {
-              s.defeats++;
-            }
-          }
-        };
-
-        updateStanding(homeId, finalHome, finalAway);
-        updateStanding(awayId, finalAway, finalHome);
+      if (roundDate.getTime() <= state.meta.currentDate) {
+        roundDate.setTime(state.meta.currentDate + ONE_DAY);
       }
-    }
 
-    for (let i = 0; i < 3; i++) {
-      const clubsShuffled = [...createdClubIds].sort(() => 0.5 - Math.random());
-      for (let j = 0; j < clubsShuffled.length; j += 2) {
-        if (j + 1 >= clubsShuffled.length) break;
-        const homeId = clubsShuffled[j];
-        const awayId = clubsShuffled[j + 1];
+      roundData.matches.forEach((matchPair) => {
         const matchId = uuidv4();
 
-        const matchDate = state.meta.currentDate + (i + 1) * ONE_DAY * 3;
+        const matchTime = new Date(roundDate);
+        if (Math.random() > 0.7) matchTime.setHours(20, 0, 0, 0);
 
         state.matches.matches[matchId] = {
           id: matchId,
           competitionGroupId: groupId,
-          stadiumId: state.clubs.infras[homeId].stadiumId,
-          homeClubId: homeId,
-          awayClubId: awayId,
+          stadiumId: state.clubs.infras[matchPair.home].stadiumId,
+          homeClubId: matchPair.home,
+          awayClubId: matchPair.away,
           homeGoals: 0,
           awayGoals: 0,
           homePenalties: null,
           awayPenalties: null,
-          roundNumber: 6 + i,
-          datetime: matchDate,
+          roundNumber: roundData.round,
+          datetime: matchTime.getTime(),
           status: "SCHEDULED",
           attendance: 0,
           ticketRevenue: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
-      }
-    }
+      });
+    });
 
     const humanManagerId = uuidv4();
     const userClubId = firstClubId;
