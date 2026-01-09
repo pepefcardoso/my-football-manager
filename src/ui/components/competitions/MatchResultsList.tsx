@@ -1,12 +1,13 @@
 import React from "react";
 import { ChevronLeft, ChevronRight, Filter, Calendar } from "lucide-react";
 import { ClubBadge } from "../ClubBadge";
+import { Club } from "../../../core/models/club";
 import { Match } from "../../../core/models/match";
-import { useGameStore } from "../../../state/useGameStore";
 import { formatDate } from "../../../core/utils/formatters";
 
 interface MatchResultsListProps {
   matches: Match[];
+  clubs: Record<string, Club>;
   currentRound: number;
   totalRounds: number;
   onlyMyGames: boolean;
@@ -19,6 +20,7 @@ interface MatchResultsListProps {
 
 export const MatchResultsList: React.FC<MatchResultsListProps> = ({
   matches,
+  clubs,
   currentRound,
   totalRounds,
   onlyMyGames,
@@ -28,8 +30,6 @@ export const MatchResultsList: React.FC<MatchResultsListProps> = ({
   onToggleFilter,
   onClubClick,
 }) => {
-  const { clubs } = useGameStore(s => s.clubs);
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-4 border-b border-background-tertiary bg-background/50">
@@ -60,11 +60,10 @@ export const MatchResultsList: React.FC<MatchResultsListProps> = ({
 
         <button
           onClick={onToggleFilter}
-          className={`flex items-center px-3 py-1.5 rounded text-sm transition-colors border ${
-            onlyMyGames
+          className={`flex items-center px-3 py-1.5 rounded text-sm transition-colors border ${onlyMyGames
               ? "bg-primary/10 border-primary text-primary"
               : "bg-transparent border-background-tertiary text-text-secondary hover:border-text-muted"
-          }`}
+            }`}
         >
           <Filter size={14} className="mr-2" />
           Apenas meus jogos
@@ -81,7 +80,7 @@ export const MatchResultsList: React.FC<MatchResultsListProps> = ({
             matches.map((match) => {
               const homeClub = clubs[match.homeClubId];
               const awayClub = clubs[match.awayClubId];
-              
+
               if (!homeClub || !awayClub) return null;
 
               const isUserGame =
@@ -93,10 +92,9 @@ export const MatchResultsList: React.FC<MatchResultsListProps> = ({
                   key={match.id}
                   className={`
                     relative p-4 rounded border transition-all duration-200
-                    ${
-                      isUserGame
-                        ? "bg-primary/5 border-primary/30 shadow-[0_0_10px_rgba(59,130,246,0.05)]"
-                        : "bg-background border-background-tertiary hover:border-text-muted/30"
+                    ${isUserGame
+                      ? "bg-primary/5 border-primary/30 shadow-[0_0_10px_rgba(59,130,246,0.05)]"
+                      : "bg-background border-background-tertiary hover:border-text-muted/30"
                     }
                   `}
                 >
@@ -116,11 +114,10 @@ export const MatchResultsList: React.FC<MatchResultsListProps> = ({
                       onClick={() => onClubClick(homeClub.id)}
                     >
                       <span
-                        className={`font-bold ${
-                          isPlayed && match.homeGoals > match.awayGoals
+                        className={`font-bold ${isPlayed && match.homeGoals > match.awayGoals
                             ? "text-text-primary"
                             : "text-text-secondary"
-                        }`}
+                          }`}
                       >
                         {homeClub.name}
                       </span>
@@ -157,11 +154,10 @@ export const MatchResultsList: React.FC<MatchResultsListProps> = ({
                         />
                       </div>
                       <span
-                        className={`font-bold ${
-                          isPlayed && match.awayGoals > match.homeGoals
+                        className={`font-bold ${isPlayed && match.awayGoals > match.homeGoals
                             ? "text-text-primary"
                             : "text-text-secondary"
-                        }`}
+                          }`}
                       >
                         {awayClub.name}
                       </span>

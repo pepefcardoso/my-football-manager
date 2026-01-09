@@ -2,6 +2,10 @@ import { GameState } from "../core/models/gameState";
 import { logger } from "../core/utils/Logger";
 import { GameStateSchema } from "./schemas/gameStateSchema";
 
+// ============================================================================
+// TYPES & INTERFACES
+// ============================================================================
+
 export interface SaveMetadata {
   version: string;
   timestamp: number;
@@ -30,14 +34,18 @@ export interface SaveInfo {
   readableDate: string;
 }
 
-const WEB_SAVE_PREFIX = "maestro_save_";
+// ============================================================================
+// CONSTANTS & HELPERS
+// ============================================================================
 
 function getElectronAPI() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (window as any).electronAPI;
 }
 
 function isElectron(): boolean {
-  return typeof window !== "undefined" && getElectronAPI() !== undefined;
+  const api = getElectronAPI();
+  return typeof window !== "undefined" && api !== undefined;
 }
 
 function formatBytes(bytes: number): string {
@@ -60,8 +68,9 @@ function formatDate(timestamp: number): string {
 }
 
 function serializeGameState(state: GameState): string {
+  // Remove funções e dados transientes para garantir serialização limpa
   const cleanState = JSON.parse(
-    JSON.stringify(state, (key, value) => {
+    JSON.stringify(state, (_key, value) => {
       if (typeof value === "function") {
         return undefined;
       }
@@ -75,86 +84,56 @@ function parseAndValidateGameState(data: unknown): GameState | null {
   const result = GameStateSchema.safeParse(data);
 
   if (!result.success) {
-    logger.error("FileSystem", "Falha na validação do Schema (Zod)", {
-      errors: result.error.issues
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .slice(0, 5),
-    });
+    logger.error(
+      "FileSystem",
+      "❌ Falha crítica de validação (Schema Mismatch)",
+      {
+        errors: result.error.issues
+          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .slice(0, 5),
+      }
+    );
     return null;
   }
 
   return result.data as unknown as GameState;
 }
 
+// ============================================================================
+// PUBLIC API (STRICT ELECTRON ONLY)
+// ============================================================================
+
 export async function saveGameToDisk(
   saveName: string,
   state: GameState
 ): Promise<SaveResult> {
   return logger.timeAsync("FileSystem", `Save Game (${saveName})`, async () => {
-    const serializedState = serializeGameState(state);
-
-    if (isElectron()) {
-      try {
-        const result = await getElectronAPI().saveGame(
-          saveName,
-          serializedState
-        );
-        if (result.success) {
-          logger.info("FileSystem", "Save gravado em disco (Electron)", {
-            size: result.metadata ? formatBytes(result.metadata.size) : "N/A",
-          });
-        } else {
-          logger.error(
-            "FileSystem",
-            "Erro do Electron ao salvar",
-            result.error
-          );
-        }
-        return result;
-      } catch (error) {
-        logger.error("FileSystem", "Exceção IPC ao salvar", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro IPC",
-        };
-      }
+    if (!isElectron()) {
+      const errorMsg =
+        "Ambiente Web não suportado para saves > 5MB. Use o App Desktop.";
+      logger.error("FileSystem", errorMsg);
+      return { success: false, error: errorMsg };
     }
 
+    const serializedState = serializeGameState(state);
+
     try {
-      const key = `${WEB_SAVE_PREFIX}${saveName}`;
-      localStorage.setItem(key, serializedState);
+      // IPC Call direto para o Main Process (Node.js fs)
+      const result = await getElectronAPI().saveGame(saveName, serializedState);
 
-      const size = new Blob([serializedState]).size;
-      logger.warn(
-        "FileSystem",
-        "⚠️ Save gravado em LocalStorage (Modo Web/Dev)",
-        {
-          key,
-          size: formatBytes(size),
-        }
-      );
+      if (result.success) {
+        logger.info("FileSystem", "✅ Save gravado em disco (Electron)", {
+          size: result.metadata ? formatBytes(result.metadata.size) : "N/A",
+          checksum: result.metadata?.checksum.substring(0, 8),
+        });
+      } else {
+        logger.error("FileSystem", "❌ Erro Electron Main", result.error);
+      }
 
-      return {
-        success: true,
-        metadata: {
-          version: "web-dev",
-          timestamp: Date.now(),
-          checksum: "web-no-checksum",
-          size: size,
-          compressed: false,
-        },
-      };
+      return result;
     } catch (error) {
-      logger.error(
-        "FileSystem",
-        "Erro ao salvar no LocalStorage (Quota?)",
-        error
-      );
-      return {
-        success: false,
-        error:
-          "Falha no LocalStorage (Provavelmente limite de espaço excedido).",
-      };
+      logger.error("FileSystem", "❌ Falha Crítica IPC Save", error);
+      return { success: false, error: (error as Error).message };
     }
   });
 }
@@ -163,167 +142,106 @@ export async function loadGameFromDisk(
   saveName: string
 ): Promise<GameState | null> {
   return logger.timeAsync("FileSystem", `Load Game (${saveName})`, async () => {
-    let rawData: string | null = null;
-    let metadata: SaveMetadata | undefined;
-
-    if (isElectron()) {
-      try {
-        const result = await getElectronAPI().loadGame(saveName);
-        if (!result.success || !result.data) {
-          logger.error(
-            "FileSystem",
-            "Erro ao carregar (Electron)",
-            result.error
-          );
-          return null;
-        }
-        rawData = result.data;
-        metadata = result.metadata;
-      } catch (error) {
-        logger.error("FileSystem", "Exceção IPC ao carregar", error);
-        return null;
-      }
-    } else {
-      const key = `${WEB_SAVE_PREFIX}${saveName}`;
-      rawData = localStorage.getItem(key);
-      if (!rawData) {
-        logger.error(
-          "FileSystem",
-          `Save não encontrado no LocalStorage: ${key}`
-        );
-        return null;
-      }
-      logger.info("FileSystem", "Save carregado do LocalStorage");
-    }
-
-    if (!rawData) {
-      logger.error("FileSystem", "Dados do save estão vazios ou nulos.");
+    if (!isElectron()) {
+      logger.error(
+        "FileSystem",
+        "Ambiente Web não suportado para carregar saves."
+      );
       return null;
     }
 
     try {
-      const parsedRaw = JSON.parse(rawData);
+      const result = await getElectronAPI().loadGame(saveName);
 
-      const stateToValidate = parsedRaw.gameState || parsedRaw;
-
-      const validatedState = parseAndValidateGameState(stateToValidate);
-
-      if (!validatedState) {
-        logger.error(
-          "FileSystem",
-          "Save inválido ou corrompido (Schema Mismatch)"
-        );
+      if (!result.success || !result.data) {
+        logger.error("FileSystem", "Falha Load Electron", result.error);
         return null;
       }
 
-      if (metadata) {
-        logger.debug("FileSystem", "Metadados do Save", {
-          version: metadata.version,
-          timestamp: formatDate(metadata.timestamp),
-        });
+      const rawData = result.data;
+      const metadata = result.metadata;
+
+      // Parsing do JSON cru vindo do disco
+      const parsedRaw = JSON.parse(rawData);
+
+      // Suporte a estrutura legacy ou wrapper { metadata, gameState }
+      const stateToValidate = parsedRaw.gameState || parsedRaw;
+
+      // Validação estrita do Schema (Zod)
+      const validatedState = parseAndValidateGameState(stateToValidate);
+
+      if (validatedState && metadata) {
+        logger.info(
+          "FileSystem",
+          `✅ Save carregado: v${metadata.version} (${formatBytes(
+            metadata.size
+          )})`
+        );
       }
 
       return validatedState;
     } catch (error) {
-      logger.error("FileSystem", "Erro ao processar JSON do save", error);
+      logger.error("FileSystem", "Erro Fatal ao carregar/parsear save", error);
       return null;
     }
   });
 }
 
 export async function listSaveFiles(): Promise<string[]> {
-  if (isElectron()) {
-    try {
-      return await getElectronAPI().listSaves();
-    } catch (error) {
-      logger.error("FileSystem", "Erro ao listar saves (IPC)", error);
-      return [];
-    }
-  }
-
-  const saves: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith(WEB_SAVE_PREFIX)) {
-      saves.push(key.replace(WEB_SAVE_PREFIX, ""));
-    }
-  }
-  return saves;
-}
-
-export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
-  if (isElectron()) {
-    try {
-      return await getElectronAPI().deleteSave(saveName);
-    } catch (error) {
-      logger.error("FileSystem", "Erro ao deletar (IPC)", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-      };
-    }
+  if (!isElectron()) {
+    logger.warn("FileSystem", "Listagem de saves indisponível (Ambiente Web).");
+    return [];
   }
 
   try {
-    const key = `${WEB_SAVE_PREFIX}${saveName}`;
-    if (confirm(`(Web Mode) Deletar save "${saveName}" permanentemente?`)) {
-      localStorage.removeItem(key);
-      logger.info("FileSystem", `Save deletado do LocalStorage: ${key}`);
-      return { success: true };
-    }
-    return { success: false, error: "Cancelado pelo usuário" };
+    return await getElectronAPI().listSaves();
   } catch (error) {
-    logger.error(
-      "FileSystem",
-      "Erro ao acessar LocalStorage durante deleção",
-      error
-    );
-    return { success: false, error: "Erro ao acessar LocalStorage" };
+    logger.error("FileSystem", "Erro IPC List", error);
+    return [];
+  }
+}
+
+export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
+  if (!isElectron()) {
+    return { success: false, error: "Operação não suportada na Web." };
+  }
+
+  try {
+    return await getElectronAPI().deleteSave(saveName);
+  } catch (error) {
+    logger.error("FileSystem", "Erro IPC Delete", error);
+    return { success: false, error: (error as Error).message };
   }
 }
 
 export async function getSaveInfo(saveName: string): Promise<SaveInfo | null> {
-  if (isElectron()) {
-    try {
-      const metadata = await getElectronAPI().getSaveInfo(saveName);
-      if (!metadata) return null;
+  if (!isElectron()) return null;
 
-      return {
-        filename: saveName,
-        metadata,
-        readableSize: formatBytes(metadata.size),
-        readableDate: formatDate(metadata.timestamp),
-      };
-    } catch (error) {
-      logger.error("FileSystem", "Erro ao obter info (IPC)", error);
-      return null;
-    }
+  try {
+    const metadata = await getElectronAPI().getSaveInfo(saveName);
+    if (!metadata) return null;
+
+    return {
+      filename: saveName,
+      metadata,
+      readableSize: formatBytes(metadata.size),
+      readableDate: formatDate(metadata.timestamp),
+    };
+  } catch (error) {
+    logger.error("FileSystem", "Erro IPC Info", error);
+    return null;
   }
-
-  const key = `${WEB_SAVE_PREFIX}${saveName}`;
-  const data = localStorage.getItem(key);
-  if (!data) return null;
-
-  const size = new Blob([data]).size;
-
-  return {
-    filename: saveName,
-    metadata: null,
-    readableSize: formatBytes(size),
-    readableDate: "Local (Dev)",
-  };
 }
 
 export async function openSavesFolder(): Promise<void> {
-  if (isElectron()) {
-    try {
-      await getElectronAPI().openSavesFolder();
-    } catch (error) {
-      logger.error("FileSystem", "Erro ao abrir pasta", error);
-    }
-  } else {
-    alert(
-      "Em modo Web, os saves estão no LocalStorage do navegador (F12 -> Application)."
-    );
+  if (!isElectron()) {
+    console.warn("Acesso ao sistema de arquivos restrito ao Electron.");
+    return;
+  }
+
+  try {
+    await getElectronAPI().openSavesFolder();
+  } catch (error) {
+    logger.error("FileSystem", "Erro ao abrir pasta de saves", error);
   }
 }

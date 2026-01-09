@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
@@ -11,9 +11,11 @@ import {
     Activity, Shield, MessageSquare, AlertCircle, BarChart2, RefreshCw
 } from "lucide-react";
 import { MatchEvent } from "../../core/models/match";
-import { MatchStatsCalculator } from "../../core/systems/MatchEngine/MatchStatsCalculator"; // Import direto do Core
+import {
+    selectMatchEventsUntilMinute,
+    selectLiveMatchStats
+} from "../../state/selectors";
 
-// Componente EventRow mantido (Pure UI)
 interface EventRowProps {
     event: MatchEvent;
     isHome: boolean;
@@ -62,18 +64,14 @@ const EventRow: React.FC<EventRowProps> = ({ event, isHome, playerName }) => {
 };
 
 export const MatchLiveScreen: React.FC = () => {
-    // 1. Seleção de Dados Estáticos (Otimização de Performance)
-    // Usamos useShallow para evitar re-renders se a referência do objeto "matches" mudar mas o conteúdo for igual
+    const { setView, activeMatchId } = useUIStore();
     const matchesMap = useGameStore(useShallow(s => s.matches.matches));
-    const allEventsMap = useGameStore(useShallow(s => s.matches.events)); // Selecionamos o mapa inteiro ou apenas do jogo específico seria melhor
+    const allEventsMap = useGameStore(useShallow(s => s.matches.events));
     const playerStatsMap = useGameStore(useShallow(s => s.matches.playerStats));
     const clubsMap = useGameStore(useShallow(s => s.clubs.clubs));
     const playersMap = useGameStore(useShallow(s => s.people.players));
-
-    const { setView, activeMatchId } = useUIStore();
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // 2. Determinação da Partida Atual
     const currentMatch = useMemo(() => {
         if (activeMatchId && matchesMap[activeMatchId]) {
             return matchesMap[activeMatchId];
@@ -81,12 +79,10 @@ export const MatchLiveScreen: React.FC = () => {
         return null;
     }, [matchesMap, activeMatchId]);
 
-    // 3. Extração Segura de Eventos (Dependência apenas da Store, não do tempo)
-    const matchEvents = useMemo(() => {
+    const rawMatchEvents = useMemo(() => {
         return currentMatch ? (allEventsMap[currentMatch.id] || []) : [];
     }, [allEventsMap, currentMatch]);
 
-    // 4. Hook de Controle de Tempo (Local State)
     const {
         currentMinute,
         isPlaying,
@@ -97,35 +93,28 @@ export const MatchLiveScreen: React.FC = () => {
         matchId: currentMatch?.id || "",
         homeClubId: currentMatch?.homeClubId || "",
         awayClubId: currentMatch?.awayClubId || "",
-        events: matchEvents // Passamos a lista completa, o hook gerencia o tempo
+        events: rawMatchEvents
     });
 
-    // 5. Lógica Derivada (Calculada no Render/Memo, fora da Store)
-    // Isso previne o "Maximum update depth exceeded" pois não dispara listeners da store
-    const visibleEvents = useMemo(() => {
-        return matchEvents
-            .filter((e) => e.minute <= currentMinute)
-            .sort((a, b) => b.minute - a.minute); // Ordem inversa para o feed (mais recente no topo)
-    }, [matchEvents, currentMinute]);
+    const visibleEvents = useGameStore(
+        useCallback(
+            (state) => selectMatchEventsUntilMinute(state, currentMatch?.id || "", currentMinute),
+            [currentMatch?.id, currentMinute]
+        )
+    );
 
-    const liveStats = useMemo(() => {
-        if (!currentMatch) return null;
+    const liveStats = useGameStore(
+        useCallback(
+            (state) => selectLiveMatchStats(state, currentMatch?.id || "", currentMinute),
+            [currentMatch?.id, currentMinute]
+        )
+    );
 
-        // Invocamos a lógica Pura do Core diretamente aqui
-        return MatchStatsCalculator.calculate(
-            visibleEvents, // Usamos os eventos já filtrados pelo tempo
-            currentMatch.homeClubId,
-            currentMatch.awayClubId
-        );
-    }, [visibleEvents, currentMatch]);
-
-    // 6. Preparação de Dados dos Times
     const homeClub = currentMatch ? clubsMap[currentMatch.homeClubId] : null;
     const awayClub = currentMatch ? clubsMap[currentMatch.awayClubId] : null;
 
     const { homeStarters, awayStarters } = useMemo(() => {
         if (!currentMatch) return { homeStarters: [], awayStarters: [] };
-        // Nota: playerStatsMap é estável, não muda durante o replay
         const allStats = Object.values(playerStatsMap).filter(s => s.matchId === currentMatch.id && s.isStarter);
         return {
             homeStarters: allStats.filter(s => s.clubId === currentMatch.homeClubId),
@@ -133,12 +122,11 @@ export const MatchLiveScreen: React.FC = () => {
         };
     }, [currentMatch, playerStatsMap]);
 
-    // Scroll automático para o topo quando novos eventos chegam
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
     }, [visibleEvents.length]);
 
-    if (!currentMatch || !homeClub || !awayClub || !liveStats) {
+    if (!currentMatch || !homeClub || !awayClub) {
         return <div className="p-8 text-center text-text-muted">Carregando dados da partida...</div>;
     }
 
@@ -176,6 +164,7 @@ export const MatchLiveScreen: React.FC = () => {
                             <p className="text-sm text-text-secondary">Mandante</p>
                         </div>
                     </div>
+
                     <div className="flex flex-col items-center w-1/3">
                         <div className="bg-black/40 rounded-lg px-6 py-2 border border-background-tertiary mb-2 backdrop-blur-sm">
                             <span className="text-5xl font-mono font-bold text-white tracking-widest">
@@ -189,6 +178,7 @@ export const MatchLiveScreen: React.FC = () => {
                             </span>
                         </div>
                     </div>
+
                     <div className="flex items-center justify-end space-x-4 w-1/3">
                         <div className="text-right">
                             <h2 className="text-xl font-bold text-text-primary">{awayClub.name}</h2>

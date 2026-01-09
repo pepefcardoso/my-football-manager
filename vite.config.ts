@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import electron from "vite-plugin-electron";
 import renderer from "vite-plugin-electron-renderer";
@@ -17,6 +17,9 @@ export default defineConfig({
             outDir: "dist-electron",
             rollupOptions: {
               external: ["electron"],
+              output: {
+                format: "cjs",
+              },
             },
           },
         },
@@ -29,6 +32,13 @@ export default defineConfig({
         vite: {
           build: {
             outDir: "dist-electron",
+            rollupOptions: {
+              external: ["electron"],
+              output: {
+                format: "cjs",
+                inlineDynamicImports: true,
+              },
+            },
           },
         },
       },

@@ -4,8 +4,10 @@ import { CompetitionView, useCompetitionData } from "../hooks/useCompetitionData
 import { CompetitionHeader } from "../components/competitions/CompetitionHeader";
 import { CompetitionTable } from "../components/competitions/CompetitionTable";
 import { MatchResultsList } from "../components/competitions/MatchResultsList";
+import { useGameStore } from "../../state/useGameStore";
 
 export const CompetitionsScreen: React.FC = () => {
+  const { clubs } = useGameStore(s => s.clubs);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<CompetitionView>("TABLE");
 
@@ -39,9 +41,9 @@ export const CompetitionsScreen: React.FC = () => {
 
       <div className="flex-1 min-h-0 bg-background-secondary rounded-lg border border-background-tertiary shadow-sm overflow-hidden flex flex-col">
         {activeView === "TABLE" ? (
-          <CompetitionTable 
-            data={tableData} 
-            onClubClick={setSelectedClubId} 
+          <CompetitionTable
+            data={tableData}
+            onClubClick={setSelectedClubId}
           />
         ) : (
           <MatchResultsList
@@ -50,10 +52,11 @@ export const CompetitionsScreen: React.FC = () => {
             totalRounds={totalRounds}
             onlyMyGames={onlyMyGames}
             userClubId={userClubId}
-            onPrevRound={() => actions.setRound((prev) => Math.max(1, prev - 1))}
-            onNextRound={() => actions.setRound((prev) => Math.min(totalRounds, prev + 1))}
+            onPrevRound={() => actions.setRound(Math.max(1, currentRound - 1))}
+            onNextRound={() => actions.setRound(Math.min(totalRounds, currentRound + 1))}
             onToggleFilter={() => actions.setOnlyMyGames((prev) => !prev)}
             onClubClick={setSelectedClubId}
+            clubs={clubs}
           />
         )}
       </div>

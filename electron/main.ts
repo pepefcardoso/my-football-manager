@@ -1,14 +1,12 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import path from "path";
 import fs from "fs/promises";
-import { fileURLToPath } from "url";
 import crypto from "crypto";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SAVES_DIR = path.join(app.getPath("userData"), "saves");
-const BACKUPS_DIR = path.join(app.getPath("userData"), "backups");
 const DIST = path.join(__dirname, "../dist");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+const SAVES_DIR = path.join(app.getPath("userData"), "saves");
+const BACKUPS_DIR = path.join(app.getPath("userData"), "backups");
 const MAX_BACKUPS = 5;
 const MAX_SAVE_SIZE_MB = 50;
 const MAX_SAVE_SIZE_BYTES = MAX_SAVE_SIZE_MB * 1024 * 1024;
@@ -58,10 +56,7 @@ function validateSaveStructure(parsedData: any): {
     "competitions",
     "matches",
     "market",
-    "world",
-    "system",
   ];
-
   const missingKeys = requiredKeys.filter((key) => !(key in parsedData));
 
   if (missingKeys.length > 0) {
@@ -73,7 +68,7 @@ function validateSaveStructure(parsedData: any): {
     };
   }
 
-  if (!parsedData.meta?.saveName || !parsedData.meta?.version) {
+  if (!parsedData.meta?.saveName) {
     return {
       valid: false,
       error: "Metadados (meta) inválidos ou incompletos.",
@@ -131,9 +126,12 @@ async function rotateBackups(originalFilename: string): Promise<void> {
       }))
       .sort((a, b) => b.timestamp - a.timestamp);
 
-    for (let i = MAX_BACKUPS; i < backups.length; i++) {
-      await fs.unlink(backups[i].path);
-      console.log(`[BACKUP] Rotação: Removido ${backups[i].name}`);
+    while (backups.length > MAX_BACKUPS) {
+      const toDelete = backups.shift();
+      if (toDelete) {
+        await fs.unlink(toDelete.path);
+        console.log(`[BACKUP] Rotação: Removido ${toDelete.name}`);
+      }
     }
   } catch (error) {
     console.error("[BACKUP] Erro na rotação:", error);
@@ -143,6 +141,11 @@ async function rotateBackups(originalFilename: string): Promise<void> {
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
+  const preloadPath = path.join(__dirname, "preload.js");
+
+  console.log("[MAIN] Iniciando janela...");
+  console.log("[MAIN] Preload path:", preloadPath);
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -150,14 +153,12 @@ function createWindow(): void {
     minHeight: 600,
     fullscreen: false,
     resizable: true,
-    minimizable: true,
-    movable: true,
     icon: path.join(process.env.VITE_PUBLIC || DIST, "icon.png"),
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      sandbox: false,
       webSecurity: true,
     },
     backgroundColor: "#0f172a",
@@ -189,65 +190,58 @@ ipcMain.handle(
       const byteSize = Buffer.byteLength(data, "utf-8");
       if (byteSize > MAX_SAVE_SIZE_BYTES) {
         throw new Error(
-          `O arquivo excede o limite de segurança (${MAX_SAVE_SIZE_MB}MB). Tamanho atual: ${(
-            byteSize /
-            1024 /
-            1024
-          ).toFixed(2)}MB`
+          `O arquivo excede o limite de segurança (${MAX_SAVE_SIZE_MB}MB).`
         );
       }
 
       const safeFilename = sanitizeFilename(filename);
-      if (!safeFilename) {
-        throw new Error("Nome de arquivo inválido ou vazio.");
-      }
+      if (!safeFilename) throw new Error("Nome de arquivo inválido.");
 
       let parsedData;
       try {
         parsedData = JSON.parse(data);
       } catch {
-        throw new Error("Falha ao processar JSON: Formato malformado.");
+        throw new Error("JSON malformado.");
       }
 
       const validation = validateSaveStructure(parsedData);
-      if (!validation.valid) {
-        throw new Error(validation.error);
-      }
+      if (!validation.valid) throw new Error(validation.error);
 
       const filePath = path.join(SAVES_DIR, `${safeFilename}.json`);
-      const tempPath = `${filePath}.tmp`;
 
       try {
         await fs.access(filePath);
         await createBackup(filePath);
       } catch {
-        // Arquivo não existe
+        // Arquivo novo, sem backup necessário
       }
 
       const metadata = createMetadata(data, byteSize);
+
       const finalData = JSON.stringify({
         metadata,
         gameState: parsedData,
       });
 
+      const tempPath = `${filePath}.tmp`;
       await fs.writeFile(tempPath, finalData, "utf-8");
-
       await fs.rename(tempPath, filePath);
 
       console.log(
-        `[IPC] ✅ Save: ${filePath} (${(byteSize / 1024).toFixed(2)} KB)`
+        `[IPC] ✅ Save Sucesso: ${filePath} (${(byteSize / 1024).toFixed(
+          2
+        )} KB)`
       );
-
       return { success: true, metadata };
     } catch (error) {
-      console.error("[IPC] ❌ Erro Crítico ao Salvar:", error);
+      console.error("[IPC] ❌ Erro Save:", error);
 
       if (filename) {
         try {
           const safeFilename = sanitizeFilename(filename);
           await fs.unlink(path.join(SAVES_DIR, `${safeFilename}.json.tmp`));
         } catch {
-          // Ignorar erros de limpeza
+          // Ignora erros de limpeza
         }
       }
 
@@ -270,7 +264,7 @@ ipcMain.handle(
       try {
         await fs.access(filePath);
       } catch {
-        throw new Error(`Arquivo de save não encontrado: ${filename}`);
+        throw new Error(`Arquivo não encontrado: ${filename}`);
       }
 
       const rawData = await fs.readFile(filePath, "utf-8");
@@ -278,40 +272,24 @@ ipcMain.handle(
 
       if (parsed.metadata && parsed.gameState) {
         const metadata = parsed.metadata as SaveMetadata;
-
-        // TODO Isso é custoso para arquivos grandes, mas garante segurança.
-        // Em produção, pode ser opcional ou feito apenas em Load.
         const gameStateStr = JSON.stringify(parsed.gameState);
-        const currentChecksum = calculateChecksum(gameStateStr);
 
+        const currentChecksum = calculateChecksum(gameStateStr);
         if (currentChecksum !== metadata.checksum) {
-          console.warn(
-            `[IPC] ⚠️ ALERTA DE INTEGRIDADE: O Checksum do save ${filename} não confere.`
-          );
+          console.warn(`[IPC] ⚠️ ALERTA: Checksum inválido para ${filename}`);
         }
 
         console.log(`[IPC] ✅ Load: ${filename} (v${metadata.version})`);
-
-        return {
-          success: true,
-          data: gameStateStr,
-          metadata,
-        };
+        return { success: true, data: gameStateStr, metadata };
       } else {
         console.log(`[IPC] ⚠️ Load (Legado): ${filename}`);
-        return {
-          success: true,
-          data: rawData,
-        };
+        return { success: true, data: rawData };
       }
     } catch (error) {
-      console.error("[IPC] ❌ Erro ao Carregar:", error);
+      console.error("[IPC] ❌ Erro Load:", error);
       return {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Arquivo corrompido ou ilegível",
+        error: error instanceof Error ? error.message : "Arquivo corrompido",
       };
     }
   }
@@ -321,13 +299,12 @@ ipcMain.handle("list-saves", async (): Promise<string[]> => {
   try {
     await ensureDirectories();
     const files = await fs.readdir(SAVES_DIR);
-
     return files
       .filter((file) => file.endsWith(".json") && !file.endsWith(".tmp"))
       .map((file) => file.replace(".json", ""))
-      .sort((a, b) => b.localeCompare(a));
+      .sort((a, b) => a.localeCompare(b));
   } catch (error) {
-    console.error("[IPC] Erro ao listar:", error);
+    console.error("[IPC] Erro List:", error);
     return [];
   }
 });
@@ -354,10 +331,9 @@ ipcMain.handle(
         console.log(`[IPC] 🗑️ Deletado: ${filePath}`);
         return { success: true };
       }
-
       return { success: false, error: "Cancelado pelo usuário" };
     } catch (error) {
-      console.error("[IPC] ❌ Erro ao Deletar:", error);
+      console.error("[IPC] Erro Delete:", error);
       return { success: false, error: "Erro ao deletar arquivo" };
     }
   }
@@ -369,8 +345,6 @@ ipcMain.handle(
     try {
       const safeFilename = sanitizeFilename(filename);
       const filePath = path.join(SAVES_DIR, `${safeFilename}.json`);
-
-      // TODO: No futuro, separar header do body em arquivos físicos diferentes para performance extrema.
       const rawData = await fs.readFile(filePath, "utf-8");
       const parsed = JSON.parse(rawData);
 
