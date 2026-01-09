@@ -20,6 +20,7 @@ import {
 } from "../core/systems/NotificationSystem";
 import { logger } from "../core/utils/Logger";
 import { setupNotificationBridge } from "./listeners/NotificationBinding";
+import { rebuildIndices } from "../core/systems/MaintenanceSystem";
 
 setupNotificationBridge();
 
@@ -98,6 +99,8 @@ const createInitialState = (): GameState => ({
     transferOffers: {},
     loans: {},
     scoutingKnowledge: {},
+    playerContractIndex: {},
+    clubSquadIndex: {},
   },
   world: {
     nations: {},
@@ -158,6 +161,8 @@ export const useGameStore = create<GameStore>()(
       const loadedState = await loadGameFromDisk(saveName);
 
       if (loadedState) {
+        rebuildIndices(loadedState);
+
         set(() => ({ ...loadedState } as GameStore));
         logger.info("GameStore", "✅ Load concluído com sucesso");
         return true;

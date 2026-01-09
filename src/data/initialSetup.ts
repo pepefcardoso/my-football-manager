@@ -186,6 +186,8 @@ const createEmptyState = (): GameState => ({
     transferOffers: {},
     loans: {},
     scoutingKnowledge: {},
+    playerContractIndex: {},
+    clubSquadIndex: {},
   },
   world: {
     nations: {},
@@ -256,6 +258,12 @@ export const createNewGame = (): GameState => {
         };
 
         state.market.contracts[contractId] = contract;
+
+        state.market.playerContractIndex[player.id] = contractId;
+        if (!state.market.clubSquadIndex[bundle.club.id]) {
+          state.market.clubSquadIndex[bundle.club.id] = [];
+        }
+        state.market.clubSquadIndex[bundle.club.id].push(player.id);
 
         state.people.playerStates[player.id] = {
           playerId: player.id,

@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { GameState } from "../models/gameState";
 import { Match, MatchEvent } from "../models/match";
-import { Contract } from "../models/contract";
 import { Player } from "../models/people";
 import { PlayerCalculations } from "../models/player";
 import {
@@ -74,14 +73,7 @@ export const buildTeamContext = (
 ): TeamMatchContext => {
   const club = state.clubs.clubs[clubId];
 
-  const activePlayerIds = Object.values(
-    state.market.contracts as Record<string, Contract>
-  )
-    .filter(
-      (c) =>
-        c.clubId === clubId && c.active && c.endDate > state.meta.currentDate
-    )
-    .map((c) => c.playerId);
+  const activePlayerIds = state.market.clubSquadIndex[clubId] || [];
 
   const squad = activePlayerIds
     .map((id) => state.people.players[id])

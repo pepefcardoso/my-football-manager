@@ -73,6 +73,8 @@ export interface MarketDomain {
   transferOffers: Record<ID, Contract.TransferOffer>;
   loans: Record<ID, Contract.PlayerLoan>;
   scoutingKnowledge: Record<string, Scouting.ScoutingKnowledge>;
+  playerContractIndex: Record<ID, ID>;
+  clubSquadIndex: Record<ID, ID[]>;
 }
 
 export interface WorldDomain {
