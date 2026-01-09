@@ -1,20 +1,17 @@
-import React, { useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
-import { useSafeMatchReplay } from "../hooks/useSafeMatchReplay";
+import { useMatchTimer } from "../hooks/useMatchTimer";
+import { useLiveMatchData } from "../hooks/useLiveMatchData";
 import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 import { DynamicPitchView } from "../components/DynamicPitchView";
 import {
     Play, Pause, SkipForward, ArrowLeft, Clock,
-    Activity, Shield, MessageSquare, AlertCircle, BarChart2, RefreshCw
+    Activity, Shield, MessageSquare, BarChart2
 } from "lucide-react";
 import { MatchEvent } from "../../core/models/match";
-import {
-    selectMatchEventsUntilMinute,
-    selectLiveMatchStats
-} from "../../state/selectors";
 
 interface EventRowProps {
     event: MatchEvent;
@@ -22,7 +19,7 @@ interface EventRowProps {
     playerName: string;
 }
 
-const EventRow: React.FC<EventRowProps> = ({ event, isHome, playerName }) => {
+const EventRow: React.FC<EventRowProps> = React.memo(({ event, isHome, playerName }) => {
     let icon = <Activity size={16} />;
     let colorClass = "text-text-secondary";
 
@@ -36,11 +33,10 @@ const EventRow: React.FC<EventRowProps> = ({ event, isHome, playerName }) => {
             colorClass = "text-status-warning";
             break;
         case "CARD_RED":
-            icon = <AlertCircle size={16} />;
+            icon = <Shield size={16} />;
             colorClass = "text-status-danger font-bold";
             break;
         default:
-            icon = <Activity size={16} />;
             break;
     }
 
@@ -61,15 +57,17 @@ const EventRow: React.FC<EventRowProps> = ({ event, isHome, playerName }) => {
             </div>
         </div>
     );
-};
+});
+EventRow.displayName = "EventRow";
 
 export const MatchLiveScreen: React.FC = () => {
     const { setView, activeMatchId } = useUIStore();
+
     const matchesMap = useGameStore(useShallow(s => s.matches.matches));
-    const allEventsMap = useGameStore(useShallow(s => s.matches.events));
     const playerStatsMap = useGameStore(useShallow(s => s.matches.playerStats));
     const clubsMap = useGameStore(useShallow(s => s.clubs.clubs));
     const playersMap = useGameStore(useShallow(s => s.people.players));
+
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const currentMatch = useMemo(() => {
@@ -79,35 +77,26 @@ export const MatchLiveScreen: React.FC = () => {
         return null;
     }, [matchesMap, activeMatchId]);
 
-    const rawMatchEvents = useMemo(() => {
-        return currentMatch ? (allEventsMap[currentMatch.id] || []) : [];
-    }, [allEventsMap, currentMatch]);
-
     const {
         currentMinute,
         isPlaying,
         speed,
-        error,
-        actions
-    } = useSafeMatchReplay({
-        matchId: currentMatch?.id || "",
-        homeClubId: currentMatch?.homeClubId || "",
-        awayClubId: currentMatch?.awayClubId || "",
-        events: rawMatchEvents
+        isFinished,
+        togglePlay,
+        setSpeed,
+        skipToFinish
+    } = useMatchTimer({
+        autoStart: true,
+        initialSpeed: 1,
+        maxDuration: 94
     });
 
-    const visibleEvents = useGameStore(
-        useCallback(
-            (state) => selectMatchEventsUntilMinute(state, currentMatch?.id || "", currentMinute),
-            [currentMatch?.id, currentMinute]
-        )
-    );
-
-    const liveStats = useGameStore(
-        useCallback(
-            (state) => selectLiveMatchStats(state, currentMatch?.id || "", currentMinute),
-            [currentMatch?.id, currentMinute]
-        )
+    const {
+        liveStats,
+        visibleEvents
+    } = useLiveMatchData(
+        currentMatch?.id || null,
+        currentMinute
     );
 
     const homeClub = currentMatch ? clubsMap[currentMatch.homeClubId] : null;
@@ -115,6 +104,7 @@ export const MatchLiveScreen: React.FC = () => {
 
     const { homeStarters, awayStarters } = useMemo(() => {
         if (!currentMatch) return { homeStarters: [], awayStarters: [] };
+        // TODO isso pode vir de um hook useMatchLineups.
         const allStats = Object.values(playerStatsMap).filter(s => s.matchId === currentMatch.id && s.isStarter);
         return {
             homeStarters: allStats.filter(s => s.clubId === currentMatch.homeClubId),
@@ -123,7 +113,9 @@ export const MatchLiveScreen: React.FC = () => {
     }, [currentMatch, playerStatsMap]);
 
     useEffect(() => {
-        if (scrollRef.current) scrollRef.current.scrollTop = 0;
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = 0;
+        }
     }, [visibleEvents.length]);
 
     if (!currentMatch || !homeClub || !awayClub) {
@@ -134,24 +126,6 @@ export const MatchLiveScreen: React.FC = () => {
 
     return (
         <div className="h-full flex flex-col bg-background animate-in fade-in duration-500 relative">
-
-            {error && (
-                <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-background-secondary border border-status-danger p-6 rounded-lg shadow-2xl max-w-md w-full text-center">
-                        <AlertCircle size={48} className="mx-auto text-status-danger mb-4" />
-                        <h3 className="text-lg font-bold text-text-primary mb-2">Erro na Simulação</h3>
-                        <p className="text-sm text-text-secondary mb-6">{error}</p>
-                        <div className="flex gap-4 justify-center">
-                            <Button variant="secondary" icon={RefreshCw} onClick={actions.retry}>
-                                Tentar Continuar
-                            </Button>
-                            <Button variant="primary" icon={SkipForward} onClick={() => setView("MATCH_RESULT")}>
-                                Pular para Resultados
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             <header className="flex-none bg-background-secondary border-b border-background-tertiary p-4 shadow-lg z-10">
                 <div className="flex justify-between items-center max-w-5xl mx-auto">
@@ -192,17 +166,39 @@ export const MatchLiveScreen: React.FC = () => {
             </header>
 
             <div className="flex-none bg-background border-b border-background-tertiary p-2 flex justify-center space-x-2">
-                <Button variant="secondary" size="sm" icon={isPlaying ? Pause : Play} onClick={actions.togglePlay} disabled={!!error || currentMinute >= 94}>
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={isPlaying ? Pause : Play}
+                    onClick={togglePlay}
+                    disabled={isFinished}
+                >
                     {isPlaying ? "Pausar" : "Continuar"}
                 </Button>
+
                 <div className="h-8 w-px bg-background-tertiary mx-2"></div>
+
                 {[1, 2, 4].map(s => (
-                    <Button key={s} variant={speed === s ? "primary" : "ghost"} size="sm" onClick={() => actions.setSpeed(s)} disabled={!!error}>
+                    <Button
+                        key={s}
+                        variant={speed === s ? "primary" : "ghost"}
+                        size="sm"
+                        onClick={() => setSpeed(s)}
+                        disabled={isFinished}
+                    >
                         {s}x
                     </Button>
                 ))}
+
                 <div className="h-8 w-px bg-background-tertiary mx-2"></div>
-                <Button variant="danger" size="sm" icon={SkipForward} onClick={actions.skipToFinish} disabled={!!error || currentMinute >= 94}>
+
+                <Button
+                    variant="danger"
+                    size="sm"
+                    icon={SkipForward}
+                    onClick={skipToFinish}
+                    disabled={isFinished}
+                >
                     Final
                 </Button>
             </div>
@@ -237,7 +233,7 @@ export const MatchLiveScreen: React.FC = () => {
                                     <span>{stats.awayPossession}%</span>
                                 </div>
                                 <div className="h-2 bg-background-tertiary rounded-full overflow-hidden flex">
-                                    <div className="bg-primary h-full" style={{ width: `${stats.homePossession}%` }}></div>
+                                    <div className="bg-primary h-full transition-all duration-500" style={{ width: `${stats.homePossession}%` }}></div>
                                 </div>
                             </div>
 
@@ -246,6 +242,7 @@ export const MatchLiveScreen: React.FC = () => {
                                 <div className="text-text-muted text-xs uppercase">Chutes</div>
                                 <div className="font-bold text-xl">{stats.awayShots}</div>
                             </div>
+
                             <div className="grid grid-cols-3 text-center text-sm items-center">
                                 <div className="font-bold text-xl text-status-warning">{stats.homeCards}</div>
                                 <div className="text-text-muted text-xs uppercase">Cartões</div>
@@ -260,26 +257,38 @@ export const MatchLiveScreen: React.FC = () => {
                         <h3 className="font-bold text-text-primary flex items-center">
                             <MessageSquare size={16} className="mr-2" /> Narração
                         </h3>
-                        {currentMinute < 94 ? (
-                            <span className="text-xs text-text-muted animate-pulse flex items-center"><div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div> AO VIVO</span>
+                        {!isFinished ? (
+                            <span className="text-xs text-text-muted animate-pulse flex items-center">
+                                <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div> AO VIVO
+                            </span>
                         ) : (
                             <span className="text-xs text-text-muted">FINALIZADO</span>
                         )}
                     </div>
+
                     <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-2 flex flex-col-reverse">
-                        {visibleEvents.length === 0 && <div className="text-center text-text-muted py-10 italic">A partida está prestes a começar...</div>}
+                        {visibleEvents.length === 0 && (
+                            <div className="text-center text-text-muted py-10 italic">A partida está prestes a começar...</div>
+                        )}
                         {visibleEvents.map((event) => (
-                            <EventRow key={event.id} event={event} isHome={event.clubId === homeClub.id} playerName={playersMap[event.playerId]?.name || "Desconhecido"} />
+                            <EventRow
+                                key={event.id}
+                                event={event}
+                                isHome={event.clubId === homeClub.id}
+                                playerName={playersMap[event.playerId]?.name || "Desconhecido"}
+                            />
                         ))}
                     </div>
                 </div>
 
                 <div className="lg:col-span-3 flex flex-col space-y-4">
                     <div className="bg-background-secondary p-4 rounded-lg border border-background-tertiary h-full flex flex-col justify-center items-center text-center">
-                        {currentMinute >= 94 ? (
+                        {isFinished ? (
                             <div className="space-y-4 animate-in zoom-in duration-300">
                                 <h2 className="text-2xl font-bold text-text-primary">Fim de Jogo</h2>
-                                <Button size="lg" icon={ArrowLeft} onClick={() => setView("MATCH_RESULT")}>Ver Resultados</Button>
+                                <Button size="lg" icon={ArrowLeft} onClick={() => setView("MATCH_RESULT")}>
+                                    Ver Resultados
+                                </Button>
                             </div>
                         ) : (
                             <div className="text-text-muted opacity-50">
