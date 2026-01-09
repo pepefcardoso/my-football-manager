@@ -13,12 +13,14 @@ export const CalendarScreen: React.FC = () => {
     const { clubs } = useGameStore(s => s.clubs);
     const { competitions, groups, fases, competitionSeasons } = useGameStore(s => s.competitions);
     const { setView } = useUIStore();
+
     const userClubId = meta.userClubId;
+
     const [isSimulating, setIsSimulating] = useState(false);
     const [simulatedDays, setSimulatedDays] = useState(0);
     const [simulationLogs, setSimulationLogs] = useState<string[]>([]);
     const [showSummary, setShowSummary] = useState(false);
-    const simulationMutex = useRef(false);
+
     const stopSimulationRef = useRef(false);
 
     const nextMatchTarget = useMemo(() => {
@@ -35,9 +37,8 @@ export const CalendarScreen: React.FC = () => {
     }, [matches, userClubId, meta.currentDate]);
 
     const startSimulation = async () => {
-        if (simulationMutex.current || !nextMatchTarget) return;
+        if (isSimulating || !nextMatchTarget) return;
 
-        simulationMutex.current = true;
         stopSimulationRef.current = false;
 
         setIsSimulating(true);
@@ -48,7 +49,7 @@ export const CalendarScreen: React.FC = () => {
         const targetDate = new Date(nextMatchTarget.datetime).setHours(0, 0, 0, 0);
 
         try {
-            logger.info("CalendarScreen", "Iniciando fluxo de simulação via UI");
+            logger.info("CalendarScreen", "Iniciando simulação (UI Request)");
 
             await simulationSystem.simulateUntilDate(
                 meta.currentDate,
@@ -70,17 +71,15 @@ export const CalendarScreen: React.FC = () => {
             }
 
         } catch (error) {
-            logger.error("CalendarScreen", "Erro crítico durante simulação", error);
-            setSimulationLogs(prev => [...prev, "❌ ERRO CRÍTICO NA SIMULAÇÃO: " + (error as Error).message]);
+            logger.error("CalendarScreen", "Erro capturado na UI durante simulação", error);
+            setSimulationLogs(prev => [...prev, "❌ ERRO: " + (error instanceof Error ? error.message : "Desconhecido")]);
         } finally {
-            simulationMutex.current = false;
             setIsSimulating(false);
-            logger.info("CalendarScreen", "Mutex de simulação liberado");
         }
     };
 
     const cancelSimulation = () => {
-        logger.warn("CalendarScreen", "Usuário solicitou cancelamento da simulação");
+        logger.warn("CalendarScreen", "Usuário solicitou cancelamento");
         stopSimulationRef.current = true;
         simulationSystem.cancel();
     };

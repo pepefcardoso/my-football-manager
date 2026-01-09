@@ -8,7 +8,9 @@ export interface SimulationCallbacks {
 }
 
 class SimulationSystem {
-  private _isSimulating: boolean = false;
+  private _executionPromise: Promise<void> | null = null;
+  private _abortTriggered: boolean = false;
+
   private readonly TICK_RATE_MS = 200;
 
   public async simulateUntilDate(
@@ -16,57 +18,97 @@ class SimulationSystem {
     targetDate: number,
     callbacks: SimulationCallbacks
   ): Promise<void> {
-    this._isSimulating = true;
-    let daysSimulated = 0;
-    let now = currentDate;
+    if (this._executionPromise) {
+      logger.warn(
+        "SimulationSystem",
+        "⚠️ Tentativa de execução paralela detectada. Aderindo ao processo existente."
+      );
+      return this._executionPromise;
+    }
 
-    logger.info("SimulationSystem", `Iniciando simulação`, {
-      from: formatDate(currentDate),
+    this._abortTriggered = false;
+
+    this._executionPromise = this._runSimulationLoop(
+      currentDate,
+      targetDate,
+      callbacks
+    );
+
+    try {
+      await this._executionPromise;
+    } finally {
+      this._executionPromise = null;
+      this._abortTriggered = false;
+      logger.debug("SimulationSystem", "Mutex liberado.");
+    }
+  }
+
+  private async _runSimulationLoop(
+    startDate: number,
+    targetDate: number,
+    callbacks: SimulationCallbacks
+  ): Promise<void> {
+    let daysSimulated = 0;
+    let now = startDate;
+
+    logger.info("SimulationSystem", `🚀 Iniciando simulação (Thread Segura)`, {
+      from: formatDate(startDate),
       to: formatDate(targetDate),
     });
 
     const startTime = performance.now();
 
-    while (now < targetDate && this._isSimulating) {
-      if (callbacks.shouldStop()) {
-        logger.warn("SimulationSystem", "Simulação interrompida pelo usuário");
-        this._isSimulating = false;
+    while (now < targetDate) {
+      if (this._abortTriggered || callbacks.shouldStop()) {
+        logger.warn(
+          "SimulationSystem",
+          "Simulação interrompida (Sinal de Parada)"
+        );
         break;
       }
 
       await new Promise((resolve) => setTimeout(resolve, this.TICK_RATE_MS));
 
-      const result = callbacks.advanceDayFn();
+      if (this._abortTriggered) break;
 
-      now = result.newDate;
-      daysSimulated++;
+      try {
+        const result = callbacks.advanceDayFn();
 
-      const formattedLogs = result.events.map(
-        (e) => `[${formatDate(result.newDate)}] ${e}`
-      );
+        now = result.newDate;
+        daysSimulated++;
 
-      callbacks.onProgress(daysSimulated, formattedLogs);
+        const formattedLogs = result.events.map(
+          (e) => `[${formatDate(result.newDate)}] ${e}`
+        );
+
+        callbacks.onProgress(daysSimulated, formattedLogs);
+      } catch (error) {
+        logger.error(
+          "SimulationSystem",
+          "❌ Erro crítico durante um dia de simulação",
+          error
+        );
+        throw error;
+      }
     }
 
     const totalTime = performance.now() - startTime;
-    logger.info("SimulationSystem", "Simulação finalizada", {
+    logger.info("SimulationSystem", "🏁 Simulação finalizada", {
       daysSimulated,
       totalTimeMs: totalTime.toFixed(0),
       avgTimePerDay: (totalTime / (daysSimulated || 1)).toFixed(2) + "ms",
     });
-
-    this._isSimulating = false;
   }
 
   public cancel(): void {
-    if (this._isSimulating) {
-      logger.info("SimulationSystem", "Sinal de cancelamento recebido");
+    if (this._executionPromise) {
+      logger.info("SimulationSystem", "🛑 Sinal de cancelamento recebido.");
+      this._abortTriggered = true;
     }
-    this._isSimulating = false;
   }
 
   public isSimulating(): boolean {
-    return this._isSimulating;
+    return this._executionPromise !== null;
   }
 }
 

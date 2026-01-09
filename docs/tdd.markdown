@@ -1,6 +1,6 @@
 Technical Design Document (TDD) - Football Manager Project
 Versão: 1.0.0 (Reboot)
-Tipo de Projeto: Desktop Application (Electron + React)
+Tipo de Projeto: Desktop Application com suporte a Web/Dev Environment
 Arquitetura: State-Driven / Data-Oriented
 1. Visão Geral e Filosofia
 Este projeto é um jogo de simulação de gestão de futebol single-player. Diferente de aplicações web tradicionais (E-commerce, SaaS), um jogo exige performance em tempo real e manipulação massiva de dados na memória.
@@ -13,6 +13,7 @@ Simplicidade nos Dados: Usaremos estruturas de dados otimizadas para leitura rá
 2. Stack Tecnológica
 A escolha das tecnologias foca na rapidez de desenvolvimento (DX) e performance de execução.
 Runtime: Electron (Para rodar como app Desktop nativa).
+Browser (LocalStorage)" como runtime secundário para desenvolvimento.
 Linguagem: TypeScript (Configurado no modo strict).
 Frontend Framework: React + Vite (Rápido, leve).
 State Management: Zustand (Store global) + Immer (Para manipular o estado complexo de forma imutável e simples).

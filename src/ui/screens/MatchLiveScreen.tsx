@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
 import { useSafeMatchReplay } from "../hooks/useSafeMatchReplay";
@@ -10,11 +11,9 @@ import {
     Activity, Shield, MessageSquare, AlertCircle, BarChart2, RefreshCw
 } from "lucide-react";
 import { MatchEvent } from "../../core/models/match";
-import {
-    selectLiveMatchStats,
-    selectMatchEventsUntilMinute
-} from "../../state/selectors";
+import { MatchStatsCalculator } from "../../core/systems/MatchEngine/MatchStatsCalculator"; // Import direto do Core
 
+// Componente EventRow mantido (Pure UI)
 interface EventRowProps {
     event: MatchEvent;
     isHome: boolean;
@@ -63,20 +62,31 @@ const EventRow: React.FC<EventRowProps> = ({ event, isHome, playerName }) => {
 };
 
 export const MatchLiveScreen: React.FC = () => {
-    const { matches, playerStats } = useGameStore(s => s.matches);
-    const { clubs } = useGameStore(s => s.clubs);
-    const { players } = useGameStore(s => s.people);
-    const { setView, activeMatchId } = useUIStore();
+    // 1. Seleção de Dados Estáticos (Otimização de Performance)
+    // Usamos useShallow para evitar re-renders se a referência do objeto "matches" mudar mas o conteúdo for igual
+    const matchesMap = useGameStore(useShallow(s => s.matches.matches));
+    const allEventsMap = useGameStore(useShallow(s => s.matches.events)); // Selecionamos o mapa inteiro ou apenas do jogo específico seria melhor
+    const playerStatsMap = useGameStore(useShallow(s => s.matches.playerStats));
+    const clubsMap = useGameStore(useShallow(s => s.clubs.clubs));
+    const playersMap = useGameStore(useShallow(s => s.people.players));
 
+    const { setView, activeMatchId } = useUIStore();
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    // 2. Determinação da Partida Atual
     const currentMatch = useMemo(() => {
-        if (activeMatchId && matches[activeMatchId]) {
-            return matches[activeMatchId];
+        if (activeMatchId && matchesMap[activeMatchId]) {
+            return matchesMap[activeMatchId];
         }
         return null;
-    }, [matches, activeMatchId]);
+    }, [matchesMap, activeMatchId]);
 
+    // 3. Extração Segura de Eventos (Dependência apenas da Store, não do tempo)
+    const matchEvents = useMemo(() => {
+        return currentMatch ? (allEventsMap[currentMatch.id] || []) : [];
+    }, [allEventsMap, currentMatch]);
+
+    // 4. Hook de Controle de Tempo (Local State)
     const {
         currentMinute,
         isPlaying,
@@ -87,30 +97,43 @@ export const MatchLiveScreen: React.FC = () => {
         matchId: currentMatch?.id || "",
         homeClubId: currentMatch?.homeClubId || "",
         awayClubId: currentMatch?.awayClubId || "",
-        events: []
+        events: matchEvents // Passamos a lista completa, o hook gerencia o tempo
     });
 
-    const liveStats = useGameStore(state =>
-        currentMatch ? selectLiveMatchStats(state, currentMatch.id, currentMinute) : null
-    );
+    // 5. Lógica Derivada (Calculada no Render/Memo, fora da Store)
+    // Isso previne o "Maximum update depth exceeded" pois não dispara listeners da store
+    const visibleEvents = useMemo(() => {
+        return matchEvents
+            .filter((e) => e.minute <= currentMinute)
+            .sort((a, b) => b.minute - a.minute); // Ordem inversa para o feed (mais recente no topo)
+    }, [matchEvents, currentMinute]);
 
-    const visibleEvents = useGameStore(state =>
-        currentMatch ? selectMatchEventsUntilMinute(state, currentMatch.id, currentMinute) : []
-    );
+    const liveStats = useMemo(() => {
+        if (!currentMatch) return null;
 
-    const homeClub = currentMatch ? clubs[currentMatch.homeClubId] : null;
-    const awayClub = currentMatch ? clubs[currentMatch.awayClubId] : null;
+        // Invocamos a lógica Pura do Core diretamente aqui
+        return MatchStatsCalculator.calculate(
+            visibleEvents, // Usamos os eventos já filtrados pelo tempo
+            currentMatch.homeClubId,
+            currentMatch.awayClubId
+        );
+    }, [visibleEvents, currentMatch]);
 
-    // TODO: Num futuro refactor, mover para selectMatchLineups(matchId)
+    // 6. Preparação de Dados dos Times
+    const homeClub = currentMatch ? clubsMap[currentMatch.homeClubId] : null;
+    const awayClub = currentMatch ? clubsMap[currentMatch.awayClubId] : null;
+
     const { homeStarters, awayStarters } = useMemo(() => {
         if (!currentMatch) return { homeStarters: [], awayStarters: [] };
-        const allStats = Object.values(playerStats).filter(s => s.matchId === currentMatch.id && s.isStarter);
+        // Nota: playerStatsMap é estável, não muda durante o replay
+        const allStats = Object.values(playerStatsMap).filter(s => s.matchId === currentMatch.id && s.isStarter);
         return {
             homeStarters: allStats.filter(s => s.clubId === currentMatch.homeClubId),
             awayStarters: allStats.filter(s => s.clubId === currentMatch.awayClubId)
         };
-    }, [currentMatch, playerStats]);
+    }, [currentMatch, playerStatsMap]);
 
+    // Scroll automático para o topo quando novos eventos chegam
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
     }, [visibleEvents.length]);
@@ -155,7 +178,7 @@ export const MatchLiveScreen: React.FC = () => {
                     </div>
                     <div className="flex flex-col items-center w-1/3">
                         <div className="bg-black/40 rounded-lg px-6 py-2 border border-background-tertiary mb-2 backdrop-blur-sm">
-                            <span className="text-4xl font-mono font-bold text-white tracking-widest">
+                            <span className="text-5xl font-mono font-bold text-white tracking-widest">
                                 {score.home} - {score.away}
                             </span>
                         </div>
@@ -205,7 +228,7 @@ export const MatchLiveScreen: React.FC = () => {
                         <DynamicPitchView
                             homeStats={homeStarters}
                             awayStats={awayStarters}
-                            players={players}
+                            players={playersMap}
                             homeColor={homeClub.primaryColor}
                             awayColor={awayClub.primaryColor}
                         />
@@ -256,7 +279,7 @@ export const MatchLiveScreen: React.FC = () => {
                     <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-2 flex flex-col-reverse">
                         {visibleEvents.length === 0 && <div className="text-center text-text-muted py-10 italic">A partida está prestes a começar...</div>}
                         {visibleEvents.map((event) => (
-                            <EventRow key={event.id} event={event} isHome={event.clubId === homeClub.id} playerName={players[event.playerId]?.name || "Desconhecido"} />
+                            <EventRow key={event.id} event={event} isHome={event.clubId === homeClub.id} playerName={playersMap[event.playerId]?.name || "Desconhecido"} />
                         ))}
                     </div>
                 </div>
