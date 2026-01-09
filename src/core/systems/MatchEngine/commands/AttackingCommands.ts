@@ -1,15 +1,15 @@
 import { BaseCommand } from "./BaseCommand";
 import { SimulationContext } from "../interfaces";
-import { rng } from "../../../utils/generators";
 import { MATCH_CONFIG } from "../../../constants/matchEngine";
 import { Player } from "../../../models/people";
 
 export class ShootCommand extends BaseCommand {
   execute(ctx: SimulationContext): void {
-    const attacker = rng.pick(ctx.hasPossession.startingXI) as Player;
+    const attacker = ctx.rng.pick(ctx.hasPossession.startingXI) as Player;
     const keeper = (ctx.defendingTeam.startingXI.find(
       (p) => p.primaryPositionId === "GK"
     ) || ctx.defendingTeam.startingXI[0]) as Player;
+
     const finishAttr =
       (attacker.finishing + attacker.technique + attacker.determination) / 3;
     const saveAttr =
@@ -21,7 +21,7 @@ export class ShootCommand extends BaseCommand {
         : (50 - ctx.momentum) / 2;
 
     const goalChance =
-      finishAttr - saveAttr + momentumBonus + rng.range(-20, 20);
+      finishAttr - saveAttr + momentumBonus + ctx.rng.range(-20, 20);
 
     if (goalChance > MATCH_CONFIG.THRESHOLDS.GOAL) {
       this.handleGoal(ctx, attacker);
@@ -49,12 +49,12 @@ export class ShootCommand extends BaseCommand {
         ? MATCH_CONFIG.MOMENTUM.AFTER_GOAL_HOME
         : MATCH_CONFIG.MOMENTUM.AFTER_GOAL_AWAY;
 
-    if (rng.range(0, 100) < MATCH_CONFIG.PROBABILITIES.ASSIST) {
+    if (ctx.rng.range(0, 100) < MATCH_CONFIG.PROBABILITIES.ASSIST) {
       const potentialAssisters = ctx.hasPossession.startingXI.filter(
         (p) => p.id !== attacker.id
       );
       if (potentialAssisters.length > 0) {
-        const assister = rng.pick(potentialAssisters) as Player;
+        const assister = ctx.rng.pick(potentialAssisters) as Player;
         this.updateStat(ctx, assister.id, "assists", 1);
         this.updateRating(ctx, assister.id, MATCH_CONFIG.RATING_WEIGHTS.ASSIST);
       }
@@ -75,7 +75,7 @@ export class ShootCommand extends BaseCommand {
   }
 
   private handleMiss(ctx: SimulationContext, attacker: Player) {
-    if (rng.range(0, 100) < 30) {
+    if (ctx.rng.range(0, 100) < 30) {
       this.createEvent(
         ctx,
         "CHANCE",

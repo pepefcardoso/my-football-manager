@@ -1,5 +1,6 @@
 import { MatchEvent, PlayerMatchStats } from "../../models/match";
 import { TeamMatchContext } from "./types";
+import { IRNG } from "../../utils/generators";
 
 export interface SimulationContext {
   matchId: string;
@@ -13,6 +14,7 @@ export interface SimulationContext {
   playerStats: Record<string, PlayerMatchStats>;
   hasPossession: TeamMatchContext;
   defendingTeam: TeamMatchContext;
+  rng: IRNG;
 }
 
 export interface IMatchCommand {

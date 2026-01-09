@@ -1,17 +1,16 @@
 import { BaseCommand } from "./BaseCommand";
 import { SimulationContext } from "../interfaces";
-import { rng } from "../../../utils/generators";
 import { MATCH_CONFIG } from "../../../constants/matchEngine";
 
 export class FoulCommand extends BaseCommand {
   execute(ctx: SimulationContext): void {
-    const offender = rng.pick(ctx.defendingTeam.startingXI);
-    const victim = rng.pick(ctx.hasPossession.startingXI);
+    const offender = ctx.rng.pick(ctx.defendingTeam.startingXI);
+    const victim = ctx.rng.pick(ctx.hasPossession.startingXI);
 
     this.updateStat(ctx, offender.id, "foulsCommitted", 1);
     this.updateStat(ctx, victim.id, "foulsSuffered", 1);
 
-    const roll = rng.range(0, 100);
+    const roll = ctx.rng.range(0, 100);
 
     if (roll < MATCH_CONFIG.PROBABILITIES.RED_CARD) {
       this.createEvent(
@@ -23,7 +22,6 @@ export class FoulCommand extends BaseCommand {
       );
       this.updateStat(ctx, offender.id, "redCard", true);
       this.updateRating(ctx, offender.id, MATCH_CONFIG.RATING_WEIGHTS.RED_CARD);
-      // TODO: Remover jogador do array startingXI no contexto para simular desvantagem numérica
     } else if (roll < MATCH_CONFIG.PROBABILITIES.YELLOW_CARD) {
       this.createEvent(
         ctx,
@@ -39,7 +37,7 @@ export class FoulCommand extends BaseCommand {
         MATCH_CONFIG.RATING_WEIGHTS.YELLOW_CARD
       );
     } else {
-      if (rng.range(0, 100) < 20) {
+      if (ctx.rng.range(0, 100) < 20) {
         this.createEvent(
           ctx,
           "FOUL",

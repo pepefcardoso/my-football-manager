@@ -1,10 +1,9 @@
 import { BaseCommand } from "./BaseCommand";
 import { SimulationContext } from "../interfaces";
-import { rng } from "../../../utils/generators";
 
 export class InjuryCommand extends BaseCommand {
   execute(ctx: SimulationContext): void {
-    const victim = rng.pick(ctx.hasPossession.startingXI);
+    const victim = ctx.rng.pick(ctx.hasPossession.startingXI);
     this.createEvent(
       ctx,
       "INJURY",
@@ -12,7 +11,6 @@ export class InjuryCommand extends BaseCommand {
       victim.id,
       `${victim.name} cai no relvado sentindo dores.`
     );
-    // TODO lógica de substituição forçada seria tratada pelo Manager (outro sistema)
   }
 }
 

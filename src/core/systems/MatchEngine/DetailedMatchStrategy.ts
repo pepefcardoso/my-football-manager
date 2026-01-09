@@ -6,12 +6,18 @@ import {
 } from "./types";
 import { Match, PlayerMatchStats } from "../../models/match";
 import { Player } from "../../models/people";
-import { rng } from "../../utils/generators";
+import { rng as globalRng, IRNG } from "../../utils/generators";
 import { MATCH_CONFIG } from "../../constants/matchEngine";
 import { SimulationContext } from "./interfaces";
 import { CommandFactory } from "./CommandFactory";
 
 export class DetailedMatchStrategy implements IMatchSimulationStrategy {
+  private rng: IRNG;
+
+  constructor(rng: IRNG = globalRng) {
+    this.rng = rng;
+  }
+
   simulate(
     match: Match,
     home: TeamMatchContext,
@@ -19,13 +25,13 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
   ): MatchEngineResult {
     const ctx: SimulationContext = this.createContext(match, home, away);
 
-    const stoppageH1 = rng.range(
+    const stoppageH1 = this.rng.range(
       MATCH_CONFIG.STOPPAGE_TIME.MIN_H1,
       MATCH_CONFIG.STOPPAGE_TIME.MAX_H1
     );
     this.runPeriod(ctx, 1, 45, stoppageH1, "1H");
 
-    const stoppageH2 = rng.range(
+    const stoppageH2 = this.rng.range(
       MATCH_CONFIG.STOPPAGE_TIME.MIN_H2,
       MATCH_CONFIG.STOPPAGE_TIME.MAX_H2
     );
@@ -82,6 +88,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
       playerStats: statsMap,
       hasPossession: home,
       defendingTeam: away,
+      rng: this.rng,
     };
   }
 
@@ -115,7 +122,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
 
     const homeChance = 50 + (homePassing - awayPassing) + momentumFactor;
 
-    if (rng.range(0, 100) < homeChance) {
+    if (ctx.rng.range(0, 100) < homeChance) {
       ctx.hasPossession = ctx.home;
       ctx.defendingTeam = ctx.away;
     } else {
@@ -131,7 +138,10 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
     let mvpId = "";
 
     allStats.forEach((stat) => {
-      stat.rating = Math.max(3, Math.min(10, stat.rating + rng.normal(0, 0.3)));
+      stat.rating = Math.max(
+        3,
+        Math.min(10, stat.rating + ctx.rng.normal(0, 0.3))
+      );
       if (stat.rating > bestRating) {
         bestRating = stat.rating;
         mvpId = stat.id;
@@ -158,7 +168,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
       stats: {
         homePossession: Math.round(ctx.momentum),
         awayPossession: 100 - Math.round(ctx.momentum),
-        homeShots: 0,
+        homeShots: 0, // TODO: Calcular real no MatchStatsCalculator
         awayShots: 0,
         homeShotsOnTarget: 0,
         awayShotsOnTarget: 0,
