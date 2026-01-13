@@ -47,18 +47,21 @@ const getOrRepairStanding = (
     const standing = state.competitions.standings[cachedStandingId];
     if (standing) return standing;
 
+    logger.warn(
+      "CompetitionSystem",
+      `⚠️ Índice corrompido para ${key}. Removendo entrada órfã.`
+    );
     delete state.competitions.standingsLookup[key];
   }
 
   logger.warn(
     "CompetitionSystem",
-    `⚠️ Cache Miss para ${key}. Reparando índice incrementalmente...`
+    `⚠️ Cache Miss para ${key}. Reparando índice (operação lenta)...`
   );
 
   const standingEntry = Object.values(state.competitions.standings).find(
     (s) => {
       if (s.competitionGroupId !== groupId) return false;
-
       const ccs =
         state.competitions.clubCompetitionSeasons[s.clubCompetitionSeasonId];
       return ccs && ccs.clubId === clubId;
@@ -72,7 +75,7 @@ const getOrRepairStanding = (
 
   logger.error(
     "CompetitionSystem",
-    `❌ Erro Crítico: Tabela não encontrada para Club ${clubId} no Grupo ${groupId}`
+    `❌ Tabela não encontrada para Club ${clubId} no Grupo ${groupId}`
   );
   return undefined;
 };
@@ -84,8 +87,7 @@ export const updateCompetitionStandings = (
   let updatesCount = 0;
 
   for (const match of matches) {
-    if (match.status !== "FINISHED") continue;
-    if (!match.competitionGroupId) continue;
+    if (match.status !== "FINISHED" || !match.competitionGroupId) continue;
 
     const { competitionGroupId, homeClubId, awayClubId, homeGoals, awayGoals } =
       match;
@@ -115,7 +117,7 @@ export const updateCompetitionStandings = (
   if (updatesCount > 0) {
     logger.debug(
       "CompetitionSystem",
-      `Tabelas atualizadas incrementalmente (${updatesCount} operações).`
+      `Tabelas atualizadas: ${updatesCount} registros processados.`
     );
   }
 };

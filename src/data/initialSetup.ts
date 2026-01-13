@@ -4,6 +4,7 @@ import { Nation } from "../core/models/geo";
 import { Contract } from "../core/models/contract";
 import { ClubFactory, PlayerFactory } from "../core/utils/generators";
 import { ClubCompetitionSeason } from "../core/models/competition";
+import { getStandingIndexKey } from "../core/systems/CompetitionSystem";
 import { logger } from "../core/utils/Logger";
 
 const BRAZIL_CLUBS_DATA = [
@@ -137,6 +138,7 @@ const createEmptyState = (): GameState => ({
     currentUserManagerId: "",
     userClubId: null,
     activeSeasonId: "",
+    persistenceMode : "DISK",
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
@@ -394,7 +396,7 @@ export const createNewGame = (): GameState => {
         goalsBalance: 0,
       };
 
-      const lookupKey = `${groupId}_${clubId}`;
+      const lookupKey = getStandingIndexKey(groupId, clubId);
       state.competitions.standingsLookup[lookupKey] = standingId;
     });
 
