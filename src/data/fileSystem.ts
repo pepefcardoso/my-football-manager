@@ -49,14 +49,7 @@ function formatBytes(bytes: number): string {
 }
 
 function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return new Date(timestamp).toLocaleString("pt-BR");
 }
 
 function serializeGameState(state: GameState): string {
@@ -69,25 +62,6 @@ function serializeGameState(state: GameState): string {
     })
   );
   return JSON.stringify(cleanState);
-}
-
-function parseAndValidateGameState(data: unknown): GameState | null {
-  const result = GameStateSchema.safeParse(data);
-
-  if (!result.success) {
-    logger.error(
-      "FileSystem",
-      "❌ Falha crítica de validação (Schema Mismatch)",
-      {
-        errors: result.error.issues
-          .map((i) => `${i.path.join(".")}: ${i.message}`)
-          .slice(0, 5),
-      }
-    );
-    return null;
-  }
-
-  return result.data as unknown as GameState;
 }
 
 export async function saveGameToDisk(
@@ -108,7 +82,7 @@ export async function saveGameToDisk(
       if (mode === "MEMORY") {
         logger.warn(
           "FileSystem",
-          "⚠️ Save Volátil: Dados persistem apenas na RAM/Sessão."
+          "⚠️ Save Volátil: Dados persistem apenas na RAM/Sessão. Recarregar a página perderá o progresso."
         );
 
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -171,35 +145,50 @@ export async function loadGameFromDisk(
 
       const rawData = result.data;
       const metadata = result.metadata;
-      const parsedRaw = JSON.parse(rawData);
-      const stateToValidate = parsedRaw.gameState || parsedRaw;
-      const validatedState = parseAndValidateGameState(stateToValidate);
 
-      if (validatedState) {
-        validatedState.meta.persistenceMode = "DISK";
-        if (metadata) {
-          logger.info(
-            "FileSystem",
-            `✅ Save carregado: v${metadata.version} (${formatBytes(
-              metadata.size
-            )})`
-          );
-        }
+      let parsedRaw;
+      try {
+        parsedRaw = JSON.parse(rawData);
+      } catch (e) {
+        logger.error("FileSystem", "JSON Corrompido", e);
+        return null;
+      }
+
+      const stateToValidate = parsedRaw.gameState || parsedRaw;
+
+      const validation = GameStateSchema.safeParse(stateToValidate);
+
+      if (!validation.success) {
+        logger.error(
+          "FileSystem",
+          "❌ Falha de Validação do Save (Schema Mismatch)",
+          validation.error
+        );
+        return null;
+      }
+
+      const validatedState = validation.data as unknown as GameState;
+      validatedState.meta.persistenceMode = "DISK";
+
+      if (metadata) {
+        logger.info(
+          "FileSystem",
+          `✅ Save carregado: v${metadata.version} (${formatBytes(
+            metadata.size
+          )})`
+        );
       }
 
       return validatedState;
     } catch (error) {
-      logger.error("FileSystem", "Erro Fatal ao carregar/parsear save", error);
+      logger.error("FileSystem", "Erro Fatal ao carregar save", error);
       return null;
     }
   });
 }
 
 export async function listSaveFiles(): Promise<string[]> {
-  if (!isElectron()) {
-    return [];
-  }
-
+  if (!isElectron()) return [];
   try {
     return await getElectronAPI().listSaves();
   } catch (error) {
@@ -209,10 +198,7 @@ export async function listSaveFiles(): Promise<string[]> {
 }
 
 export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
-  if (!isElectron()) {
-    return { success: true };
-  }
-
+  if (!isElectron()) return { success: true };
   try {
     return await getElectronAPI().deleteSave(saveName);
   } catch (error) {
@@ -223,11 +209,9 @@ export async function deleteSaveFile(saveName: string): Promise<SaveResult> {
 
 export async function getSaveInfo(saveName: string): Promise<SaveInfo | null> {
   if (!isElectron()) return null;
-
   try {
     const metadata = await getElectronAPI().getSaveInfo(saveName);
     if (!metadata) return null;
-
     return {
       filename: saveName,
       metadata,
@@ -237,21 +221,5 @@ export async function getSaveInfo(saveName: string): Promise<SaveInfo | null> {
   } catch (error) {
     logger.error("FileSystem", "Erro IPC Info", error);
     return null;
-  }
-}
-
-export async function openSavesFolder(): Promise<void> {
-  if (!isElectron()) {
-    logger.warn(
-      "FileSystem",
-      "Acesso ao sistema de arquivos restrito ao Electron."
-    );
-    return;
-  }
-
-  try {
-    await getElectronAPI().openSavesFolder();
-  } catch (error) {
-    logger.error("FileSystem", "Erro ao abrir pasta de saves", error);
   }
 }

@@ -3,7 +3,7 @@ import { z } from "zod";
 const IDSchema = z.string().default("");
 const TimestampSchema = z.coerce.number().default(0);
 const MoneySchema = z.coerce.number().default(0);
-const AttributeSchema = z.coerce.number().min(1).max(100).catch(10);
+const AttributeSchema = z.coerce.number().min(1).max(100).catch(50);
 const FootSchema = z.union([
   z.literal("LEFT"),
   z.literal("RIGHT"),
@@ -14,11 +14,12 @@ const PositionSchema = z.string().default("UNKNOWN");
 const MatchStatusSchema = z
   .enum(["SCHEDULED", "IN_PROGRESS", "FINISHED", "POSTPONED"])
   .catch("SCHEDULED");
+
 const UserIdSchema = IDSchema;
 const ClubIdSchema = IDSchema;
 const PlayerIdSchema = IDSchema;
-const MatchIdSchema = IDSchema;
 const NationIdSchema = IDSchema;
+const MatchIdSchema = IDSchema;
 
 const SeasonSchema = z.object({
   id: IDSchema,
@@ -172,19 +173,55 @@ const ScoutingKnowledgeSchema = z.object({
   lastUpdated: TimestampSchema,
 });
 
-export const MetaSchema = z
-  .object({
-    version: z.string().default("2.0.0"),
-    saveName: z.string().default("New Save"),
-    currentDate: TimestampSchema,
-    currentUserManagerId: UserIdSchema,
-    userClubId: ClubIdSchema.nullable().default(null),
-    activeSeasonId: IDSchema,
-    persistenceMode: z.enum(["DISK", "MEMORY"]).default("DISK"),
-    createdAt: TimestampSchema,
-    updatedAt: TimestampSchema,
-  })
-  .passthrough();
+const ManagerCareerRecordSchema = z.object({
+  id: IDSchema,
+  managerId: IDSchema,
+  clubId: IDSchema,
+  clubName: z.string(),
+  startDate: TimestampSchema,
+  endDate: TimestampSchema.nullable(),
+  gamesManaged: z.number().int().default(0),
+  wins: z.number().int().default(0),
+  draws: z.number().int().default(0),
+  losses: z.number().int().default(0),
+  trophiesWon: z.array(z.string()).default([]),
+});
+
+const TitleRecordSchema = z.object({
+  id: IDSchema,
+  seasonId: IDSchema,
+  competitionId: IDSchema,
+  winnerClubId: IDSchema,
+  runnerUpClubId: IDSchema,
+  managerId: IDSchema,
+});
+
+const ManagerSchema = z.object({
+  id: IDSchema,
+  name: z.string().default("Unknown Manager"),
+  nationId: NationIdSchema,
+  birthDate: TimestampSchema,
+  isHuman: z.boolean().default(false),
+  reputation: z.number().min(0).max(10000).default(0),
+  careerHistory: z.array(ManagerCareerRecordSchema).default([]),
+  titles: z.array(TitleRecordSchema).default([]),
+  preferredStyle: z
+    .enum(["ATTACKING", "DEFENSIVE", "BALANCED"])
+    .catch("BALANCED"),
+  preferredFormation: z.string().default("4-3-3"),
+  createdAt: TimestampSchema,
+  updatedAt: TimestampSchema,
+});
+
+const StaffSchema = z.object({
+  id: IDSchema,
+  name: z.string().default("Unknown Staff"),
+  nationId: NationIdSchema,
+  birthDate: TimestampSchema,
+  function: z.string().default("COACH"),
+  overall: AttributeSchema,
+  potential: AttributeSchema,
+});
 
 export const PlayerSchema = z
   .object({
@@ -216,6 +253,28 @@ export const PlayerSchema = z
     updatedAt: TimestampSchema,
   })
   .passthrough();
+
+const PlayerStateSchema = z.object({
+  playerId: PlayerIdSchema,
+  morale: AttributeSchema,
+  fitness: AttributeSchema,
+  matchReadiness: AttributeSchema,
+});
+
+const PlayerInjurySchema = z.object({
+  id: IDSchema,
+  playerId: PlayerIdSchema,
+  name: z.string(),
+  severity: z.string(),
+  startDate: TimestampSchema,
+  estimatedReturnDate: TimestampSchema,
+});
+
+const PlayerSecondaryPositionSchema = z.object({
+  playerId: PlayerIdSchema,
+  positionId: IDSchema,
+  proficiency: AttributeSchema,
+});
 
 export const ClubSchema = z
   .object({
@@ -269,23 +328,39 @@ const TempLineupSchema = z
   .nullable()
   .optional();
 
+export const MetaSchema = z
+  .object({
+    version: z.string().default("2.0.0"),
+    saveName: z.string().default("New Save"),
+    currentDate: TimestampSchema,
+    currentUserManagerId: UserIdSchema,
+    userClubId: ClubIdSchema.nullable().default(null),
+    activeSeasonId: IDSchema,
+    persistenceMode: z.enum(["DISK", "MEMORY"]).default("DISK"),
+    createdAt: TimestampSchema,
+    updatedAt: TimestampSchema,
+  })
+  .passthrough();
+
 export const GameStateSchema = z
   .object({
     meta: MetaSchema,
 
     people: z.object({
-      managers: z.record(IDSchema, z.any()), // TODO: Implementar ManagerSchema
+      managers: z.record(IDSchema, ManagerSchema).catch({}),
       players: z.record(PlayerIdSchema, PlayerSchema).catch({}),
-      staff: z.record(IDSchema, z.any()), // TODO: Implementar StaffSchema
-      playerStates: z.record(IDSchema, z.any()), // TODO: Implementar PlayerStateSchema
-      playerInjuries: z.record(IDSchema, z.any()),
-      playerSecondaryPositions: z.record(z.string(), z.any()),
+      staff: z.record(IDSchema, StaffSchema).catch({}),
+      playerStates: z.record(IDSchema, PlayerStateSchema).catch({}),
+      playerInjuries: z.record(IDSchema, PlayerInjurySchema).catch({}),
+      playerSecondaryPositions: z
+        .record(z.string(), z.array(PlayerSecondaryPositionSchema))
+        .catch({}),
     }),
 
     clubs: z.object({
       clubs: z.record(ClubIdSchema, ClubSchema).catch({}),
-      infras: z.record(IDSchema, z.any()), // TODO: ClubInfraSchema
-      finances: z.record(IDSchema, z.any()), // TODO: ClubFinancesSchema
+      infras: z.record(IDSchema, z.any()), // TODO: Implementar ClubInfraSchema na próxima fase
+      finances: z.record(IDSchema, z.any()), // TODO: Implementar ClubFinancesSchema
       relationships: z.record(IDSchema, z.any()),
       rivalries: z.record(z.string(), z.any()),
       stadiums: z.record(IDSchema, z.any()),
@@ -328,8 +403,8 @@ export const GameStateSchema = z
       clubSquadIndex: z.record(ClubIdSchema, z.array(PlayerIdSchema)),
     }),
 
-    world: z.any(), // TODO: Tipar World Domain
-    system: z.any(), // TODO: Tipar System Domain
+    world: z.any(),
+    system: z.any(),
   })
   .passthrough();
 
@@ -337,7 +412,8 @@ export type Meta = z.infer<typeof MetaSchema>;
 export type Player = z.infer<typeof PlayerSchema>;
 export type Club = z.infer<typeof ClubSchema>;
 export type Match = z.infer<typeof MatchSchema>;
+export type Manager = z.infer<typeof ManagerSchema>;
+export type Staff = z.infer<typeof StaffSchema>;
 export type GameState = z.infer<typeof GameStateSchema>;
-
 export type PlayerId = z.infer<typeof PlayerIdSchema>;
 export type ClubId = z.infer<typeof ClubIdSchema>;
