@@ -1,12 +1,6 @@
 import { GameState } from "../models/gameState";
 import { eventBus } from "../events/EventBus";
-
-const RECOVERY_CONFIG = {
-  BASE_RATE: 10,
-  AGE_PENALTY_THRESHOLD: 32,
-  AGE_BONUS_THRESHOLD: 25,
-  RELAPSE_RISK_READINESS: 70,
-};
+import { RECOVERY_CONSTANTS } from "../constants/recovery";
 
 export interface RecoveryResult {
   recoveredPlayers: string[];
@@ -26,8 +20,12 @@ const getStaffBonus = (state: GameState, clubId: string): number => {
     if (staff && staff.overall > bestOverall) bestOverall = staff.overall;
   });
 
-  if (bestOverall >= 80) return 0.15;
-  if (bestOverall >= 50) return 0.05;
+  if (bestOverall >= RECOVERY_CONSTANTS.STAFF.HIGH_TIER_THRESHOLD) {
+    return RECOVERY_CONSTANTS.STAFF.HIGH_TIER_BONUS;
+  }
+  if (bestOverall >= RECOVERY_CONSTANTS.STAFF.MID_TIER_THRESHOLD) {
+    return RECOVERY_CONSTANTS.STAFF.MID_TIER_BONUS;
+  }
   return 0;
 };
 
@@ -35,16 +33,26 @@ const getInfraBonus = (state: GameState, clubId: string): number => {
   const infra = state.clubs.infras[clubId];
   if (!infra) return 0;
 
-  if (infra.medicalCenterLevel >= 80) return 0.2;
+  if (
+    infra.medicalCenterLevel >= RECOVERY_CONSTANTS.INFRA.HIGH_TIER_THRESHOLD
+  ) {
+    return RECOVERY_CONSTANTS.INFRA.HIGH_TIER_BONUS;
+  }
 
-  if (infra.medicalCenterLevel >= 40) return 0.1;
+  if (infra.medicalCenterLevel >= RECOVERY_CONSTANTS.INFRA.MID_TIER_THRESHOLD) {
+    return RECOVERY_CONSTANTS.INFRA.MID_TIER_BONUS;
+  }
 
   return 0;
 };
 
 const getAgeModifier = (age: number): number => {
-  if (age < RECOVERY_CONFIG.AGE_BONUS_THRESHOLD) return 0.05;
-  if (age > RECOVERY_CONFIG.AGE_PENALTY_THRESHOLD) return -0.1;
+  if (age < RECOVERY_CONSTANTS.AGE_YOUNG_THRESHOLD) {
+    return RECOVERY_CONSTANTS.AGE_BONUS_MODIFIER;
+  }
+  if (age > RECOVERY_CONSTANTS.AGE_OLD_THRESHOLD) {
+    return RECOVERY_CONSTANTS.AGE_PENALTY_MODIFIER;
+  }
   return 0;
 };
 
@@ -55,32 +63,39 @@ export const processDailyRecovery = (state: GameState): RecoveryResult => {
   for (const id in state.people.playerStates) {
     const pState = state.people.playerStates[id];
 
-    if (pState.fitness >= 100) continue;
+    if (pState.fitness >= RECOVERY_CONSTANTS.MAX_FITNESS) continue;
 
     const contract = Object.values(state.market.contracts).find(
       (c) => c.playerId === id && c.active
     );
+
     if (!contract) {
       pState.fitness = Math.min(
-        100,
-        pState.fitness + RECOVERY_CONFIG.BASE_RATE
+        RECOVERY_CONSTANTS.MAX_FITNESS,
+        pState.fitness + RECOVERY_CONSTANTS.BASE_RATE
       );
       continue;
     }
 
     const player = state.people.players[id];
     const age = player
-      ? Math.floor((state.meta.currentDate - player.birthDate) / 31536000000)
-      : 25;
+      ? Math.floor(
+          (state.meta.currentDate - player.birthDate) /
+            RECOVERY_CONSTANTS.MS_PER_YEAR
+        )
+      : RECOVERY_CONSTANTS.DEFAULT_AGE_IF_UNKNOWN;
 
     const staffBonus = getStaffBonus(state, contract.clubId);
     const infraBonus = getInfraBonus(state, contract.clubId);
     const ageMod = getAgeModifier(age);
 
     const totalRate =
-      RECOVERY_CONFIG.BASE_RATE * (1 + staffBonus + infraBonus + ageMod);
+      RECOVERY_CONSTANTS.BASE_RATE * (1 + staffBonus + infraBonus + ageMod);
 
-    pState.fitness = Math.min(100, pState.fitness + totalRate);
+    pState.fitness = Math.min(
+      RECOVERY_CONSTANTS.MAX_FITNESS,
+      pState.fitness + totalRate
+    );
   }
 
   for (const injuryId in state.people.playerInjuries) {
@@ -110,10 +125,11 @@ export const processDailyRecovery = (state: GameState): RecoveryResult => {
       delete state.people.playerInjuries[injuryId];
 
       if (state.people.playerStates[injury.playerId]) {
-        state.people.playerStates[injury.playerId].fitness = 90;
+        state.people.playerStates[injury.playerId].fitness =
+          RECOVERY_CONSTANTS.FITNESS_AFTER_INJURY;
 
         state.people.playerStates[injury.playerId].matchReadiness =
-          RECOVERY_CONFIG.RELAPSE_RISK_READINESS;
+          RECOVERY_CONSTANTS.RELAPSE_RISK_READINESS;
       }
     }
   }
