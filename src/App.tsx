@@ -11,17 +11,14 @@ import { MatchResultScreen } from "./ui/screens/MatchResultScreen";
 import { CalendarScreen } from "./ui/screens/CalendarScreen";
 import { ManagerProfileScreen } from "./ui/screens/ManagerProfileScreen";
 import { GameErrorBoundary } from "./ui/components/GameErrorBoundary";
-import { useEffect } from "react";
-import { setupNotificationBridge } from "./state/listeners/NotificationBinding";
+import { useNotificationBridge } from "./ui/hooks/useNotificationBridge";
 
 const TacticsScreen = () => <div className="p-4">Táticas (Em breve)</div>;
 
 function App() {
   const currentView = useUIStore((state) => state.currentView);
 
-  useEffect(() => {
-    setupNotificationBridge();
-  }, []);
+  useNotificationBridge();
 
   if (currentView === "MAIN_MENU") {
     return <MainMenuScreen />;
@@ -45,6 +42,7 @@ function App() {
       default: return <div className="text-text-muted p-8">Funcionalidade {currentView} em desenvolvimento.</div>;
     }
   };
+
   return (
     <MainLayout>
       <GameErrorBoundary>
