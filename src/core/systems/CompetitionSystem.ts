@@ -49,15 +49,12 @@ const getOrRepairStanding = (
 
     logger.warn(
       "CompetitionSystem",
-      `⚠️ Índice corrompido para ${key}. Removendo entrada órfã.`
+      `⚠️ Índice órfão detectado para ${key}. Removendo entrada inválida.`
     );
     delete state.competitions.standingsLookup[key];
   }
 
-  logger.warn(
-    "CompetitionSystem",
-    `⚠️ Cache Miss para ${key}. Reparando índice (operação lenta)...`
-  );
+  const startTime = performance.now();
 
   const standingEntry = Object.values(state.competitions.standings).find(
     (s) => {
@@ -68,14 +65,23 @@ const getOrRepairStanding = (
     }
   );
 
+  const duration = performance.now() - startTime;
+
   if (standingEntry) {
     state.competitions.standingsLookup[key] = standingEntry.id;
+
+    logger.warn(
+      "CompetitionSystem",
+      `🔧 Cache Miss recuperado (Reparo: ${duration.toFixed(
+        2
+      )}ms). Chave: ${key}`
+    );
     return standingEntry;
   }
 
   logger.error(
     "CompetitionSystem",
-    `❌ Tabela não encontrada para Club ${clubId} no Grupo ${groupId}`
+    `❌ Tabela CRÍTICA não encontrada: Club ${clubId} @ Group ${groupId}`
   );
   return undefined;
 };
@@ -84,7 +90,11 @@ export const updateCompetitionStandings = (
   state: GameState,
   matches: Match[]
 ): void => {
+  if (matches.length === 0) return;
+
+  const startTotal = performance.now();
   let updatesCount = 0;
+  let cacheMisses = 0;
 
   for (const match of matches) {
     if (match.status !== "FINISHED" || !match.competitionGroupId) continue;
@@ -97,11 +107,24 @@ export const updateCompetitionStandings = (
       competitionGroupId,
       homeClubId
     );
+    if (
+      !state.competitions.standingsLookup[
+        getStandingIndexKey(competitionGroupId, homeClubId)
+      ]
+    )
+      cacheMisses++;
+
     const awayStanding = getOrRepairStanding(
       state,
       competitionGroupId,
       awayClubId
     );
+    if (
+      !state.competitions.standingsLookup[
+        getStandingIndexKey(competitionGroupId, awayClubId)
+      ]
+    )
+      cacheMisses++;
 
     if (homeStanding) {
       applyMatchResultToStanding(homeStanding, homeGoals, awayGoals);
@@ -114,30 +137,40 @@ export const updateCompetitionStandings = (
     }
   }
 
-  if (updatesCount > 0) {
-    logger.debug(
-      "CompetitionSystem",
-      `Tabelas atualizadas: ${updatesCount} registros processados.`
-    );
+  const totalDuration = performance.now() - startTotal;
+
+  if (totalDuration > 5 || cacheMisses > 0) {
+    logger.info("CompetitionSystem", `📊 Atualização de Tabelas`, {
+      matches: matches.length,
+      updates: updatesCount,
+      duration: `${totalDuration.toFixed(2)}ms`,
+      performance: totalDuration > 16 ? "⚠️ LENTO" : "✅ OK",
+      cacheMisses: cacheMisses > 0 ? `⚠️ ${cacheMisses} REPAROS` : "0",
+    });
   }
 };
 
 export const rebuildStandingsIndex = (state: GameState): void => {
-  logger.time("CompetitionSystem", "Reconstrução Total de Índices", () => {
-    state.competitions.standingsLookup = {};
+  const start = performance.now();
 
-    Object.values(state.competitions.standings).forEach((standing) => {
-      const ccs =
-        state.competitions.clubCompetitionSeasons[
-          standing.clubCompetitionSeasonId
-        ];
-      if (ccs) {
-        const key = getStandingIndexKey(
-          standing.competitionGroupId,
-          ccs.clubId
-        );
-        state.competitions.standingsLookup[key] = standing.id;
-      }
-    });
+  state.competitions.standingsLookup = {};
+  let count = 0;
+
+  Object.values(state.competitions.standings).forEach((standing) => {
+    const ccs =
+      state.competitions.clubCompetitionSeasons[
+        standing.clubCompetitionSeasonId
+      ];
+    if (ccs) {
+      const key = getStandingIndexKey(standing.competitionGroupId, ccs.clubId);
+      state.competitions.standingsLookup[key] = standing.id;
+      count++;
+    }
   });
+
+  const duration = performance.now() - start;
+  logger.info(
+    "CompetitionSystem",
+    `♻️ Índices reconstruídos: ${count} entradas em ${duration.toFixed(2)}ms`
+  );
 };
