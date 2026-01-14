@@ -25,6 +25,7 @@ import {
   buildTeamContext,
   simulateSingleMatch,
 } from "../core/systems/MatchSystem";
+import { TacticsSystem } from "../core/systems/TacticsSystem";
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
@@ -43,6 +44,11 @@ interface GameActions {
   setTempLineup: (lineup: Omit<TempLineup, "lastUpdated">) => void;
   clearTempLineup: () => void;
   playMatch: (matchId: string) => void;
+  autoPickLineup: () => void;
+  movePlayerInLineup: (
+    playerId: string,
+    targetSection: "starters" | "bench" | "reserves"
+  ) => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -133,9 +139,10 @@ export const useGameStore = create<GameStore>()(
     saveGame: async (saveName: string) => {
       const state = get();
       const stateCopy = { ...state };
+
       const dataToSave = Object.fromEntries(
         Object.entries(stateCopy).filter(
-          ([_key, value]) => typeof value !== "function"
+          ([, value]) => typeof value !== "function"
         )
       ) as unknown as GameState;
 
@@ -332,8 +339,61 @@ export const useGameStore = create<GameStore>()(
           isHome ? opponentContext : userContext
         );
 
-        // Limpeza pós-jogo
         state.matches.tempLineup = null;
+      });
+    },
+
+    autoPickLineup: () => {
+      const state = get();
+      const { userClubId } = state.meta;
+
+      if (!userClubId) return;
+
+      const recommendation = TacticsSystem.suggestOptimalLineup(
+        userClubId,
+        state.people.players,
+        state.market.contracts
+      );
+
+      set((state) => {
+        state.matches.tempLineup = {
+          ...recommendation,
+          lastUpdated: Date.now(),
+        };
+      });
+    },
+
+    movePlayerInLineup: (playerId, targetSection) => {
+      set((state) => {
+        const lineup = state.matches.tempLineup;
+        if (!lineup) return;
+
+        const removeFromList = (list: string[]) => {
+          const idx = list.indexOf(playerId);
+          if (idx > -1) list.splice(idx, 1);
+          return idx > -1;
+        };
+
+        removeFromList(lineup.starters);
+        const wasBench = removeFromList(lineup.bench);
+        removeFromList(lineup.reserves);
+
+        if (targetSection === "starters") {
+          if (lineup.starters.length >= 11) {
+            const removedPlayerId = lineup.starters.pop();
+            if (removedPlayerId) {
+              if (wasBench) lineup.bench.push(removedPlayerId);
+              else lineup.reserves.push(removedPlayerId);
+            }
+          }
+          lineup.starters.push(playerId);
+        } else if (targetSection === "bench") {
+          lineup.bench.push(playerId);
+        } else {
+          lineup.reserves.push(playerId);
+        }
+
+        lineup.lastUpdated = Date.now();
       });
     },
   }))

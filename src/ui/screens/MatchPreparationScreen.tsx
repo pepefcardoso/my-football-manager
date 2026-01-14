@@ -1,12 +1,12 @@
 import React, { useMemo, useEffect } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
-import { TacticsSystem } from "../../core/systems/TacticsSystem";
 import { calculateOverall, formatPosition, getAttributeColorClass } from "../../core/utils/playerUtils";
 import { Button } from "../components/Button";
 import { Skeleton } from "../components/Skeleton";
 import { EmptyState } from "../components/EmptyState";
 import { ArrowLeft, Play, Shirt, RefreshCw, CalendarX } from "lucide-react";
+import { selectClubById } from "../../state/selectors";
 
 const PlayerListSkeleton = () => (
     <div className="space-y-2 animate-pulse">
@@ -24,90 +24,78 @@ const PlayerListSkeleton = () => (
     </div>
 );
 
-export const MatchPreparationScreen: React.FC = () => {
-    const { meta, setTempLineup, playMatch } = useGameStore();
-    const matchesDomain = useGameStore(s => s.matches);
-    const { contracts } = useGameStore(s => s.market);
-    const { players, playerStates } = useGameStore(s => s.people);
-    const { clubs } = useGameStore(s => s.clubs);
-    const { setView, activeMatchId } = useUIStore();
+const PlayerRow = React.memo(({ id, actionLabel, onAction }: { id: string, actionLabel: string, onAction: () => void }) => {
+    const player = useGameStore(s => s.people.players[id]);
+    const state = useGameStore(s => s.people.playerStates[id]);
 
-    const tempLineup = matchesDomain.tempLineup;
+    if (!player) return null;
+    const ovr = calculateOverall(player);
+
+    return (
+        <div className="flex items-center justify-between p-2 bg-background border border-background-tertiary rounded mb-1 hover:border-primary/50 transition-colors duration-200 group">
+            <div className="flex items-center space-x-3">
+                <span className="w-8 text-xs font-bold text-text-secondary bg-background-tertiary px-1 rounded text-center">
+                    {formatPosition(player.primaryPositionId)}
+                </span>
+                <div>
+                    <div className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">{player.name}</div>
+                    <div className="text-xs text-text-muted flex space-x-2">
+                        <span>OVR: <span className={getAttributeColorClass(ovr)}>{ovr}</span></span>
+                        <span>Cond: <span className={state?.fitness < 70 ? 'text-status-danger' : 'text-text-secondary'}>{state?.fitness ?? 100}%</span></span>
+                    </div>
+                </div>
+            </div>
+            <button
+                onClick={onAction}
+                className="text-xs bg-background-tertiary text-text-secondary hover:bg-primary hover:text-white px-2 py-1 rounded transition-colors duration-200 opacity-0 group-hover:opacity-100"
+            >
+                {actionLabel}
+            </button>
+        </div>
+    );
+});
+
+PlayerRow.displayName = "PlayerRow";
+
+export const MatchPreparationScreen: React.FC = () => {
+    const {
+        meta,
+        playMatch,
+        autoPickLineup,
+        movePlayerInLineup
+    } = useGameStore();
+
+    const matchesDomain = useGameStore(s => s.matches);
+    const tempLineup = useGameStore(s => s.matches.tempLineup);
+    const { setView, activeMatchId } = useUIStore();
 
     const currentMatch = useMemo(() => {
         if (activeMatchId && matchesDomain.matches[activeMatchId]) {
             return matchesDomain.matches[activeMatchId];
         }
-
         if (!meta.userClubId) return null;
-        const allMatches = Object.values(matchesDomain.matches);
-        return allMatches
+
+        return Object.values(matchesDomain.matches)
             .filter(m => m.status === "SCHEDULED" && (m.homeClubId === meta.userClubId || m.awayClubId === meta.userClubId))
             .sort((a, b) => a.datetime - b.datetime)[0];
     }, [matchesDomain.matches, meta.userClubId, activeMatchId]);
 
-    const opponentId = currentMatch ? (currentMatch.homeClubId === meta.userClubId ? currentMatch.awayClubId : currentMatch.homeClubId) : null;
-    const opponent = opponentId ? clubs[opponentId] : null;
+    const opponent = useGameStore(selectClubById(
+        currentMatch
+            ? (currentMatch.homeClubId === meta.userClubId ? currentMatch.awayClubId : currentMatch.homeClubId)
+            : null
+    ));
 
     useEffect(() => {
-        if (!meta.userClubId) return;
-
-        if (!tempLineup) {
-            const optimized = TacticsSystem.suggestOptimalLineup(
-                meta.userClubId,
-                players,
-                contracts
-            );
-
-            setTempLineup(optimized);
+        if (meta.userClubId && !tempLineup) {
+            autoPickLineup();
         }
-    }, [meta.userClubId, players, contracts, tempLineup, setTempLineup]);
-
-    const handleAutoPick = () => {
-        const optimized = TacticsSystem.suggestOptimalLineup(
-            meta.userClubId!,
-            players,
-            contracts
-        );
-        setTempLineup(optimized);
-    };
-
-    const movePlayer = (playerId: string, target: 'starter' | 'bench' | 'reserve') => {
-        if (!tempLineup) return;
-
-        const newStarters = tempLineup.starters.filter(id => id !== playerId);
-        const newBench = tempLineup.bench.filter(id => id !== playerId);
-        const newReserves = tempLineup.reserves.filter(id => id !== playerId);
-
-        if (target === 'starter') {
-            if (newStarters.length >= 11) {
-                const playerOrigin = tempLineup.starters.includes(playerId) ? 'starter' : tempLineup.bench.includes(playerId) ? 'bench' : 'reserve';
-                if (playerOrigin !== 'starter') {
-                    const removedId = newStarters.pop();
-                    if (removedId) {
-                        if (playerOrigin === 'bench') newBench.push(removedId);
-                        else newReserves.push(removedId);
-                    }
-                }
-            }
-            newStarters.push(playerId);
-        } else if (target === 'bench') {
-            newBench.push(playerId);
-        } else {
-            newReserves.push(playerId);
-        }
-
-        setTempLineup({
-            starters: newStarters,
-            bench: newBench,
-            reserves: newReserves
-        });
-    };
+    }, [meta.userClubId, tempLineup, autoPickLineup]);
 
     const handlePlayMatch = () => {
-        if (!currentMatch || !meta.userClubId || !tempLineup) return;
+        if (!currentMatch) return;
 
-        if (tempLineup.starters.length !== 11) {
+        if (tempLineup && tempLineup.starters.length !== 11) {
             alert("Você precisa selecionar exatamente 11 titulares!");
             return;
         }
@@ -117,38 +105,7 @@ export const MatchPreparationScreen: React.FC = () => {
             setView("MATCH_LIVE", currentMatch.id);
         } catch (error) {
             console.error("Falha ao iniciar partida:", error);
-            alert("Ocorreu um erro ao processar a partida.");
         }
-    };
-
-    const PlayerRow = ({ id, actionLabel, onAction }: { id: string, actionLabel: string, onAction: () => void }) => {
-        const player = players[id];
-        const state = playerStates[id];
-        if (!player) return null;
-        const ovr = calculateOverall(player);
-
-        return (
-            <div className="flex items-center justify-between p-2 bg-background border border-background-tertiary rounded mb-1 hover:border-primary/50 transition-colors duration-200 group">
-                <div className="flex items-center space-x-3">
-                    <span className="w-8 text-xs font-bold text-text-secondary bg-background-tertiary px-1 rounded text-center">
-                        {formatPosition(player.primaryPositionId)}
-                    </span>
-                    <div>
-                        <div className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">{player.name}</div>
-                        <div className="text-xs text-text-muted flex space-x-2">
-                            <span>OVR: <span className={getAttributeColorClass(ovr)}>{ovr}</span></span>
-                            <span>Cond: <span className={state?.fitness < 70 ? 'text-status-danger' : 'text-text-secondary'}>{state?.fitness}%</span></span>
-                        </div>
-                    </div>
-                </div>
-                <button
-                    onClick={onAction}
-                    className="text-xs bg-background-tertiary text-text-secondary hover:bg-primary hover:text-white px-2 py-1 rounded transition-colors duration-200 opacity-0 group-hover:opacity-100"
-                >
-                    {actionLabel}
-                </button>
-            </div>
-        );
     };
 
     if (!currentMatch || !opponent) {
@@ -161,7 +118,7 @@ export const MatchPreparationScreen: React.FC = () => {
                     <EmptyState
                         icon={CalendarX}
                         title="Sem Jogos Agendados"
-                        description="Você não tem partidas marcadas para os próximos dias ou o calendário foi finalizado."
+                        description="Você não tem partidas marcadas para os próximos dias."
                         actionLabel="Ir para Calendário"
                         onAction={() => setView("CALENDAR")}
                     />
@@ -173,28 +130,17 @@ export const MatchPreparationScreen: React.FC = () => {
     if (!tempLineup) {
         return (
             <div className="h-full flex flex-col animate-in fade-in duration-300">
-                <div className="p-6 border-b border-background-tertiary flex justify-between items-center">
-                    <div className="flex items-center space-x-4">
-                        <Button variant="ghost" size="sm" disabled>Voltar</Button>
-                        <Skeleton className="w-48 h-8" />
-                    </div>
+                <div className="p-6 border-b border-background-tertiary">
+                    <Skeleton className="w-48 h-8" />
                 </div>
                 <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="bg-background-secondary rounded-lg border border-background-tertiary p-4 flex flex-col h-full">
-                            <div className="mb-4 flex justify-between">
-                                <Skeleton className="w-24 h-4" />
-                                <Skeleton className="w-12 h-4" />
-                            </div>
-                            <div className="flex-1">
-                                <PlayerListSkeleton />
-                            </div>
-                        </div>
-                    ))}
+                    <PlayerListSkeleton />
                 </div>
             </div>
         );
     }
+
+    const isReady = tempLineup.starters.length === 11;
 
     return (
         <div className="h-full flex flex-col animate-in fade-in duration-300">
@@ -209,7 +155,7 @@ export const MatchPreparationScreen: React.FC = () => {
                 <div className="flex items-center space-x-4">
                     <div className="text-right mr-4">
                         <div className="text-xs text-text-muted uppercase tracking-wider">Titulares</div>
-                        <div className={`text-2xl font-mono font-bold ${tempLineup.starters.length === 11 ? 'text-status-success' : 'text-status-danger'}`}>
+                        <div className={`text-2xl font-mono font-bold ${isReady ? 'text-status-success' : 'text-status-danger'}`}>
                             {tempLineup.starters.length}/11
                         </div>
                     </div>
@@ -217,7 +163,7 @@ export const MatchPreparationScreen: React.FC = () => {
                         size="lg"
                         icon={Play}
                         onClick={handlePlayMatch}
-                        disabled={tempLineup.starters.length !== 11}
+                        disabled={!isReady}
                         className="shadow-lg shadow-primary/20"
                     >
                         Iniciar Partida
@@ -232,9 +178,13 @@ export const MatchPreparationScreen: React.FC = () => {
                         <span className="text-xs text-text-muted">{tempLineup.starters.length} selecionados</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
-                        {tempLineup.starters.length === 0 && <div className="text-center text-text-muted py-8 text-sm italic">Nenhum jogador selecionado</div>}
                         {tempLineup.starters.map(id => (
-                            <PlayerRow key={id} id={id} actionLabel="Mover p/ Banco" onAction={() => movePlayer(id, 'bench')} />
+                            <PlayerRow
+                                key={id}
+                                id={id}
+                                actionLabel="Mover p/ Banco"
+                                onAction={() => movePlayerInLineup(id, 'bench')}
+                            />
                         ))}
                     </div>
                 </div>
@@ -246,9 +196,13 @@ export const MatchPreparationScreen: React.FC = () => {
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
                         {tempLineup.bench.map(id => (
-                            <PlayerRow key={id} id={id} actionLabel="Tornar Titular" onAction={() => movePlayer(id, 'starter')} />
+                            <PlayerRow
+                                key={id}
+                                id={id}
+                                actionLabel="Tornar Titular"
+                                onAction={() => movePlayerInLineup(id, 'starters')}
+                            />
                         ))}
-                        {tempLineup.bench.length === 0 && <div className="text-center text-text-muted py-8 text-xs italic">Banco vazio</div>}
                     </div>
                 </div>
 
@@ -257,7 +211,7 @@ export const MatchPreparationScreen: React.FC = () => {
                         <h3 className="font-bold text-text-muted uppercase text-xs tracking-wider">Não Relacionados</h3>
                         <button
                             className="text-xs text-primary hover:text-primary-hover hover:underline flex items-center transition-colors font-medium"
-                            onClick={handleAutoPick}
+                            onClick={() => autoPickLineup()}
                             title="Restaurar melhor escalação automática"
                         >
                             <RefreshCw size={12} className="mr-1" /> Auto-seleção
@@ -265,9 +219,13 @@ export const MatchPreparationScreen: React.FC = () => {
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
                         {tempLineup.reserves.map(id => (
-                            <PlayerRow key={id} id={id} actionLabel="Relacionar" onAction={() => movePlayer(id, 'bench')} />
+                            <PlayerRow
+                                key={id}
+                                id={id}
+                                actionLabel="Relacionar"
+                                onAction={() => movePlayerInLineup(id, 'bench')}
+                            />
                         ))}
-                        {tempLineup.reserves.length === 0 && <div className="text-center text-text-muted py-8 text-xs italic">Todos os jogadores relacionados</div>}
                     </div>
                 </div>
             </div>
