@@ -26,6 +26,10 @@ import {
   simulateSingleMatch,
 } from "../core/systems/MatchSystem";
 import { TacticsSystem } from "../core/systems/TacticsSystem";
+import { rng } from "../core/utils/generators";
+import { v4 as uuidv4 } from "uuid";
+import { PlayerInjury } from "../core/models/stats";
+import { eventBus } from "../core/events/EventBus";
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
@@ -294,22 +298,19 @@ export const useGameStore = create<GameStore>()(
       });
     },
 
-    playMatch: (matchId: string) => {
+    playMatch: async (matchId: string) => {
       const { userClubId } = get().meta;
       const { tempLineup } = get().matches;
 
       if (!userClubId) {
-        logger.error(
-          "GameStore",
-          "❌ Erro ao iniciar partida: Usuário sem clube."
-        );
+        logger.error("GameStore", "❌ Erro: Usuário sem clube.");
         return;
       }
 
       if (!tempLineup || tempLineup.starters.length !== 11) {
         logger.error(
           "GameStore",
-          "❌ Erro ao iniciar partida: Escalação inválida."
+          "❌ Erro: Escalação inválida (precisa de 11)."
         );
         return;
       }
@@ -319,29 +320,100 @@ export const useGameStore = create<GameStore>()(
         `⚽ Iniciando simulação da partida ${matchId}...`
       );
 
-      set((state) => {
-        const match = state.matches.matches[matchId];
-        if (!match) return;
+      const state = get();
+      const match = state.matches.matches[matchId];
+      if (!match) return;
 
-        const isHome = match.homeClubId === userClubId;
-        const opponentId = isHome ? match.awayClubId : match.homeClubId;
+      const isHome = match.homeClubId === userClubId;
+      const opponentId = isHome ? match.awayClubId : match.homeClubId;
 
-        const userContext = buildTeamContext(state, userClubId, {
-          startingXI: state.matches.tempLineup!.starters,
-          bench: state.matches.tempLineup!.bench,
+      // 1. Construção de Contextos (Leitura - Síncrona)
+      const userContext = buildTeamContext(state, userClubId, {
+        startingXI: state.matches.tempLineup!.starters,
+        bench: state.matches.tempLineup!.bench,
+      });
+      const opponentContext = buildTeamContext(state, opponentId);
+
+      // 2. Simulação Pesada (Async - Fora do State Lock)
+      // O 'await' aqui permite que a UI respire graças ao Yielding implementado na Strategy
+      const result = await simulateSingleMatch(
+        state,
+        match,
+        isHome ? userContext : opponentContext,
+        isHome ? opponentContext : userContext
+      );
+
+      // 3. Aplicação do Resultado (Escrita - Síncrona e Atômica)
+      set((draft) => {
+        const draftMatch = draft.matches.matches[matchId];
+        if (!draftMatch) return;
+
+        // Atualizar dados da partida
+        draftMatch.homeGoals = result.homeScore;
+        draftMatch.awayGoals = result.awayScore;
+        draftMatch.status = "FINISHED";
+        draft.matches.events[matchId] = result.events;
+
+        // Persistir estatísticas dos jogadores
+        result.playerStats.forEach((stat) => {
+          draft.matches.playerStats[stat.id] = stat;
         });
 
-        const opponentContext = buildTeamContext(state, opponentId);
+        // Processar Lesões (Lógica portada do MatchSystem para o State com Immer)
+        const injuryEvents = result.events.filter((e) => e.type === "INJURY");
 
-        simulateSingleMatch(
-          state,
-          match,
-          isHome ? userContext : opponentContext,
-          isHome ? opponentContext : userContext
-        );
+        injuryEvents.forEach((event) => {
+          const severityRoll = rng.range(1, 100);
+          let severity = "Leve";
+          let daysOut = rng.range(3, 10);
 
-        state.matches.tempLineup = null;
+          if (severityRoll > 90) {
+            severity = "Grave";
+            daysOut = rng.range(60, 180);
+          } else if (severityRoll > 70) {
+            severity = "Moderada";
+            daysOut = rng.range(14, 45);
+          }
+
+          const injuryId = uuidv4();
+          const currentDate = draft.meta.currentDate;
+          const returnDate = currentDate + daysOut * 24 * 60 * 60 * 1000;
+
+          const injury: PlayerInjury = {
+            id: injuryId,
+            playerId: event.playerId,
+            name: "Lesão em Jogo",
+            severity,
+            startDate: currentDate,
+            estimatedReturnDate: returnDate,
+          };
+
+          draft.people.playerInjuries[injuryId] = injury;
+
+          const pState = draft.people.playerStates[event.playerId];
+          if (pState) {
+            pState.fitness = 50;
+            pState.matchReadiness = 0;
+          }
+
+          eventBus.emit(state, "PLAYER_INJURY_OCCURRED", {
+            playerId: event.playerId,
+            injuryName: "Lesão durante a partida",
+            severity,
+            daysOut,
+          });
+        });
+
+        draft.matches.tempLineup = null;
+
+        eventBus.emit(state, "MATCH_FINISHED", {
+          matchId: match.id,
+          homeScore: result.homeScore,
+          awayScore: result.awayScore,
+        });
       });
+
+      logger.info("GameStore", "✅ Partida finalizada e estado atualizado.");
     },
 
     prepareMatchLineup: (clubId: string) => {

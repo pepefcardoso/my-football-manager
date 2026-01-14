@@ -38,5 +38,5 @@ export interface IMatchSimulationStrategy {
     match: Match,
     home: TeamMatchContext,
     away: TeamMatchContext
-  ): MatchEngineResult;
+  ): Promise<MatchEngineResult>;
 }

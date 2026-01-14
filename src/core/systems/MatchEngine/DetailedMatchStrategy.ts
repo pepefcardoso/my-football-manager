@@ -13,33 +13,67 @@ import { CommandFactory } from "./CommandFactory";
 
 export class DetailedMatchStrategy implements IMatchSimulationStrategy {
   private rng: IRNG;
+  private readonly YIELD_INTERVAL_MINUTES = 15;
 
   constructor(rng: IRNG = globalRng) {
     this.rng = rng;
   }
 
-  simulate(
+  async simulate(
     match: Match,
     home: TeamMatchContext,
     away: TeamMatchContext
-  ): MatchEngineResult {
+  ): Promise<MatchEngineResult> {
     const ctx: SimulationContext = this.createContext(match, home, away);
 
     const stoppageH1 = this.rng.range(
       MATCH_CONFIG.STOPPAGE_TIME.MIN_H1,
       MATCH_CONFIG.STOPPAGE_TIME.MAX_H1
     );
-    this.runPeriod(ctx, 1, 45, stoppageH1, "1H");
+
+    await this.runPeriod(ctx, 1, 45, stoppageH1, "1H");
+
+    await this.yieldToMainThread();
 
     const stoppageH2 = this.rng.range(
       MATCH_CONFIG.STOPPAGE_TIME.MIN_H2,
       MATCH_CONFIG.STOPPAGE_TIME.MAX_H2
     );
-    this.runPeriod(ctx, 46, 90, stoppageH2, "2H");
+    await this.runPeriod(ctx, 46, 90, stoppageH2, "2H");
 
     this.finalizeStats(ctx);
 
     return this.buildResult(match, ctx);
+  }
+
+  private yieldToMainThread(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  private async runPeriod(
+    ctx: SimulationContext,
+    start: number,
+    end: number,
+    extra: number,
+    periodLabel: "1H" | "2H"
+  ) {
+    ctx.period = periodLabel;
+    const totalMinutes = end - start + 1 + extra;
+
+    for (let i = 0; i < totalMinutes; i++) {
+      const absoluteMinute = start + i;
+      ctx.currentMinute = absoluteMinute > end ? end : absoluteMinute;
+      ctx.extraMinute = absoluteMinute > end ? absoluteMinute - end : 0;
+
+      if (i > 0 && i % this.YIELD_INTERVAL_MINUTES === 0) {
+        await this.yieldToMainThread();
+      }
+
+      this.updatePossession(ctx);
+
+      const command = CommandFactory.getNextCommand(ctx);
+      command.execute(ctx);
+    }
   }
 
   private createContext(
@@ -90,28 +124,6 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
       defendingTeam: away,
       rng: this.rng,
     };
-  }
-
-  private runPeriod(
-    ctx: SimulationContext,
-    start: number,
-    end: number,
-    extra: number,
-    periodLabel: "1H" | "2H"
-  ) {
-    ctx.period = periodLabel;
-    const totalMinutes = end - start + 1 + extra;
-
-    for (let i = 0; i < totalMinutes; i++) {
-      const absoluteMinute = start + i;
-      ctx.currentMinute = absoluteMinute > end ? end : absoluteMinute;
-      ctx.extraMinute = absoluteMinute > end ? absoluteMinute - end : 0;
-
-      this.updatePossession(ctx);
-
-      const command = CommandFactory.getNextCommand(ctx);
-      command.execute(ctx);
-    }
   }
 
   private updatePossession(ctx: SimulationContext) {
@@ -168,7 +180,7 @@ export class DetailedMatchStrategy implements IMatchSimulationStrategy {
       stats: {
         homePossession: Math.round(ctx.momentum),
         awayPossession: 100 - Math.round(ctx.momentum),
-        homeShots: 0, // TODO: Calcular real no MatchStatsCalculator
+        homeShots: 0,
         awayShots: 0,
         homeShotsOnTarget: 0,
         awayShotsOnTarget: 0,

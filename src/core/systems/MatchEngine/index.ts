@@ -5,7 +5,7 @@ import {
   MatchEngineResult,
   TeamMatchContext,
 } from "./types";
-import { logger } from "../../utils/logger";
+import { logger } from "../../utils/Logger";
 
 class MatchEngine {
   private strategy: IMatchSimulationStrategy;
@@ -18,15 +18,16 @@ class MatchEngine {
     this.strategy = strategy;
   }
 
-  public simulate(
+  public async simulate(
     match: Match,
     home: TeamMatchContext,
     away: TeamMatchContext
-  ): MatchEngineResult {
-    logger.info("MatchEngine",
+  ): Promise<MatchEngineResult> {
+    logger.info(
+      "MatchEngine",
       `Simulando ${home.clubName} vs ${away.clubName} com ${this.strategy.constructor.name}...`
     );
-    return this.strategy.simulate(match, home, away);
+    return await this.strategy.simulate(match, home, away);
   }
 }
 

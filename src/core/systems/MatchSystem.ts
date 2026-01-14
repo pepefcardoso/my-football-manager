@@ -16,28 +16,30 @@ export interface MatchSystemResult {
   matchesToday: Match[];
 }
 
-export const simulateSingleMatch = (
+export const simulateSingleMatch = async (
   state: GameState,
   match: Match,
   homeContext: TeamMatchContext,
   awayContext: TeamMatchContext
-): MatchEngineResult => {
-  const result = matchEngine.simulate(match, homeContext, awayContext);
+): Promise<MatchEngineResult> => {
+  const result = await matchEngine.simulate(match, homeContext, awayContext);
 
   applyMatchResults(state, match, result);
 
   return result;
 };
 
-export const processScheduledMatches = (
+export const processScheduledMatches = async (
   state: GameState
-): MatchSystemResult => {
+): Promise<MatchSystemResult> => {
   const matchesToday: Match[] = [];
   const currentDateStart = new Date(state.meta.currentDate);
   currentDateStart.setHours(0, 0, 0, 0);
   const currentDayTime = currentDateStart.getTime();
 
-  for (const matchId in state.matches.matches) {
+  const matchIds = Object.keys(state.matches.matches);
+
+  for (const matchId of matchIds) {
     const match = state.matches.matches[matchId];
 
     if (!match) continue;
@@ -56,7 +58,8 @@ export const processScheduledMatches = (
       if (!isUserMatch) {
         const homeContext = buildTeamContext(state, match.homeClubId);
         const awayContext = buildTeamContext(state, match.awayClubId);
-        simulateSingleMatch(state, match, homeContext, awayContext);
+
+        await simulateSingleMatch(state, match, homeContext, awayContext);
 
         matchesToday.push(match);
       }
