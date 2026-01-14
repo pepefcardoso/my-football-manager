@@ -49,6 +49,7 @@ interface GameActions {
     playerId: string,
     targetSection: "starters" | "bench" | "reserves"
   ) => void;
+  prepareMatchLineup: (clubId: string) => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -340,6 +341,36 @@ export const useGameStore = create<GameStore>()(
         );
 
         state.matches.tempLineup = null;
+      });
+    },
+
+    prepareMatchLineup: (clubId: string) => {
+      const state = get();
+
+      if (!state.clubs.clubs[clubId]) {
+        logger.error(
+          "GameStore",
+          `❌ Falha ao preparar lineup: Clube ${clubId} não encontrado.`
+        );
+        return;
+      }
+
+      logger.info(
+        "GameStore",
+        `📋 Gerando melhor escalação inicial para ${clubId}...`
+      );
+
+      const recommendation = TacticsSystem.suggestOptimalLineup(
+        clubId,
+        state.people.players,
+        state.market.contracts
+      );
+
+      set((draft) => {
+        draft.matches.tempLineup = {
+          ...recommendation,
+          lastUpdated: Date.now(),
+        };
       });
     },
 

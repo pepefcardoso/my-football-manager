@@ -61,8 +61,9 @@ export const MatchPreparationScreen: React.FC = () => {
     const {
         meta,
         playMatch,
-        autoPickLineup,
-        movePlayerInLineup
+        prepareMatchLineup,
+        movePlayerInLineup,
+        autoPickLineup
     } = useGameStore();
 
     const matchesDomain = useGameStore(s => s.matches);
@@ -88,9 +89,9 @@ export const MatchPreparationScreen: React.FC = () => {
 
     useEffect(() => {
         if (meta.userClubId && !tempLineup) {
-            autoPickLineup();
+            prepareMatchLineup(meta.userClubId);
         }
-    }, [meta.userClubId, tempLineup, autoPickLineup]);
+    }, [meta.userClubId, tempLineup, prepareMatchLineup]);
 
     const handlePlayMatch = () => {
         if (!currentMatch) return;
@@ -172,6 +173,7 @@ export const MatchPreparationScreen: React.FC = () => {
             </div>
 
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 overflow-hidden bg-background">
+
                 <div className="bg-background-secondary rounded-lg border border-background-tertiary flex flex-col h-full overflow-hidden shadow-sm">
                     <div className="p-3 border-b border-background-tertiary bg-primary/5 flex justify-between items-center">
                         <h3 className="font-bold text-primary flex items-center uppercase text-xs tracking-wider"><Shirt size={14} className="mr-2" /> Titulares</h3>
