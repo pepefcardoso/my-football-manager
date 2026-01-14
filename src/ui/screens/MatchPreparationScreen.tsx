@@ -1,7 +1,6 @@
 import React, { useMemo, useEffect } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
-import { buildTeamContext, simulateSingleMatch } from "../../core/systems/MatchSystem";
 import { TacticsSystem } from "../../core/systems/TacticsSystem";
 import { calculateOverall, formatPosition, getAttributeColorClass } from "../../core/utils/playerUtils";
 import { Button } from "../components/Button";
@@ -26,7 +25,7 @@ const PlayerListSkeleton = () => (
 );
 
 export const MatchPreparationScreen: React.FC = () => {
-    const { meta, setTempLineup, clearTempLineup, setState } = useGameStore();
+    const { meta, setTempLineup, playMatch } = useGameStore();
     const matchesDomain = useGameStore(s => s.matches);
     const { contracts } = useGameStore(s => s.market);
     const { players, playerStates } = useGameStore(s => s.people);
@@ -66,7 +65,7 @@ export const MatchPreparationScreen: React.FC = () => {
 
     const handleAutoPick = () => {
         const optimized = TacticsSystem.suggestOptimalLineup(
-            meta.userClubId,
+            meta.userClubId!,
             players,
             contracts
         );
@@ -113,23 +112,13 @@ export const MatchPreparationScreen: React.FC = () => {
             return;
         }
 
-        setState(state => {
-            const userContext = buildTeamContext(state, meta.userClubId!, {
-                startingXI: tempLineup.starters,
-                bench: tempLineup.bench
-            });
-            const oppId = currentMatch.homeClubId === meta.userClubId ? currentMatch.awayClubId : currentMatch.homeClubId;
-            const opponentContext = buildTeamContext(state, oppId);
-
-            simulateSingleMatch(state, state.matches.matches[currentMatch.id],
-                currentMatch.homeClubId === meta.userClubId ? userContext : opponentContext,
-                currentMatch.homeClubId === meta.userClubId ? opponentContext : userContext
-            );
-        });
-
-        clearTempLineup();
-
-        setView("MATCH_LIVE", currentMatch.id);
+        try {
+            playMatch(currentMatch.id);
+            setView("MATCH_LIVE", currentMatch.id);
+        } catch (error) {
+            console.error("Falha ao iniciar partida:", error);
+            alert("Ocorreu um erro ao processar a partida.");
+        }
     };
 
     const PlayerRow = ({ id, actionLabel, onAction }: { id: string, actionLabel: string, onAction: () => void }) => {

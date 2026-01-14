@@ -21,6 +21,10 @@ import {
 import { logger } from "../core/utils/Logger";
 import { rebuildIndices } from "../core/systems/MaintenanceSystem";
 import { TempLineup } from "../core/models/match";
+import {
+  buildTeamContext,
+  simulateSingleMatch,
+} from "../core/systems/MatchSystem";
 
 interface GameActions {
   advanceDay: () => TimeAdvanceResult;
@@ -38,12 +42,13 @@ interface GameActions {
   deleteNotification: (id: string) => void;
   setTempLineup: (lineup: Omit<TempLineup, "lastUpdated">) => void;
   clearTempLineup: () => void;
+  playMatch: (matchId: string) => void;
 }
 
 type GameStore = GameState & GameActions;
 
 const createInitialState = (): GameState => ({
-meta: {
+  meta: {
     version: "2.0.0",
     saveName: "New Game",
     currentDate: Date.now(),
@@ -148,12 +153,18 @@ export const useGameStore = create<GameStore>()(
         set((state) => {
           state.meta.saveName = saveName;
           state.meta.updatedAt = Date.now();
-          if (!result.metadata?.checksum || result.metadata.checksum === "VOLATILE_MEMORY_HASH") {
-             state.meta.persistenceMode = "MEMORY";
+          if (
+            !result.metadata?.checksum ||
+            result.metadata.checksum === "VOLATILE_MEMORY_HASH"
+          ) {
+            state.meta.persistenceMode = "MEMORY";
           }
         });
-        
-        const modeMsg = result.metadata?.checksum === "VOLATILE_MEMORY_HASH" ? "(RAM)" : "(Disco)";
+
+        const modeMsg =
+          result.metadata?.checksum === "VOLATILE_MEMORY_HASH"
+            ? "(RAM)"
+            : "(Disco)";
         logger.info("GameStore", `✅ Save concluído ${modeMsg}`);
       } else {
         logger.error("GameStore", "❌ Falha ao salvar", result.error);
@@ -271,6 +282,57 @@ export const useGameStore = create<GameStore>()(
 
     clearTempLineup: () => {
       set((state) => {
+        state.matches.tempLineup = null;
+      });
+    },
+
+    playMatch: (matchId: string) => {
+      const { userClubId } = get().meta;
+      const { tempLineup } = get().matches;
+
+      if (!userClubId) {
+        logger.error(
+          "GameStore",
+          "❌ Erro ao iniciar partida: Usuário sem clube."
+        );
+        return;
+      }
+
+      if (!tempLineup || tempLineup.starters.length !== 11) {
+        logger.error(
+          "GameStore",
+          "❌ Erro ao iniciar partida: Escalação inválida."
+        );
+        return;
+      }
+
+      logger.info(
+        "GameStore",
+        `⚽ Iniciando simulação da partida ${matchId}...`
+      );
+
+      set((state) => {
+        const match = state.matches.matches[matchId];
+        if (!match) return;
+
+        const isHome = match.homeClubId === userClubId;
+        const opponentId = isHome ? match.awayClubId : match.homeClubId;
+
+        const userContext = buildTeamContext(state, userClubId, {
+          startingXI: state.matches.tempLineup!.starters,
+          bench: state.matches.tempLineup!.bench,
+        });
+
+        const opponentContext = buildTeamContext(state, opponentId);
+
+        simulateSingleMatch(
+          state,
+          match,
+          isHome ? userContext : opponentContext,
+          isHome ? opponentContext : userContext
+        );
+
+        // Limpeza pós-jogo
         state.matches.tempLineup = null;
       });
     },
