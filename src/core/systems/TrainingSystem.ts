@@ -1,6 +1,6 @@
 import { GameState } from "../models/gameState";
 import { Player } from "../models/people";
-import { rng } from "../utils/generators";
+import { rng as globalRng, IRNG } from "../utils/generators";
 import { PlayerCalculations } from "../models/player";
 import { PlayerSeasonStats } from "../models/stats";
 import { eventBus } from "../events/EventBus";
@@ -62,7 +62,10 @@ const getRecentPlaytimeMultiplier = (
     : 1.0;
 };
 
-export const processDailyTraining = (state: GameState): TrainingResult => {
+export const processDailyTraining = (
+  state: GameState,
+  rng: IRNG = globalRng
+): TrainingResult => {
   let totalImprovements = 0;
   const logs: string[] = [];
 
@@ -85,7 +88,8 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
         player,
         age,
         logs,
-        contract.clubId === state.meta.userClubId
+        contract.clubId === state.meta.userClubId,
+        rng
       );
       continue;
     }
@@ -119,7 +123,8 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
     if (pointsToDistribute > 0.01) {
       const improvedAttribute = applyGrowthToAttributes(
         player,
-        pointsToDistribute
+        pointsToDistribute,
+        rng
       );
 
       if (improvedAttribute) {
@@ -152,7 +157,8 @@ export const processDailyTraining = (state: GameState): TrainingResult => {
 
 const applyGrowthToAttributes = (
   player: Player,
-  amount: number
+  amount: number,
+  rng: IRNG
 ): TrainableAttribute | null => {
   const targetAttr: TrainableAttribute = rng.pick([...TRAINABLE_ATTRIBUTES]);
 
@@ -170,7 +176,8 @@ const processRegression = (
   player: Player,
   age: number,
   logs: string[],
-  isUserPlayer: boolean
+  isUserPlayer: boolean,
+  rng: IRNG
 ) => {
   const decayChance = (age - 30) * 5;
 

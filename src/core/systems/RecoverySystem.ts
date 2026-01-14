@@ -1,6 +1,7 @@
 import { GameState } from "../models/gameState";
 import { eventBus } from "../events/EventBus";
 import { RECOVERY_CONSTANTS } from "../constants/recovery";
+import { rng as globalRng, IRNG } from "../utils/generators";
 
 export interface RecoveryResult {
   recoveredPlayers: string[];
@@ -56,7 +57,10 @@ const getAgeModifier = (age: number): number => {
   return 0;
 };
 
-export const processDailyRecovery = (state: GameState): RecoveryResult => {
+export const processDailyRecovery = (
+  state: GameState,
+  rng: IRNG = globalRng
+): RecoveryResult => {
   const recoveredPlayers: string[] = [];
   const logs: string[] = [];
 
@@ -88,9 +92,12 @@ export const processDailyRecovery = (state: GameState): RecoveryResult => {
     const staffBonus = getStaffBonus(state, contract.clubId);
     const infraBonus = getInfraBonus(state, contract.clubId);
     const ageMod = getAgeModifier(age);
+    const biologicalVariance = rng.range(90, 110) / 100;
 
     const totalRate =
-      RECOVERY_CONSTANTS.BASE_RATE * (1 + staffBonus + infraBonus + ageMod);
+      RECOVERY_CONSTANTS.BASE_RATE *
+      (1 + staffBonus + infraBonus + ageMod) *
+      biologicalVariance;
 
     pState.fitness = Math.min(
       RECOVERY_CONSTANTS.MAX_FITNESS,
