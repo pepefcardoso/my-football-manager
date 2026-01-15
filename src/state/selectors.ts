@@ -319,3 +319,56 @@ export const selectMatchLiveScreenData = createSelector(
     };
   }
 );
+
+export interface PlayerRowData {
+  id: string;
+  name: string;
+  nickname: string | undefined;
+  position: string;
+  age: number;
+  overall: number;
+  fitness: number;
+  morale: number;
+  wage: number;
+  primaryColor?: string;
+}
+
+export const selectPlayerRowData = createSelector(
+  [
+    selectPlayers,
+    selectPlayerStates,
+    selectContracts,
+    selectMarketIndices,
+    selectCurrentDateRaw,
+    selectPlayerIdArg,
+  ],
+  (
+    players,
+    playerStates,
+    contracts,
+    market,
+    currentDate,
+    playerId
+  ): PlayerRowData | null => {
+    const player = players[playerId];
+    if (!player) return null;
+
+    const contractId = market.playerContractIndex[playerId];
+    const contract = contractId ? contracts[contractId] : null;
+    const state = playerStates[playerId];
+
+    const age = Math.floor((currentDate - player.birthDate) / 31536000000);
+
+    return {
+      id: player.id,
+      name: player.name,
+      nickname: player.nickname,
+      position: player.primaryPositionId,
+      age: age,
+      overall: player.overall,
+      fitness: state?.fitness ?? 100,
+      morale: state?.morale ?? 50,
+      wage: contract ? contract.monthlyWage : 0,
+    };
+  }
+);

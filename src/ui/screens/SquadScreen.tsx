@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useGameStore } from "../../state/useGameStore";
 import { useShallow } from "zustand/react/shallow";
+import { usePlayerRowData } from "../hooks/usePlayerRowData";
 import { getAttributeColorClass } from "../../core/utils/playerUtils";
 import { PlayerDetailModal } from "../components/PlayerDetailModal";
 import { Users, Filter } from "lucide-react";
@@ -9,76 +10,94 @@ import {
     selectClubPlayerIds,
     selectPlayerById,
     selectPlayerStateById,
-    selectContractByPlayerId
+    PlayerRowData
 } from "../../state/selectors";
 
-const PlayerRow = React.memo(({ playerId, onClick }: { playerId: string, onClick: (id: string) => void }) => {
-    const player = useGameStore(selectPlayerById(playerId));
-    const state = useGameStore(selectPlayerStateById(playerId));
-    const contract = useGameStore(selectContractByPlayerId(playerId));
+interface PlayerRowViewProps {
+    data: PlayerRowData;
+    onClick: (id: string) => void;
+}
 
-    if (!player || !contract) return null;
-
-    const fitness = state?.fitness ?? 100;
-    const morale = state?.morale ?? 50;
+const PlayerRowView = React.memo(({ data, onClick }: PlayerRowViewProps) => {
+    const formattedWage = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        maximumFractionDigits: 0
+    }).format(data.wage);
 
     return (
         <tr
-            onClick={() => onClick(player.id)}
+            onClick={() => onClick(data.id)}
             className="hover:bg-background-tertiary/40 cursor-pointer transition-colors duration-200 group"
         >
             <td className="p-4">
                 <div className="font-medium text-text-primary group-hover:text-primary transition-colors duration-200">
-                    {player.name}
+                    {data.name}
                 </div>
                 <div className="text-xs text-text-muted hidden md:block">
-                    {player.nickname || "Sem apelido"}
+                    {data.nickname || "Sem apelido"}
                 </div>
             </td>
             <td className="p-4">
                 <span className="inline-block px-2 py-1 bg-background border border-background-tertiary rounded text-xs font-mono text-text-secondary">
-                    {player.primaryPositionId}
+                    {data.position}
                 </span>
             </td>
             <td className="p-4 text-center text-text-secondary">
-                {new Date().getFullYear() - new Date(player.birthDate).getFullYear()}
+                {data.age}
             </td>
             <td className="p-4 text-center">
-                <div className={`font-bold ${getAttributeColorClass(player.overall)}`}>
-                    {player.overall}
+                <div className={`font-bold ${getAttributeColorClass(data.overall)}`}>
+                    {data.overall}
                 </div>
             </td>
             <td className="p-4 text-center">
                 <div className="flex items-center justify-center space-x-2">
                     <div className="w-16 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
                         <div
-                            className={`h-full ${fitness > 80 ? 'bg-status-success' : fitness > 50 ? 'bg-status-warning' : 'bg-status-danger'}`}
-                            style={{ width: `${fitness}%` }}
+                            className={`h-full ${data.fitness > 80 ? 'bg-status-success' : data.fitness > 50 ? 'bg-status-warning' : 'bg-status-danger'}`}
+                            style={{ width: `${data.fitness}%` }}
                         />
                     </div>
-                    <span className="text-xs text-text-muted w-6">{fitness.toFixed(0)}%</span>
+                    <span className="text-xs text-text-muted w-6">{data.fitness.toFixed(0)}%</span>
                 </div>
             </td>
             <td className="p-4 text-center">
-                <span className={`${morale > 70 ? 'text-status-success' : 'text-text-secondary'}`}>
-                    {morale > 80 ? "Excelente" : morale > 50 ? "Bom" : "Baixo"}
+                <span className={`${data.morale > 70 ? 'text-status-success' : 'text-text-secondary'}`}>
+                    {data.morale > 80 ? "Excelente" : data.morale > 50 ? "Bom" : "Baixo"}
                 </span>
             </td>
             <td className="p-4 text-right font-mono text-text-secondary text-sm">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(contract.monthlyWage)}
+                {formattedWage}
             </td>
         </tr>
     );
 });
 
-PlayerRow.displayName = "PlayerRow";
+PlayerRowView.displayName = "PlayerRowView";
+
+const PlayerRowContainer = React.memo(({ playerId, onClick }: { playerId: string, onClick: (id: string) => void }) => {
+    const data = usePlayerRowData(playerId);
+
+    if (!data) return null;
+
+    return <PlayerRowView data={data} onClick={onClick} />;
+});
+
+PlayerRowContainer.displayName = "PlayerRowContainer";
 
 export const SquadScreen: React.FC = () => {
     const userClubId = useGameStore(selectUserClubId);
     const playerIds = useGameStore(useShallow(selectClubPlayerIds(userClubId)));
+
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+
     const selectedPlayer = useGameStore(selectPlayerById(selectedPlayerId || ""));
     const selectedPlayerState = useGameStore(selectPlayerStateById(selectedPlayerId || ""));
+
+    const handlePlayerClick = useCallback((id: string) => {
+        setSelectedPlayerId(id);
+    }, []);
 
     if (!userClubId) {
         return <div className="p-8 text-text-muted">Erro: Nenhum clube selecionado.</div>;
@@ -119,10 +138,10 @@ export const SquadScreen: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-background-tertiary/50">
                             {playerIds.map((id) => (
-                                <PlayerRow
+                                <PlayerRowContainer
                                     key={id}
                                     playerId={id}
-                                    onClick={setSelectedPlayerId}
+                                    onClick={handlePlayerClick}
                                 />
                             ))}
                         </tbody>
