@@ -1,14 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useGameStore } from "../useGameStore";
 import { Match } from "../../core/models/match";
-// 1. Importamos o módulo real para usar com vi.mocked()
 import * as MatchSystem from "../../core/systems/MatchSystem";
 
-// ============================================================================
-// 1. MOCKS GLOBAIS
-// ============================================================================
-
-// Mock do Sistema de Arquivos
 vi.mock("../../data/fileSystem", () => ({
   saveGameToDisk: vi.fn().mockResolvedValue({ success: true, metadata: {} }),
   loadGameFromDisk: vi.fn().mockResolvedValue(null),
@@ -17,10 +11,8 @@ vi.mock("../../data/fileSystem", () => ({
   getSaveInfo: vi.fn().mockResolvedValue(null),
 }));
 
-// 2. Auto-Mock do MatchSystem (Vitest cria spies para todas as funções exportadas)
 vi.mock("../../core/systems/MatchSystem");
 
-// Mock do TacticsSystem
 vi.mock("../../core/systems/TacticsSystem", () => ({
   TacticsSystem: {
     suggestOptimalLineup: vi.fn(() => ({
@@ -31,17 +23,12 @@ vi.mock("../../core/systems/TacticsSystem", () => ({
   },
 }));
 
-// ============================================================================
-// 2. SETUP DO ESTADO
-// ============================================================================
-
 const setupTestState = () => {
   useGameStore.getState().resetGame();
 
   useGameStore.getState().setState((state) => {
     state.meta.userClubId = "club-user";
 
-    // Setup Clubes
     state.clubs.clubs["club-user"] = {
       id: "club-user",
       name: "User FC",
@@ -58,7 +45,6 @@ const setupTestState = () => {
       secondaryColor: "#FFF",
     } as any;
 
-    // Setup Partida
     const matchId = "match-1";
     state.matches.matches[matchId] = {
       id: matchId,
@@ -72,7 +58,6 @@ const setupTestState = () => {
       stadiumId: "stadium-1",
     } as Match;
 
-    // Setup Jogadores
     state.market.clubSquadIndex["club-user"] = [];
     for (let i = 0; i < 15; i++) {
       const pid = `p-${i}`;
@@ -93,17 +78,11 @@ const setupTestState = () => {
   });
 };
 
-// ============================================================================
-// 3. TESTES
-// ============================================================================
-
 describe("Store Integration: Match Workflow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupTestState();
 
-    // 3. Configurar o comportamento do Mock ANTES de cada teste
-    // Isso garante que simulateSingleMatch retorne o objeto esperado, e não undefined
     vi.mocked(MatchSystem.buildTeamContext).mockReturnValue({
       clubId: "mock-club",
       clubName: "Mock FC",
@@ -141,7 +120,7 @@ describe("Store Integration: Match Workflow", () => {
     const starters = Array.from({ length: 11 }, (_, i) => `p-${i}`);
     const bench = [`p-11`, `p-12`];
 
-    // ACT 1: Set Lineup
+    // ACT 1
     store.setTempLineup({
       starters,
       bench,
@@ -152,7 +131,7 @@ describe("Store Integration: Match Workflow", () => {
       11
     );
 
-    // ACT 2: Play Match
+    // ACT 2
     await store.playMatch(matchId);
 
     // ASSERT

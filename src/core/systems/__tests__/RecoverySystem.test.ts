@@ -3,7 +3,6 @@ import { processDailyRecovery } from "../RecoverySystem";
 import { GameState } from "../../models/gameState";
 import { eventBus } from "../../events/EventBus";
 
-// Mock do EventBus para verificar se eventos são emitidos
 vi.mock("../../events/EventBus", () => ({
   eventBus: {
     emit: vi.fn(),
@@ -123,7 +122,6 @@ describe("RecoverySystem", () => {
     expect(pState.fitness).toBe(90);
     expect(pState.matchReadiness).toBe(70);
 
-    // Verifica se o evento foi emitido no EventBus
     expect(eventBus.emit).toHaveBeenCalledWith(
       expect.anything(),
       "PLAYER_RECOVERED",

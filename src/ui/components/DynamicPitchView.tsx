@@ -70,7 +70,7 @@ export const DynamicPitchView: React.FC<DynamicPitchViewProps> = ({
         stats.forEach(stat => {
             const role = stat.positionPlayedId as keyof typeof lines;
             if (lines[role]) lines[role].push(stat);
-            else lines['MID'].push(stat); // Fallback
+            else lines['MID'].push(stat);
         });
 
         return Object.entries(lines).map(([role, playersInRole]) =>

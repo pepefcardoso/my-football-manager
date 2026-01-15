@@ -6,18 +6,15 @@ import {
   TimeAdvanceResult,
 } from "../../core/systems/TimeSystem";
 
-export const advanceDayAction = (
-  set: (fn: (state: GameState) => void) => void
-): TimeAdvanceResult => {
-  let result: TimeAdvanceResult = {
-    newDate: 0,
-    matchesToday: [],
-    events: [],
-    stats: { expensesProcessed: 0, playersRecovered: 0 },
-  };
+type SetState = (fn: (state: GameState) => Promise<void> | void) => void;
 
-  set((state) => {
-    result = advanceOneDay(state);
+export const advanceDayAction = async (
+  set: SetState
+): Promise<TimeAdvanceResult> => {
+  let result: TimeAdvanceResult | undefined;
+
+  await set(async (state) => {
+    result = await advanceOneDay(state);
 
     const newNotifications = processDailyNotifications(state);
 
@@ -25,6 +22,9 @@ export const advanceDayAction = (
       eventBus.emit(state, "NOTIFICATION_CREATED", { notification });
     });
   });
+
+  if (!result)
+    throw new Error("Falha crítica ao avançar o dia: Resultado indefinido.");
 
   return result;
 };

@@ -3,7 +3,7 @@ import { SaveResult } from "../../data/fileSystem";
 
 interface GameLoopCallbacks {
   onProgress: (message: string, type?: "loading" | "success") => void;
-  onAdvance: () => TimeAdvanceResult;
+  onAdvance: () => Promise<TimeAdvanceResult>;
   onSave: (saveName: string) => Promise<SaveResult>;
   saveName: string;
 }
@@ -20,16 +20,16 @@ export const executeGameDay = async (
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
 
-  onAdvance();
+  await onAdvance();
 
   onProgress("Salvando progresso...", "loading");
   await new Promise((resolve) => setTimeout(resolve, 200));
 
-    const result = await onSave(saveName);
+  const result = await onSave(saveName);
 
-    if (result.success) {
-      onProgress("Dia finalizado com sucesso!", "success");
-    } else {
-      throw new Error(result.error || "Erro desconhecido ao salvar o jogo.");
-    }
+  if (result.success) {
+    onProgress("Dia finalizado com sucesso!", "success");
+  } else {
+    throw new Error(result.error || "Erro desconhecido ao salvar o jogo.");
+  }
 };

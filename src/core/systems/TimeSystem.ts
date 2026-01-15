@@ -26,7 +26,9 @@ export interface TimeAdvanceResult {
   };
 }
 
-export function advanceOneDay(state: GameState): TimeAdvanceResult {
+export async function advanceOneDay(
+  state: GameState
+): Promise<TimeAdvanceResult> {
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   const previousDate = state.meta.currentDate;
   const newDate = previousDate + ONE_DAY_MS;
@@ -44,7 +46,8 @@ export function advanceOneDay(state: GameState): TimeAdvanceResult {
     aggregatedEvents.push(...recoveryResult.logs);
 
   processDailyTraining(state);
-  const matchResult = processScheduledMatches(state);
+
+  const matchResult = await processScheduledMatches(state);
 
   if (matchResult.matchesToday.length > 0) {
     updateCompetitionStandings(state, matchResult.matchesToday);

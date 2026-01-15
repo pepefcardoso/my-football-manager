@@ -137,7 +137,6 @@ describe("TrainingSystem", () => {
   });
 });
 
-// Helpers
 function createMockPlayer(id: string, age: number): Player {
   return {
     id,

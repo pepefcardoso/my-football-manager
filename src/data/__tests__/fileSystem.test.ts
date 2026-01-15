@@ -203,7 +203,6 @@ describe("FileSystem Service", () => {
       });
 
       // Act
-      // NOTE: Logger uses console.log with CSS, not console.error
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const result = await FileSystem.loadGameFromDisk("corrupted-save");
 

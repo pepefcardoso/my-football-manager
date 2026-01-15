@@ -32,7 +32,7 @@ import { PlayerInjury } from "../core/models/stats";
 import { eventBus } from "../core/events/EventBus";
 
 interface GameActions {
-  advanceDay: () => TimeAdvanceResult;
+  advanceDay: () => Promise<TimeAdvanceResult>;
   saveGame: (saveName: string) => Promise<SaveResult>;
   loadGame: (saveName: string) => Promise<boolean>;
   listSaves: () => Promise<string[]>;
@@ -109,6 +109,7 @@ const createInitialState = (): GameState => ({
     positions: {},
     teamTactics: {},
     tempLineup: null,
+    scheduledMatches: {},
   },
   market: {
     contracts: {},
@@ -140,7 +141,7 @@ let autoSaveInterval: NodeJS.Timeout | null = null;
 export const useGameStore = create<GameStore>()(
   immer((set, get) => ({
     ...createInitialState(),
-    advanceDay: () => advanceDayAction(set),
+    advanceDay: async () => await advanceDayAction(set),
     saveGame: async (saveName: string) => {
       const state = get();
       const stateCopy = { ...state };
@@ -327,15 +328,12 @@ export const useGameStore = create<GameStore>()(
       const isHome = match.homeClubId === userClubId;
       const opponentId = isHome ? match.awayClubId : match.homeClubId;
 
-      // 1. Construção de Contextos (Leitura - Síncrona)
       const userContext = buildTeamContext(state, userClubId, {
         startingXI: state.matches.tempLineup!.starters,
         bench: state.matches.tempLineup!.bench,
       });
       const opponentContext = buildTeamContext(state, opponentId);
 
-      // 2. Simulação Pesada (Async - Fora do State Lock)
-      // O 'await' aqui permite que a UI respire graças ao Yielding implementado na Strategy
       const result = await simulateSingleMatch(
         state,
         match,
@@ -343,23 +341,19 @@ export const useGameStore = create<GameStore>()(
         isHome ? opponentContext : userContext
       );
 
-      // 3. Aplicação do Resultado (Escrita - Síncrona e Atômica)
       set((draft) => {
         const draftMatch = draft.matches.matches[matchId];
         if (!draftMatch) return;
 
-        // Atualizar dados da partida
         draftMatch.homeGoals = result.homeScore;
         draftMatch.awayGoals = result.awayScore;
         draftMatch.status = "FINISHED";
         draft.matches.events[matchId] = result.events;
 
-        // Persistir estatísticas dos jogadores
         result.playerStats.forEach((stat) => {
           draft.matches.playerStats[stat.id] = stat;
         });
 
-        // Processar Lesões (Lógica portada do MatchSystem para o State com Immer)
         const injuryEvents = result.events.filter((e) => e.type === "INJURY");
 
         injuryEvents.forEach((event) => {

@@ -62,7 +62,7 @@ export const NotificationCenter: React.FC = () => {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-2 text-text-secondary hover:text-text-primary hover:bg-background-tertiary rounded-full transition-colors duration-200" // Adicionado duration-200
+                className="p-2 text-text-secondary hover:text-text-primary hover:bg-background-tertiary rounded-full transition-colors duration-200"
             >
                 <Bell size={20} />
                 {unreadCount > 0 && (

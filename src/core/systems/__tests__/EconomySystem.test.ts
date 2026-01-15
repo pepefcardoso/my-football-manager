@@ -17,7 +17,6 @@ const createMockState = (
           youthAcademyLevel: infraLevels.youth,
           medicalCenterLevel: infraLevels.medical,
           stadiumId: "stadium-1",
-          // Ajustado para 0 para não interferir no cálculo base dos testes
           dataAnalysisCenterLevel: 0,
           administrationLevel: 0,
           reserveStadiumId: "reserve-1",
@@ -50,9 +49,6 @@ describe("EconomySystem (Unit)", () => {
     const levels = { training: 50, youth: 30, medical: 20 };
     const initialBalance = 1_000_000;
     const state = createMockState(CLUB_ID, levels, initialBalance);
-
-    // Soma: 50 + 30 + 20 + 0 + 0 = 100 níveis
-    // Custo: 100 * 100 = 10.000
     const expectedDailyCost = (50 + 30 + 20) * MAINTENANCE_COST_PER_LEVEL;
 
     // ACT
@@ -100,8 +96,6 @@ describe("EconomySystem (Unit)", () => {
     const result = processDailyEconomy(state);
 
     // ASSERT
-    // Club A: 10 níveis * 100 = 1.000
-    // Club B: 200 níveis * 100 = 20.000
     expect(result.dailyExpenses).toBe(1000 + 20000);
     expect(state.clubs.finances[clubA].balanceCurrent).toBe(49_000);
     expect(state.clubs.finances[clubB].balanceCurrent).toBe(980_000);
@@ -111,9 +105,6 @@ describe("EconomySystem (Unit)", () => {
     // ARRANGE
     const levels = { training: 10, youth: 10, medical: 10 };
     const state = createMockState(CLUB_ID, levels, 1000);
-
-    // Custo: 30 níveis * 100 = 3.000
-    // Saldo: 1.000 - 3.000 = -2.000
 
     // ACT
     processDailyEconomy(state);
