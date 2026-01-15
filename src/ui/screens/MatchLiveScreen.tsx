@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useGameStore } from "../../state/useGameStore";
 import { useUIStore } from "../../state/useUIStore";
@@ -8,10 +8,15 @@ import { Button } from "../components/Button";
 import { ClubBadge } from "../components/ClubBadge";
 import { DynamicPitchView } from "../components/DynamicPitchView";
 import {
-    Play, Pause, SkipForward, ArrowLeft, Clock,
+    Play, Pause, SkipForward, Clock,
     Activity, Shield, MessageSquare, BarChart2
 } from "lucide-react";
 import { MatchEvent } from "../../core/models/match";
+import {
+    selectMatchContext,
+    selectMatchLineups,
+    selectAllPlayers
+} from "../../state/selectors";
 
 interface EventRowProps {
     event: MatchEvent;
@@ -63,19 +68,17 @@ EventRow.displayName = "EventRow";
 export const MatchLiveScreen: React.FC = () => {
     const { setView, activeMatchId } = useUIStore();
 
-    const matchesMap = useGameStore(useShallow(s => s.matches.matches));
-    const playerStatsMap = useGameStore(useShallow(s => s.matches.playerStats));
-    const clubsMap = useGameStore(useShallow(s => s.clubs.clubs));
-    const playersMap = useGameStore(useShallow(s => s.people.players));
+    const matchContext = useGameStore(
+        useShallow((state) => selectMatchContext(state, activeMatchId))
+    );
+
+    const lineups = useGameStore(
+        useShallow((state) => selectMatchLineups(state, activeMatchId))
+    );
+
+    const playersMap = useGameStore(selectAllPlayers);
 
     const scrollRef = useRef<HTMLDivElement>(null);
-
-    const currentMatch = useMemo(() => {
-        if (activeMatchId && matchesMap[activeMatchId]) {
-            return matchesMap[activeMatchId];
-        }
-        return null;
-    }, [matchesMap, activeMatchId]);
 
     const {
         currentMinute,
@@ -95,22 +98,9 @@ export const MatchLiveScreen: React.FC = () => {
         liveStats,
         visibleEvents
     } = useLiveMatchData(
-        currentMatch?.id || null,
+        activeMatchId,
         currentMinute
     );
-
-    const homeClub = currentMatch ? clubsMap[currentMatch.homeClubId] : null;
-    const awayClub = currentMatch ? clubsMap[currentMatch.awayClubId] : null;
-
-    const { homeStarters, awayStarters } = useMemo(() => {
-        if (!currentMatch) return { homeStarters: [], awayStarters: [] };
-        // TODO isso pode vir de um hook useMatchLineups.
-        const allStats = Object.values(playerStatsMap).filter(s => s.matchId === currentMatch.id && s.isStarter);
-        return {
-            homeStarters: allStats.filter(s => s.clubId === currentMatch.homeClubId),
-            awayStarters: allStats.filter(s => s.clubId === currentMatch.awayClubId)
-        };
-    }, [currentMatch, playerStatsMap]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -118,10 +108,12 @@ export const MatchLiveScreen: React.FC = () => {
         }
     }, [visibleEvents.length]);
 
-    if (!currentMatch || !homeClub || !awayClub) {
+    if (!matchContext || !lineups) {
         return <div className="p-8 text-center text-text-muted">Carregando dados da partida...</div>;
     }
 
+    const { homeClub, awayClub } = matchContext;
+    const { homeStarters, awayStarters } = lineups;
     const { score, stats } = liveStats;
 
     return (
@@ -286,7 +278,7 @@ export const MatchLiveScreen: React.FC = () => {
                         {isFinished ? (
                             <div className="space-y-4 animate-in zoom-in duration-300">
                                 <h2 className="text-2xl font-bold text-text-primary">Fim de Jogo</h2>
-                                <Button size="lg" icon={ArrowLeft} onClick={() => setView("MATCH_RESULT")}>
+                                <Button size="lg" onClick={() => setView("MATCH_RESULT")}>
                                     Ver Resultados
                                 </Button>
                             </div>

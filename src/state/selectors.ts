@@ -208,3 +208,49 @@ export const selectLiveMatchStats = (
     match.awayClubId
   );
 };
+
+export const selectMatchContext = createSelector(
+  [
+    (state: GameState) => state.matches.matches,
+    (state: GameState) => state.clubs.clubs,
+    (_: GameState, matchId: string | null) => matchId,
+  ],
+  (matches, clubs, matchId) => {
+    if (!matchId || !matches[matchId]) return null;
+    const match = matches[matchId];
+
+    return {
+      match,
+      homeClub: clubs[match.homeClubId],
+      awayClub: clubs[match.awayClubId],
+    };
+  }
+);
+
+export const selectMatchLineups = createSelector(
+  [
+    (state: GameState) => state.matches.playerStats,
+    (_: GameState, matchId: string | null) => matchId,
+    (state: GameState, matchId: string | null) => {
+      if (!matchId || !state.matches.matches[matchId]) return null;
+      return {
+        homeId: state.matches.matches[matchId].homeClubId,
+        awayId: state.matches.matches[matchId].awayClubId,
+      };
+    },
+  ],
+  (playerStats, matchId, clubIds) => {
+    if (!matchId || !clubIds) return { homeStarters: [], awayStarters: [] };
+
+    const matchStats = Object.values(playerStats).filter(
+      (s) => s.matchId === matchId && s.isStarter
+    );
+
+    return {
+      homeStarters: matchStats.filter((s) => s.clubId === clubIds.homeId),
+      awayStarters: matchStats.filter((s) => s.clubId === clubIds.awayId),
+    };
+  }
+);
+
+export const selectAllPlayers = (state: GameState) => state.people.players;
