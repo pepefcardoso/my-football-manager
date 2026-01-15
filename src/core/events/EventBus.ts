@@ -10,32 +10,30 @@ type EventHandler<K extends GameEventKey> = (
 type Unsubscribe = () => void;
 
 class GameEventBus {
-  private listeners: Partial<Record<GameEventKey, EventHandler<any>[]>> = {};
+  private listeners: Partial<Record<GameEventKey, Set<EventHandler<any>>>> = {};
 
   public on<K extends GameEventKey>(
     event: K,
     handler: EventHandler<K>
   ): Unsubscribe {
     if (!this.listeners[event]) {
-      this.listeners[event] = [];
+      this.listeners[event] = new Set();
     }
-    this.listeners[event]!.push(handler);
+
+    this.listeners[event]!.add(handler);
 
     return () => this.off(event, handler);
   }
 
   public off<K extends GameEventKey>(event: K, handler: EventHandler<K>): void {
-    if (!this.listeners[event]) return;
+    const handlers = this.listeners[event];
+    if (!handlers) return;
 
-    const initialLength = this.listeners[event]!.length;
-    this.listeners[event] = this.listeners[event]!.filter((h) => h !== handler);
+    handlers.delete(handler);
 
-    if (this.listeners[event]!.length === 0) {
+    if (handlers.size === 0) {
       delete this.listeners[event];
-    }
-
-    if (this.listeners[event]?.length !== initialLength) {
-      logger.debug("EventBus", `Listener removido para: ${event}`);
+      // logger.debug("EventBus", `Chave limpa da memória: ${event}`);
     }
   }
 
@@ -45,23 +43,33 @@ class GameEventBus {
     payload: GameEventMap[K]
   ): void {
     const handlers = this.listeners[event];
-    if (handlers) {
-      [...handlers].forEach((handler) => {
-        try {
-          handler(state, payload);
-        } catch (error) {
-          logger.error("EventBus", `Erro ao processar evento ${event}`, error);
-        }
-      });
+
+    if (!handlers || handlers.size === 0) return;
+
+    for (const handler of handlers) {
+      try {
+        handler(state, payload);
+      } catch (error) {
+        logger.error(
+          "EventBus",
+          `❌ Erro crítico no handler do evento: ${event}`,
+          error
+        );
+      }
     }
   }
 
   public clear(): void {
     this.listeners = {};
-    logger.warn(
-      "EventBus",
-      "Todos os listeners foram removidos (Clear Total)."
-    );
+    logger.warn("EventBus", "♻️ EventBus purgado (Hard Reset).");
+  }
+
+  public getListenerCount(event: GameEventKey): number {
+    return this.listeners[event]?.size ?? 0;
+  }
+
+  public hasKey(event: GameEventKey): boolean {
+    return Object.prototype.hasOwnProperty.call(this.listeners, event);
   }
 }
 
