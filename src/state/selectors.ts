@@ -5,7 +5,9 @@ import {
   MatchStatsCalculator,
   LiveMatchStats,
 } from "../core/systems/MatchEngine/MatchStatsCalculator";
-import { MatchEvent } from "../core/models/match";
+import { MatchEvent, Match, PlayerMatchStats } from "../core/models/match";
+import { Player } from "../core/models/people";
+import { Club } from "../core/models/club";
 
 const selectClubsDomain = (state: GameState) => state.clubs;
 const selectMetaDomain = (state: GameState) => state.meta;
@@ -254,3 +256,66 @@ export const selectMatchLineups = createSelector(
 );
 
 export const selectAllPlayers = (state: GameState) => state.people.players;
+
+const selectMatchIdArg = (_: GameState, matchId: string | null) => matchId;
+
+export interface MatchScreenData {
+  match: Match;
+  homeClub: Club;
+  awayClub: Club;
+  homeStarters: PlayerMatchStats[];
+  awayStarters: PlayerMatchStats[];
+  playersMap: Record<string, Player>;
+}
+
+export const selectMatchLiveScreenData = createSelector(
+  [
+    selectMatchesMap,
+    (state: GameState) => state.clubs.clubs,
+    (state: GameState) => state.matches.playerStats,
+    selectPlayers,
+    selectMatchIdArg,
+  ],
+  (
+    matches: Record<ID, Match>,
+    clubs: Record<ID, Club>,
+    playerStats: Record<ID, PlayerMatchStats>,
+    allPlayers: Record<ID, Player>,
+    matchId: string | null
+  ): MatchScreenData | null => {
+    if (!matchId || !matches[matchId]) return null;
+
+    const match = matches[matchId];
+    const homeClub = clubs[match.homeClubId];
+    const awayClub = clubs[match.awayClubId];
+
+    const matchStats = Object.values(playerStats).filter(
+      (s) => s.matchId === matchId
+    );
+
+    const homeStarters = matchStats.filter(
+      (s) => s.clubId === match.homeClubId && s.isStarter
+    );
+    const awayStarters = matchStats.filter(
+      (s) => s.clubId === match.awayClubId && s.isStarter
+    );
+
+    const involvedStats = [...homeStarters, ...awayStarters];
+    const playersMap: Record<string, Player> = {};
+
+    involvedStats.forEach((stat) => {
+      if (allPlayers[stat.playerId]) {
+        playersMap[stat.playerId] = allPlayers[stat.playerId];
+      }
+    });
+
+    return {
+      match,
+      homeClub,
+      awayClub,
+      homeStarters,
+      awayStarters,
+      playersMap,
+    };
+  }
+);

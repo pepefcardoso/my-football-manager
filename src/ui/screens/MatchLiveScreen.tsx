@@ -12,11 +12,7 @@ import {
     Activity, Shield, MessageSquare, BarChart2
 } from "lucide-react";
 import { MatchEvent } from "../../core/models/match";
-import {
-    selectMatchContext,
-    selectMatchLineups,
-    selectAllPlayers
-} from "../../state/selectors";
+import { selectMatchLiveScreenData } from "../../state/selectors";
 
 interface EventRowProps {
     event: MatchEvent;
@@ -68,15 +64,9 @@ EventRow.displayName = "EventRow";
 export const MatchLiveScreen: React.FC = () => {
     const { setView, activeMatchId } = useUIStore();
 
-    const matchContext = useGameStore(
-        useShallow((state) => selectMatchContext(state, activeMatchId))
+    const matchData = useGameStore(
+        useShallow((state) => selectMatchLiveScreenData(state, activeMatchId))
     );
-
-    const lineups = useGameStore(
-        useShallow((state) => selectMatchLineups(state, activeMatchId))
-    );
-
-    const playersMap = useGameStore(selectAllPlayers);
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -108,13 +98,14 @@ export const MatchLiveScreen: React.FC = () => {
         }
     }, [visibleEvents.length]);
 
-    if (!matchContext || !lineups) {
+    if (!matchData) {
         return <div className="p-8 text-center text-text-muted">Carregando dados da partida...</div>;
     }
 
-    const { homeClub, awayClub } = matchContext;
-    const { homeStarters, awayStarters } = lineups;
+    const { homeClub, awayClub, homeStarters, awayStarters, playersMap } = matchData;
     const { score, stats } = liveStats;
+
+    const getPlayerName = (id: string) => playersMap[id]?.name || "Jogador";
 
     return (
         <div className="h-full flex flex-col bg-background animate-in fade-in duration-500 relative">
@@ -267,7 +258,7 @@ export const MatchLiveScreen: React.FC = () => {
                                 key={event.id}
                                 event={event}
                                 isHome={event.clubId === homeClub.id}
-                                playerName={playersMap[event.playerId]?.name || "Desconhecido"}
+                                playerName={getPlayerName(event.playerId)}
                             />
                         ))}
                     </div>
