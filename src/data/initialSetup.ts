@@ -6,6 +6,8 @@ import { ClubFactory, PlayerFactory } from "../core/utils/generators";
 import { ClubCompetitionSeason } from "../core/models/competition";
 import { getStandingIndexKey } from "../core/systems/CompetitionSystem";
 import { logger } from "../core/utils/Logger";
+import { Match } from "../core/models/match";
+import { indexMatchSchedule } from "../core/systems/MatchSystem";
 
 const BRAZIL_CLUBS_DATA = [
   {
@@ -181,6 +183,7 @@ const createEmptyState = (): GameState => ({
     positions: {},
     teamTactics: {},
     tempLineup: null,
+    scheduledMatches: {},
   },
   market: {
     contracts: {},
@@ -421,7 +424,7 @@ export const createNewGame = (): GameState => {
         const matchTime = new Date(roundDate);
         if (Math.random() > 0.7) matchTime.setHours(20, 0, 0, 0);
 
-        state.matches.matches[matchId] = {
+        const match: Match = {
           id: matchId,
           competitionGroupId: groupId,
           stadiumId: state.clubs.infras[matchPair.home].stadiumId,
@@ -439,6 +442,10 @@ export const createNewGame = (): GameState => {
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
+
+        state.matches.matches[matchId] = match;
+        
+        indexMatchSchedule(state, match);
       });
     });
 

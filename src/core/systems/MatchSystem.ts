@@ -11,10 +11,35 @@ import {
 import { eventBus } from "../events/EventBus";
 import { rng } from "../utils/generators";
 import { PlayerInjury } from "../models/stats";
+import { logger } from "../utils/Logger";
 
 export interface MatchSystemResult {
   matchesToday: Match[];
 }
+
+export const getDayKey = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime().toString();
+};
+
+export const indexMatchSchedule = (state: GameState, match: Match): void => {
+  if (match.status !== "SCHEDULED") return;
+
+  const key = getDayKey(match.datetime);
+
+  if (!state.matches.scheduledMatches) {
+    state.matches.scheduledMatches = {};
+  }
+
+  if (!state.matches.scheduledMatches[key]) {
+    state.matches.scheduledMatches[key] = [];
+  }
+
+  if (!state.matches.scheduledMatches[key].includes(match.id)) {
+    state.matches.scheduledMatches[key].push(match.id);
+  }
+};
 
 export const simulateSingleMatch = async (
   state: GameState,
@@ -31,39 +56,51 @@ export const simulateSingleMatch = async (
 
 export const processScheduledMatches = async (
   state: GameState
-): Promise<MatchSystemResult> => {
+): Promise<{ matchesToday: Match[] }> => {
   const matchesToday: Match[] = [];
-  const currentDateStart = new Date(state.meta.currentDate);
-  currentDateStart.setHours(0, 0, 0, 0);
-  const currentDayTime = currentDateStart.getTime();
+  const currentDayKey = getDayKey(state.meta.currentDate);
 
-  const matchIds = Object.keys(state.matches.matches);
+  const scheduledIds = state.matches.scheduledMatches?.[currentDayKey] || [];
 
-  for (const matchId of matchIds) {
+  if (scheduledIds.length === 0) {
+    return { matchesToday };
+  }
+
+  logger.debug(
+    "MatchSystem",
+    `📅 Encontrados ${scheduledIds.length} jogos agendados para hoje via índice.`
+  );
+
+  for (const matchId of scheduledIds) {
     const match = state.matches.matches[matchId];
 
-    if (!match) continue;
+    if (!match || match.status !== "SCHEDULED") continue;
 
-    const matchDate = new Date(match.datetime);
-    matchDate.setHours(0, 0, 0, 0);
+    if (getDayKey(match.datetime) !== currentDayKey) continue;
 
-    if (
-      matchDate.getTime() === currentDayTime &&
-      match.status === "SCHEDULED"
-    ) {
-      const isUserMatch =
-        match.homeClubId === state.meta.userClubId ||
-        match.awayClubId === state.meta.userClubId;
+    const isUserMatch =
+      match.homeClubId === state.meta.userClubId ||
+      match.awayClubId === state.meta.userClubId;
 
-      if (!isUserMatch) {
-        const homeContext = buildTeamContext(state, match.homeClubId);
-        const awayContext = buildTeamContext(state, match.awayClubId);
+    if (!isUserMatch) {
+      const homeContext = buildTeamContext(state, match.homeClubId);
+      const awayContext = buildTeamContext(state, match.awayClubId);
 
-        await simulateSingleMatch(state, match, homeContext, awayContext);
-
-        matchesToday.push(match);
-      }
+      await simulateSingleMatch(state, match, homeContext, awayContext);
+      matchesToday.push(match);
+    } else {
+      matchesToday.push(match);
     }
+  }
+
+  const remainingScheduled = scheduledIds.filter(
+    (id) => state.matches.matches[id]?.status === "SCHEDULED"
+  );
+
+  if (remainingScheduled.length === 0) {
+    delete state.matches.scheduledMatches[currentDayKey];
+  } else {
+    state.matches.scheduledMatches[currentDayKey] = remainingScheduled;
   }
 
   return { matchesToday };

@@ -375,6 +375,7 @@ export const GameStateSchema = z
       positions: z.record(IDSchema, z.any()),
       teamTactics: z.record(IDSchema, z.any()),
       tempLineup: TempLineupSchema,
+      scheduledMatches: z.record(z.string(), z.array(MatchIdSchema)).catch({}),
     }),
 
     competitions: z.object({
